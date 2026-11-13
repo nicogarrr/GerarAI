@@ -25,7 +25,9 @@ const CONNECTOR = readFileSync('data-engine/app/services/connectors/sp500_factsh
 const QUANT = readFileSync('data-engine/app/services/market_regime_quant.py', 'utf8');
 
 test('cada reason del backend de concentración tiene texto mapeado', () => {
-  const mapKeys = [...SRC.matchAll(/^ {2}([a-z0-9_]+): '/gm)].map((m) => m[1]);
+  const copy = JSON.parse(readFileSync('lib/i18n/messages/es/movers.json', 'utf8'));
+  const mapKeys = Object.keys(copy.regime.concentrationReasons);
+  for (const reason of mapKeys) assert.ok(SRC.includes(`movers.regime.concentrationReasons.${reason}`), `clave no conectada: ${reason}`);
   const backendReasons = new Set([
     ...[...CONNECTOR.matchAll(/REASON_\w+ = "([a-z0-9_]+)"/g)].map((m) => m[1]),
     ...[...QUANT.matchAll(/"reason": "([a-z0-9_]+)"/g)].map((m) => m[1]),

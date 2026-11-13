@@ -7,7 +7,9 @@ import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { formatNumber, type Formatters } from '@/lib/format';
 import { getFormat, getT } from '@/lib/i18n/server';
 import type { Locale } from '@/lib/i18n/locale';
-import type { TranslateFn } from '@/lib/i18n/translate';
+import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
+import type { TranslationKey } from '@/lib/i18n/t';
+import moversEs from '@/lib/i18n/messages/es/movers.json';
 
 /**
  * Vista «Régimen» de la seccion Mercado: pinta el ultimo snapshot de
@@ -19,18 +21,17 @@ import type { TranslateFn } from '@/lib/i18n/translate';
 /** «1 sesión» / «N sesiones»: concordancia es-ES del conteo de entrenamiento. */
 export function trainingSessionsText(count: number, locale: Locale = 'es'): string {
   const n = formatNumber(count, { maximumFractionDigits: 0 }, undefined, locale);
-  if (locale === 'en') return `${n} ${count === 1 ? 'session' : 'sessions'}`;
-  return `${n} ${count === 1 ? 'sesión' : 'sesiones'}`;
+  return createTranslator(locale)(count === 1 ? 'movers.regime.trainingSessionOne' : 'movers.regime.trainingSessionMany', { n });
 }
 
-const METRICAS: { key: keyof MarketRegime['metrics']; label: string; en: string }[] = [
-  { key: 'treasury_10y_us', label: 'Bono EE. UU. 10 años', en: 'US 10-year Treasury' },
-  { key: 'treasury_2y_us', label: 'Bono EE. UU. 2 años', en: 'US 2-year Treasury' },
-  { key: 'yield_curve_10y_2y_us', label: 'Curva 10 años − 2 años', en: '10-year − 2-year curve' },
-  { key: 'breakeven_10y_us', label: 'Inflación implícita 10 años', en: '10-year breakeven inflation' },
-  { key: 'high_yield_spread_us', label: 'Diferencial high yield', en: 'High-yield spread' },
-  { key: 'vix_us', label: 'VIX', en: 'VIX' },
-  { key: 'mortgage_30y_us', label: 'Hipoteca 30 años EE. UU.', en: 'US 30-year mortgage' },
+const METRICAS: { key: keyof MarketRegime['metrics']; labelKey: TranslationKey }[] = [
+  { key: 'treasury_10y_us', labelKey: 'movers.regime.metrics.treasury_10y_us' },
+  { key: 'treasury_2y_us', labelKey: 'movers.regime.metrics.treasury_2y_us' },
+  { key: 'yield_curve_10y_2y_us', labelKey: 'movers.regime.metrics.yield_curve_10y_2y_us' },
+  { key: 'breakeven_10y_us', labelKey: 'movers.regime.metrics.breakeven_10y_us' },
+  { key: 'high_yield_spread_us', labelKey: 'movers.regime.metrics.high_yield_spread_us' },
+  { key: 'vix_us', labelKey: 'movers.regime.metrics.vix_us' },
+  { key: 'mortgage_30y_us', labelKey: 'movers.regime.metrics.mortgage_30y_us' },
 ];
 
 /** Valor con la unidad declarada; unidades desconocidas se muestran tal cual. */
@@ -146,68 +147,54 @@ function TarjetaConcentracion({ top, t, fmt }: { top?: RegimeTopTen; t: Translat
 // operación: puede llevar rutas del servidor o nombres de variables de
 // entorno, p. ej. «SP500_FACTSHEET_DIR sin definir» o snapshots antiguos con
 // «/data/...»). En pantalla solo texto para la persona usuaria.
-const MOTIVO_CONCENTRACION_SIN_DATOS: Record<string, string> = {
-  no_snapshot_in_disk: 'El factsheet del S&P 500 aún no está cargado; aparecerá en la próxima sincronización.',
-  snapshot_dir_not_configured: 'El factsheet del S&P 500 no está disponible en este momento.',
-  snapshot_integrity_failed: 'El factsheet del S&P 500 no pasó la verificación de integridad; sin datos hasta la próxima sincronización.',
-  snapshot_vintage_after_requested_date: 'El factsheet disponible es posterior a la fecha consultada; no describe el índice en esa fecha.',
-  requested_date_invalid: 'Sin fecha de consulta válida no se puede leer el factsheet del S&P 500.',
-  snapshot_too_stale_for_requested_date: 'El último factsheet del S&P 500 es demasiado antiguo para la fecha de hoy; sin datos hasta que se actualice.',
-  index_weights_not_published_by_source: 'El factsheet no publica el peso de los mayores constituyentes.',
-};
-
-// Mismos motivos en inglés (Ajustes → Idioma); las claves son las del backend.
-const MOTIVO_CONCENTRACION_SIN_DATOS_EN: Record<string, string> = {
-  no_snapshot_in_disk: 'The S&P 500 factsheet is not loaded yet; it will appear at the next sync.',
-  snapshot_dir_not_configured: 'The S&P 500 factsheet is not available right now.',
-  snapshot_integrity_failed: 'The S&P 500 factsheet failed its integrity check; no data until the next sync.',
-  snapshot_vintage_after_requested_date: 'The available factsheet is later than the requested date; it does not describe the index on that date.',
-  requested_date_invalid: 'Without a valid requested date the S&P 500 factsheet cannot be read.',
-  snapshot_too_stale_for_requested_date: 'The latest S&P 500 factsheet is too old for today; no data until it is updated.',
-  index_weights_not_published_by_source: 'The factsheet does not publish the weight of the largest constituents.',
-};
 
 /**
  * Motivos y métodos que el motor declara en español (bloque HMM, beta de
  * cartera, curva 10a−2a). Con el inglés elegido se muestran traducidos; un
  * texto que no está en la lista se muestra tal cual.
  */
-const TEXTO_REGIMEN_EN: Record<string, string> = {
-  'sesiones discontinuas': 'non-consecutive sessions',
-  'varianza de benchmark nula': 'zero benchmark variance',
-  'universo de constituyentes incompleto': 'incomplete constituent universe',
-  'capitalizaciones positivas y fechadas incompletas': 'incomplete positive, dated market caps',
-  'historial insuficiente': 'not enough history',
-  'valores inválidos': 'invalid values',
-  'serie constante': 'constant series',
-  'ajuste no convergente': 'the fit did not converge',
-  'probabilidad inválida': 'invalid probability',
-  'modelo no disponible': 'model not available',
-  'observaciones recientes ausentes': 'no recent observations',
-  'sin posiciones o benchmark S&P 500': 'no positions or S&P 500 benchmark',
-  'benchmark S&P 500 sin cierres ajustados': 'S&P 500 benchmark without adjusted closes',
-  'La beta de tu cartera aún no está disponible.': 'Your portfolio beta is not available yet.',
-  'La beta de tu cartera aún no está disponible; el snapshot macro es global y no mezcla carteras.':
-    'Your portfolio beta is not available yet; the macro snapshot is global and does not mix portfolios.',
-  'HMM gaussiano de 2 estados; filtro hacia adelante; estados sin etiqueta económica':
-    '2-state Gaussian HMM; forward filter; states with no economic label',
-  'DGS10 menos DGS2 en la misma fecha': 'DGS10 minus DGS2 on the same date',
-  'cov(retorno activo, retorno S&P 500) / var(retorno S&P 500); cierres ajustados pareados':
-    'cov(active return, S&P 500 return) / var(S&P 500 return); paired adjusted closes',
-  'Probabilidades filtradas sin etiqueta económica; métricas faltantes indican sin datos.':
-    'Filtered probabilities with no economic label; missing metrics mean no data.',
-};
+// Se cruza el texto exacto del motor con claves del diccionario; los textos
+// nuevos o desconocidos siguen visibles, nunca se inventa una traducción.
+const TEXTO_REGIMEN_KEYS = new Map<string, TranslationKey>([
+  [moversEs.regime.backendText.nonConsecutiveSessions, 'movers.regime.backendText.nonConsecutiveSessions'],
+  [moversEs.regime.backendText.zeroBenchmarkVariance, 'movers.regime.backendText.zeroBenchmarkVariance'],
+  [moversEs.regime.backendText.incompleteConstituents, 'movers.regime.backendText.incompleteConstituents'],
+  [moversEs.regime.backendText.incompleteMarketCaps, 'movers.regime.backendText.incompleteMarketCaps'],
+  [moversEs.regime.backendText.insufficientHistory, 'movers.regime.backendText.insufficientHistory'],
+  [moversEs.regime.backendText.invalidValues, 'movers.regime.backendText.invalidValues'],
+  [moversEs.regime.backendText.constantSeries, 'movers.regime.backendText.constantSeries'],
+  [moversEs.regime.backendText.fitNotConverged, 'movers.regime.backendText.fitNotConverged'],
+  [moversEs.regime.backendText.invalidProbability, 'movers.regime.backendText.invalidProbability'],
+  [moversEs.regime.backendText.modelUnavailable, 'movers.regime.backendText.modelUnavailable'],
+  [moversEs.regime.backendText.missingRecentObservations, 'movers.regime.backendText.missingRecentObservations'],
+  [moversEs.regime.backendText.noPositionsOrBenchmark, 'movers.regime.backendText.noPositionsOrBenchmark'],
+  [moversEs.regime.backendText.benchmarkNoAdjustedCloses, 'movers.regime.backendText.benchmarkNoAdjustedCloses'],
+  [moversEs.regime.backendText.portfolioBetaUnavailable, 'movers.regime.backendText.portfolioBetaUnavailable'],
+  [moversEs.regime.backendText.globalMacroNoPortfolioMix, 'movers.regime.backendText.globalMacroNoPortfolioMix'],
+  [moversEs.regime.backendText.gaussianHmmMethod, 'movers.regime.backendText.gaussianHmmMethod'],
+  [moversEs.regime.backendText.yieldCurveMethod, 'movers.regime.backendText.yieldCurveMethod'],
+  [moversEs.regime.backendText.portfolioBetaMethod, 'movers.regime.backendText.portfolioBetaMethod'],
+  [moversEs.regime.backendText.filteredProbabilitiesNote, 'movers.regime.backendText.filteredProbabilitiesNote'],
+]);
+const MOTIVO_CONCENTRACION_SIN_DATOS = new Map<string, TranslationKey>([
+  ['no_snapshot_in_disk', 'movers.regime.concentrationReasons.no_snapshot_in_disk'],
+  ['snapshot_dir_not_configured', 'movers.regime.concentrationReasons.snapshot_dir_not_configured'],
+  ['snapshot_integrity_failed', 'movers.regime.concentrationReasons.snapshot_integrity_failed'],
+  ['snapshot_vintage_after_requested_date', 'movers.regime.concentrationReasons.snapshot_vintage_after_requested_date'],
+  ['requested_date_invalid', 'movers.regime.concentrationReasons.requested_date_invalid'],
+  ['snapshot_too_stale_for_requested_date', 'movers.regime.concentrationReasons.snapshot_too_stale_for_requested_date'],
+  ['index_weights_not_published_by_source', 'movers.regime.concentrationReasons.index_weights_not_published_by_source'],
+]);
 
 export function textoRegimen(text: string, locale: Locale = 'es'): string {
-  return locale === 'en' ? (TEXTO_REGIMEN_EN[text] ?? text) : text;
+  const key = TEXTO_REGIMEN_KEYS.get(text);
+  return locale === 'en' && key ? createTranslator(locale)(key) : text;
 }
 
 function motivoConcentracionSinDatos(top?: RegimeTopTen, locale: Locale = 'es') {
   if (!top?.reason && !top?.detail) return null;
-  const motivo = locale === 'en'
-    ? ((top.reason && MOTIVO_CONCENTRACION_SIN_DATOS_EN[top.reason]) ?? 'The S&P 500 factsheet is not available right now.')
-    : ((top.reason && MOTIVO_CONCENTRACION_SIN_DATOS[top.reason])
-    ?? 'El factsheet del S&P 500 no está disponible en este momento.');
+  const key = top.reason ? MOTIVO_CONCENTRACION_SIN_DATOS.get(top.reason) : undefined;
+  const motivo = createTranslator(locale)(key ?? 'movers.regime.concentrationReasons.snapshot_dir_not_configured');
   return <p className="text-xs text-gray-500">{motivo}</p>;
 }
 
@@ -240,7 +227,7 @@ export async function MarketRegimeVista() {
     if (error && isBackendUnavailableError(error)) {
       return <BackendOffline as="section" feature={t('movers.regime.feature')} retryHref="/screener?vista=regimen" />;
     }
-    throw error ?? new Error('Sin respuesta de régimen de mercado');
+    throw error ?? new Error(t('movers.regime.noResponse'));
   }
   const estado = estadoBadge(regimen.status, t);
   const sinSnapshot = !regimen.date;
@@ -263,10 +250,10 @@ export async function MarketRegimeVista() {
       ) : (
         <>
           <div className="grid min-w-0 grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
-            {METRICAS.map(({ key, label, en: labelEn }) => (
+            {METRICAS.map(({ key, labelKey }) => (
               <TarjetaMetrica
                 key={key}
-                label={fmt.locale === 'en' ? labelEn : label}
+                label={t(labelKey)}
                 t={t}
                 fmt={fmt}
                 metrica={regimen.metrics[key] as RegimeObservedMetric | RegimeComputedMetric | undefined}

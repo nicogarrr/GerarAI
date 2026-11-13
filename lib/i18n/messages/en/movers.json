@@ -31,6 +31,48 @@
     },
     "feature": "Market",
     "generated": "generated {datetime}",
-    "empty": "No data yet — it will show here as soon as there is a regime snapshot."
+    "empty": "No data yet — it will show here as soon as there is a regime snapshot.",
+    "metrics": {
+      "treasury_10y_us": "US 10-year Treasury",
+      "treasury_2y_us": "US 2-year Treasury",
+      "yield_curve_10y_2y_us": "10-year − 2-year curve",
+      "breakeven_10y_us": "10-year breakeven inflation",
+      "high_yield_spread_us": "High-yield spread",
+      "vix_us": "VIX",
+      "mortgage_30y_us": "US 30-year mortgage"
+    },
+    "concentrationReasons": {
+      "no_snapshot_in_disk": "The S&P 500 factsheet is not loaded yet; it will appear at the next sync.",
+      "snapshot_dir_not_configured": "The S&P 500 factsheet is not available right now.",
+      "snapshot_integrity_failed": "The S&P 500 factsheet failed its integrity check; no data until the next sync.",
+      "snapshot_vintage_after_requested_date": "The available factsheet is later than the requested date; it does not describe the index on that date.",
+      "requested_date_invalid": "Without a valid requested date the S&P 500 factsheet cannot be read.",
+      "snapshot_too_stale_for_requested_date": "The latest S&P 500 factsheet is too old for today; no data until it is updated.",
+      "index_weights_not_published_by_source": "The factsheet does not publish the weight of the largest constituents."
+    },
+    "backendText": {
+      "nonConsecutiveSessions": "non-consecutive sessions",
+      "zeroBenchmarkVariance": "zero benchmark variance",
+      "incompleteConstituents": "incomplete constituent universe",
+      "incompleteMarketCaps": "incomplete positive, dated market caps",
+      "insufficientHistory": "not enough history",
+      "invalidValues": "invalid values",
+      "constantSeries": "constant series",
+      "fitNotConverged": "the fit did not converge",
+      "invalidProbability": "invalid probability",
+      "modelUnavailable": "model not available",
+      "missingRecentObservations": "no recent observations",
+      "noPositionsOrBenchmark": "no positions or S&P 500 benchmark",
+      "benchmarkNoAdjustedCloses": "S&P 500 benchmark without adjusted closes",
+      "portfolioBetaUnavailable": "Your portfolio beta is not available yet.",
+      "globalMacroNoPortfolioMix": "Your portfolio beta is not available yet; the macro snapshot is global and does not mix portfolios.",
+      "gaussianHmmMethod": "2-state Gaussian HMM; forward filter; states with no economic label",
+      "yieldCurveMethod": "DGS10 minus DGS2 on the same date",
+      "portfolioBetaMethod": "cov(active return, S&P 500 return) / var(S&P 500 return); paired adjusted closes",
+      "filteredProbabilitiesNote": "Filtered probabilities with no economic label; missing metrics mean no data."
+    },
+    "trainingSessionOne": "{n} session",
+    "trainingSessionMany": "{n} sessions",
+    "noResponse": "No market regime response"
   }
 }
