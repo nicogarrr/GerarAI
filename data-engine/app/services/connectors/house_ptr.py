@@ -230,6 +230,11 @@ def parse_ptr_text(text: str) -> dict[str, Any]:
             # Cualquier campo (D, C, S O...) puede partirse en varias lineas.
             after_free_text = True
             continue
+        if after_free_text and _OWNER_START.match(line):
+            # Un titular explicito SP/JT/DC abre una fila nueva, aunque su
+            # importe no se pueda leer. Lo anterior era cola del comentario.
+            buffer = []
+            after_free_text = False
         buffer.append(line)
         joined = re.sub(r"\s+", " ", " ".join(buffer))
         match = _ROW.match(joined)
@@ -267,6 +272,10 @@ def parse_ptr_text(text: str) -> dict[str, Any]:
             **parse_amount(match.group("amount")),
         })
         buffer = []
+    # La ultima fila tambien cuenta aunque no haya otro metadato que cierre
+    # su bloque. Las continuaciones de comentarios no son operaciones.
+    if buffer and not after_free_text:
+        unparsed += 1
     return {
         "member": name.group(1).strip() if name else None,
         "status": status.group(1).strip() if status else None,

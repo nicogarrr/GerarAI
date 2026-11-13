@@ -194,3 +194,39 @@ def test_importe_exacto_solo_redondea_si_hay_centimos(text, low, high):
     """Los ceros decimales no convierten un importe exacto en una horquilla."""
     parsed = hp.parse_amount(text)
     assert (parsed["amount_min"], parsed["amount_max"]) == (low, high)
+
+
+@pytest.mark.parametrize("tail", ["", "\n* For the complete list of asset types, see instructions"])
+def test_parse_ptr_cuenta_ultima_fila_ilegible(tail):
+    text = (
+        "ID Owner Asset Transaction Type Date Notification Date Amount\n"
+        "$200?\n"
+        "SP Empresa (ABC) [ST] P 03/01/2025 03/02/2025 importe ilegible"
+        + tail
+    )
+    parsed = hp.parse_ptr_text(text)
+    assert parsed["trades"] == []
+    assert parsed["unparsed_blocks"] == 1
+
+
+def test_parse_ptr_no_cuenta_comentario_final_como_fila_ilegible():
+    text = (
+        "ID Owner Asset Transaction Type Date Notification Date Amount\n"
+        "$200?\n"
+        "C : Comentario del declarante\n"
+        "que sigue en otra linea\n"
+    )
+    assert hp.parse_ptr_text(text)["unparsed_blocks"] == 0
+
+
+@pytest.mark.parametrize("owner", ["SP", "JT", "DC"])
+@pytest.mark.parametrize("end", ["", "\nD : Nueva descripcion"])
+def test_parse_ptr_fila_ilegible_tras_comentario(owner, end):
+    text = (
+        "ID Owner Asset Transaction Type Date Notification Date Amount\n"
+        "$200?\nC : Comentario\ncontinuacion del comentario\n"
+        f"{owner} Empresa (ABC) [ST] P 03/01/2025 03/02/2025 importe ilegible{end}"
+    )
+    parsed = hp.parse_ptr_text(text)
+    assert parsed["trades"] == []
+    assert parsed["unparsed_blocks"] == 1
