@@ -67,7 +67,8 @@ def normalize_ipo_row(row: dict[str, Any], status: str) -> dict[str, Any]:
     aun no lo publica) y la pagina lo dice.
     """
     symbol = str(row.get("proposedTickerSymbol") or "").strip().upper()
-    day = _parse_us_date(row.get("pricedDate") or row.get("expectedPriceDate"))
+    date_field = "pricedDate" if status == "priced" else "expectedPriceDate"
+    day = _parse_us_date(row.get(date_field))
     return {
         "deal_id": row.get("dealID"),
         "symbol": symbol or None,
