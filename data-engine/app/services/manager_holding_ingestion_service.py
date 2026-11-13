@@ -430,7 +430,7 @@ class ManagerHoldingIngestionService:
                         value_usd_thousands=_decimal(row.get("value_usd_thousands")),
                         value_scale=scale_info["scale"],
                         shares=_decimal(row.get("ssh_prnamt")),
-                        share_type=(row.get("ssh_prnamt_type") or "SH").strip(),
+                        share_type=(row.get("ssh_prnamt_type") or "UNKNOWN").strip().upper() or "UNKNOWN",
                         put_call=put_call,
                         investment_discretion=(row.get("investment_discretion") or "").strip(),
                         voting_sole=_decimal(row.get("voting_sole")),
@@ -803,7 +803,7 @@ class ManagerHoldingIngestionService:
                         else None
                     ),
                     "shares": float(row.shares) if row.shares is not None else None,
-                    "share_type": row.share_type,
+                    "share_type": row.share_type if row.share_type in {"SH", "PRN"} else None,
                     "put_call": row.put_call or None,
                     "investment_discretion": row.investment_discretion,
                     "filing_url": row.filing_url,
