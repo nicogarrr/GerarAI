@@ -17,6 +17,7 @@ jamás una ponderación inventada.
 """
 from __future__ import annotations
 
+import math
 import re
 import threading
 import time
@@ -214,6 +215,17 @@ def _agency_filter(agency_name: str, start: str, end: str) -> dict:
     }
 
 
+def _reported_amount(value: Any) -> float | None:
+    """Missing/invalid is not zero; negative obligations can be real reversals."""
+    if value is None or isinstance(value, bool):
+        return None
+    try:
+        amount = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return amount if math.isfinite(amount) else None
+
+
 def fetch_agency_obligations(agency_name: str, start: str, end: str) -> float:
     """Obligaciones (contratos + ayudas) de la agencia en la ventana.
 
@@ -230,7 +242,10 @@ def fetch_agency_obligations(agency_name: str, start: str, end: str) -> float:
     results = data.get("results") or []
     if not results:
         raise RuntimeError("USAspending no devolvió obligaciones para la ventana")
-    return float(results[0]["aggregated_amount"])
+    amount = _reported_amount(results[0].get("aggregated_amount"))
+    if amount is None:
+        raise ValueError("USAspending no devolvió un importe verificable")
+    return amount
 
 
 def fetch_top_categories(agency_name: str, start: str, end: str, limit: int = 8) -> list[dict]:
@@ -262,7 +277,7 @@ def aggregate_recipients(results: list[dict], top: int = 12) -> list[dict]:
     (p. ej. LOCKHEED MARTIN CORPORATION aparece con varios recipient_id); sin
     esta agregación el mismo gastador saldría tres veces.
     """
-    totals: dict[str, float] = {}
+    totals: dict[str, float | None] = {}
     display: dict[str, str] = {}
     for row in results:
         name = (row.get("name") or "").strip()
@@ -271,10 +286,12 @@ def aggregate_recipients(results: list[dict], top: int = 12) -> list[dict]:
         key = normalize_recipient(name)
         if not key:
             continue
-        # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
-        totals[key] = totals.get(key, 0.0) + float(row.get("amount") or 0.0)
+        amount = _reported_amount(row.get("amount"))
+        previous = totals.get(key, 0.0)
+        total = previous + amount if previous is not None and amount is not None else None
+        totals[key] = total if total is not None and math.isfinite(total) else None
         display.setdefault(key, name)
-    ordered = sorted(totals.items(), key=lambda item: item[1], reverse=True)[:top]
+    ordered = sorted(totals.items(), key=lambda item: (item[1] is not None, item[1] or 0), reverse=True)[:top]
     return [{"name": display[key], "amount": amount} for key, amount in ordered]
 
 
@@ -518,8 +535,7 @@ def build_usaspending_theme(
             label = PSC_LABELS_ES.get(code, row.get("name") or code)
             destinations.append({
                 "label": label,
-                # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
-                "amount": float(row.get("amount") or 0.0),
+                "amount": _reported_amount(row.get("amount")),
                 "unit": "USD",
                 "source": {
                     "kind": KIND_REPORTADO,
@@ -536,7 +552,7 @@ def build_usaspending_theme(
             suppliers.append({
                 "ticker": ticker,
                 "name": row["name"],
-                "amount": float(row["amount"]),
+                "amount": row["amount"],
                 "unit": "USD",
                 "reason": note
                 or ("Sin mapeo a ticker declarado" if ticker is None else "Contratista según USAspending"),
@@ -555,16 +571,23 @@ def build_usaspending_theme(
         spenders[0]["note"] = "USAspending no disponible ahora mismo"
     # (5) cobertura declarada: los tops son "principales", no el total
     total_amount = spenders[0]["amount"]
+    missing_destinations = sum(item["amount"] is None for item in destinations)
+    missing_suppliers = sum(item["amount"] is None for item in suppliers)
+    if missing_destinations or missing_suppliers:
+        notes.append(
+            f"USAspending: {missing_destinations} categorías y {missing_suppliers} destinatarios "
+            "sin importe verificable; no se sustituyen por cero ni se afirma cobertura completa."
+        )
     if total_amount:
-        psc_sum = sum(item["amount"] for item in destinations)
+        psc_sum = sum(item["amount"] for item in destinations if item["amount"] is not None)
         rec_sum = sum(item["amount"] for item in suppliers if item["amount"] is not None)
         destinations_note = (
             f"Principales categorías: cubren el {psc_sum / total_amount * 100:.0f} % de lo obligado"
-            if destinations else None
+            if destinations and not missing_destinations else None
         )
         suppliers_note = (
             f"Principales recipientes: cubren el {rec_sum / total_amount * 100:.0f} % de lo obligado"
-            if suppliers else None
+            if suppliers and not missing_suppliers else None
         )
     else:
         destinations_note = None
