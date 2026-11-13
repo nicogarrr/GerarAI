@@ -168,6 +168,8 @@ def parse_dataset(source: str | IO[bytes], cusips: set[str], *, url: str = "") -
             # vendió todo. El job conserva el snapshot previo al fallar.
             if not amount.is_finite():
                 raise ValueError("Cantidad 13F no finita: cartera no verificable")
+            if amount < 0:
+                raise ValueError("Cantidad 13F negativa: cartera no verificable")
             if amount > 0:
                 filing.shares[cusip] = filing.shares.get(cusip, Decimal(0)) + amount
     return DatasetParse(url, filings)
