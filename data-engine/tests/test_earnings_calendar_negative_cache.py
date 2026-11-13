@@ -43,7 +43,7 @@ def test_failed_days_are_not_refetched_within_ttl(monkeypatch):
 
     first, second, first_s, second_s = asyncio.run(two_views())
     assert len(calls) == 3  # la segunda vista no vuelve a la red
-    assert first == second == ([], [f"2026-11-0{d}: calendario no disponible" for d in (2, 3, 4)])
+    assert first == second == ([], [f"2026-11-0{d}: calendario no disponible" for d in (2, 3, 4)], [])
     assert first_s >= 0.2 and second_s < 0.05
 
     # Pasado el TTL se reintenta y un dia que vuelve se cachea como siempre.
@@ -53,6 +53,6 @@ def test_failed_days_are_not_refetched_within_ttl(monkeypatch):
         calls.append(day)
         return [{"symbol": "AAPL", "date": day.isoformat()}]
 
-    events, errors = asyncio.run(ec._fetch_days(up, DAY, DAY, None, kind="neg-test"))  # noqa: SLF001
+    events, errors, _stale_days = asyncio.run(ec._fetch_days(up, DAY, DAY, None, kind="neg-test"))  # noqa: SLF001
     assert errors == [] and events == [{"symbol": "AAPL", "date": "2026-11-02"}]
     assert ("neg-test", DAY) not in ec._day_failures  # noqa: SLF001
