@@ -184,8 +184,8 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                 {t('ownership.page.coverage', { value: holdings.coverage ?? NA })}
                             </Badge>
                         </div>
-                        {holdingsVerificationNote(holdings.status) ? (
-                            <p className="mt-2 text-sm text-amber-300">{holdingsVerificationNote(holdings.status)}</p>
+                        {holdingsVerificationNote(holdings.status, fmt.locale) ? (
+                            <p className="mt-2 text-sm text-amber-300">{holdingsVerificationNote(holdings.status, fmt.locale)}</p>
                         ) : null}
                         <div className="mt-4 space-y-3 md:hidden">
                             {holdings.holdings.map((row) => (
