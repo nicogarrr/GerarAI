@@ -6,6 +6,7 @@ distintas (cotizacion en vivo vs cierres de BD)."""
 
 from __future__ import annotations
 
+import math
 from collections.abc import Collection
 from types import SimpleNamespace
 
@@ -163,7 +164,9 @@ def compute_session_changes(
             # las cuentas sean USD): el precio se muestra en ESA divisa.
             listed = listing_price(close, quote_currency=quote_currency, company=company)
             if listed is not None:
-                normalized, currency = listed
+                candidate, currency = listed
+                if candidate.is_finite() and candidate > 0:
+                    normalized = candidate
         return {
             "ticker": ticker,
             "name": name,
@@ -293,7 +296,7 @@ def ticker_close_change(db: Session, company_id: int) -> dict | None:
         return None
     currency = last_listed[1]
     last, prev = float(last_listed[0]), float(prev_listed[0])
-    if last <= 0 or prev <= 0:
+    if not math.isfinite(last) or not math.isfinite(prev) or last <= 0 or prev <= 0:
         return None
     return {
         "currency": currency,
