@@ -17,6 +17,7 @@ from __future__ import annotations
 import re
 import time
 from datetime import date
+from datetime import time as clock_time
 from html import unescape
 from typing import Any
 
@@ -132,7 +133,15 @@ def parse_bls_ics(text: str) -> list[dict[str, Any]]:
                 except ValueError:
                     day = None
                 if day is not None:
-                    time_et = f"{stamp.group(4)}:{stamp.group(5)}" if stamp.group(4) else None
+                    time_et = None
+                    if stamp.group(4):
+                        clock = re.search(r"T(\d{2})(\d{2})(\d{2})?", current.get("DTSTART", ""))
+                        try:
+                            valid_clock = clock_time(int(clock.group(1)), int(clock.group(2)), int(clock.group(3) or 0))
+                        except ValueError:
+                            pass
+                        else:
+                            time_et = valid_clock.strftime("%H:%M")
                     events.append({"title": summary, "date": day.isoformat(), "time_et": time_et})
             current = None
         elif current is not None and ":" in line:
