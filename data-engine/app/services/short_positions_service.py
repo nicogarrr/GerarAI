@@ -36,6 +36,7 @@ def read_shorts(db: Session, company: Company) -> dict:
     invalid_stamp = bool(payload) and (stamp is None or stamp > now)
     stale = bool(stamp and now - stamp > timedelta(days=4))
     invalid_date = False
+    stale_settlement = False
     if payload.get("source") == "FINRA":
         try:
             trade_date = date.fromisoformat(payload["date"])
@@ -48,11 +49,15 @@ def read_shorts(db: Session, company: Company) -> dict:
             try:
                 settlement = date.fromisoformat(interest["settlement_date"])
                 invalid_date = invalid_date or settlement > now.date()
+                # Same conservative freshness window used by FINRA alerts.
+                # A new daily-volume observation cannot rejuvenate this series.
+                stale_settlement = now.date() - settlement > timedelta(days=35)
+                stale = stale or stale_settlement
             except (KeyError, TypeError, ValueError):
                 invalid_date = True
     return {"ticker": company.ticker, "status": "degraded" if invalid_stamp or invalid_date or (state and state.consecutive_errors) else "stale" if stale else "available" if payload else "empty",
             "fetched_at": stamp.isoformat() if stamp else None, "data": payload or None,
-            "reason": "Fecha de consulta ausente o futura: no se puede verificar la antigüedad del dato guardado." if invalid_stamp else "Fecha FINRA ausente, inválida o futura: no se puede verificar la vigencia del dato guardado." if invalid_date else "No hay mapeo revisado para esta bolsa o empresa." if state and state.last_error == "UnsupportedMarket" else "La fuente no devolvió datos verificables; el dato anterior conserva su fecha." if state and state.consecutive_errors else "Consulta o fecha de negociación fuera del límite de 4 días." if stale else "No hay consulta almacenada. Usa Actualizar para consultar la fuente pública." if not payload else None}
+            "reason": "Fecha de consulta ausente o futura: no se puede verificar la antigüedad del dato guardado." if invalid_stamp else "Fecha FINRA ausente, inválida o futura: no se puede verificar la vigencia del dato guardado." if invalid_date else "No hay mapeo revisado para esta bolsa o empresa." if state and state.last_error == "UnsupportedMarket" else "La fuente no devolvió datos verificables; el dato anterior conserva su fecha." if state and state.consecutive_errors else "Fecha de liquidación FINRA de hace más de 35 días; el volumen diario conserva su propia fecha." if stale_settlement else "Consulta o fecha de negociación fuera del límite de 4 días." if stale else "No hay consulta almacenada. Usa Actualizar para consultar la fuente pública." if not payload else None}
 
 
 
