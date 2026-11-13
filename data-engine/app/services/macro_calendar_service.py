@@ -29,22 +29,25 @@ BLS_RELEASES: dict[str, tuple[str, str]] = {
     "Employment Cost Index": ("eci", "Índice de costes laborales"),
 }
 
-_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
+_cache: dict[str, tuple[float, list[dict[str, Any]], str]] = {}
 
 
 def clear_cache() -> None:
     _cache.clear()
 
 
-async def _cached(key: str, loader, *, use_cache: bool) -> list[dict[str, Any]]:
+async def _cached(key: str, loader, *, use_cache: bool) -> tuple[list[dict[str, Any]], str]:
     now = time.monotonic()
     hit = _cache.get(key)
     if use_cache and hit and now - hit[0] < CACHE_TTL_SECONDS:
-        return hit[1]
+        return hit[1], hit[2]
     value = await loader()
+    # A cached calendar retains the actual source read time, not the time
+    # of each later API request that happens to reuse it.
+    fetched_at = datetime.now(UTC).isoformat()
     if use_cache:
-        _cache[key] = (now, value)
-    return value
+        _cache[key] = (now, value, fetched_at)
+    return value, fetched_at
 
 
 def _fomc_event(raw: dict[str, Any]) -> dict[str, Any]:
@@ -99,7 +102,7 @@ async def get_macro_events(
 
     async def run(name: str, url: str, loader, convert) -> tuple[dict[str, Any], list[dict[str, Any]]]:
         try:
-            rows = await _cached(name, loader, use_cache=use_cache)
+            rows, source_fetched_at = await _cached(name, loader, use_cache=use_cache)
         except (httpx.HTTPError, ValueError):
             return (
                 {"name": name, "url": url, "status": "unavailable", "fetched_at": fetched_at,
@@ -116,7 +119,7 @@ async def get_macro_events(
         if status == "ready" and covered_until is not None and end.isoformat() > covered_until:
             status = "partial"
         return (
-            {"name": name, "url": url, "status": status, "fetched_at": fetched_at,
+            {"name": name, "url": url, "status": status, "fetched_at": source_fetched_at,
              "covered_until": covered_until},
             converted,
         )
