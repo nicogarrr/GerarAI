@@ -123,6 +123,8 @@ def parse_dataset(source: str | IO[bytes], cusips: set[str]) -> dict[str, FundRe
                 if rep_ is None or _get(index, row, "UNIT").upper() != "NS" or _get(index, row, "PAYOFF_PROFILE").lower() != "long":
                     continue
                 shares = _dec(_get(index, row, "BALANCE"))
+                if shares is not None and not shares.is_finite():
+                    raise ValueError("Cantidad N-PORT no finita: cartera no verificable")
                 if not shares or shares <= 0:
                     continue
                 rep_.shares[cusip] = rep_.shares.get(cusip, Decimal(0)) + shares
