@@ -447,7 +447,7 @@ def _month_back(day: date) -> date:
     return date(year, month, min(day.day, last_prev.day))
 
 
-def _bars(candles: dict | None) -> list[tuple[date, float]]:
+def _bars(candles: dict | None, as_of: date | None = None) -> list[tuple[date, float]]:
     """Pares (fecha UTC, cierre) validos y ordenados; descarta cierres no finitos o <= 0."""
     if not candles or candles.get("s") != "ok":
         return []
@@ -458,7 +458,7 @@ def _bars(candles: dict | None) -> list[tuple[date, float]]:
             when = datetime.fromtimestamp(int(ts), tz=UTC).date()
         except (TypeError, ValueError, OverflowError, OSError):
             continue
-        if math.isfinite(value) and value > 0:
+        if math.isfinite(value) and value > 0 and (as_of is None or when <= as_of):
             out.append((when, value))
     out.sort(key=lambda pair: pair[0])
     return out
@@ -487,7 +487,7 @@ def symbol_returns(candles: dict | None, session: date) -> dict:
     ultimo cierre anterior al 1 de enero de ese año. 1M = frente al ultimo cierre de hace
     un mes (hasta 7 dias antes de esa fecha; mas atras es un hueco, no un dato).
     """
-    bars = _bars(candles)
+    bars = _bars(candles, session)
     result: dict = {"last_date": None, "ytd": None, "m1": None}
     if not bars:
         return result
@@ -521,7 +521,10 @@ def compute_themes(
 ) -> dict:
     """Ranking de temas a partir de velas ya descargadas (puro: sin red ni reloj)."""
     baskets = baskets if baskets is not None else BASKETS
-    last_dates = [bars[-1][0] for bars in (_bars(c) for c in candles.values()) if bars]
+    generated_at = generated_at or datetime.now(UTC)
+    last_dates = [bars[-1][0] for bars in (
+        _bars(c, generated_at.astimezone(UTC).date()) for c in candles.values()
+    ) if bars]
     universe = all_symbols(baskets)
     if not last_dates:
         return {
