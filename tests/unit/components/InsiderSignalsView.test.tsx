@@ -155,6 +155,8 @@ describe('InsiderSignalsView', () => {
     it('señales sin fecha de lectura no inventan fecha', () => {
         render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals({ provenance: undefined })} initialFilings={filings([])} />);
         expect(screen.getByText(/datos al/)).toBeInTheDocument();
+        // El prefijo «datos al» sale una sola vez: la fecha llega a pelo, sin otro asOf dentro.
+        expect(screen.queryByText(/datos al Datos al/)).not.toBeInTheDocument();
     });
 
     it('filings: transacciones, derivados, 10b5-1, vacíos y enmienda', () => {
