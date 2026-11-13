@@ -162,7 +162,7 @@ class CompanyEventsService:
             payload = await self._calendar_fetcher(
                 chunk_start.isoformat(), chunk_end.isoformat()
             )
-            if payload is None:
+            if not isinstance(payload, dict) or not isinstance(payload.get("earningsCalendar"), list):
                 continue
             calendar_chunks_ok += 1
             for row in payload.get("earningsCalendar") or []:
