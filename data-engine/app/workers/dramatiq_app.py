@@ -1375,6 +1375,28 @@ def backfill_document_kpis() -> dict[str, Any]:
 RECOMPUTE_METRICS_CHUNK = 60
 
 
+RECOMPUTE_CHAIN_DELAY_MS = 30_000
+
+
+def _send_next_recompute_chunk(tenant_id, user_id, start_from: str, limit: int) -> None:
+    """Encola el chunk siguiente del barrido sin que la cola KPI llena lo corte.
+
+    La admision acotada de `kpis` esta pensada para documentos nuevos. Este
+    mensaje continua trabajo YA aceptado: si la cola esta llena (o sin
+    consumidor) `send` lanza QueueCapacityError y el barrido se perdia hasta
+    el cron del dia siguiente. Los envios con delay no pasan por la admision
+    (igual que retries/promociones), asi que se reintenta asi."""
+    try:
+        recompute_fundamental_metrics.send(tenant_id, user_id, start_from=start_from, limit=limit)
+    except QueueCapacityError:
+        logger.warning("recompute_fundamental_metrics: cola KPI llena; siguiente chunk con delay (cursor=%s)", start_from)
+        recompute_fundamental_metrics.send_with_options(
+            args=(tenant_id, user_id),
+            kwargs={"start_from": start_from, "limit": limit},
+            delay=RECOMPUTE_CHAIN_DELAY_MS,
+        )
+
+
 @dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=KPI_QUEUE_NAME)
 def recompute_fundamental_metrics(
     tenant_id: int | None = None,
@@ -1455,7 +1477,7 @@ def recompute_fundamental_metrics(
             # ultimo ticker visto. Sin coalesce a proposito: cada chunk es
             # trabajo distinto y no debe suprimir al siguiente.
             next_cursor = companies[-1].ticker
-            recompute_fundamental_metrics.send(tenant_id, user_id, start_from=next_cursor, limit=limit)
+            _send_next_recompute_chunk(tenant_id, user_id, next_cursor, limit)
         return {
             "status": _batch_status(processed, errors),
             "actor": actor_name,
