@@ -96,6 +96,9 @@ export type IpoCalendar = {
     count: number;
     events: IpoEvent[];
     errors: string[];
+    // Meses servidos desde copia guardada (>1 h, actualización pendiente o
+    // fallida): la página lo declara, nunca lo disimula.
+    stale_months?: string[];
 };
 
 /** GET /api/calendar/ipos — salidas a bolsa US del mes en curso y el siguiente (NASDAQ público). */
