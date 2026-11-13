@@ -5,7 +5,10 @@ vi.mock('@/lib/actions/email-alerts.actions', () => ({
     getEmailAlertStatus: vi.fn(),
     setEmailAlertPreference: vi.fn(),
 }));
-vi.mock('@/lib/i18n/client', () => ({ useT: () => (key: string) => key }));
+// Match useT's stable callback identity. A new function each render would
+// retrigger refresh's effect, consume queued statuses and erase write errors.
+const { translate } = vi.hoisted(() => ({ translate: (key: string) => key }));
+vi.mock('@/lib/i18n/client', () => ({ useT: () => translate }));
 
 import EmailNotifications from '@/components/alerts/EmailNotifications';
 import { getEmailAlertStatus, setEmailAlertPreference } from '@/lib/actions/email-alerts.actions';
