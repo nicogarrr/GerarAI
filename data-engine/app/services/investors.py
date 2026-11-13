@@ -122,7 +122,7 @@ def _latest_view(db: Session, manager: FundManager) -> list[ManagerHolding]:
 
 def _total(rows: list[ManagerHolding]) -> float | None:
     values = [r.value_usd_thousands for r in rows if r.value_usd_thousands is not None]
-    if not values:
+    if not values or len(values) != len(rows):
         return None
     return float(sum(values, Decimal(0)))
 
@@ -184,7 +184,9 @@ def _latest_summaries(
         accession = _latest_accession(rows)
         view = [r for r in rows if r.accession_number == accession]
         values = [r.value_usd_thousands for r in view if r.value_usd_thousands is not None]
-        summaries[manager_id] = (len(view), float(sum(values, Decimal(0))) if values else None)
+        summaries[manager_id] = (
+            len(view), float(sum(values, Decimal(0))) if values and len(values) == len(view) else None,
+        )
     return summaries
 
 
@@ -211,7 +213,10 @@ def list_investors(db: Session) -> dict[str, Any]:
                 else None,
                 "positions": positions or None,
                 "value_usd_thousands": value,
-                "note": None if inv.cik else NO_13F_NOTE,
+                "note": (
+                    "Valor total incompleto: faltan importes declarados de algunas posiciones; no se calculan pesos con un subtotal."
+                    if positions and value is None else None if inv.cik else NO_13F_NOTE
+                ),
             }
         )
         out.append(item)
@@ -233,6 +238,8 @@ def investor_detail(db: Session, slug: str) -> dict[str, Any] | None:
     rows = _latest_view(db, manager) if manager else []
     rows.sort(key=lambda r: r.value_usd_thousands or Decimal(0), reverse=True)
     total = _total(rows)
+    if rows and total is None:
+        detail["note"] = "Valor total incompleto: faltan importes declarados de algunas posiciones; no se calculan pesos con un subtotal."
     from app.services.instrument_reference import names_by_cusip
 
     display_names = names_by_cusip(db, [r.cusip for r in rows])

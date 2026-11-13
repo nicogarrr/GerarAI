@@ -99,7 +99,8 @@ def test_list_investors_same_summary_in_constant_queries(db):
     assert seen == 2
     ciks = [inv.cik for inv in inv_mod.INVESTORS if inv.cik in inv_mod.REVIEWED_MANAGERS]
     first = next(i for i in result["investors"] if i["cik"] == ciks[0])
-    assert first["positions"] == 3 and first["value_usd_thousands"] == 30.0
+    assert first["positions"] == 3 and first["value_usd_thousands"] is None
+    assert first["note"]
     assert first["coverage"] is not None
 
 
