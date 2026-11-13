@@ -174,7 +174,8 @@
     "legend": "Tipos de aviso por correo",
     "serverOff": "Correo sin configurar en el servidor: los avisos solo llegan en la app",
     "noBinding": "Todavía no conocemos el correo de tu sesión: recarga la página",
-    "errorSave": "No se pudo guardar la preferencia de correo"
+    "errorSave": "No se pudo guardar la preferencia de correo",
+    "errorLoad": "No se pudo cargar el estado de los avisos por correo. Reintenta en unos segundos."
   },
   "skipNote": {
     "stale": "dato desactualizado",

@@ -174,7 +174,8 @@
     "legend": "Email alert types",
     "serverOff": "Email is not configured on the server: alerts only arrive in the app",
     "noBinding": "We do not know your session email yet: reload the page",
-    "errorSave": "The email preference could not be saved"
+    "errorSave": "The email preference could not be saved",
+    "errorLoad": "The email alerts status could not be loaded. Try again in a few seconds."
   },
   "skipNote": {
     "stale": "data is out of date",
