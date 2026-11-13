@@ -55,5 +55,42 @@
     "engineDown": "The analysis engine isn't responding right now.",
     "unknown": "The operation couldn't be completed. Please try again.",
     "reload": "Reload"
+  },
+  "backendValidation": {
+    "currencyCode": "Currency must be a code such as EUR, USD or GBp.",
+    "currencyIso": "Currency must be an ISO 4217 code such as EUR or USD.",
+    "baseCurrencyIso": "Base currency must be an ISO 4217 code such as EUR or USD.",
+    "feesDecimals": "Fees allow at most 4 decimal places.",
+    "tradeDateFuture": "The trade date cannot be in the future.",
+    "dateFuture": "The date cannot be in the future.",
+    "finiteNumber": "The value must be a finite number.",
+    "min6Decimals": "Must be at least 0.000001 (6 decimal places).",
+    "min10Decimals": "Must be at least 0.0000000001 (10 decimal places)."
+  },
+  "validationFields": {
+    "ticker": "ticker",
+    "symbol": "symbol",
+    "name": "name",
+    "currency": "currency",
+    "base_currency": "base currency",
+    "quote_currency": "quote currency",
+    "monthly_contribution": "monthly contribution",
+    "monthly_contribution_currency": "contribution currency",
+    "trade_date": "trade date",
+    "price": "price",
+    "fees": "fees",
+    "rate": "exchange rate",
+    "quantity": "quantity",
+    "value": "value",
+    "threshold": "threshold",
+    "date": "date",
+    "year": "year",
+    "fiscal_year": "fiscal year",
+    "email": "email",
+    "password": "password",
+    "file": "file",
+    "title": "title",
+    "text": "text",
+    "operator": "operator"
   }
 }

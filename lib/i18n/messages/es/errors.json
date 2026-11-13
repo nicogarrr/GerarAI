@@ -55,5 +55,42 @@
     "engineDown": "El motor de análisis no responde ahora mismo.",
     "unknown": "No se pudo completar la operación. Inténtalo de nuevo.",
     "reload": "Recargar"
+  },
+  "backendValidation": {
+    "currencyCode": "La divisa debe ser un código como EUR, USD o GBp.",
+    "currencyIso": "La divisa debe ser un código ISO 4217 como EUR o USD.",
+    "baseCurrencyIso": "La divisa base debe ser un código ISO 4217 como EUR o USD.",
+    "feesDecimals": "Las comisiones admiten como máximo 4 decimales.",
+    "tradeDateFuture": "La fecha de la operación no puede ser futura.",
+    "dateFuture": "La fecha no puede ser futura.",
+    "finiteNumber": "El valor debe ser un número finito.",
+    "min6Decimals": "Debe ser al menos 0,000001 (6 decimales).",
+    "min10Decimals": "Debe ser al menos 0,0000000001 (10 decimales)."
+  },
+  "validationFields": {
+    "ticker": "ticker",
+    "symbol": "símbolo",
+    "name": "nombre",
+    "currency": "divisa",
+    "base_currency": "divisa base",
+    "quote_currency": "divisa destino",
+    "monthly_contribution": "aportación mensual",
+    "monthly_contribution_currency": "divisa de la aportación",
+    "trade_date": "fecha de la operación",
+    "price": "precio",
+    "fees": "comisiones",
+    "rate": "tipo de cambio",
+    "quantity": "cantidad",
+    "value": "valor",
+    "threshold": "umbral",
+    "date": "fecha",
+    "year": "año",
+    "fiscal_year": "año fiscal",
+    "email": "email",
+    "password": "contraseña",
+    "file": "archivo",
+    "title": "título",
+    "text": "texto",
+    "operator": "operador"
   }
 }

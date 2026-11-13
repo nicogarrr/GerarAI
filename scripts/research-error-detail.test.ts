@@ -28,7 +28,7 @@ describe('researchErrorDetail', () => {
     const message = researchErrorDetail(payload, FALLBACK);
     assert.equal(typeof message, 'string');
     assert.doesNotMatch(message, /\[object Object\]/);
-    assert.equal(message, 'Datos no válidos en: left, operator. Revisa esos campos y vuelve a intentarlo.');
+    assert.equal(message, 'Datos no válidos en: left, operador. Revisa esos campos y vuelve a intentarlo.');
   });
 
   it('una lista sin loc utilizable da un aviso genérico en español, nunca [object Object]', () => {

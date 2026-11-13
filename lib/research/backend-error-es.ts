@@ -15,6 +15,47 @@
 // Ruta relativa con extensión .ts: este módulo se importa desde tests con node --test.
 // @ts-expect-error TS5097
 import { knownBackendMessageEn } from './backend-error-en.ts';
+// Import relativo con atributo, igual que lib/research/shorts-text.ts: los
+// textos viven en los diccionarios y aquí solo se cruzan, así el guard de
+// i18n no cuenta literales de este archivo y los techos no se tocan.
+import esErrors from '../i18n/messages/es/errors.json' with { type: 'json' };
+
+// Validaciones pydantic de cartera, alertas y plan (llegan como texto de
+// `detail` cuando la ruta hace `HTTPException(detail=str(exc))`).
+type ValidationKey = keyof typeof esErrors.backendValidation;
+
+// Uso por literal para el guard de i18n (claves consumidas por iteración,
+// igual que SHORTS_BACKEND_TEXT_KEY_LITERALS): sin estas cadenas el guard
+// las marcaría como huérfanas nuevas.
+export const BACKEND_ERROR_VALIDATION_KEY_LITERALS = [
+  'errors.backendValidation.currencyCode',
+  'errors.backendValidation.currencyIso',
+  'errors.backendValidation.baseCurrencyIso',
+  'errors.backendValidation.feesDecimals',
+  'errors.backendValidation.tradeDateFuture',
+  'errors.backendValidation.dateFuture',
+  'errors.backendValidation.finiteNumber',
+  'errors.backendValidation.min6Decimals',
+  'errors.backendValidation.min10Decimals',
+] as const;
+
+/** Mensaje exacto del motor (en minúsculas) → clave de diccionario. */
+const VALIDATION_MESSAGES: [string, ValidationKey][] = [
+  ['currency must be a currency code such as eur, usd or gbp', 'currencyCode'],
+  ['currency must be an iso 4217 code such as eur or usd', 'currencyIso'],
+  ['base_currency must be an iso 4217 code such as eur or usd', 'baseCurrencyIso'],
+  ['fees allow at most 4 decimal places', 'feesDecimals'],
+  ['trade_date cannot be in the future', 'tradeDateFuture'],
+  ['date cannot be in the future', 'dateFuture'],
+  ['value must be a finite number', 'finiteNumber'],
+  ['must be at least 0.000001 (6 decimal places)', 'min6Decimals'],
+  ['must be at least 0.0000000001 (10 decimal places)', 'min10Decimals'],
+];
+
+// Sin genéricos con ángulos ni flechas antes de EXACT: un `>` seguido más
+// abajo de un `<` crea un falso nodo JSX para el guard de i18n y le infla
+// el recuento de literales.
+const validationTexts: { [key: string]: string } = esErrors.backendValidation;
 
 const GENERIC = 'No se pudo completar la operación. Inténtalo de nuevo.';
 const ENGINE_DOWN = 'El motor de análisis no responde ahora mismo. Reintenta en unos segundos.';
@@ -48,18 +89,10 @@ const EXACT: Record<string, string> = {
   'rate limit backend unavailable': 'El servicio de control de peticiones no está disponible ahora mismo. Reintenta en unos segundos.',
   'research authentication is not configured': 'El motor de análisis no está configurado todavía. Inténtalo más tarde.',
   'tenant access is not active': 'Tu cuenta no está activa. Cierra sesión y vuelve a entrar; si sigue fallando, contacta con soporte.',
-  // Validaciones pydantic de cartera, alertas y plan (llegan como texto de
-  // `detail` cuando la ruta hace `HTTPException(detail=str(exc))`).
-  'currency must be a currency code such as eur, usd or gbp': 'La divisa debe ser un código como EUR, USD o GBp.',
-  'currency must be an iso 4217 code such as eur or usd': 'La divisa debe ser un código ISO 4217 como EUR o USD.',
-  'base_currency must be an iso 4217 code such as eur or usd': 'La divisa base debe ser un código ISO 4217 como EUR o USD.',
-  'fees allow at most 4 decimal places': 'Las comisiones admiten como máximo 4 decimales.',
-  'trade_date cannot be in the future': 'La fecha de la operación no puede ser futura.',
-  'date cannot be in the future': 'La fecha no puede ser futura.',
-  'value must be a finite number': 'El valor debe ser un número finito.',
-  'must be at least 0.000001 (6 decimal places)': 'Debe ser al menos 0,000001 (6 decimales).',
-  'must be at least 0.0000000001 (10 decimal places)': 'Debe ser al menos 0,0000000001 (10 decimales).',
 };
+
+// Las validaciones pydantic se cruzan desde el diccionario (ver arriba).
+for (const [message, key] of VALIDATION_MESSAGES) EXACT[message] = validationTexts[key];
 
 /** Sujeto de «X not found» → español. */
 const NOT_FOUND_SUBJECT: Record<string, string> = {
