@@ -4,6 +4,7 @@ import { test } from 'node:test';
 
 const flow = readFileSync('components/research/NewsEventsFlow.tsx', 'utf8');
 const labels = readFileSync('lib/labels.ts', 'utf8');
+const dict = JSON.parse(readFileSync('lib/i18n/messages/es/labels.json', 'utf8'));
 
 test('la etiqueta de impacto muestra el motivo en una linea junto a buena/mala/neutra', () => {
   // El badge acepta el tipo de evento y lo pinta tras el impacto.
@@ -14,9 +15,12 @@ test('la etiqueta de impacto muestra el motivo en una linea junto a buena/mala/n
 
 test('el motivo sale del tipo de evento real, nunca inventado, y omite lo no informativo', () => {
   assert.match(flow, /eventType !== 'general_news' && eventType !== 'unknown'/);
-  // El catalogo de tipos existe y es el que traduce el motivo.
-  assert.match(labels, /dilution: 'Dilución'/);
-  assert.match(labels, /general_news: 'Noticia general'/);
+  // El catalogo de tipos existe (en el diccionario, cruzado en labels.ts)
+  // y es el que traduce el motivo.
+  assert.match(labels, /EVENTO_CODES/);
+  assert.match(labels, /byCode\(EVENTO_CODES, esLabels\.eventTypes\)/);
+  assert.equal(dict.eventTypes.dilution, 'Dilución');
+  assert.equal(dict.eventTypes.general_news, 'Noticia general');
 });
 
 test('las dos filas (tarjeta movil y tabla md) pasan el tipo de evento al badge', () => {
