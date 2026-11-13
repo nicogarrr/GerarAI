@@ -121,7 +121,7 @@ def _tx_dict_from_row(row: Any, line: int) -> dict[str, Any]:
 
 
 def _group_tranches(items: list[dict]) -> list[dict]:
-    """Agrupa los tramos de una misma operacion (mismo filing + insider + codigo).
+    """Agrupa los tramos de una misma operacion (mismo filing + insider + codigo + fecha).
 
     Un Form 4 suele desglosar una venta en decenas de tramos a distintos
     precios (mismo accession, una fila por tramo): mostrados sueltos la tabla
@@ -132,7 +132,7 @@ def _group_tranches(items: list[dict]) -> list[dict]:
     groups: dict[tuple, dict] = {}
     order: list[tuple] = []
     for tx in items:
-        key = (tx.get("accession_number"), tx.get("insider"), tx.get("type"), tx.get("form"), tx.get("currency"))
+        key = (tx.get("accession_number"), tx.get("insider"), tx.get("type"), tx.get("form"), tx.get("currency"), tx.get("date"))
         group = groups.get(key)
         if group is None:
             group = dict(tx)
