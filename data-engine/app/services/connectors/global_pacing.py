@@ -109,6 +109,22 @@ class GlobalPacer:
         except Exception:  # noqa: BLE001 - fail-open al pacing local
             return None
 
+    def _log_local_fallback(self, sin_cliente: bool) -> None:
+        """Aviso (como mucho 1 por minuto) de que se usa el pacing local.
+
+        `_client` traga excepciones y una fabrica None entra aqui sin rastro:
+        sin este log no se puede saber si prod cae al fallback local."""
+        ahora = time.monotonic()
+        ultimo = getattr(self, "_last_fallback_log", None)
+        if ultimo is not None and ahora - ultimo < 60.0:
+            return
+        self._last_fallback_log = ahora
+        logger.warning(
+            "global pacer %s: usando pacing local (%s)",
+            self.key,
+            "sin cliente Redis" if sin_cliente else "error de Redis",
+        )
+
     async def wait(self) -> None:
         """Bloquea (async) hasta el siguiente hueco global del proveedor."""
         interval_ms = int(self.min_interval_seconds * 1000)
@@ -116,7 +132,10 @@ class GlobalPacer:
         if client is not None:
             try:
                 now_ms = int(self._wall() * 1000)
-                wait_ms = client.eval(
+                # El cliente Redis es sincrono: fuera del event loop para que un
+                # Redis lento (hasta socket_timeout) no pare todas las rutas.
+                wait_ms = await asyncio.to_thread(
+                    client.eval,
                     _CLAIM_SLOT_LUA, 2, self._slot_key, self._cooldown_key,
                     now_ms, interval_ms, self._slot_ttl_ms,
                 )
@@ -137,6 +156,7 @@ class GlobalPacer:
         # cool_down() (Retry-After) que llegue mientras se duerme debe
         # respetarse, como hacia el bucle bloqueante original.
         dormir = self._sleep_async if self._sleep_async is not None else asyncio.sleep
+        self._log_local_fallback(client is None)
         while True:
             with self._local_lock:
                 now = self._monotonic()

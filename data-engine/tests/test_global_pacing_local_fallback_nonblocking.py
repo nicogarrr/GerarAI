@@ -73,3 +73,49 @@ def test_local_fallback_revalidates_cooldown_arriving_during_the_wait():
 
     salida = asyncio.run(main())
     assert salida >= 0.38, f"salio a {salida:.3f}s con cooldown pendiente"
+
+def test_redis_eval_runs_off_the_event_loop():
+    """El `eval` sincrono de Redis no debe ejecutarse en el hilo del event loop."""
+    import threading
+
+    seen: dict[str, int] = {}
+
+    class SlowRedis:
+        def eval(self, *args):
+            seen["thread"] = threading.get_ident()
+            time.sleep(0.3)
+            return 0
+
+    pacer = GlobalPacer("redis-offloop", min_interval_seconds=0.1, redis_client_factory=lambda: SlowRedis())
+    ticks: list[float] = []
+
+    async def ticker():
+        while True:
+            ticks.append(time.monotonic())
+            await asyncio.sleep(0.02)
+
+    async def main() -> int:
+        task = asyncio.create_task(ticker())
+        await asyncio.sleep(0)
+        await pacer.wait()
+        task.cancel()
+        return threading.get_ident()
+
+    loop_thread = asyncio.run(main())
+    assert seen["thread"] != loop_thread
+    assert len(ticks) >= 5, f"el event loop estuvo bloqueado por Redis: {len(ticks)} ticks"
+
+
+def test_local_fallback_logs_a_throttled_warning(caplog):
+    import logging
+
+    pacer = GlobalPacer("fallback-log", min_interval_seconds=0.01, redis_client_factory=lambda: None)
+
+    async def main():
+        for _ in range(3):
+            await pacer.wait()
+
+    with caplog.at_level(logging.WARNING):
+        asyncio.run(main())
+    avisos = [r for r in caplog.records if "usando pacing local" in r.getMessage()]
+    assert len(avisos) == 1  # limitado a 1 por minuto
