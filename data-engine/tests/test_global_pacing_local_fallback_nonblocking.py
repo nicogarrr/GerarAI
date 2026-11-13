@@ -1,0 +1,54 @@
+"""El fallback local de GlobalPacer.wait() no debe bloquear el event loop.
+
+Con Redis caido, la espera del hueco usaba `time.sleep` dentro de la corrutina:
+el loop entero (todas las rutas del proceso) se paraba durante el intervalo.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import time
+
+from app.services.connectors.global_pacing import GlobalPacer
+
+
+def test_local_fallback_wait_yields_to_the_event_loop():
+    pacer = GlobalPacer("fallback-nonblocking", min_interval_seconds=0.3, redis_client_factory=lambda: None)
+    ticks: list[float] = []
+
+    async def ticker():
+        while True:
+            ticks.append(time.monotonic())
+            await asyncio.sleep(0.02)
+
+    async def main() -> float:
+        await pacer.wait()  # primer hueco: sin espera
+        task = asyncio.create_task(ticker())
+        t0 = time.monotonic()
+        await pacer.wait()  # segundo: espera ~0,3 s
+        waited = time.monotonic() - t0
+        task.cancel()
+        return waited
+
+    waited = asyncio.run(main())
+    assert waited >= 0.25
+    # Con sleep bloqueante el ticker no avanzaba durante la espera.
+    assert len(ticks) >= 5, f"el event loop estuvo bloqueado durante la espera: {len(ticks)} ticks"
+
+
+def test_local_fallback_keeps_the_interval_between_concurrent_waiters():
+    pacer = GlobalPacer("fallback-concurrent", min_interval_seconds=0.1, redis_client_factory=lambda: None)
+
+    async def main() -> list[float]:
+        marks: list[float] = []
+
+        async def one():
+            await pacer.wait()
+            marks.append(time.monotonic())
+
+        await asyncio.gather(one(), one(), one())
+        return sorted(marks)
+
+    marks = asyncio.run(main())
+    assert marks[1] - marks[0] >= 0.08
+    assert marks[2] - marks[1] >= 0.08
