@@ -10929,11 +10929,13 @@ export interface components {
              * Change
              * @enum {string}
              */
-            change: "new" | "closed" | "increased" | "decreased" | "unchanged";
+            change: "new" | "closed" | "increased" | "decreased" | "unchanged" | "unknown";
             /** Cusip */
             cusip: string;
             /** Name Of Issuer */
             name_of_issuer: string;
+            /** Notice */
+            notice?: string | null;
             /** Put Call */
             put_call?: string | null;
             /** Shares Latest */

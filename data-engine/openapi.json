@@ -11403,7 +11403,8 @@
               "closed",
               "increased",
               "decreased",
-              "unchanged"
+              "unchanged",
+              "unknown"
             ],
             "title": "Change",
             "type": "string"
@@ -11415,6 +11416,17 @@
           "name_of_issuer": {
             "title": "Name Of Issuer",
             "type": "string"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
           },
           "put_call": {
             "anyOf": [

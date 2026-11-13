@@ -1026,7 +1026,8 @@ class ManagerHoldingsOut(BaseModel):
 
 
 class ManagerChangeRowOut(BaseModel):
-    change: Literal["new", "closed", "increased", "decreased", "unchanged"]
+    change: Literal["new", "closed", "increased", "decreased", "unchanged", "unknown"]
+    notice: str | None = None
     name_of_issuer: str
     title_of_class: str
     cusip: str
