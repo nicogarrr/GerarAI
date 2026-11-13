@@ -462,6 +462,9 @@ def _spender_payload(
         source=fact_source(capex),
     )
     if lease is not None and lease.period == capex.period:
+        if not capex.unit or lease.unit != capex.unit or capex.unit.strip().lower() in {"", "unknown"}:
+            base["note"] = "Leases financieros sin importe comparable: moneda distinta o no disponible"
+            return base
         base.update(
             extra_amount=float(lease.value),
             extra_label="Leases financieros nuevos (mismo periodo)",
