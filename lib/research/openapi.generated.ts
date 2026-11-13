@@ -14727,6 +14727,8 @@ export interface components {
             average_cost?: number | null;
             /** First Buy Date */
             first_buy_date?: string | null;
+            /** Notice */
+            notice?: string | null;
         };
         /** TrackRecordHorizonOut */
         TrackRecordHorizonOut: {

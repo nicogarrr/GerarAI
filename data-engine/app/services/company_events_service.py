@@ -456,17 +456,33 @@ def _timeline_day(value: Any) -> date | None:
 def stored_holding(db: Session, company: Company) -> dict[str, Any] | None:
     """Precio medio ponderado y primera compra de la posición del tenant (None si no la tiene)."""
     positions = db.scalars(select(Position).where(Position.company_id == company.id, *tenant_filters(db, Position))).all()
-    qty = sum((_timeline_float(p.quantity) or 0.0) for p in positions)
+    quantities = [_timeline_float(p.quantity) for p in positions]
+    # The purchase date remains useful even when a cost cannot be compared.
+    first_buy = current_holding_starts(db, [company.id]).get(company.id)
+    if not positions:
+        return None
+    start = first_buy.isoformat() if first_buy else None
+    notice = "Coste medio no comparable: faltan cantidades/costes válidos o las divisas no coinciden. No se ha inferido un tipo de cambio."
+    if any(qty is None for qty in quantities):
+        return {"average_cost": None, "first_buy_date": start, "notice": notice}
+    qty = sum(quantities)
     if qty <= 0:
         return None
-    cost = sum((_timeline_float(p.quantity) or 0.0) * (_timeline_float(p.average_cost) or 0.0) for p in positions)
-    # La compra que abrió la tenencia actual: tras venderlo todo y recomprar,
-    # «Primera compra» y «Desde la compra» parten de la nueva compra.
-    first_buy = current_holding_starts(db, [company.id]).get(company.id)
-    return {
-        "average_cost": round(cost / qty, 4) if cost > 0 else None,
-        "first_buy_date": first_buy.isoformat() if first_buy else None,
-    }
+    from app.valuation.currency import canonical_currency_code
+
+    expected = canonical_currency_code(company.currency)
+    active = [(p, quantity) for p, quantity in zip(positions, quantities, strict=True) if quantity != 0]
+    costs = [_timeline_float(p.average_cost) for p, _quantity in active]
+    comparable = bool(expected) and all(
+        canonical_currency_code(p.currency) == expected for p, _quantity in active
+    )
+    if not comparable or any(cost is None or cost <= 0 for cost in costs):
+        return {"average_cost": None, "first_buy_date": start, "notice": notice}
+    cost = sum(quantity * unit_cost for (_p, quantity), unit_cost in zip(active, costs, strict=True))
+    average = _timeline_float(cost / qty)
+    if average is None or average <= 0:
+        return {"average_cost": None, "first_buy_date": start, "notice": notice}
+    return {"average_cost": round(average, 4), "first_buy_date": start}
 
 
 def stored_timeline_events(db: Session, company: Company, desde: date, hasta: date) -> list[dict[str, Any]]:

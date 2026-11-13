@@ -23549,6 +23549,17 @@
               }
             ],
             "title": "First Buy Date"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
           }
         },
         "title": "TimelineHoldingOut",
