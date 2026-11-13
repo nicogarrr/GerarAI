@@ -2215,6 +2215,13 @@
     "limits": "13F: solo gestores con más de 100 M$ en acciones de EE. UU., trimestral, hasta 45 días de retraso y solo largos. Un gestor puede declarar lo que otro también declara: la suma no son las acciones en circulación. «Sin 13F aún» / «Sin 13F previo»: no consta su 13F de ese trimestre; no cuenta como venta ni como compra."
   },
   "fondos": {
+    "backendText": {
+      "nportIncomplete": "Datos N-PORT incompletos: los importes o pesos con componentes ausentes no se presentan como totales completos.",
+      "nportSnapshotLegacy": "Snapshot N-PORT previo: integridad de importes y pesos no verificada hasta recalcular.",
+      "nportLimitUniverse": "N-PORT: fondos y ETF registrados en EE. UU.; la cartera pública es la del último mes de cada trimestre fiscal del fondo, con hasta 60 días de retraso.",
+      "nportLimitDates": "Cada fondo tiene su propia fecha de cartera (se muestra); no son todas del mismo día.",
+      "nportLimitWeight": "Peso = % del patrimonio neto que declara el propio fondo."
+    },
     "title": "Fondos y ETF que la tienen",
     "loadError": "No se pudieron cargar los fondos ahora mismo.",
     "noCusip": "Sin CUSIP verificado: no se puede cruzar con las carteras N-PORT.",

@@ -2215,6 +2215,13 @@
     "limits": "13F: only managers with over $100M in US equities, quarterly, up to 45 days late and long-only. One manager may report what another also reports: the sum is not shares outstanding. «No 13F yet» / «No prior 13F»: that quarter's 13F is not on file; not counted as a sale or a purchase."
   },
   "fondos": {
+    "backendText": {
+      "nportIncomplete": "Incomplete N-PORT data: amounts or weights with missing components are not shown as complete totals.",
+      "nportSnapshotLegacy": "Previous N-PORT snapshot: amount and weight integrity not verified until recomputed.",
+      "nportLimitUniverse": "N-PORT: US-registered funds and ETFs; the public portfolio is from the last month of each fund's fiscal quarter, up to 60 days late.",
+      "nportLimitDates": "Each fund has its own portfolio date (shown); they are not all from the same day.",
+      "nportLimitWeight": "Weight = % of net assets declared by the fund itself."
+    },
     "title": "Funds and ETFs that hold it",
     "loadError": "Could not load funds right now.",
     "noCusip": "No verified CUSIP: cannot match against N-PORT portfolios.",
