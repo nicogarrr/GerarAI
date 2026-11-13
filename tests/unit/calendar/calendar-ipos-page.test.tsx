@@ -1,6 +1,12 @@
 // La página es un server component traducido con getT(): lib/i18n/server lee
 // la cookie de locale vía next/headers; sin cookie el locale es «es».
-vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
+const cookieStore = vi.hoisted(() => ({ value: undefined as string | undefined }));
+vi.mock('next/headers', () => ({
+    cookies: async () => ({
+        get: (key: string) =>
+            key === 'gerarai_locale' && cookieStore.value ? { value: cookieStore.value } : undefined,
+    }),
+}));
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -74,6 +80,18 @@ describe('página de IPOs', () => {
         getIpoCalendar.mockResolvedValue({ ...calendarOk, stale_months: ['diciembre'] });
         render(await IposPage());
         expect(screen.getByText(/Copia guardada de diciembre con más de una hora/)).toBeInTheDocument();
+    });
+
+    it('en inglés el aviso y el subtítulo traducen los meses del backend', async () => {
+        cookieStore.value = 'en';
+        try {
+            getIpoCalendar.mockResolvedValue({ ...calendarOk, stale_months: ['diciembre'] });
+            render(await IposPage());
+            expect(screen.getByText(/Saved copy of December over an hour old/)).toBeInTheDocument();
+            expect(screen.getByText(/Current and next month \(November, December\)/)).toBeInTheDocument();
+        } finally {
+            cookieStore.value = undefined;
+        }
     });
 
     it('sin copia caducada no pinta el aviso', async () => {

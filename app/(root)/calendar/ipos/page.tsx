@@ -6,6 +6,7 @@ import BackendOffline from '@/components/system/BackendOffline';
 import { getIpoCalendar, type IpoCalendar, type IpoEvent } from '@/lib/actions/catalysts.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getT, getFormat } from '@/lib/i18n/server';
+import { ipoMonthsLabel } from '@/lib/calendar/ipo-months';
 import { i18nPageMetadata } from '@/lib/i18n/metadata';
 import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
@@ -72,7 +73,7 @@ export default async function IposPage() {
             <PageHeader
                 kicker={ti('calendar.ipos.kicker')}
                 title={ti('calendar.ipos.headerTitle')}
-                description={ti('calendar.ipos.headerDescription', { months: calendar.months.join(', ') })}
+                description={ti('calendar.ipos.headerDescription', { months: ipoMonthsLabel(calendar.months, f.locale) })}
                 actions={<div className="flex items-center gap-2 rounded-lg border border-gray-800 bg-surface-1 px-3 py-2 text-sm text-gray-300">
                     <CalendarDays aria-hidden="true" className="h-4 w-4 text-teal-300" />
                     {f.formatNumber(calendar.count, { maximumFractionDigits: 0 })} {calendar.count === 1 ? ti('calendar.ipos.countSingular') : ti('calendar.ipos.countPlural')}
@@ -89,7 +90,7 @@ export default async function IposPage() {
 
             {calendar.stale_months?.length ? (
                 <p role="status" className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3 text-sm text-amber-200">
-                    {ti('calendar.ipos.staleCopy', { months: calendar.stale_months.join(', ') })}
+                    {ti('calendar.ipos.staleCopy', { months: ipoMonthsLabel(calendar.stale_months, f.locale) })}
                 </p>
             ) : null}
 
