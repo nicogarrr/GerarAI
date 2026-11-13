@@ -33,11 +33,17 @@ def read_shorts(db: Session, company: Company) -> dict:
     payload = state.metadata_ if state and isinstance(state.metadata_, dict) else {}
     stamp = utc(state.last_success_at) if state else None
     stale = bool(stamp and datetime.now(UTC) - stamp > timedelta(days=4))
-    if payload.get("source") == "FINRA" and payload.get("date"):
-        stale = stale or (datetime.now(UTC).date() - date.fromisoformat(payload["date"]) > timedelta(days=4))
-    return {"ticker": company.ticker, "status": "degraded" if state and state.consecutive_errors else "stale" if stale else "available" if payload else "empty",
+    invalid_date = False
+    if payload.get("source") == "FINRA":
+        try:
+            trade_date = date.fromisoformat(payload["date"])
+            invalid_date = trade_date > datetime.now(UTC).date()
+            stale = stale or (datetime.now(UTC).date() - trade_date > timedelta(days=4))
+        except (KeyError, TypeError, ValueError):
+            invalid_date = True
+    return {"ticker": company.ticker, "status": "degraded" if invalid_date or (state and state.consecutive_errors) else "stale" if stale else "available" if payload else "empty",
             "fetched_at": stamp.isoformat() if stamp else None, "data": payload or None,
-            "reason": "No hay mapeo revisado para esta bolsa o empresa." if state and state.last_error == "UnsupportedMarket" else "La fuente no devolvió datos verificables; el dato anterior conserva su fecha." if state and state.consecutive_errors else "Consulta o fecha de negociación fuera del límite de 4 días." if stale else "No hay consulta almacenada. Usa Actualizar para consultar la fuente pública." if not payload else None}
+            "reason": "Fecha FINRA ausente, inválida o futura: no se puede verificar la vigencia del dato guardado." if invalid_date else "No hay mapeo revisado para esta bolsa o empresa." if state and state.last_error == "UnsupportedMarket" else "La fuente no devolvió datos verificables; el dato anterior conserva su fecha." if state and state.consecutive_errors else "Consulta o fecha de negociación fuera del límite de 4 días." if stale else "No hay consulta almacenada. Usa Actualizar para consultar la fuente pública." if not payload else None}
 
 
 async def refresh_shorts(db: Session, company: Company) -> dict:
