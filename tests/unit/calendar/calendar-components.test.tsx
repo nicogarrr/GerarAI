@@ -346,6 +346,38 @@ describe('FollowedEarningsRow', () => {
     });
 });
 
+describe('FollowedEarningsRow: directo oficial el día del evento', () => {
+    const metaEvent = () => ev({ ticker: 'META', company: 'Meta Platforms', date: '2026-10-21' });
+    it('el día del evento con directo verificado: botón destacado y sin chip duplicado en IrLine', () => {
+        render(<ul><FollowedEarningsRow event={metaEvent()} today="2026-10-21" /></ul>);
+        const live = screen.getByRole('link', { name: /Ver directo oficial/ });
+        expect(live).toHaveAttribute('href', 'https://events.q4inc.com/attendee/132342320');
+        expect(live).toHaveAttribute('target', '_blank');
+        expect(live.getAttribute('title')).toContain('verificado el 2026-10-21');
+        // IrLine sigue enlazando la página del evento y la presentación, pero no repite el webcast.
+        expect(screen.getByRole('link', { name: /Evento T3 2026 en IR/ })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Presentación/ })).toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /^Webcast$/ })).not.toBeInTheDocument();
+    });
+    it('otro día o sin today: no hay botón destacado y el webcast queda en IrLine como siempre', () => {
+        const { unmount } = render(<ul><FollowedEarningsRow event={metaEvent()} today="2026-10-22" /></ul>);
+        expect(screen.queryByRole('link', { name: /Ver directo oficial/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /^Webcast$/ })).toBeInTheDocument();
+        unmount();
+        render(<ul><FollowedEarningsRow event={metaEvent()} /></ul>);
+        expect(screen.queryByRole('link', { name: /Ver directo oficial/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /^Webcast$/ })).toBeInTheDocument();
+    });
+    it('el día del evento sin directo verificado en el registro: no hay botón', () => {
+        render(<ul><FollowedEarningsRow event={ev()} today="2026-10-28" /></ul>);
+        expect(screen.queryByRole('link', { name: /Ver directo oficial/ })).not.toBeInTheDocument();
+    });
+    it('emisor con webcast verificado en el registro (ASTS): el botón apunta al webcast oficial', () => {
+        render(<ul><FollowedEarningsRow event={ev({ ticker: 'ASTS', company: 'AST SpaceMobile', date: '2026-11-09' })} today="2026-11-09" /></ul>);
+        expect(screen.getByRole('link', { name: /Ver directo oficial/ })).toHaveAttribute('href', expect.stringContaining('choruscall.com'));
+    });
+});
+
 describe('SubscribeButtons', () => {
     it('apple usa webcal://, google y outlook codifican el enlace y abren pestaña nueva', () => {
         render(<SubscribeButtons origin="https://gerarai.vercel.app" token="tok" />);

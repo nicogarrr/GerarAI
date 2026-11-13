@@ -13,7 +13,7 @@ type TiFn = (key: TranslationKey, vars?: TranslationVars) => string;
 const esT: TiFn = t;
 import type { FollowedEarningsEvent } from '@/lib/actions/catalysts.actions';
 import type { EventMaterials, MaterialDocument } from '@/lib/earnings-materials';
-import { irLinksFor, type IrSectionLabelKey } from '@/lib/ir-registry';
+import { irLinksFor, irLiveAssetFor, type IrSectionLabelKey } from '@/lib/ir-registry';
 
 
 /** "Sep/2026" -> "T. Sep 2026"; formato desconocido: se muestra tal cual, nunca se reinterpreta. */
@@ -92,10 +92,14 @@ const IR_SECTION_LABEL: Record<IrSectionLabelKey, TranslationKey> = {
     investorRelations: 'calendar.earnings.irLabels.investorRelations',
 };
 
-/** Enlaces oficiales de IR (registro verificado): pagina del evento si la fecha coincide, si no la seccion general. */
-export function IrLine({ ticker, date, ti = esT }: { ticker: string; date: string; ti?: TiFn }) {
+/** Enlaces oficiales de IR (registro verificado): pagina del evento si la fecha coincide, si no la seccion general.
+ *  `omitLiveAssets`: la fila ya destaca el directo con su propio boton; no duplicar el chip. */
+export function IrLine({ ticker, date, ti = esT, omitLiveAssets = false }: { ticker: string; date: string; ti?: TiFn; omitLiveAssets?: boolean }) {
     const links = irLinksFor(ticker, date);
     if (!links) return null;
+    const assets = omitLiveAssets
+        ? (links.eventPage?.assets ?? []).filter((a) => a.kind !== 'directo' && a.kind !== 'webcast')
+        : links.eventPage?.assets;
     const tip = ti('calendar.earnings.irTip', { date: links.verifiedOn });
     const chip = 'inline-flex min-h-[44px] items-center gap-1 rounded-md border border-gray-700 px-1.5 py-0.5 font-medium text-gray-300 hover:bg-gray-800 sm:min-h-0';
     return (
@@ -111,7 +115,7 @@ export function IrLine({ ticker, date, ti = esT }: { ticker: string; date: strin
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
             )}
-            {links.eventPage?.assets.map((a) => (
+            {assets?.map((a) => (
                 <a key={a.url} href={a.url} target="_blank" rel="noopener noreferrer" title={ti('calendar.earnings.irAssetTip', { date: links.verifiedOn })} className={chip}>
                     {ti(ASSET_KEY[a.kind])}
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
@@ -127,13 +131,17 @@ export async function EventMaterialsLine({ promise, eventKey, ti = esT, f }: { p
     return <MaterialsLine materials={all[eventKey]} ti={ti} f={f} />;
 }
 
-export function FollowedEarningsRow({ event, materialsSlot, ti = esT }: { event: FollowedEarningsEvent; materialsSlot?: ReactNode; ti?: TiFn }) {
+export function FollowedEarningsRow({ event, materialsSlot, ti = esT, today }: { event: FollowedEarningsEvent; materialsSlot?: ReactNode; ti?: TiFn; today?: string }) {
     const session = event.session
         ? ti(event.session === 'pre_market' ? 'calendar.earnings.sessionPreMarket' : 'calendar.earnings.sessionAfterMarket')
         : null;
     const label = fiscalLabel(event.fiscal_label, ti);
+    // El directo oficial solo se ofrece el mismo dia del evento y con enlace verificado en el
+    // registro IR (fecha exacta). Nunca una hora: la franja publicada sigue visible arriba.
+    const isToday = today !== undefined && event.date === today;
+    const live = isToday ? irLiveAssetFor(event.ticker, event.date) : null;
     return (
-        <li className="flex items-center gap-3 px-4 py-3">
+        <li className={`flex items-center gap-3 border-l-2 px-4 py-3 ${isToday ? 'border-blue-500' : 'border-transparent'}`}>
             <CompanyLogo ticker={event.ticker} name={event.company || event.ticker} className="size-12 rounded-xl" />
             <div className="min-w-0 flex-1">
                 <p className="truncate text-base font-semibold text-gray-100">{event.company || event.ticker}</p>
@@ -149,8 +157,22 @@ export function FollowedEarningsRow({ event, materialsSlot, ti = esT }: { event:
                         <span className="rounded border border-amber-800/60 px-1.5 py-0.5 text-xs text-amber-300">{ti('calendar.earnings.estimated')}</span>
                     ) : null}
                 </p>
+                {live ? (
+                    <p className="mt-1.5 text-xs">
+                        <a
+                            href={live.asset.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={ti('calendar.earnings.liveWatchTip', { date: live.verifiedOn })}
+                            className="inline-flex min-h-[44px] items-center gap-1.5 rounded-md bg-blue-600 px-2.5 py-1 font-semibold text-white hover:bg-blue-500 sm:min-h-0"
+                        >
+                            {ti('calendar.earnings.liveWatch')}
+                            <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                        </a>
+                    </p>
+                ) : null}
                 {materialsSlot}
-                <IrLine ticker={event.ticker} date={event.date} ti={ti} />
+                <IrLine ticker={event.ticker} date={event.date} ti={ti} omitLiveAssets={live !== null} />
             </div>
             {event.source_url ? (
                 <a

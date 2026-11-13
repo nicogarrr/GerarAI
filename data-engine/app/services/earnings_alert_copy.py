@@ -94,6 +94,8 @@ def message_text(earnings: dict[str, Any], language: str = "es") -> str:
     lines += [f"{label}: {value}" for label, value in detail_rows(earnings, language)]
     if earnings.get("source_url"):
         lines += ["", f"{'Source link' if en else 'Enlace de la fuente'}: {earnings['source_url']}"]
+    if earnings.get("live_url"):
+        lines += ["", f"{'Official live stream (verified link)' if en else 'Directo oficial (enlace verificado)'}: {earnings['live_url']}"]
     lines += ["", DISCLAIMER_EN if en else DISCLAIMER]
     return "\n".join(lines)
 
@@ -109,6 +111,15 @@ def email_content(earnings: dict[str, Any], language: str = "es") -> EmailConten
         "</tr>"
         for label, value in detail_rows(earnings, language)
     )
+    live_url = str(earnings.get("live_url") or "")
+    live_html = (
+        f"<p style=\"margin:16px 0 0\"><a href=\"{escape(live_url, quote=True)}\" "
+        'style="display:inline-block;background:#1a56db;color:#ffffff;padding:10px 16px;'
+        'border-radius:8px;font-size:14px;font-weight:600;text-decoration:none">'
+        f"{'Watch the official live stream' if en else 'Ver directo oficial'}</a></p>"
+        if live_url
+        else ""
+    )
     source_url = str(earnings.get("source_url") or "")
     link_html = (
         f"<p style=\"font-size:13px;margin:14px 0 0\">{'Source' if en else 'Fuente'}: "
@@ -123,6 +134,7 @@ def email_content(earnings: dict[str, Any], language: str = "es") -> EmailConten
         f"<h1 style=\"font-size:22px;margin:0 0 4px\">{escape(headline)}</h1>"
         + (f"<p style=\"margin:0 0 16px;color:#555\">{escape(str(company))}</p>" if company else "")
         + f"<table style=\"margin-top:16px;border-collapse:collapse\">{rows_html}</table>"
+        + live_html
         + link_html
         + f"<p style=\"font-size:11px;color:#777;margin:20px 0 0\">{escape(DISCLAIMER_EN if en else DISCLAIMER)} "
         f"{escape(FOOTER_EN if en else FOOTER)}</p>"

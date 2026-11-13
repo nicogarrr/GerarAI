@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { IR_REGISTRY, irLinksFor, type IrAssetKind, type IrSectionLabelKey } from '@/lib/ir-registry';
+import { IR_REGISTRY, irLinksFor, irLiveAssetFor, type IrAssetKind, type IrSectionLabelKey } from '@/lib/ir-registry';
 
 const ASSET_KINDS: readonly IrAssetKind[] = ['presentacion', 'webcast', 'directo', 'grabacion', 'transcripcion'];
 const SECTION_LABEL_KEYS: readonly IrSectionLabelKey[] = [
@@ -13,6 +13,22 @@ const SECTION_LABEL_KEYS: readonly IrSectionLabelKey[] = [
     'investorRelations',
 ];
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+describe('irLiveAssetFor', () => {
+    it('fecha exacta con webcast: devuelve el asset y la fecha de verificación', () => {
+        const live = irLiveAssetFor('meta', '2026-10-21');
+        expect(live?.asset).toEqual(expect.objectContaining({ kind: 'webcast', url: 'https://events.q4inc.com/attendee/132342320' }));
+        expect(live?.verifiedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+    it('evento con webcast pero sin directo: devuelve el webcast', () => {
+        expect(irLiveAssetFor('ASTS', '2026-11-09')?.asset.kind).toBe('webcast');
+    });
+    it('sin entrada, sin evento ese día o evento sin directo: null', () => {
+        expect(irLiveAssetFor('ZZZZ', '2026-10-21')).toBeNull();
+        expect(irLiveAssetFor('META', '2026-10-22')).toBeNull();
+        expect(irLiveAssetFor('BN', '2026-11-12')).toBeNull();
+    });
+});
 
 describe('IR_REGISTRY hygiene', () => {
     it('cada entrada tiene seccion https con etiqueta y fecha de verificacion ISO', () => {

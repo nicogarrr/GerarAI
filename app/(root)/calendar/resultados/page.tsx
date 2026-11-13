@@ -57,6 +57,7 @@ export default async function FollowedEarningsPage() {
                         key={`${event.ticker}-${event.date}`}
                         ti={ti}
                         event={event}
+                        today={today}
                         materialsSlot={
                             event.date <= today ? (
                                 <Suspense fallback={null}>

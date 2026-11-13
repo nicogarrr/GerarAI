@@ -219,3 +219,13 @@ export function irLinksFor(ticker: string, eventDate: string): IrLinks | null {
         verifiedOn: entry.verifiedOn,
     };
 }
+
+/** Directo oficial verificado del evento: kind 'directo' o, en su defecto, 'webcast'.
+ *  Misma regla que el registro: fecha exacta o nada; sin entrada verificada no hay enlace. */
+export function irLiveAssetFor(ticker: string, eventDate: string): { asset: IrAsset; verifiedOn: string } | null {
+    const links = irLinksFor(ticker, eventDate);
+    if (!links) return null;
+    const assets = links.eventPage?.assets ?? [];
+    const asset = assets.find((a) => a.kind === 'directo') ?? assets.find((a) => a.kind === 'webcast');
+    return asset ? { asset, verifiedOn: links.verifiedOn } : null;
+}
