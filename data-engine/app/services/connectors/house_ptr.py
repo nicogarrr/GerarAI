@@ -172,8 +172,10 @@ def parse_amount(text: str) -> dict[str, Any]:
         return {"amount_text": clean, "amount_min": low, "amount_max": None}
     rng = re.match(r"\$([\d,]+)\s*-\s*\$([\d,]+)", clean)
     if rng:
-        return {"amount_text": clean, "amount_min": int(rng.group(1).replace(",", "")),
-                "amount_max": int(rng.group(2).replace(",", ""))}
+        low, high = (int(rng.group(i).replace(",", "")) for i in (1, 2))
+        if low > high:
+            return {"amount_text": clean, "amount_min": None, "amount_max": None}
+        return {"amount_text": clean, "amount_min": low, "amount_max": high}
     exact = re.fullmatch(r"\$([\d,]+)(?:\.(\d{1,2}))?", clean)
     if exact:
         # Algunos miembros declaran la cifra exacta en vez del rango.
