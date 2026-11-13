@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import math
 import time
 from collections.abc import Awaitable, Callable
 from datetime import UTC, date, datetime, timedelta
@@ -81,6 +82,16 @@ CikFetcher = Callable[[str], Awaitable[str | None]]
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
+
+
+def _event_number(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    return number if math.isfinite(number) else None
 
 
 class CompanyEventsService:
@@ -224,8 +235,8 @@ class CompanyEventsService:
             "hour": row.get("hour") or None,
             "quarter": row.get("quarter"),
             "year": row.get("year"),
-            "eps_estimate": row.get("epsEstimate"),
-            "revenue_estimate": row.get("revenueEstimate"),
+            "eps_estimate": _event_number(row.get("epsEstimate")),
+            "revenue_estimate": _event_number(row.get("revenueEstimate")),
             "source": "Finnhub /calendar/earnings",
         }
 
@@ -245,10 +256,10 @@ class CompanyEventsService:
                 "period": period,
                 "quarter": row.get("quarter"),
                 "year": row.get("year"),
-                "eps_estimate": row.get("epsEstimate"),
-                "eps_actual": row.get("epsActual"),
-                "revenue_estimate": row.get("revenueEstimate"),
-                "revenue_actual": row.get("revenueActual"),
+                "eps_estimate": _event_number(row.get("epsEstimate")),
+                "eps_actual": _event_number(row.get("epsActual")),
+                "revenue_estimate": _event_number(row.get("revenueEstimate")),
+                "revenue_actual": _event_number(row.get("revenueActual")),
                 "eps_surprise_percent": None,
                 "source": "Finnhub /calendar/earnings",
             }
@@ -271,10 +282,10 @@ class CompanyEventsService:
                 },
             )
             if entry["eps_estimate"] is None:
-                entry["eps_estimate"] = row.get("estimate")
+                entry["eps_estimate"] = _event_number(row.get("estimate"))
             if entry["eps_actual"] is None:
-                entry["eps_actual"] = row.get("actual")
-            entry["eps_surprise_percent"] = row.get("surprisePercent")
+                entry["eps_actual"] = _event_number(row.get("actual"))
+            entry["eps_surprise_percent"] = _event_number(row.get("surprisePercent"))
         return sorted(
             by_period.values(), key=lambda item: item["period"], reverse=True
         )[:8]
