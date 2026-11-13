@@ -67,6 +67,18 @@ describe('CalendarEvents', () => {
         expect(await screen.findByRole('status')).toHaveTextContent('puede estar incompleta');
     });
 
+    it('copia caducada: declara los días servidos desde la copia guardada', async () => {
+        await show(calendar({ stale_days: ['2026-11-10'] }));
+        const notices = await screen.findAllByRole('status');
+        expect(notices.some((n) => /Copia guardada de .*10.* con más de una hora/.test(n.textContent ?? ''))).toBe(true);
+    });
+
+    it('sin copia caducada no pinta el aviso', async () => {
+        await show(calendar({ stale_days: [] }));
+        expect(screen.getAllByTestId('logo').length).toBeGreaterThan(0);
+        expect(screen.queryByText(/Copia guardada/)).not.toBeInTheDocument();
+    });
+
     it('estado unavailable: aviso de NASDAQ caído aunque no haya eventos', async () => {
         await show(calendar({ status: 'unavailable', events: [], count: 0 }));
         expect(await screen.findByRole('status')).toHaveTextContent('no responde');

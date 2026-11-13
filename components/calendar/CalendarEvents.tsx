@@ -55,6 +55,14 @@ export async function CalendarEvents({ calendarPromise }: { calendarPromise: Pro
                 </p>
             ) : null}
 
+            {calendar.stale_days?.length ? (
+                <p role="status" className="rounded-lg border border-amber-900/50 bg-amber-950/20 p-3 text-sm text-amber-200">
+                    {ti('calendar.catalysts.staleCopy', {
+                        days: calendar.stale_days.map((day) => f.formatMarketDate(day, { day: 'numeric', month: 'short' })).join(', '),
+                    })}
+                </p>
+            ) : null}
+
             {calendar.held_count === 0 && !calendar.watchlist_count ? (
                 <div className="rounded-lg border border-gray-800 p-4 text-sm text-gray-400">
                     <p>{ti('calendar.catalysts.emptyNoFollow1')}</p>

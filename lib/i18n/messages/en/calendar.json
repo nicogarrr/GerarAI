@@ -33,6 +33,7 @@
     "countPlural": "events",
     "degradedUnavailable": "The public NASDAQ calendar is not responding: earnings and dividends cannot be shown. This does not mean there are no events.",
     "degradedPartial": "The public NASDAQ calendar failed for some days: the list may be incomplete.",
+    "staleCopy": "Saved copy of {days} over an hour old: the update is pending or failed, so a recent change may be missing.",
     "emptyNoFollow1": "You have no open positions or watchlist, so there are no catalysts to follow.",
     "emptyNoFollow2": "Follow a company or record a buy and you will see its earnings and dividends here.",
     "addWatchlist": "Add to watchlist",
