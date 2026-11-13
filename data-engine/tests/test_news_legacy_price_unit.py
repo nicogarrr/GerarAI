@@ -16,3 +16,8 @@ def test_major_unit_legacy_and_explicit_pence_are_still_supported():
     uk = SimpleNamespace(ticker='TSCO.L', currency='GBP')
     assert service._listed(Decimal('110'), None, us) == (Decimal('110'), 'USD')
     assert service._listed(Decimal('255'), 'GBp', uk) == (Decimal('2.55'), 'GBP')
+
+
+def test_price_without_company_identity_cannot_be_assigned_a_currency():
+    assert service._listed(Decimal('110'), 'USD', None) is None
+    assert service._listed(Decimal('110'), None, None) is None
