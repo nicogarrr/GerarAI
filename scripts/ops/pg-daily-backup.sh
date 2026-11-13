@@ -45,9 +45,11 @@ SRC_TABLES="$(docker exec "$SOURCE" sh -c 'psql -X -v ON_ERROR_STOP=1 -U "$POSTG
 # Reserve cleanup before creating: even a failed create can leave a container.
 started=1
 docker run -d --name "$TMP" --network none --cpus=.5 --memory=2g -e POSTGRES_PASSWORD=verify -e POSTGRES_DB=verify "$IMAGE" >> "$DIR/pg-verify-container.log"
+# The entrypoint's temporary initialization server accepts Unix sockets only.
+# Waiting on TCP avoids racing its intentional shutdown before the final server.
 ready=0
 for _ in $(seq 1 30); do
-  if docker exec "$TMP" pg_isready -U postgres -d verify >> "$DIR/pg-verify-container.log" 2>&1; then ready=1; break; fi
+  if docker exec "$TMP" pg_isready -h 127.0.0.1 -U postgres -d verify >> "$DIR/pg-verify-container.log" 2>&1; then ready=1; break; fi
   sleep 2
 done
 (( ready )) || { log 'FAIL temporary Postgres not ready'; exit 1; }

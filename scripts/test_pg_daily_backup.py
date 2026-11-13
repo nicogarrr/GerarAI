@@ -64,6 +64,7 @@ class BackupTests(unittest.TestCase):
         self.assertIn('--no-owner --no-privileges', calls)
         self.assertIn('ON_ERROR_STOP=1', calls)
         self.assertIn('--single-transaction', calls)
+        self.assertIn("'pg_isready', '-h', '127.0.0.1'", calls)
         self.assertIn("'--network', 'none'", calls)
         self.assertEqual(len(list(backup.glob('*.verified'))), 1)
         self.assertTrue((backup / 'pg-daily-unverified.sql.gz').exists())
