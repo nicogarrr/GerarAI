@@ -19,6 +19,10 @@ describe('public shorts texts in English', () => {
     }
     expect(shortsText('Texto nuevo.', 'en')).toBe('Texto nuevo.');
     expect(shortsText(null, 'en')).toBeNull();
+    expect(shortsText('Fecha FINRA ausente, inválida o futura: no se puede verificar la vigencia del dato guardado.', 'en'))
+      .toBe('Missing, invalid or future FINRA date: the freshness of the stored figure cannot be verified.');
+    expect(shortsText('Fecha de consulta ausente o futura: no se puede verificar la antigüedad del dato guardado.', 'en'))
+      .toBe('Missing or future lookup date: the age of the stored figure cannot be verified.');
   });
 
   it('the page routes reason and note through the translator', () => {
