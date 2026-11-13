@@ -7,6 +7,7 @@
     "trumpHolder": "Holder: Donald J. Trump Revocable Trust (indirect ownership). 41.5% of 276,497,911 shares outstanding per 13D/A No. 3 (event 2025-12-18, filed 2025-12-22). No later 13D/A has been verified.",
     "no13f": "No 13F: only positions documented in 13D/Forms 3/4. Value and weight are not available until there is a sourced valuation; this is not the full portfolio.",
     "comparisonIncompleteRow": "Incomplete comparison: valid share counts are missing in one or both periods; no purchase, sale or unchanged position is inferred.",
+    "comparisonIncompleteRowUnits": "Incomplete comparison: valid quantities are missing or the units are not comparable; no purchase, sale or unchanged position is inferred.",
     "comparisonIncompleteLimitation": "Incomplete comparison for some positions: see each row notice.",
     "limitQuarterlyLag": "Quarterly cadence with up to a 45-day reporting lag",
     "limitLongOnly": "Long-only US-listed positions; no shorts, no non-13F securities",

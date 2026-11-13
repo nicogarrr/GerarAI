@@ -23,6 +23,7 @@ const TEXT_KEYS = [
     'trumpHolder',
     'no13f',
     'comparisonIncompleteRow',
+    'comparisonIncompleteRowUnits',
     'comparisonIncompleteLimitation',
 ] as const;
 const LIMITATION_KEYS = ['limitQuarterlyLag', 'limitLongOnly', 'limitAsFiled', 'limitAmendments'] as const;
@@ -38,6 +39,7 @@ export const OWNERSHIP_BACKEND_TEXT_KEY_LITERALS = [
     'ownership.backendText.trumpHolder',
     'ownership.backendText.no13f',
     'ownership.backendText.comparisonIncompleteRow',
+    'ownership.backendText.comparisonIncompleteRowUnits',
     'ownership.backendText.comparisonIncompleteLimitation',
     'ownership.backendText.limitQuarterlyLag',
     'ownership.backendText.limitLongOnly',

@@ -14,9 +14,26 @@ const BACKEND = ['investor_portfolio.py', 'manager_holding_ingestion_service.py'
     .join('\n')
     .replace(/"\s*\n\s*"/g, '');
 
+// Aviso anterior de comparación incompleta: el motor nuevo (#5479) ya no lo
+// emite, pero la traducción se mantiene mientras pueda convivir con un
+// backend desplegado antes del cambio. No se exige en el código del motor.
+const LEGACY_BACKEND_PHRASES = [
+    'Comparación incompleta: faltan acciones válidas en uno o ambos periodos; no se infiere una compra, venta ni posición sin cambios.',
+];
+
 describe('cartera de un inversor: notas del backend en inglés', () => {
     it('el backend sigue mandando cada frase de la tabla', () => {
-        for (const sentence of Object.keys(OWNERSHIP_TEXT_EN)) expect(BACKEND).toContain(sentence);
+        for (const sentence of Object.keys(OWNERSHIP_TEXT_EN)) {
+            if (LEGACY_BACKEND_PHRASES.includes(sentence)) continue;
+            expect(BACKEND).toContain(sentence);
+        }
+    });
+
+    it('el aviso nuevo y el anterior de comparación incompleta salen en inglés', () => {
+        expect(ownershipNote('Comparación incompleta: faltan cantidades válidas o las unidades no son comparables; no se infiere una compra, venta ni posición sin cambios.', 'en'))
+            .toBe('Incomplete comparison: valid quantities are missing or the units are not comparable; no purchase, sale or unchanged position is inferred.');
+        expect(ownershipNote('Comparación incompleta: faltan acciones válidas en uno o ambos periodos; no se infiere una compra, venta ni posición sin cambios.', 'en'))
+            .toBe('Incomplete comparison: valid share counts are missing in one or both periods; no purchase, sale or unchanged position is inferred.');
     });
 
     it('con English la nota de cada fila sale en inglés', () => {
