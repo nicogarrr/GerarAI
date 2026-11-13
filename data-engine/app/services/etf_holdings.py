@@ -62,12 +62,12 @@ def parse_procure(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
     for rec in csv.DictReader(io.StringIO(text.lstrip("\ufeff"))):
         ticker = (rec.get("StockTicker") or "").strip().upper()
         weight = _pct(rec.get("Weightings"), fraction=False)
-        try:
-            day = datetime.strptime((rec.get("Date") or "").strip(), "%m/%d/%Y").date()
-        except ValueError:
-            continue
         if not _TICKER.match(ticker):
             continue
+        try:
+            day = datetime.strptime((rec.get("Date") or "").strip(), "%m/%d/%Y").date()
+        except ValueError as exc:
+            raise ValueError("ETF invalid equity date") from exc
         if weight is None:
             raise ValueError("ETF invalid equity weight")
         if as_of is not None and as_of != day:
@@ -92,8 +92,8 @@ def parse_tema(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
             continue
         try:
             day = datetime.strptime((rec.get("holdings_date") or "").strip(), "%Y-%m-%d").date()
-        except ValueError:
-            continue
+        except ValueError as exc:
+            raise ValueError("ETF invalid equity date") from exc
         if weight is None:
             raise ValueError("ETF invalid equity weight")
         if as_of is not None and as_of != day:

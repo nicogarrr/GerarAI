@@ -7,10 +7,10 @@ Sin red: HTTP con MockTransport o httpx.Client doblado; SQLite real para la
 recarga. CSVs sintéticos.
 """
 
-from datetime import date
 from decimal import Decimal
 
 import httpx
+import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -44,18 +44,17 @@ def test_pct_invalido_devuelve_none_y_formatos():
     assert eh._pct("0.055", fraction=True) == Decimal("5.500")
 
 
-def test_parse_procure_fecha_mala_se_salta():
+def test_parse_procure_fecha_mala_rechaza_carga():
     csv_texto = (
         "Date,Account,StockTicker,CUSIP,SecurityName,Shares,Price,MarketValue,Weightings\n"
         "fecha-mala,UFO,AAA,x,N,1,1,1,9.5%\n"
         "10/19/2026,UFO,BBB,x,N,1,1,1,4.0%\n"
     )
-    as_of, rows = eh.parse_procure(csv_texto)
-    assert as_of == date(2026, 10, 19)
-    assert rows == [("BBB", Decimal("4.0"))]
+    with pytest.raises(ValueError, match="equity date"):
+        eh.parse_procure(csv_texto)
 
 
-def test_parse_tema_cash_fecha_mala_y_no_eeuu_se_saltan():
+def test_parse_tema_fecha_mala_rechaza_carga():
     csv_texto = (
         "holdings_date,ticker,cusip,proper_name,shares,market_value,percent_of_nav,is_cash,country,sector\n"
         "2026-10-16,USD,,Cash,1,1,0.01,1,,\n"
@@ -63,9 +62,8 @@ def test_parse_tema_cash_fecha_mala_y_no_eeuu_se_saltan():
         "2026-10-16,FTC,cFTC,N,1,1,0.05,0,United Kingdom,IT\n"
         "2026-10-16,BBB,cBBB,N,1,1,0.05,0,United States,IT\n"
     )
-    as_of, rows = eh.parse_tema(csv_texto)
-    assert as_of == date(2026, 10, 16)
-    assert rows == [("BBB", Decimal("5.00"))]
+    with pytest.raises(ValueError, match="equity date"):
+        eh.parse_tema(csv_texto)
 
 
 # --- refresh: pesos incoherentes y duplicados -------------------------------
