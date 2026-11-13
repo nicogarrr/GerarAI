@@ -127,6 +127,9 @@ def normalize_earnings_row(row: dict[str, Any], day: date) -> dict[str, Any]:
 
 def normalize_dividend_row(row: dict[str, Any], day: date) -> dict[str, Any]:
     """Normaliza una fila del calendario de dividendos a un evento propio."""
+    amount = row.get("dividend_Rate")
+    if amount in (None, ""):
+        amount = row.get("amount")
     return {
         "symbol": str(row.get("symbol", "")).upper(),
         "company": row.get("companyName") or row.get("name"),
@@ -134,7 +137,7 @@ def normalize_dividend_row(row: dict[str, Any], day: date) -> dict[str, Any]:
         "ex_date": row.get("dividend_Ex_Date"),
         "payment_date": row.get("payment_Date"),
         "record_date": row.get("record_Date"),
-        "amount": _parse_float(row.get("dividend_Rate") or row.get("amount")),
+        "amount": _parse_float(amount),
     }
 
 
