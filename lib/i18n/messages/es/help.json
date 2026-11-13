@@ -1,1 +1,117 @@
-{}
+{
+  "title": "Centro de ayuda",
+  "subtitle": "Documentación, preguntas frecuentes y soporte",
+  "methodologyQuestion": "¿Quieres ver cómo analizamos y de dónde salen los datos?",
+  "methodologyLink": "Metodología y fuentes",
+  "tabsAria": "Secciones de la ayuda",
+  "tabDocs": "Documentación",
+  "tabContact": "Contacto",
+  "learnTitle": "Aprende",
+  "learnText": "La pestaña Documentación explica qué hace cada módulo hoy y cómo usarlo, con enlace a la metodología y las fuentes.",
+  "supportTitle": "Soporte",
+  "supportText": "El soporte es por email y lo atiende quien mantiene el proyecto. No hay un plazo de respuesta garantizado.",
+  "sourcedTitle": "Datos con fuente",
+  "sourcedText": "Las cifras de research indican su fuente y su fecha. Si no hay dato verificable, la app muestra N/D en vez de inventarlo.",
+  "faqTitle": "Preguntas frecuentes",
+  "docsTitle": "Documentación",
+  "docsSubtitle": "Guía práctica por módulo: lo que la app hace hoy y cómo usarla.",
+  "firstStepsTitle": "Primeros pasos: modelo → tesis → decisión",
+  "moduleGuideTitle": "Guía por módulo",
+  "glossaryTitle": "Glosario y metodología",
+  "contactTitle": "Contacto",
+  "emailTo": "Enviar email a",
+  "contactWithEmail": "¿Tienes preguntas o sugerencias? Escríbenos por email.",
+  "contactNoEmail": "¿Tienes preguntas o sugerencias? El canal de contacto se publicará aquí.",
+  "modules": {
+    "item0": {
+      "title": "Research",
+      "text": "Ficha por ticker: hechos financieros canónicos, métricas trazables, tesis, moat, pares, valoración y chat con fuentes."
+    },
+    "item1": {
+      "title": "Modelo a largo plazo",
+      "text": "Modelo fundamental con supuestos visibles (crecimiento, margen FCF, WACC), escenarios Bear/Base/Bull con sus spreads, owner earnings, TAM/SAM/SOM y reverse DCF. Pestaña «Modelo» de la ficha."
+    },
+    "item2": {
+      "title": "Cartera",
+      "text": "Posiciones, transacciones, importación desde IBKR y desglose por sector y divisa."
+    },
+    "item3": {
+      "title": "Exposiciones",
+      "text": "Pesos, concentración (top 1 y top 5) y exposición por sector y factor. No calcula VaR, drawdown ni volatilidad: son métricas de estructura de cartera."
+    },
+    "item4": {
+      "title": "Screener",
+      "text": "Universo de grandes capitalizaciones con perfiles y precios reales para partir de candidatos verificables."
+    },
+    "item5": {
+      "title": "ProPicks",
+      "text": "Scores 0-100 con motivos auditables (cada motivo muestra su métrica y su valor) y backtest por estrategia comparado contra el S&P 500."
+    },
+    "item6": {
+      "title": "Alertas",
+      "text": "Señales con umbral de materialidad explícito, enlazadas a la ficha de la compañía."
+    },
+    "item7": {
+      "title": "Insider",
+      "text": "Operaciones de personas vinculadas (Form 4 de la SEC) con señales por cluster de compra."
+    },
+    "item8": {
+      "title": "Knowledge y búsqueda",
+      "text": "Biblioteca de principios de inversión e índice semántico que se reconstruye desde Postgres."
+    },
+    "item9": {
+      "title": "Watchlist",
+      "text": "Seguimiento de símbolos con enlace directo a su ficha de research."
+    },
+    "item10": {
+      "title": "Metodología",
+      "text": "Motores de valoración con sus supuestos, fuentes de datos, límites (look-ahead, cobertura parcial) y costes explícitos."
+    }
+  },
+  "faqs": {
+    "item0": {
+      "question": "¿Cuánto cuesta usar GerarAI?",
+      "answer": "La app no tiene planes de pago ni cobra por usarla. Funciona con proveedores de datos de capa gratuita (Finnhub, Yahoo Finance, SEC EDGAR), lo que limita la cobertura y la frescura de algunos datos."
+    },
+    "item1": {
+      "question": "¿Esto es asesoramiento financiero?",
+      "answer": "No. GerarAI es una herramienta de análisis: los modelos y las tesis dependen de supuestos visibles y pueden fallar. Las decisiones de inversión son tuyas."
+    },
+    "item2": {
+      "question": "¿Cómo sigo una compañía?",
+      "answer": "Abre su ficha en Research y pulsa «Seguir», junto al nombre. Los símbolos que sigues se recogen en tu watchlist."
+    },
+    "item3": {
+      "question": "¿Qué hago si encuentro un error o tengo una sugerencia?",
+      "answer": "Escribe a la dirección de la pestaña Contacto, con la página y lo que esperabas ver. No se garantiza un plazo de respuesta."
+    },
+    "item4": {
+      "question": "¿Los datos de mercado son en tiempo real?",
+      "answer": "No. Los datos de mercado llegan con retraso en la mayoría de mercados: sirven para análisis, no para operar en intradía. En watchlist y research, cada precio indica la fecha de su cierre."
+    }
+  },
+  "login": {
+    "prefix": "Los enlaces a",
+    "portfolio": "cartera",
+    "risk": "riesgo",
+    "alerts": "alertas",
+    "export": "exportación",
+    "and": "y",
+    "description": "describen módulos del espacio de trabajo y",
+    "required": "requieren iniciar sesión",
+    "public": ". Esta página de ayuda y la metodología se leen sin cuenta."
+  },
+  "steps": {
+    "model": "1. Modelo.",
+    "modelText": "elige la compañía y abre la pestaña «Modelo» y pulsa «Generar modelo». Revisa los supuestos (crecimiento, margen FCF, WACC) y los escenarios Bear/Base/Bull con sus spreads antes de fiarte del número.",
+    "in": "En",
+    "thesis": "2. Tesis.",
+    "thesisText": "Genera la tesis desde la misma ficha: hipótesis, escenarios con probabilidades, catalizadores con fecha y qué la invalidaría. El memo y el EPUB se exportan desde la propia vista de tesis («Exportar memo» y «Exportar EPUB»);",
+    "exportText": "es la exportación anual del journal.",
+    "decision": "3. Decisión.",
+    "decisionText": "Registra la decisión en el Diario de decisiones (Comprar / Mantener / Reducir / Vender / Vigilar / Evitar) con la evidencia que la justifica y las condiciones verificables («Qué debe cumplirse»). Más adelante, «Expectativa vs realidad» compara tu previsión con los hechos publicados."
+  },
+  "glossary": {
+    "text": "Los términos técnicos (DCF, WACC, reverse DCF, moat, margen de seguridad, look-ahead, owner earnings, TAM/SAM/SOM, ROIC, VaR, drawdown, Sharpe) llevan un tooltip con su definición dondequiera que aparecen. Los motores de valoración con sus supuestos, las fuentes de datos (Finnhub, Yahoo Finance, SEC EDGAR), los límites y los costes están documentados en"
+  }
+}

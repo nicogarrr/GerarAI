@@ -13,7 +13,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-const source = readFileSync('components/help/HelpTabs.tsx', 'utf8');
+// Las afirmaciones visibles viven en el diccionario; los enlaces siguen en JSX.
+const source = readFileSync('components/help/HelpTabs.tsx', 'utf8') + '\n' + readFileSync('lib/i18n/messages/es/help.json', 'utf8');
 
 describe('help copy honesty guard (F138/F238/F244)', () => {
   it('nombra la pestaña y el boton reales del modelo', () => {
