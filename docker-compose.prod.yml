@@ -181,7 +181,11 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "0.75"
+          # CPU alineada con el contenedor vivo (docker inspect 2026-11-13: 2 CPU,
+          # subido a mano). Con 0.75 el cgroup medido acumula nr_throttled 404.863.
+          # La memoria (vivo 3 GiB) sigue en 896M: 3G rompe el guard de 16 GiB de
+          # test_memory_limits_fit_the_24gb_vm_with_host_reserve (suma 18.304 MiB).
+          cpus: "2.00"
           memory: 896M
 
   redis:
