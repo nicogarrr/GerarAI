@@ -23,6 +23,10 @@ describe('public shorts texts in English', () => {
       .toBe('Missing, invalid or future FINRA date: the freshness of the stored figure cannot be verified.');
     expect(shortsText('Fecha de consulta ausente o futura: no se puede verificar la antigüedad del dato guardado.', 'en'))
       .toBe('Missing or future lookup date: the age of the stored figure cannot be verified.');
+    // Aviso de liquidación FINRA >35 días (short_positions_service.py, #5565):
+    // aún no está en main, así que se aserta el literal nuevo a mano.
+    expect(shortsText('Fecha de liquidación FINRA de hace más de 35 días; el volumen diario conserva su propia fecha.', 'en'))
+      .toBe('FINRA settlement date older than 35 days; the daily volume keeps its own date.');
   });
 
   it('the page routes reason and note through the translator', () => {

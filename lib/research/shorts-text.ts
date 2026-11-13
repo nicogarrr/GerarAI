@@ -23,6 +23,7 @@ const TEXT_KEYS = [
   'noStoredLookup',
   'dailyVolumeNote',
   'cnmvScopeNote',
+  'finraSettlementStale',
 ] as const;
 
 // Uso por literal para el guard de i18n (claves consumidas por iteración,
@@ -37,6 +38,7 @@ export const SHORTS_BACKEND_TEXT_KEY_LITERALS = [
   'shorts.backendText.noStoredLookup',
   'shorts.backendText.dailyVolumeNote',
   'shorts.backendText.cnmvScopeNote',
+  'shorts.backendText.finraSettlementStale',
 ] as const;
 
 const backendText = (area: typeof esShorts, key: string): string =>
