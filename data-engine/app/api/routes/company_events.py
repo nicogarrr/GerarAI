@@ -95,6 +95,7 @@ class TimelineEventOut(BaseModel):
 class TimelineHoldingOut(BaseModel):
     average_cost: float | None = None
     first_buy_date: str | None = None
+    notice: str | None = None
 
 
 class CompanyTimelineEventsOut(BaseModel):
