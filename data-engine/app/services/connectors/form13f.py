@@ -240,9 +240,9 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
     queda desconocido, no como subtotal completo. Las filas sin CUSIP se
     descartan (nunca se inventa uno).
 
-    Limite conocido: la clave NO incluye SH/PRN (acciones vs importe nominal). Si un
-    gestor declarase ambos tipos para el mismo CUSIP y titulo, "shares" mezclaria
-    unidades; el valor en dolares si es correcto y se verifica contra tableValueTotal.
+    La clave no incluye SH/PRN (acciones vs importe nominal). Si hay unidades
+    incompatibles, la cantidad queda desconocida y el tipo MIXED; no se cambia
+    la identidad ni se mezclan unidades. El valor USD sigue siendo sumable.
     """
     summed = ("value_usd_thousands", "ssh_prnamt", "voting_sole", "voting_shared", "voting_none")
     merged: dict[tuple[str, str, str], dict] = {}
@@ -255,18 +255,25 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
         if current is None:
             merged[key] = dict(row)
             shares = _dec(row.get("ssh_prnamt"))
-            if shares is None or not shares.is_finite() or shares < 0:
+            unit = str(row.get("ssh_prnamt_type") or "").strip().upper()
+            merged[key]["ssh_prnamt_type"] = unit if unit in {"SH", "PRN"} else "UNKNOWN"
+            if shares is None or not shares.is_finite() or shares < 0 or unit not in {"SH", "PRN"}:
                 merged[key]["ssh_prnamt"] = None
             continue
         for name in summed:
             a, b = _dec(current.get(name)), _dec(row.get(name))
             # Existing rows are not absent positions: one unknown component
             # makes the complete share total unknown, including later rows.
-            if name == "ssh_prnamt" and any(
-                value is None or not value.is_finite() or value < 0 for value in (a, b)
-            ):
-                current[name] = None
-                continue
+            if name == "ssh_prnamt":
+                current_unit = current.get("ssh_prnamt_type")
+                row_unit = str(row.get("ssh_prnamt_type") or "").strip().upper()
+                if current_unit not in {"SH", "PRN"} or current_unit != row_unit:
+                    current[name] = None
+                    current["ssh_prnamt_type"] = "MIXED"
+                    continue
+                if any(value is None or not value.is_finite() or value < 0 for value in (a, b)):
+                    current[name] = None
+                    continue
             if a is None and b is None:
                 continue
             current[name] = str((a or Decimal(0)) + (b or Decimal(0)))
