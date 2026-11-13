@@ -50,7 +50,7 @@ def test_deadline_preserves_resolved_days_and_marks_the_rest():
         )
 
     t0 = time.monotonic()
-    events, errors = run_async(probe())
+    events, errors, _stale_days = run_async(probe())
     elapsed = time.monotonic() - t0
     assert len(events) == 4, "la primera oleada (4 dias) se conserva"
     assert len(errors) == 2, "los otros 2 dias se declaran, no se rellenan"
@@ -74,7 +74,7 @@ def test_deadline_error_is_explicit_and_distinct_from_provider_failure():
             fake_day, start, start + timedelta(days=6), object(), deadline_s=8.0
         )
 
-    events, errors = run_async(probe())
+    events, errors, _stale_days = run_async(probe())
     assert len(events) == 4
     assert any("calendario no disponible" in e for e in errors)
     assert any("deadline del rango" in e for e in errors)
@@ -152,5 +152,5 @@ def test_default_concurrency_fits_two_weeks_in_the_cold_deadline(monkeypatch):
             fake_day, start, start + timedelta(days=14), object(), deadline_s=3.0
         )
 
-    events, errors = run_async(probe())
+    events, errors, _stale_days = run_async(probe())
     assert len(events) == 15 and errors == []

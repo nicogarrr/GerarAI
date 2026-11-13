@@ -211,6 +211,10 @@ def _check_range(desde: date, hasta: date) -> None:
 _DEADLINE: Any = object()
 
 
+class _StaleDay(list[dict[str, Any]]):
+    """Copy of a cached day whose refresh is pending or failed."""
+
+
 async def _fetch_day_pooled(
     kind: str,
     day: date,
@@ -236,7 +240,7 @@ async def _fetch_day_pooled(
         if age < _DAY_STALE_MAX_S:
             if not recently_failed:
                 _day_flight(loop, kind, day, fetch_day)
-            return hit[1]
+            return _StaleDay(hit[1])
     if recently_failed:
         return None
     return await _day_flight(loop, kind, day, fetch_day)
@@ -284,7 +288,7 @@ async def _fetch_days(
     *,
     kind: str = "earnings",
     deadline_s: float = RANGE_DEADLINE_S,
-) -> tuple[list[dict[str, Any]], list[str]]:
+) -> tuple[list[dict[str, Any]], list[str], list[str]]:
     """Consulta los dias del rango en paralelo acotado, con deadline total.
 
     ``asyncio.gather`` conserva el orden de los dias en el resultado, asi el
@@ -320,6 +324,7 @@ async def _fetch_days(
     per_day = await asyncio.gather(*(_one(day) for day in days))
     events: list[dict[str, Any]] = []
     errors: list[str] = []
+    stale_days: list[str] = []
     for day, day_events in zip(days, per_day, strict=True):
         if day_events is _DEADLINE:
             errors.append(f"{day.isoformat()}: sin datos (deadline del rango de {deadline_s:g}s agotado)")
@@ -327,7 +332,10 @@ async def _fetch_days(
             errors.append(f"{day.isoformat()}: calendario no disponible")
         else:
             events.extend(day_events)
-    return events, errors
+            if isinstance(day_events, _StaleDay):
+                stale_days.append(day.isoformat())
+                errors.append(f"{day.isoformat()}: copia guardada hace más de una hora; actualización pendiente o fallida.")
+    return events, errors, stale_days
 
 
 async def fetch_earnings_range(
@@ -341,8 +349,8 @@ async def fetch_earnings_range(
     ``[]``; si solo fallan algunos, ``status`` es ``"partial"``.
     """
     _check_range(desde, hasta)
-    events, errors = await _fetch_days(fetch_earnings_day, desde, hasta, client, kind="earnings")
-    if errors and not events:
+    events, errors, stale_days = await _fetch_days(fetch_earnings_day, desde, hasta, client, kind="earnings")
+    if errors and not events and not stale_days:
         status = "unavailable"
     elif errors:
         status = "partial"
@@ -355,6 +363,7 @@ async def fetch_earnings_range(
         "count": len(events),
         "events": events,
         "errors": errors,
+        "stale_days": stale_days,
     }
 
 
@@ -365,8 +374,8 @@ async def fetch_dividends_range(
 ) -> dict[str, Any]:
     """Agrega dividendos dia a dia con la misma semantica de degradacion."""
     _check_range(desde, hasta)
-    events, errors = await _fetch_days(fetch_dividends_day, desde, hasta, client, kind="dividends")
-    if errors and not events:
+    events, errors, stale_days = await _fetch_days(fetch_dividends_day, desde, hasta, client, kind="dividends")
+    if errors and not events and not stale_days:
         status = "unavailable"
     elif errors:
         status = "partial"
@@ -379,4 +388,5 @@ async def fetch_dividends_range(
         "count": len(events),
         "events": events,
         "errors": errors,
+        "stale_days": stale_days,
     }
