@@ -154,7 +154,9 @@
       "W": "Inheritance",
       "X": "Option exercise"
     },
-    "excludedFutureRows": "{count} transactions dated in the future excluded from the observed feed; they are not included in the totals."
+    "excludedFutureRows": "{count} transactions dated in the future excluded from the observed feed; they are not included in the totals.",
+    "amountMinKnown": "≥ {known} as a minimum · {missing} without an amount",
+    "amountNa": "amount N/A"
   },
   "statusCopy": {
     "reason": {

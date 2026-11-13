@@ -57,6 +57,22 @@ function Filter<T extends string | number>({
     );
 }
 
+/**
+ * Importe de una señal. Si falta el importe de alguna compra de la ventana,
+ * total_value llega null y se muestra el mínimo conocido con su aviso —nunca
+ * una suma parcial como si fuera el total—; sin ningún dato, N/D.
+ */
+function signalAmountText(t: TFunction, f: Formatters, signal: InsiderFeedSignal): string {
+    const total = signal.value ?? signal.total_value;
+    if (typeof total === 'number' && Number.isFinite(total)) return usd(f, total, 0, 'USD');
+    const known = signal.known_total_value;
+    const missing = signal.window_value_missing;
+    if (typeof known === 'number' && Number.isFinite(known) && typeof missing === 'number' && missing > 0) {
+        return t('insider.feed.amountMinKnown', { known: usd(f, known, 0, 'USD'), missing: f.formatNumber(missing, { maximumFractionDigits: 0 }) });
+    }
+    return t('insider.feed.amountNa');
+}
+
 /** Fila de señal (cluster / CEO-CFO / gran compra): ticker, quién, cuánto y cuándo. */
 function SignalLine({ signal, children }: { signal: InsiderFeedSignal; children?: React.ReactNode }) {
     const t = useT();
@@ -74,7 +90,7 @@ function SignalLine({ signal, children }: { signal: InsiderFeedSignal; children?
                 <span className="rounded-full bg-indigo-950/60 px-2 py-0.5 text-xs font-semibold text-indigo-300">{t('insider.feed.institutional')}</span>
             ) : null}
             {children}
-            <span className="tabular-nums text-gray-300">{usd(f, signal.value ?? signal.total_value, 0, 'USD')}</span>
+            <span className="tabular-nums text-gray-300">{signalAmountText(t, f, signal)}</span>
             <span className="text-gray-500">{signal.date ? f.formatDate(signal.date) : signal.window_start ? t('insider.feed.sinceDate', { date: f.formatDate(signal.window_start) }) : '—'}</span>
         </li>
     );

@@ -74,6 +74,29 @@ describe('InsiderFeed', () => {
         expect(screen.getByRole('link', { name: 'CCC' })).toHaveAttribute('href', '/insider?ticker=CCC');
     });
 
+    it('cluster con importes ausentes: mínimo conocido con aviso, nunca como total; sin dato, N/D', () => {
+        render(
+            <InsiderFeed
+                side="all"
+                days={90}
+                feed={feed({
+                    clusters: [
+                        { ticker: 'AAA', insider_count: 4, total_value: null, known_total_value: 100000, window_value_missing: 2, window_start: '2026-09-01' },
+                        { ticker: 'BBB', insider_count: 2, total_value: null, known_total_value: null, window_value_missing: 3, window_start: '2026-09-01' },
+                        { ticker: 'CCC', insider_count: 3, total_value: 175000, known_total_value: 175000, window_value_missing: 0, window_start: '2026-09-01' },
+                    ],
+                })}
+            />,
+        );
+        // Mínimo explícito con aviso de importes ausentes.
+        expect(screen.getByText(/≥ 100\.000.*US\$.*como mínimo · 2 sin importe/)).toBeInTheDocument();
+        // Sin ningún importe conocido: N/D, nunca un 0 ni una suma parcial.
+        expect(screen.getByText('importe N/D')).toBeInTheDocument();
+        // Ventana completa: el total se muestra tal cual, sin «mínimo».
+        expect(screen.getByText('175.000 US$')).toBeInTheDocument();
+        expect(screen.queryByText(/175\.000.*como mínimo/)).not.toBeInTheDocument();
+    });
+
     it('sin señales no pinta sus secciones', () => {
         render(<InsiderFeed feed={feed()} side="all" days={90} />);
         expect(screen.queryByRole('heading', { name: 'Clusters de compra' })).not.toBeInTheDocument();
