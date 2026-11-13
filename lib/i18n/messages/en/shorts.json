@@ -1,0 +1,12 @@
+{
+  "backendText": {
+    "finraDateInvalid": "Missing, invalid or future FINRA date: the freshness of the stored figure cannot be verified.",
+    "lookupDateInvalid": "Missing or future lookup date: the age of the stored figure cannot be verified.",
+    "noMapping": "There is no reviewed mapping for this exchange or company.",
+    "sourceUnverifiable": "The source returned no verifiable data; the previous figure keeps its date.",
+    "lookupWindowLimit": "Lookup or trade date outside the 4-day limit.",
+    "noStoredLookup": "No stored lookup. Use Refresh to query the public source.",
+    "dailyVolumeNote": "Daily off-exchange short volume, not open positions or a share of the whole market. It does not imply bearish sentiment on its own.",
+    "cnmvScopeNote": "Only public positions >=0.5%. The sum is not the market’s total short interest; dates differ by holder."
+  }
+}
