@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { FundHoldersPanel } from '@/components/research/FundHoldersPanel';
+import { datasetLabel, fundHoldersExtraNotices } from '@/lib/research/fund-holders';
 import type { FundHolders } from '@/lib/research/fund-holders';
 
 const fund = (over: Partial<FundHolders['top_funds'][number]>) => ({
@@ -49,6 +50,39 @@ describe('FundHoldersPanel', () => {
     const columns = container.querySelectorAll('[data-testid="fondos"] .grid > div');
     expect(columns.length).toBeGreaterThan(1);
     columns.forEach((column) => expect(column).toHaveClass('min-w-0'));
+  });
+
+  it('avisos N-PORT del backend: traducidos en inglés, sin repetir las limitaciones del pie', () => {
+    const noticed: FundHolders = {
+      ...data,
+      totals: { funds: 2, shares: 1060, value_usd: null },
+      limitations: [
+        'N-PORT: fondos y ETF registrados en EE. UU.; la cartera pública es la del último mes de cada trimestre fiscal del fondo, con hasta 60 días de retraso.',
+        'Cada fondo tiene su propia fecha de cartera (se muestra); no son todas del mismo día.',
+        'Peso = % del patrimonio neto que declara el propio fondo.',
+        'Snapshot N-PORT previo: integridad de importes y pesos no verificada hasta recalcular.',
+        'Datos N-PORT incompletos: los importes o pesos con componentes ausentes no se presentan como totales completos.',
+        'Aviso nuevo del backend',
+      ],
+    };
+    const { rerender } = render(<FundHoldersPanel data={noticed} locale="es" />);
+    expect(screen.getByText(/Snapshot N-PORT previo/)).toBeInTheDocument();
+    expect(screen.getByText(/Datos N-PORT incompletos/)).toBeInTheDocument();
+    expect(screen.getByText('Aviso nuevo del backend')).toBeInTheDocument();
+    expect(screen.queryByText(/Cada fondo tiene su propia fecha de cartera/)).not.toBeInTheDocument();
+    rerender(<FundHoldersPanel data={noticed} locale="en" />);
+    expect(screen.getByText('Previous N-PORT snapshot: amount and weight integrity not verified until recomputed.')).toBeInTheDocument();
+    expect(screen.getByText('Incomplete N-PORT data: amounts or weights with missing components are not shown as complete totals.')).toBeInTheDocument();
+    expect(screen.getByText('Aviso nuevo del backend')).toBeInTheDocument();
+    expect(screen.queryByText(/Datos N-PORT incompletos/)).not.toBeInTheDocument();
+  });
+
+  it('datasetLabel traduce el trimestre del fichero y respeta valores raros', () => {
+    expect(datasetLabel('2026q3', 'es')).toBe('3T 2026');
+    expect(datasetLabel('2026q3', 'en-US')).toBe('Q3 2026');
+    expect(datasetLabel('trimestre-raro', 'es')).toBe('trimestre-raro');
+    expect(datasetLabel(undefined, 'es')).toBe('—');
+    expect(fundHoldersExtraNotices(undefined)).toEqual([]);
   });
 
   it('cero observado: la acción no aparece en el fichero, no «0 fondos declaran 0 acciones»', () => {

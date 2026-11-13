@@ -1,7 +1,7 @@
 import { naFor } from '@/lib/format';
 import { DEFAULT_LOCALE, intlLocale, parseLocale, type Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
-import { datasetLabel, type FundHolder, type FundHolders } from '@/lib/research/fund-holders';
+import { datasetLabel, fundHoldersExtraNotices, fundHoldersNotice, type FundHolder, type FundHolders } from '@/lib/research/fund-holders';
 import { compactShares, pct } from '@/lib/research/institutional-holders';
 
 function fmtDate(value: string | null | undefined, intl: string): string {
@@ -100,6 +100,13 @@ export function FundHoldersPanel({ data, locale = DEFAULT_LOCALE }: { data: Fund
           <ol className="mt-1">{data.by_weight.map((f) => <Row fund={f} intl={intl} key={`w-${f.accession}`} mode="weight" t={t} />)}</ol>
         </div>
       </div>
+      {fundHoldersExtraNotices(data.limitations).length > 0 ? (
+        <ul className="space-y-1" role="status">
+          {fundHoldersExtraNotices(data.limitations).map((notice) => (
+            <li className="text-xs text-amber-300" key={notice}>{fundHoldersNotice(notice, locale)}</li>
+          ))}
+        </ul>
+      ) : null}
       <p className="text-xs text-gray-500">
         {t('research.fondos.source')}{' '}
         {data.source ? (
