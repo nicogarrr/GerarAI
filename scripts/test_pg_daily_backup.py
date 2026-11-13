@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 
-SCRIPT = Path(__file__).resolve().parents[1] / 'pg-daily-backup.sh'
+SCRIPT = Path(__file__).resolve().parent / 'ops' / 'pg-daily-backup.sh'
 MOCK = '''#!/usr/bin/env python3
 import os,sys
 from pathlib import Path

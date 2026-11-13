@@ -92,5 +92,5 @@ revision, gates de la VM y restauracion aislada satisfactoria del SHA revisado.
 - `BACKUP_DIR`, `PG_SOURCE_CONTAINER`, `PG_VERIFY_IMAGE`, `BACKUP_KEEP` y
   `LOCKFILE` permiten probar en un directorio aislado sin sustituir el timer.
 - La prueba unitaria usa comandos simulados, no una base real:
-  `python -m unittest discover -s scripts/ops/tests -p test_pg_daily_backup.py -v`.
+  `python -m unittest discover -s scripts -p test_pg_daily_backup.py -v`.
   La prueba real de restauracion sigue siendo obligatoria antes de instalar.
