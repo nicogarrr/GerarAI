@@ -181,3 +181,33 @@ def test_actor_determinista_no_declara_completas_las_metricas_pendientes(engine,
     assert out["mode"] == "deterministic-only"
     with _open(engine) as db:
         assert db.get(Document, doc_id).metadata_["kpi_deterministic"]["unresolved_metrics"] == ["revenue"]
+
+
+def test_402_del_proveedor_difiere_sin_gastar_el_intento(engine, monkeypatch):
+    from app.llm.errors import ProviderHTTPError
+
+    monkeypatch.setattr(dramatiq_app, "_session", lambda *a: _open(engine))
+    doc_id = _document(engine, metadata={"kpi_deferred": {"attempts": 3, "queued_at": 1}})
+    _fake_service(monkeypatch, exc=ProviderHTTPError("opencode-go", 402))
+    result = dramatiq_app.extract_document_kpis.fn(doc_id)
+    assert result["status"] == "deferred"
+    assert result["reason"] == "provider_payment_required"
+    with _open(engine) as db:
+        meta = db.get(Document, doc_id).metadata_
+        deferred = meta[dramatiq_app.KPI_DEFERRED_KEY]
+        assert deferred["attempts"] == 2  # el intento reservado por backfill se devuelve
+        assert deferred["not_before"] >= meta["kpi_provider_deferred"]["at"] + dramatiq_app.KPI_PAYMENT_DEFER_SECONDS - 5
+        assert "queued_at" not in deferred
+
+
+def test_401_y_403_siguen_siendo_fallo_permanente_visible(engine, monkeypatch):
+    from app.llm.errors import ProviderHTTPError
+
+    monkeypatch.setattr(dramatiq_app, "_session", lambda *a: _open(engine))
+    for status in (401, 403):
+        doc_id = _document(engine, metadata={"kpi_deferred": {"attempts": 1}})
+        _fake_service(monkeypatch, exc=ProviderHTTPError("opencode-go", status))
+        out = dramatiq_app.extract_document_kpis.fn(doc_id)
+        assert out["status"] == "error"
+        with _open(engine) as db:
+            assert db.get(Document, doc_id).metadata_["kpi_deferred"]["attempts"] == 1
