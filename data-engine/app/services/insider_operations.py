@@ -134,7 +134,9 @@ def _matched_raw_tickers(db: Session, followed: set[str]) -> list[str]:
 def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
     """Agregado por empresa (cartera + watchlist) e insider, ultimos `days` dias."""
     followed = followed_companies(db)
-    cutoff = (date.today() - timedelta(days=days)).isoformat()
+    today = date.today()
+    cutoff = (today - timedelta(days=days)).isoformat()
+    excluded_future_rows = 0
     # Sin filtro de codigo/fecha en SQL: los descartes se cuentan en Python
     # para declararlos (el WHERE los haria invisibles).
     # Solo Form 4 (SEC, USD): los movimientos PDMR (UK) vienen en GBP y esta
@@ -189,6 +191,9 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
             if not effective:
                 rows_without_date += 1
             else:
+                if effective > today.isoformat():
+                    excluded_future_rows += 1
+                    continue
                 if effective < cutoff:
                     continue
                 dates.append(effective)
@@ -268,6 +273,7 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
         "days": days,
         "as_of": date.today().isoformat(),
         "scope": "cartera+watchlist",
+        "excluded_future_rows": excluded_future_rows,
         "note": (
             "Solo compras/ventas en mercado abierto (codigos Form 4 P/S, no "
             "derivadas) ya persistidas por el monitor; concesiones, ejercicios "
