@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import httpx
 from lxml import html
@@ -62,7 +62,7 @@ async def fetch_positions(issuer: CNMVIssuer, *, client: httpx.AsyncClient | Non
     except httpx.TransportError as exc:
         registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
         raise
-    except ValueError as exc:
+    except (ValueError, InvalidOperation) as exc:
         registry.record_failure(_REGISTRY_KEY, f"parseo: {exc}")
         raise
     registry.record_success(_REGISTRY_KEY)
