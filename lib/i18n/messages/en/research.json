@@ -821,7 +821,9 @@
       "insiderSomeone": "An insider",
       "insiderBuys": "{name} buys shares",
       "insiderSells": "{name} sells shares",
-      "insiderDetail": "${value} trade (form {form})"
+      "insiderDetail": "${value} trade (form {form})",
+      "insiderCurrencyDetail": "{value} {currency} trade (form {form})",
+      "insiderUnknownDetail": "Amount not comparable: currency or amount not reported (form {form})"
     },
     "chartType": "Chart type",
     "lineMode": "Line",

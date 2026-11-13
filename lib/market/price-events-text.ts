@@ -15,6 +15,9 @@ const DIVIDEND_DETAIL = /^(\S+) (\S+) por acción$/;
 const INSIDER_TITLE = /^(.+) (compra|vende) acciones$/;
 const INSIDER_DETAIL = /^Operación de (\d{1,3}(?:\.\d{3})*) \$ \(formulario (.+)\)$/;
 
+const INSIDER_CURRENCY_DETAIL = /^Operación de (\d{1,3}(?:\.\d{3})*) (\S+) \(formulario (.+)\)$/;
+const INSIDER_UNKNOWN_DETAIL = /^Importe no comparable: divisa o importe no informado \(formulario (.+)\)$/;
+
 function resultsText(event: PriceEvent, t: TranslateFn): PriceEvent {
   const label = RESULTS_LABEL.exec(event.title);
   const title = event.title === 'Resultados'
@@ -39,7 +42,12 @@ function insiderText(event: PriceEvent, t: TranslateFn): PriceEvent {
     title = who[2] === 'compra' ? t('research.chart.storedEvent.insiderBuys', { name }) : t('research.chart.storedEvent.insiderSells', { name });
   }
   const trade = event.detail ? INSIDER_DETAIL.exec(event.detail) : null;
-  const detail = trade ? t('research.chart.storedEvent.insiderDetail', { value: trade[1].replace(/\./g, ','), form: trade[2] }) : event.detail;
+  const currencyTrade = event.detail ? INSIDER_CURRENCY_DETAIL.exec(event.detail) : null;
+  const unknown = event.detail ? INSIDER_UNKNOWN_DETAIL.exec(event.detail) : null;
+  const detail = currencyTrade && currencyTrade[2] !== '$'
+    ? t('research.chart.storedEvent.insiderCurrencyDetail', { value: currencyTrade[1].replace(/\./g, ','), currency: currencyTrade[2], form: currencyTrade[3] })
+    : unknown ? t('research.chart.storedEvent.insiderUnknownDetail', { form: unknown[1] })
+    : trade ? t('research.chart.storedEvent.insiderDetail', { value: trade[1].replace(/\./g, ','), form: trade[2] }) : event.detail;
   return { ...event, title, detail };
 }
 

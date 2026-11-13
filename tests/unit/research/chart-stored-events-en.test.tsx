@@ -45,7 +45,7 @@ describe('gráfico «Precio y eventos»: eventos guardados en inglés', () => {
         expect(SERVICE).toContain('"title": "Ex-dividendo",');
         expect(SERVICE).toContain('"detail": f"{amount:g} {row.currency} por acción" if amount else None,');
         expect(SERVICE).toContain(`"title": f"{row.insider or 'Un directivo'} {'compra' if row.code == 'P' else 'vende'} acciones",`);
-        expect(SERVICE).toContain('"detail": f"Operación de {value:,.0f} $ (formulario {row.form})".replace(",", "."),');
+        expect(SERVICE).toContain('detail = f"Operación de {value:,.0f} $ (formulario {row.form})".replace(",", ".")');
     });
 
     it('resultados, ex-dividendo y directivos salen en inglés; las noticias quedan como vienen', () => {
@@ -67,4 +67,15 @@ describe('gráfico «Precio y eventos»: eventos guardados en inglés', () => {
         expect(titles).not.toMatch(SPANISH);
         expect(screen.queryByText(/Resultados|Ex-dividendo|vende acciones/)).toBeNull();
     });
+});
+
+
+it('traduce moneda declarada y avisa cuando el importe no es comparable', () => {
+    const base: PriceEvent = { id: 'pdmr', date: '2026-11-13', kind: 'insider', title: 'Ana compra acciones', source: 'tracefour' };
+    const known = { ...base, detail: 'Operación de 250.000 GBP (formulario PDMR)' };
+    const unknown = { ...base, detail: 'Importe no comparable: divisa o importe no informado (formulario PDMR)' };
+    expect(storedEventText(known, 'en').detail).toBe('250,000 GBP trade (form PDMR)');
+    expect(storedEventText(unknown, 'en').detail).toBe('Amount not comparable: currency or amount not reported (form PDMR)');
+    expect(storedEventText(known, 'es')).toEqual(known);
+    expect(storedEventText(unknown, 'es')).toEqual(unknown);
 });
