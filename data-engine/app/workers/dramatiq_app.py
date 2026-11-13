@@ -1129,6 +1129,7 @@ def reset_local_leases() -> None:
 
 
 # 429 del proveedor LLM en la extraccion KPI: 2 min, 4 min... (techo 30 min).
+KPI_PAYMENT_DEFER_SECONDS = 6 * 3600
 KPI_RATE_LIMIT_BASE_SECONDS = 120.0
 KPI_RATE_LIMIT_CAP_SECONDS = 1800.0
 
@@ -1180,6 +1181,26 @@ def extract_document_kpis(
             return {"status": "deferred", "reason": "daily_call_limit", "document_id": document_id}
         from app.llm.errors import ProviderHTTPError
 
+        if isinstance(exc, ProviderHTTPError) and exc.status_code == 402:
+            # Proveedor sin credito/suscripcion (Go agotado): no es culpa del
+            # documento. Se difiere con ventana y SIN gastar el intento que
+            # backfill ya persistio al reenviar; asi una caida de facturacion
+            # no deja los documentos "exhausted" para siempre. 401/403 (clave
+            # invalida) siguen siendo fallo permanente visible.
+            document = db.get(Document, document_id)
+            if document is not None:
+                meta = dict(document.metadata_ or {})
+                previous = dict(meta.get(KPI_DEFERRED_KEY) or {})
+                attempts = max(0, int(previous.get("attempts") or 0) - 1)
+                meta[KPI_DEFERRED_KEY] = {
+                    "attempts": attempts,
+                    "not_before": int(time.time()) + KPI_PAYMENT_DEFER_SECONDS,
+                }
+                meta["kpi_provider_deferred"] = {"at": int(time.time()), "reason": "provider_payment_required"}
+                document.metadata_ = meta
+                db.commit()
+            logger.warning("extract_document_kpis: proveedor LLM responde 402; documento %s diferido", document_id)
+            return {"status": "deferred", "reason": "provider_payment_required", "document_id": document_id}
         if isinstance(exc, ProviderHTTPError) and exc.status_code == 429:
             # Limite del proveedor LLM: el backoff del actor (15-30 s) volvia
             # contra la misma ventana y acababa en dead-letter (prod, 1-nov).
