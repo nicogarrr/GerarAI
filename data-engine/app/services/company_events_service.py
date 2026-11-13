@@ -608,17 +608,31 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
     ).all():
         value = _timeline_float(row.value)
         day = _timeline_day(row.tx_date)
-        if day is None or not (desde <= day <= hasta) or value is None or value < TIMELINE_INSIDER_MIN_VALUE:
+        if day is None or not (desde <= day <= hasta):
             continue
         if row.code not in ("P", "S") or row.is_derivative:
             continue
+        sec = row.form in {"4", "4/A", "5", "5/A"}
+        if sec and (value is None or value < TIMELINE_INSIDER_MIN_VALUE):
+            continue
+        quality = row.data_quality if isinstance(row.data_quality, dict) else {}
+        currency = quality.get("currency")
+        if sec:
+            source = "SEC"
+            detail = f"Operación de {value:,.0f} $ (formulario {row.form})".replace(",", ".")
+        else:
+            source = {"PDMR": "tracefour", "CA-INSIDER": "Yahoo Finance (no oficial)"}.get(row.form, "Registro insider")
+            if isinstance(currency, str) and currency.strip() and value is not None and value >= 0:
+                detail = f"Operación de {value:,.0f} {currency.strip()} (formulario {row.form})".replace(",", ".")
+            else:
+                detail = f"Importe no comparable: divisa o importe no informado (formulario {row.form})"
         events.append({
             "id": f"insider-{row.id}",
             "date": day.isoformat(),
             "kind": "insider",
             "title": f"{row.insider or 'Un directivo'} {'compra' if row.code == 'P' else 'vende'} acciones",
-            "detail": f"Operación de {value:,.0f} $ (formulario {row.form})".replace(",", "."),
-            "source": "SEC",
+            "detail": detail,
+            "source": source,
             "source_url": row.source_url,
         })
     events.sort(key=lambda e: (e["date"], e["id"]), reverse=True)

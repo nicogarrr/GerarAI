@@ -821,7 +821,9 @@
       "insiderSomeone": "Un directivo",
       "insiderBuys": "{name} compra acciones",
       "insiderSells": "{name} vende acciones",
-      "insiderDetail": "Operación de {value} $ (formulario {form})"
+      "insiderDetail": "Operación de {value} $ (formulario {form})",
+      "insiderCurrencyDetail": "Operación de {value} {currency} (formulario {form})",
+      "insiderUnknownDetail": "Importe no comparable: divisa o importe no informado (formulario {form})"
     },
     "chartType": "Tipo de gráfico",
     "lineMode": "Línea",
