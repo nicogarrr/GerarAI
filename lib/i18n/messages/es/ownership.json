@@ -87,6 +87,7 @@
     "feature": "Más compradas",
     "intro": "Lo que más inversores añadieron a su cartera en el último trimestre.",
     "empty": "Sin datos todavía: faltan dos trimestres de 13F sincronizados.",
+    "incompleteNotice": "Importe incompleto: faltan valores declarados de algunas posiciones compradoras; el subtotal conocido no es el total.",
     "buyers": "{n} compran",
     "sellers": "{n} reducen",
     "source": "Fuente: SEC, Form 13F (EDGAR){reports}. Trimestral, con hasta 45 días de retardo. Compara cada inversor con su trimestre anterior ({n} comparados{withoutHistory}{partial}). Solo acciones largas en EE. UU.; las opciones no cuentan. El 13F no trae ticker, se muestra el emisor y su CUSIP. Valor = posición actual de quienes compran, en dólares.",

@@ -1,5 +1,6 @@
 'use server';
 
+import { getT } from '@/lib/i18n/server';
 import { researchRequest } from '@/lib/research/client';
 import { AppError } from '@/lib/types/errors';
 
@@ -115,7 +116,14 @@ export type MostBoughtItem = {
   buyers_count: number;
   new_count: number;
   sellers_count: number;
+  /** Subtotal de quienes compran; null cuando falta el valor declarado de alguna posición (#5484). */
   value_usd: number | null;
+  /** Subtotal conocido aunque value_usd sea null por posiciones sin valor. */
+  known_value_usd?: number | null;
+  /** Posiciones compradoras sin valor declarado en el subtotal. */
+  missing_value_count?: number;
+  /** Aviso de calidad del dato (texto fijo del motor) cuando el importe es incompleto. */
+  notice?: string | null;
   buyers: { slug: string; name: string; change: 'new' | 'increased'; report_date?: string }[];
 };
 
@@ -129,8 +137,20 @@ export type MostBought = {
   limitations: string[];
 };
 
+// Aviso de calidad con texto fijo que emite el motor (investors.py, #5484)
+// cuando el subtotal de quienes compran es incompleto.
+const MOST_BOUGHT_INCOMPLETE_NOTICE = 'Importe incompleto: faltan valores declarados de algunas posiciones compradoras; el subtotal conocido no es el total.';
+
 export async function getMostBought(): Promise<MostBought> {
-  return requestJson<MostBought>('/api/investors/most-bought');
+  const data = await requestJson<MostBought>('/api/investors/most-bought');
+  // El aviso llega en castellano: se sirve traducido; uno desconocido pasa tal cual.
+  if (data.items?.some((item) => item.notice)) {
+    const t = await getT();
+    for (const item of data.items) {
+      if (item.notice === MOST_BOUGHT_INCOMPLETE_NOTICE) item.notice = t('ownership.mostBought.incompleteNotice');
+    }
+  }
+  return data;
 }
 
 export type PortfolioOverlap = {

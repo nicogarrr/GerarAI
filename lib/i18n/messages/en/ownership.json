@@ -87,6 +87,7 @@
     "feature": "Most bought",
     "intro": "What the most investors added to their portfolios last quarter.",
     "empty": "No data yet: two synced quarters of 13F are needed.",
+    "incompleteNotice": "Incomplete amount: declared values are missing for some buying positions; the known subtotal is not the total.",
     "buyers": "{n} buying",
     "sellers": "{n} trimming",
     "source": "Source: SEC, Form 13F (EDGAR){reports}. Quarterly, with up to a 45-day lag. Each investor is compared with their previous quarter ({n} compared{withoutHistory}{partial}). US long positions only; options do not count. The 13F has no ticker, so the issuer and its CUSIP are shown. Value = current position of those buying, in dollars.",
