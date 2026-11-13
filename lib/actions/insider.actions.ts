@@ -179,9 +179,13 @@ export interface InsiderFeedResult {
     count: number;
     totals: {
         buy_count: number;
-        buy_value: number;
+        buy_value: number | null;
+        buy_known_value?: number;
+        buy_value_missing?: number;
         sell_count: number;
-        sell_value: number;
+        sell_value: number | null;
+        sell_known_value?: number;
+        sell_value_missing?: number;
         filings_total: number;
         filings_with_transactions: number;
         filings_pending: number;
