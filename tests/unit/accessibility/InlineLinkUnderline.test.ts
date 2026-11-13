@@ -21,7 +21,7 @@ function classTokens(className: string): string[] {
 describe('enlaces inline en texto', () => {
     it('el enlace a /watchlist dentro del contador de Inicio va subrayado siempre', () => {
         const src = readFileSync('components/PersonalizedOverview.tsx', 'utf8');
-        const inlineLink = src.match(/<Link href="\/watchlist" className="([^"]*)">\s*\{t\('home\.watchlist\.seeFullList'\)\}/);
+        const inlineLink = src.match(/<IntentLink href="\/watchlist" className="([^"]*)">\s*\{t\('home\.watchlist\.seeFullList'\)\}/);
         expect(inlineLink, 'no se encuentra el enlace inline a /watchlist').not.toBeNull();
         const tokens = classTokens(inlineLink![1]);
         expect(tokens, 'el enlace necesita el token exacto `underline`, no solo hover:underline').toContain('underline');

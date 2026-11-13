@@ -3,6 +3,12 @@ import { markBrainReady, OPEN_BRAIN_PENDING_KEY } from '@/lib/brain/open-brain';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+// Exponemos la política de Next Link sin precargas reales en jsdom.
+vi.mock('next/link', () => ({
+    default: ({ prefetch, ...props }: React.ComponentProps<'a'> & { prefetch?: boolean }) =>
+        <a {...props} data-prefetch={String(prefetch)} />,
+}));
+
 // El shell real consume el handoff; el panel de chat tiene su suite propia.
 vi.mock('@/components/brain/GlobalBrainPanel', () => ({
     GlobalBrainPanel: ({ openDetail }: { openDetail: { seq: number } | null }) =>
@@ -125,6 +131,24 @@ beforeEach(() => {
 });
 
 describe('PersonalizedOverview', () => {
+    it('no precarga destinos del inicio sin intención y conserva navegación al interactuar', async () => {
+        setup({ portfolio: summary([holding('AAA')]), watch: { unavailable: false, total: 1, items: [watch('AAPL')] } });
+        const { container } = await renderHome();
+        const internal = [...container.querySelectorAll('a[href^="/"]')];
+        expect(internal.length).toBeGreaterThan(4);
+        internal.forEach(link => expect(link).toHaveAttribute('data-prefetch', 'false'));
+        const details = screen.getByRole('link', { name: /Ver detalles/ });
+        fireEvent.mouseEnter(details);
+        expect(details).toHaveAttribute('data-prefetch', 'true');
+        expect(details).toHaveAttribute('href', '/portfolio');
+        const watchlist = container.querySelector<HTMLAnchorElement>('a[href="/watchlist"]')!;
+        fireEvent.focus(watchlist);
+        expect(watchlist).toHaveAttribute('data-prefetch', 'true');
+        const alerts = screen.getByRole('link', { name: 'Gestionar' });
+        fireEvent.touchStart(alerts);
+        expect(alerts).toHaveAttribute('data-prefetch', 'true');
+    });
+
     it('muestra esqueletos mientras carga y el bloque de oportunidades no aparece', () => {
         setup();
         getPortfolioSummary.mockReturnValue(new Promise(() => {}));
@@ -315,6 +339,7 @@ describe('PersonalizedOverview', () => {
         await renderHome();
         const retry = screen.getAllByRole('button', { name: 'Reintentar' });
         expect(retry).toHaveLength(1);
+        expect(retry[0]).toHaveClass('min-h-11', 'min-w-11', 'inline-flex');
         getPortfolioSummary.mockResolvedValue(summary([holding('ASTS')]));
         fireEvent.click(retry[0]);
         await waitFor(() => expect(screen.getByText('desglose 5000')).toBeInTheDocument());
