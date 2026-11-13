@@ -431,3 +431,33 @@ def test_backlog_mayor_que_la_ventana_subestima_documentado(redis_client, monkey
     # Y desde ahí acumula.
     (sample,) = wd.sample_queues(redis_client, queues=("prices",), now_ms=t0 + 360_000)
     assert sample.ready_age_seconds == 60.0
+
+
+def test_kpis_sin_consumidor_lo_dice_explicitamente(db, redis_client, monkeypatch):
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "3600")
+    _push(redis_client, "kpis")
+    wd.sample_tick(redis_client, namespace="dramatiq", queues=("kpis",), now=NOW - timedelta(seconds=1000))
+    stats = wd.emit_queue_stuck_alerts(db, client=redis_client, now=NOW)
+    assert stats["stuck"] == 1
+    alert = db.scalars(select(ResearchAlert)).one()
+    assert "sin consumidor" in alert.title.lower()
+    assert "NINGUN consumidor" in alert.message
+    assert alert.metadata_["no_consumer"] is True
+
+
+def test_kpis_con_consumidor_fresco_usa_el_mensaje_generico(db, redis_client, monkeypatch):
+    monkeypatch.setenv("QUEUE_WATCHDOG_MAX_SAMPLE_GAP_SECONDS", "3600")
+    _push(redis_client, "kpis")
+    redis_client.zadd("dramatiq:kpis:consumers", {"tok": int(NOW.timestamp()) - 5})
+    wd.sample_tick(redis_client, namespace="dramatiq", queues=("kpis",), now=NOW - timedelta(seconds=1000))
+    redis_client.zadd("dramatiq:kpis:consumers", {"tok": int(NOW.timestamp()) - 5})
+    wd.emit_queue_stuck_alerts(db, client=redis_client, now=NOW)
+    alert = db.scalars(select(ResearchAlert)).one()
+    assert alert.title == "Cola kpis atascada"
+    assert "variacion neta" in alert.message
+
+
+def test_otras_colas_nunca_afirman_sin_consumidor(redis_client):
+    _push(redis_client, "yahoo")
+    samples = wd.sample_queues(redis_client, queues=("yahoo",), now_ms=NOW.timestamp() * 1000)
+    assert samples[0].no_consumer is False
