@@ -156,7 +156,54 @@
     },
     "excludedFutureRows": "{count} operaciones con fecha futura excluidas del feed observado; no entran en los totales.",
     "amountMinKnown": "≥ {known} como mínimo · {missing} sin importe",
-    "amountNa": "importe N/D"
+    "amountNa": "importe N/D",
+    "roleTitles": {
+      "chiefExecutive": "CEO",
+      "chiefFinancial": "CFO",
+      "chiefOperating": "COO",
+      "chiefTechnology": "CTO",
+      "chiefLegal": "Director jurídico",
+      "generalCounsel": "Asesor jurídico general",
+      "chiefAccounting": "Director de contabilidad",
+      "chiefCommercial": "Director comercial",
+      "chiefMedical": "Director médico",
+      "chiefInformation": "Director de sistemas de información",
+      "chiefHumanResources": "Director de recursos humanos",
+      "chiefStrategy": "Director de estrategia",
+      "chiefInvestment": "Director de inversiones",
+      "chiefMarketing": "Director de marketing",
+      "chiefRevenue": "Director de ingresos",
+      "chiefProduct": "Director de producto",
+      "chiefRisk": "Director de riesgos",
+      "chiefCompliance": "Director de cumplimiento",
+      "chiefData": "Director de datos",
+      "seniorVicePresident": "Vicepresidente senior",
+      "executiveVicePresident": "Vicepresidente ejecutivo",
+      "vicePresident": "Vicepresidente",
+      "executiveChair": "Presidente ejecutivo",
+      "chair": "Presidente del consejo",
+      "president": "Presidente",
+      "governmentAffairs": "Relaciones gubernamentales",
+      "officer": "Directivo",
+      "treasurer": "Tesorero",
+      "secretary": "Secretario"
+    },
+    "roleParts": {
+      "multipleInsiders": "Varios insiders",
+      "director": "Director",
+      "owner10": "Accionista 10 %",
+      "insider": "Insider"
+    },
+    "signalLabels": {
+      "cluster_buy": "Cluster de compra",
+      "c_suite_buy": "Compra de CEO/CFO",
+      "big_buy": "Gran compra"
+    },
+    "signalTooltips": {
+      "cluster_buy": "3 o más insiders distintos compran en 30 días",
+      "c_suite_buy": "El CEO o el CFO compra acciones",
+      "big_buy": "Una compra supera 1 M$"
+    }
   },
   "statusCopy": {
     "reason": {
