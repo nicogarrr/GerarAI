@@ -10,6 +10,7 @@ from datetime import date, datetime
 from decimal import Decimal
 
 import httpx
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
@@ -18,6 +19,18 @@ from app.models.entities import Base
 from app.models.public_market_data import PublicSourceDocument
 from app.services import fund_holders as fh
 from app.services.connectors import form_nport_dataset as nport
+
+
+@pytest.fixture(autouse=True)
+def scenario_clock(monkeypatch):
+    # El escenario incluye filings del 20-nov-2026; no depende del reloj real.
+    class ScenarioDate(date):
+        @classmethod
+        def today(cls):
+            return date(2026, 11, 21)
+
+    monkeypatch.setattr(nport, "date", ScenarioDate)
+
 
 APPLE = "037833100"
 URL = "https://www.sec.gov/files/dera/data/form-n-port-data-sets/2026q3_nport.zip"

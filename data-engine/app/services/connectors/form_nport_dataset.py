@@ -101,7 +101,7 @@ def parse_dataset(source: str | IO[bytes], cusips: set[str]) -> dict[str, FundRe
             acc = _get(index, row, "ACCESSION_NUMBER")
             form = _get(index, row, "SUB_TYPE").upper()
             filed, rep = _date(_get(index, row, "FILING_DATE")), _date(_get(index, row, "REPORT_DATE"))
-            if acc and filed and rep and form in {"NPORT-P", "NPORT-P/A"}:
+            if acc and filed and rep and rep <= filed <= date.today() and form in {"NPORT-P", "NPORT-P/A"}:
                 reports[acc] = FundReport(acc, filed, rep, form)
         for index, row in _rows(zf, "REGISTRANT.tsv"):
             rep_ = reports.get(_get(index, row, "ACCESSION_NUMBER"))
