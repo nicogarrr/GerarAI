@@ -91,7 +91,8 @@
     "footRowsWithoutValue": "{n} sin importe en el filing: no se imputa, el precio medio queda N/D y los totales marcados con ≥ son mínimos.",
     "footRowsWithoutDate": "{n} sin fecha: suman al agregado pero no al periodo.",
     "footAmended": "{n} enmienda(s) 4/A: el filing original corregido no se puede excluir (la ingesta no enlaza enmiendas) y puede haber doble conteo.",
-    "pagerUnit": "empresas"
+    "pagerUnit": "empresas",
+    "excludedFutureRows": "{count} operaciones con fecha futura excluidas del agregado del periodo; no entran en las cifras."
   },
   "feed": {
     "errorLoad": "No se pudo leer el histórico insider. Reintenta en unos minutos.",
@@ -152,7 +153,8 @@
       "U": "Disposición por OPA",
       "W": "Herencia",
       "X": "Ejercicio de opción"
-    }
+    },
+    "excludedFutureRows": "{count} operaciones con fecha futura excluidas del feed observado; no entran en los totales."
   },
   "statusCopy": {
     "reason": {

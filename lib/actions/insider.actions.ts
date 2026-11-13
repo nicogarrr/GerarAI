@@ -186,6 +186,8 @@ export interface InsiderFeedResult {
         filings_with_transactions: number;
         filings_pending: number;
     };
+    /** Operaciones con fecha futura excluidas del feed (se declaran, no se suman). */
+    excluded_future_rows?: number;
     clusters: InsiderFeedSignal[];
     c_suite_buys: InsiderFeedSignal[];
     /** Compras codigo P de mas de $1M (detectadas, no siempre presentes). */
@@ -245,6 +247,8 @@ export interface InsiderOperationsResult {
     days: number;
     as_of?: string;
     note?: string;
+    /** Operaciones con fecha futura excluidas del agregado (se declaran, no se suman). */
+    excluded_future_rows?: number;
     companies: InsiderOperationsCompany[];
     companies_without_data: string[];
 }

@@ -91,7 +91,8 @@
     "footRowsWithoutValue": "{n} without amount in the filing: not imputed, the average price stays N/A and totals marked with ≥ are minimums.",
     "footRowsWithoutDate": "{n} without date: they count toward the aggregate but not toward the period.",
     "footAmended": "{n} 4/A amendment(s): the corrected original filing cannot be excluded (the ingest does not link amendments) and there may be double counting.",
-    "pagerUnit": "companies"
+    "pagerUnit": "companies",
+    "excludedFutureRows": "{count} transactions dated in the future excluded from the period aggregate; they are not included in the figures."
   },
   "feed": {
     "errorLoad": "Could not read the insider history. Try again in a few minutes.",
@@ -152,7 +153,8 @@
       "U": "Tender offer disposition",
       "W": "Inheritance",
       "X": "Option exercise"
-    }
+    },
+    "excludedFutureRows": "{count} transactions dated in the future excluded from the observed feed; they are not included in the totals."
   },
   "statusCopy": {
     "reason": {

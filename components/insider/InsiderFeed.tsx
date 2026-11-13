@@ -191,6 +191,11 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                 ))}
             </dl>
             <p className="-mt-3 text-xs text-gray-500">{t('insider.feed.totalsNote')}</p>
+            {feed.excluded_future_rows ? (
+                <p role="status" className="-mt-3 text-xs text-amber-300">
+                    {t('insider.feed.excludedFutureRows', { count: f.formatNumber(feed.excluded_future_rows, { maximumFractionDigits: 0 }) })}
+                </p>
+            ) : null}
 
             {feed.clusters.length > 0 ? (
                 <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
