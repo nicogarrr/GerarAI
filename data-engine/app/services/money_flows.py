@@ -251,13 +251,17 @@ def fetch_agency_obligations(agency_name: str, start: str, end: str) -> float:
 def fetch_top_categories(agency_name: str, start: str, end: str, limit: int = 8) -> list[dict]:
     payload = {"filters": _agency_filter(agency_name, start, end), "limit": limit}
     data = _usaspending_post("/search/spending_by_category/psc/", payload)
-    return data.get("results") or []
+    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+        raise ValueError("USAspending no devolvió un desglose verificable")
+    return data["results"]
 
 
 def fetch_top_recipients(agency_name: str, start: str, end: str, limit: int = 30) -> list[dict]:
     payload = {"filters": _agency_filter(agency_name, start, end), "limit": limit}
     data = _usaspending_post("/search/spending_by_category/recipient/", payload)
-    return data.get("results") or []
+    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+        raise ValueError("USAspending no devolvió un desglose verificable")
+    return data["results"]
 
 
 _NORMALIZE_RE = re.compile(r"[^A-Z0-9 ]+")
