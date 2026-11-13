@@ -280,7 +280,12 @@ def days_late(tx_date: str | None, filed: str | None) -> int | None:
     """Dias por encima de los 45 del STOCK Act (0 = a tiempo; None sin fechas)."""
     if not tx_date or not filed:
         return None
-    gap = (date.fromisoformat(filed) - date.fromisoformat(tx_date)).days
+    try:
+        gap = (date.fromisoformat(filed) - date.fromisoformat(tx_date)).days
+    except (TypeError, ValueError):
+        return None
+    if gap < 0:
+        return None
     return max(0, gap - STOCK_ACT_DUE_DAYS)
 
 
