@@ -202,6 +202,10 @@ def share_change_label(now: Any, before: Any) -> str:
     if any(value is None or not value.is_finite() or value < 0
            for value in (now_shares, before_shares)):
         return "unknown"
+    now_unit = str(getattr(now, "share_type", None) or "").strip().upper()
+    before_unit = str(getattr(before, "share_type", None) or "").strip().upper()
+    if now_unit not in {"SH", "PRN"} or now_unit != before_unit:
+        return "unknown"
     if implied_split_ratio(now, before) is not None:
         return "unchanged"
     if now_shares > before_shares:
@@ -667,7 +671,7 @@ class ManagerHoldingIngestionService:
                 {
                     "change": change,
                     "notice": (
-                        "Comparación incompleta: faltan acciones válidas en uno o ambos periodos; "
+                        "Comparación incompleta: faltan cantidades válidas o las unidades no son comparables; "
                         "no se infiere una compra, venta ni posición sin cambios."
                         if change == "unknown" else None
                     ),
