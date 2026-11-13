@@ -139,6 +139,8 @@ def _group_tranches(items: list[dict]) -> list[dict]:
             group["tranches"] = 0
             group["_shares_sum"] = 0.0
             group["_value_sum"] = 0.0
+            group["_value_complete"] = True
+            group["_shares_complete"] = True
             groups[key] = group
             order.append(key)
         group["tranches"] += 1
@@ -146,8 +148,12 @@ def _group_tranches(items: list[dict]) -> list[dict]:
         group["rule_10b5_1"] = bool(group.get("rule_10b5_1")) and bool(tx.get("rule_10b5_1"))
         if tx.get("shares") is not None:
             group["_shares_sum"] += float(tx["shares"])
+        else:
+            group["_shares_complete"] = False
         if tx.get("value") is not None:
             group["_value_sum"] += float(tx["value"])
+        else:
+            group["_value_complete"] = False
     grouped: list[dict] = []
     for key in order:
         group = groups[key]
@@ -159,6 +165,14 @@ def _group_tranches(items: list[dict]) -> list[dict]:
                 group["price"] = value / shares
         if value:
             group["value"] = value
+        value_complete = group.pop("_value_complete")
+        shares_complete = group.pop("_shares_complete")
+        if not value_complete:
+            group["value"] = None
+        if not shares_complete:
+            group["shares"] = None
+        if not value_complete or not shares_complete:
+            group["price"] = None
         grouped.append(group)
     grouped.sort(key=lambda t: (str(t.get("date") or ""), str(t.get("accession_number") or "")), reverse=True)
     return grouped
