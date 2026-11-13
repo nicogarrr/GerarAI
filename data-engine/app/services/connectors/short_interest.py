@@ -182,6 +182,19 @@ async def fetch_short_volume(
 # ---------------- FINRA: posicion corta consolidada (quincenal) ----------------
 
 
+def _interest_number(value: Any, *, count: bool = False) -> float | None:
+    """FINRA quantities cannot be negative, fractional counts, booleans or nonfinite."""
+    if isinstance(value, bool):
+        return None
+    try:
+        number = _to_float(value)
+    except OverflowError:
+        return None
+    if number is None or not math.isfinite(number) or number < 0:
+        return None
+    return number if not count or number.is_integer() else None
+
+
 def parse_short_interest_record(record: dict, symbol: str) -> dict | None:
     """Normaliza una fila del dataset `consolidatedShortInterest` de FINRA."""
     if not isinstance(record, dict):
@@ -189,12 +202,12 @@ def parse_short_interest_record(record: dict, symbol: str) -> dict | None:
     code = str(record.get("symbolCode") or "").upper()
     if code != symbol.strip().upper():
         return None
-    current = _to_float(record.get("currentShortPositionQuantity"))
-    previous = _to_float(record.get("previousShortPositionQuantity"))
-    avg_volume = _to_float(record.get("averageDailyVolumeQuantity"))
-    days_to_cover = _to_float(record.get("daysToCoverQuantity"))
+    current = _interest_number(record.get("currentShortPositionQuantity"), count=True)
+    previous = _interest_number(record.get("previousShortPositionQuantity"), count=True)
+    avg_volume = _interest_number(record.get("averageDailyVolumeQuantity"), count=True)
+    days_to_cover = _interest_number(record.get("daysToCoverQuantity"))
     if days_to_cover is None and current is not None and avg_volume:
-        days_to_cover = current / avg_volume
+        days_to_cover = _interest_number(current / avg_volume)
     change_pct = (current - previous) / previous if current is not None and previous else None
     return {
         "symbol": code,
