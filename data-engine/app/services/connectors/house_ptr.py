@@ -180,7 +180,7 @@ def parse_amount(text: str) -> dict[str, Any]:
     if exact:
         # Algunos miembros declaran la cifra exacta en vez del rango.
         whole = int(exact.group(1).replace(",", ""))
-        return {"amount_text": clean, "amount_min": whole, "amount_max": whole + (1 if exact.group(2) else 0)}
+        return {"amount_text": clean, "amount_min": whole, "amount_max": whole + (1 if int(exact.group(2) or "0") else 0)}
     return {"amount_text": clean, "amount_min": None, "amount_max": None}
 
 

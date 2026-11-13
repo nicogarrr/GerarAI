@@ -182,3 +182,15 @@ def test_parse_ptr_text_cuenta_bloque_no_parseado_al_llegar_meta():
     result = hp.parse_ptr_text(text)
     assert result["unparsed_blocks"] == 1
     assert result["trades"] == []
+
+
+@pytest.mark.parametrize(("text", "low", "high"), [
+    ("$1,234.00", 1234, 1234),
+    ("$1,234.0", 1234, 1234),
+    ("$1,234.50", 1234, 1235),
+    ("$1,234.01", 1234, 1235),
+])
+def test_importe_exacto_solo_redondea_si_hay_centimos(text, low, high):
+    """Los ceros decimales no convierten un importe exacto en una horquilla."""
+    parsed = hp.parse_amount(text)
+    assert (parsed["amount_min"], parsed["amount_max"]) == (low, high)
