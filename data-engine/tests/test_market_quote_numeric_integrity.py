@@ -49,3 +49,12 @@ def test_overflowing_percentage_is_unknown_without_discarding_prices():
     result = fetch(closes=(1e-308, 1e308))
     assert result['c'] == 1e308 and result['pc'] == 1e-308
     assert result['dp'] is None
+
+
+@pytest.mark.parametrize('stamp', [float('inf'), True, -1, 1000.5])
+def test_invalid_live_time_cannot_certify_a_missing_final_close(stamp):
+    result = fetch(closes=(10, None), stamps=[500, 1000], meta={
+        'regularMarketPrice': 20, 'regularMarketTime': stamp,
+        'currentTradingPeriod': {'regular': {'start': 900, 'end': 1100}},
+    })
+    assert result['c'] == 10, 'invalid time cannot promote live price to a closed candle'

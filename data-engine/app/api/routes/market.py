@@ -196,7 +196,9 @@ def _fetch_yahoo_quote(client: httpx.Client, symbol: str) -> dict | None:
             closes_raw
             and closes_raw[-1] is None
             and len(_stamps0) == len(closes_raw)
-            and all(isinstance(v, (int, float)) for v in (_reg.get("start"), _reg.get("end"), _rmt))
+            and all(number(v, timestamp=True) is not None for v in (
+                _reg.get("start"), _reg.get("end"), _rmt, _stamps0[-1],
+            ))
             and number(_rmp, positive=True) is not None
             and _reg["start"] <= _stamps0[-1] < _reg["end"]
             and _rmt >= _reg["end"]
