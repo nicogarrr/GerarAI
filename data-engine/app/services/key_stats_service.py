@@ -75,9 +75,11 @@ class KeyStats(BaseModel):
 
 
 def _finite(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
     try:
         number = float(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return number if math.isfinite(number) else None
 
@@ -91,7 +93,10 @@ def _epoch_date(value: Any) -> date | None:
     number = _finite(value)
     if number is None or number <= 0:
         return None
-    return datetime.fromtimestamp(number, tz=UTC).date()
+    try:
+        return datetime.fromtimestamp(number, tz=UTC).date()
+    except (ValueError, OverflowError, OSError):
+        return None
 
 
 def range_from_closes(
