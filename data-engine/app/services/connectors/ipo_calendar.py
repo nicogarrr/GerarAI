@@ -97,11 +97,15 @@ def _payload_events(payload: dict[str, Any]) -> list[dict[str, Any]]:
         for row in upcoming.get("rows") or []
         if isinstance(row, dict)
     )
-    # Una operacion en transicion puede salir en las dos listas del mismo
-    # mes: gana ``priced`` (fecha y precio reales).
+    return _unique_deals(events)
+
+
+def _unique_deals(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # Una operacion en transicion puede salir en varias listas o meses:
+    # gana ``priced`` (fecha y precio reales).
     seen: dict[Any, dict[str, Any]] = {}
-    for event in sorted(events, key=lambda e: 0 if e["status"] == "priced" else 1):
-        key = event["deal_id"] or (event["symbol"], event["company"], event["date"])
+    for event in sorted(events, key=lambda e: 0 if e.get("status") == "priced" else 1):
+        key = event.get("deal_id") or (event["symbol"], event["company"], event["date"])
         seen.setdefault(key, event)
     return list(seen.values())
 
@@ -240,6 +244,7 @@ async def fetch_ipo_calendar(
     for result in per_month:
         events.extend(result["events"])
         errors.extend(result["errors"])
+    events = _unique_deals(events)
     events.sort(key=lambda e: (e["date"] is None, e["date"] or "", e["company"] or ""))
     answered = sum(1 for r in per_month if r["status"] in {"ok", "partial"})
     if answered == 0:
