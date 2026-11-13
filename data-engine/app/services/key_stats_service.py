@@ -108,7 +108,7 @@ def range_from_closes(
     in_window = [day for day in split_dates if cutoff < day <= today]
     if in_window:
         cutoff = max(in_window) - timedelta(days=1)
-    valid = [(day, float(close)) for day, close in rows if day > cutoff and _positive(close) is not None]
+    valid = [(day, float(close)) for day, close in rows if cutoff < day <= today and _positive(close) is not None]
     if not valid:
         return None
     low = min(valid, key=lambda row: row[1])
@@ -174,6 +174,7 @@ def _own_data(db: Session, ticker: str, today: date) -> dict[str, Any]:
                 MarketPrice.company_id == company.id,
                 MarketPrice.close.isnot(None),
                 MarketPrice.date > today - timedelta(days=365),
+                MarketPrice.date <= today,
             )
         ).all():
             got = listing_price(Decimal(str(close)), quote_currency=quote, company=company)
