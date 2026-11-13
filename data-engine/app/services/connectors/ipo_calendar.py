@@ -188,7 +188,11 @@ async def _fetch_ipo_month(first: date, client: httpx.AsyncClient | None) -> dic
         )
     except TimeoutError:
         payload = None
-    if not payload:
+    data = payload.get("data") if isinstance(payload, dict) else None
+    has_calendar = isinstance(data, dict) and any(
+        isinstance(data.get(section), dict) for section in ("priced", "upcoming")
+    )
+    if not has_calendar:
         return {
             "status": "unavailable",
             "month": f"{first.year:04d}-{first.month:02d}",
