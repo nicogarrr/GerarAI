@@ -30,7 +30,7 @@ def parse_positions(page: str, issuer: CNMVIssuer, *, now: datetime | None = Non
         raise ValueError("CNMV current table unavailable")
     rows = []
     holders = set()
-    for row in tables[0].xpath(".//tbody/tr"):
+    for row in tables[0].xpath(".//tr[td]"):
         cells = [cell.text_content().strip() for cell in row.xpath("./td")]
         if len(cells) != 4 or not cells[0]:
             raise ValueError("CNMV table drift")
