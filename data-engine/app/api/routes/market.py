@@ -75,9 +75,15 @@ def _fetch_index(client: httpx.Client, symbol: str) -> dict | None:
         # lib/actions/market.actions.ts, asi que en vez de meter un null que
         # contradiria ese contrato la serie no se publica: el hueco sale por
         # `coverage` (partial/empty), que la UI ya declara como tal.
-        if previous <= 0:
+        # Validate the actual pair, not a filtered replacement: silently
+        # skipping an invalid newest observation would publish an older price.
+        if any(isinstance(value, bool) or not isinstance(value, (int, float))
+               or not math.isfinite(value) or value <= 0 for value in (last, previous)):
             return None
         change = last - previous
+        change_percent = (change / previous) * 100
+        if not math.isfinite(change) or not math.isfinite(change_percent):
+            return None
         timestamps = result.get("timestamp") or []
         last_idx = valid[-1][0]
         observed_at = timestamps[last_idx] if last_idx < len(timestamps) else None
@@ -86,9 +92,9 @@ def _fetch_index(client: httpx.Client, symbol: str) -> dict | None:
             "priceAsOf": observed_at,
             "price": round(float(last), 2),
             "change": round(float(change), 2),
-            "changePercent": round((change / previous) * 100, 2),
+            "changePercent": round(change_percent, 2),
         }
-    except (httpx.HTTPError, KeyError, IndexError, ValueError):
+    except (httpx.HTTPError, KeyError, IndexError, TypeError, ValueError, OverflowError):
         return None
 
 
