@@ -122,7 +122,7 @@ def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None 
                     except Exception as exc:  # noqa: BLE001
                         logger.warning("etf_holdings %s enlace %s fallo: %s", etf, link, exc)
                         continue
-                    if as_of and len(rows) >= MIN_ROWS and (best is None or as_of > best[0]):
+                    if as_of and as_of <= date.today() and len(rows) >= MIN_ROWS and (best is None or as_of > best[0]):
                         best = (as_of, link, rows)
                 if best is None:
                     out[etf] = "ningun fichero valido: se conserva la carga anterior (si la hay)"
@@ -156,13 +156,15 @@ def etfs_for_tickers(db: Session, tickers: set[str], today: date | None = None) 
     """ticker -> ETFs que lo tienen con peso >= 2 % y holdings de <= 45 dias."""
     if not tickers:
         return {}
-    cutoff = (today or date.today()) - timedelta(days=MAX_AGE_DAYS)
+    today = today or date.today()
+    cutoff = today - timedelta(days=MAX_AGE_DAYS)
     rows = db.scalars(
         select(EtfHolding)
         .where(
             EtfHolding.ticker.in_({t.upper() for t in tickers}),
             EtfHolding.weight_pct >= MIN_WEIGHT_PCT,
             EtfHolding.as_of >= cutoff,
+            EtfHolding.as_of <= today,
         )
         .order_by(EtfHolding.weight_pct.desc())
     ).all()
