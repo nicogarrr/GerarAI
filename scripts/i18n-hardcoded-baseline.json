@@ -31,7 +31,6 @@
   "app/not-found.tsx": 1,
   "components/data/RecordViews.tsx": 3,
   "components/ErrorBoundary.tsx": 1,
-  "components/help/HelpTabs.tsx": 46,
   "components/knowledge-graph/KnowledgeGraphCanvas.tsx": 1,
   "components/market/MarketRegime.tsx": 2,
   "components/paper-trading/ManualDemoPanel.tsx": 1,
