@@ -172,7 +172,7 @@ def filing_deadline_event(submissions: dict[str, Any], ticker: str) -> dict[str,
         if form not in _PERIODIC:
             continue
         period = _parse_us_date(report)
-        if period is not None:
+        if period is not None and period <= date.today():
             periods_set.add(period)
     if not periods_set:
         return None
