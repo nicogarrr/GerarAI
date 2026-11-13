@@ -236,7 +236,9 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
     Un 13F real repite (cusip, titulo, put/call) una vez por gestor "other
     manager" o por discrecion. La tabla guarda una fila por clave, asi que se
     SUMAN valor, acciones y votos; del resto se conserva el primer valor no
-    vacio. Las filas sin CUSIP se descartan (nunca se inventa uno).
+    vacio. Si faltan acciones válidas en una subfila, el total de acciones
+    queda desconocido, no como subtotal completo. Las filas sin CUSIP se
+    descartan (nunca se inventa uno).
 
     Limite conocido: la clave NO incluye SH/PRN (acciones vs importe nominal). Si un
     gestor declarase ambos tipos para el mismo CUSIP y titulo, "shares" mezclaria
@@ -252,9 +254,19 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
         current = merged.get(key)
         if current is None:
             merged[key] = dict(row)
+            shares = _dec(row.get("ssh_prnamt"))
+            if shares is None or not shares.is_finite() or shares < 0:
+                merged[key]["ssh_prnamt"] = None
             continue
         for name in summed:
             a, b = _dec(current.get(name)), _dec(row.get(name))
+            # Existing rows are not absent positions: one unknown component
+            # makes the complete share total unknown, including later rows.
+            if name == "ssh_prnamt" and any(
+                value is None or not value.is_finite() or value < 0 for value in (a, b)
+            ):
+                current[name] = None
+                continue
             if a is None and b is None:
                 continue
             current[name] = str((a or Decimal(0)) + (b or Decimal(0)))
