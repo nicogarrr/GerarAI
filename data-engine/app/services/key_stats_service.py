@@ -217,6 +217,7 @@ class KeyStatsService:
         except Exception:  # noqa: BLE001 - Yahoo puede fallar; nunca se cachea un fallo
             return None
         data = normalize_yahoo_info(info, today)
+        data["_fetched_at"] = int(time.time())
         self._cache[symbol] = (now, data)
         return data
 
@@ -228,7 +229,10 @@ class KeyStatsService:
         except Exception:  # noqa: BLE001 - sin BD la ficha sigue con lo que de Yahoo
             own = {"found": False, "yahoo": key, "currency": None}
         yahoo = await self._yahoo(own["yahoo"], today) if own.get("yahoo") else None
-        stats = KeyStats(symbol=key, fetched_at=int(time.time()), currency=own.get("currency"))
+        # Mixed DB/Yahoo response: use the actual (possibly cached) Yahoo
+        # read time conservatively, never rejuvenate six-hour-old key figures.
+        fetched_at = yahoo["_fetched_at"] if yahoo is not None else int(time.time())
+        stats = KeyStats(symbol=key, fetched_at=fetched_at, currency=own.get("currency"))
         rng: Range52w | None = own.get("range")
         same_currency = yahoo is not None and (
             own.get("currency") is None or yahoo.get("currency") == own.get("currency")
