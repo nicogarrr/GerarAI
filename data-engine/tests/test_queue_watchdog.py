@@ -461,3 +461,18 @@ def test_otras_colas_nunca_afirman_sin_consumidor(redis_client):
     _push(redis_client, "yahoo")
     samples = wd.sample_queues(redis_client, queues=("yahoo",), now_ms=NOW.timestamp() * 1000)
     assert samples[0].no_consumer is False
+
+
+def test_kpis_redis_falla_al_medir_consumidor_no_afirma_ausencia(redis_client):
+    _push(redis_client, "kpis")
+
+    class BrokenZcount:
+        def __getattr__(self, name):
+            return getattr(redis_client, name)
+
+        def zcount(self, *args, **kwargs):
+            raise ConnectionError("redis caido")
+
+    samples = wd.sample_queues(BrokenZcount(), queues=("kpis",), now_ms=NOW.timestamp() * 1000)
+    assert samples[0].depth == 1
+    assert samples[0].no_consumer is False
