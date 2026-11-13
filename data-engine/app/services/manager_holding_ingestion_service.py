@@ -197,11 +197,11 @@ def implied_split_ratio(now: Any, before: Any) -> Fraction | None:
 
 
 def share_change_label(now: Any, before: Any) -> str:
-    """increased / decreased / unchanged por acciones, neutralizando un split."""
-    # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
-    now_shares = Decimal(now.shares or 0)
-    # nosemgrep: gerarai-money-none-to-zero -- variacion de acciones 13F: posicion ausente en un trimestre = 0 acciones por definicion del filing
-    before_shares = Decimal(before.shares or 0)
+    """Compara filas existentes; una cifra ausente no equivale a posición ausente."""
+    now_shares, before_shares = _decimal(now.shares), _decimal(before.shares)
+    if any(value is None or not value.is_finite() or value < 0
+           for value in (now_shares, before_shares)):
+        return "unknown"
     if implied_split_ratio(now, before) is not None:
         return "unchanged"
     if now_shares > before_shares:
@@ -666,6 +666,11 @@ class ManagerHoldingIngestionService:
             changes.append(
                 {
                     "change": change,
+                    "notice": (
+                        "Comparación incompleta: faltan acciones válidas en uno o ambos periodos; "
+                        "no se infiere una compra, venta ni posición sin cambios."
+                        if change == "unknown" else None
+                    ),
                     "name_of_issuer": subject.name_of_issuer,
                     "title_of_class": subject.title_of_class,
                     "cusip": subject.cusip,
@@ -699,7 +704,10 @@ class ManagerHoldingIngestionService:
                 "rule": "último filing por periodo; las enmiendas sustituyen a los filings base en esta vista y cada filing se conserva almacenado de forma inmutable",
             },
             "changes": changes,
-            "limitations": LIMITATIONS,
+            "limitations": [*LIMITATIONS, *(
+                ["Comparación incompleta en algunas posiciones: consulta el aviso de cada fila."]
+                if any(row["change"] == "unknown" for row in changes) else []
+            )],
             "provenance": provenance(SOURCE, SourceKind.INTERNAL, coverage=Coverage.OK),
         }
 
