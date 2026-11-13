@@ -73,3 +73,24 @@ Coste 0 EUR, solo lectura sobre Atlas:
   `30 4 * * 0 cd ~/GerarAI && ./scripts/mongo-backup.sh`.
 - M0 no tiene backups gestionados: si el cron no corre, no hay segunda copia.
   Verifica el primer domingo que aparece un `backups/mongo-*.age` nuevo.
+
+## Backup diario PG: verificacion estricta
+
+`scripts/ops/pg-daily-backup.sh` es la version mantenida del job de la VM.
+No se instala automaticamente: antes de reemplazar el job existente requiere
+revision, gates de la VM y restauracion aislada satisfactoria del SHA revisado.
+
+- Exporta esquema y datos de una base, sin propietarios ni ACL (`--no-owner
+  --no-privileges`). No sustituye una copia de roles/configuracion del cluster.
+- Comprueba espacio antes de empezar; un error del dump, gzip, arranque,
+  restauracion SQL o inventario de tablas termina con error y conserva las copias.
+- Restaura sin red publicada en Postgres temporal con
+  `ON_ERROR_STOP=1 --single-transaction`, sin cargar configuracion de psql.
+- Solo escribe `.verified` y rota copias despues de restaurar sin errores y
+  retirar el contenedor temporal. Conserva dos dumps marcados por defecto.
+  No borra dumps sin marca ni los backups completos predeploy.
+- `BACKUP_DIR`, `PG_SOURCE_CONTAINER`, `PG_VERIFY_IMAGE`, `BACKUP_KEEP` y
+  `LOCKFILE` permiten probar en un directorio aislado sin sustituir el timer.
+- La prueba unitaria usa comandos simulados, no una base real:
+  `python -m unittest discover -s scripts/ops/tests -p test_pg_daily_backup.py -v`.
+  La prueba real de restauracion sigue siendo obligatoria antes de instalar.
