@@ -16,7 +16,7 @@ import re
 import time
 import unicodedata
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -150,6 +150,7 @@ def quotes_for(db: Session, company_ids: set[int]) -> dict[int, dict]:
             MarketPrice.company_id.in_(company_ids),
             MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES),
             MarketPrice.date >= since,
+            MarketPrice.date <= datetime.now(UTC).date(),
         )
         .order_by(MarketPrice.company_id, MarketPrice.date.desc())
     ).all()
