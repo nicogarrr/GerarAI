@@ -295,7 +295,9 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                         signals: f.formatCount(signals.length, ti('insider.signals.unit'), ti('insider.signals.unitPlural')),
                                         buys: countText(f, initialResult.buy_count),
                                         scanned: countText(f, initialResult.filings_scanned),
-                                        date: ti('signals.asOf', { date: formatFetchedAt(f, (initialResult.provenance as Record<string, unknown> | undefined)?.fetched_at ?? initialResult.fetched_at, ti) }),
+                                        // La clave ya trae el prefijo «datos al {date}»: se pasa la fecha
+                                        // formateada a pelo; ti('signals.asOf') la duplicaba («datos al Datos al»).
+                                        date: formatFetchedAt(f, (initialResult.provenance as Record<string, unknown> | undefined)?.fetched_at ?? initialResult.fetched_at, ti),
                                     })}
                                 </CardDescription>
                             </div>
