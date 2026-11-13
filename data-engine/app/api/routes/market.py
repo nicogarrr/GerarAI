@@ -454,19 +454,20 @@ def _fetch_yahoo_candles(
         l: list[float | None] = []
         v: list[float | None] = []
         def optional_value(values: list, index: int) -> float | None:
-            if index >= len(values) or values[index] is None:
+            if index >= len(values) or values[index] is None or isinstance(values[index], bool):
                 return None
             try:
                 value = float(values[index])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 return None
             return value if math.isfinite(value) else None
 
-        for index, close in enumerate(closes_raw):
-            if close is None:
+        for index in range(len(closes_raw)):
+            close = optional_value(closes_raw, index)
+            stamp = optional_value(timestamps, index)
+            if close is None or stamp is None or stamp < 0 or not stamp.is_integer():
                 continue
-            close = float(close)
-            t.append(int(timestamps[index]))
+            t.append(int(stamp))
             c.append(close)
             o.append(optional_value(opens_raw, index))
             h.append(optional_value(highs_raw, index))
@@ -474,7 +475,8 @@ def _fetch_yahoo_candles(
             # F318: volumen desconocido = None (la UI muestra N/D y el
             # análisis técnico lo ignora), nunca un 0.0 fabricado que se
             # presenta como dato conocido y arrastra las medias a 0/0.
-            v.append(optional_value(volumes_raw, index))
+            volume = optional_value(volumes_raw, index)
+            v.append(volume if volume is not None and volume >= 0 else None)
         if not c:
             return None
         payload = {"s": "ok", "c": c, "t": t, "o": o, "h": h, "l": l, "v": v}
