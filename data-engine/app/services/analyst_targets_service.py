@@ -123,7 +123,8 @@ def normalize_rows(
     sin fecha o sin cifra no hay nada que mostrar. El objetivo anterior 0 de
     Yahoo significa "sin objetivo previo" y se devuelve como ausente.
     """
-    cutoff_ordinal = (today or datetime.now(UTC).date()).toordinal() - MAX_AGE_DAYS
+    observed_today = today or datetime.now(UTC).date()
+    cutoff_ordinal = observed_today.toordinal() - MAX_AGE_DAYS
     latest: dict[str, AnalystTargetRow] = {}
     for record in records:
         firm = _clean(record.get("firm"))
@@ -135,7 +136,9 @@ def normalize_rows(
             when = raw_date.date() if hasattr(raw_date, "date") else date.fromisoformat(str(raw_date)[:10])
         except ValueError:
             continue
-        if when.toordinal() < cutoff_ordinal or (listed_from is not None and when < listed_from):
+        # A future-dated note is not an observed analyst publication and must
+        # not displace the latest real note from the same firm.
+        if when > observed_today or when.toordinal() < cutoff_ordinal or (listed_from is not None and when < listed_from):
             continue
         key = firm.casefold()
         current = latest.get(key)
