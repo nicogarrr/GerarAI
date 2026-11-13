@@ -127,7 +127,7 @@ def parse_bls_ics(text: str) -> list[dict[str, Any]]:
         elif line == "END:VEVENT" and current is not None:
             summary = current.get("SUMMARY", "").strip()
             stamp = re.search(r"(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2}))?", current.get("DTSTART", ""))
-            if summary and stamp:
+            if summary and stamp and current.get("STATUS", "").strip().upper() != "CANCELLED":
                 try:
                     day = date(int(stamp.group(1)), int(stamp.group(2)), int(stamp.group(3)))
                 except ValueError:
