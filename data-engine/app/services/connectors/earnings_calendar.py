@@ -203,7 +203,11 @@ async def fetch_dividends_day(
     calendar = data.get("calendar") if "calendar" in data else data
     if not isinstance(calendar, dict) or "rows" not in calendar:
         return None
-    rows = calendar.get("rows") or []
+    rows = calendar["rows"]
+    if rows is None:
+        rows = []
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        return None
     return [normalize_dividend_row(row, day) for row in rows if row.get("symbol")]
 
 
