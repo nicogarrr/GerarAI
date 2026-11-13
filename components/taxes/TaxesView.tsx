@@ -386,9 +386,12 @@ export default function TaxesView({ initialHoldings, initialReport, initialThres
         () => Number(new Intl.DateTimeFormat('en-CA', { timeZone: USER_TZ, year: 'numeric' }).format(new Date())),
         () => 0,
     );
-    const yearOptions = currentYear === 0
+    // El ejercicio pedido ya viene del servidor: debe tener una opción en
+    // SSR y tras hidratar, incluso si no está entre los seis años recientes.
+    const recentYears = currentYear === 0
         ? []
         : Array.from({ length: 6 }, (_, index) => currentYear - index);
+    const yearOptions = [...new Set([year, ...recentYears])].sort((a, b) => b - a);
 
     // [&>*]:min-w-0: a 768 px (md) la tarjeta «Posiciones fiscales» (min-content
     // 513 px) inflaba la vía implícita de esta grid y la página hacía scroll
