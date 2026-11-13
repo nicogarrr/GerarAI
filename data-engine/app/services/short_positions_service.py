@@ -43,6 +43,13 @@ def read_shorts(db: Session, company: Company) -> dict:
             stale = stale or (datetime.now(UTC).date() - trade_date > timedelta(days=4))
         except (KeyError, TypeError, ValueError):
             invalid_date = True
+        interest = payload.get("short_interest")
+        if isinstance(interest, dict):
+            try:
+                settlement = date.fromisoformat(interest["settlement_date"])
+                invalid_date = invalid_date or settlement > now.date()
+            except (KeyError, TypeError, ValueError):
+                invalid_date = True
     return {"ticker": company.ticker, "status": "degraded" if invalid_stamp or invalid_date or (state and state.consecutive_errors) else "stale" if stale else "available" if payload else "empty",
             "fetched_at": stamp.isoformat() if stamp else None, "data": payload or None,
             "reason": "Fecha de consulta ausente o futura: no se puede verificar la antigüedad del dato guardado." if invalid_stamp else "Fecha FINRA ausente, inválida o futura: no se puede verificar la vigencia del dato guardado." if invalid_date else "No hay mapeo revisado para esta bolsa o empresa." if state and state.last_error == "UnsupportedMarket" else "La fuente no devolvió datos verificables; el dato anterior conserva su fecha." if state and state.consecutive_errors else "Consulta o fecha de negociación fuera del límite de 4 días." if stale else "No hay consulta almacenada. Usa Actualizar para consultar la fuente pública." if not payload else None}
