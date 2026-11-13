@@ -57,6 +57,9 @@ export async function MostBought({ pagina }: { pagina?: string }) {
                                         {item.sellers_count > 0 ? `${t('ownership.mostBought.sellers', { n: formatNumber(item.sellers_count, { maximumFractionDigits: 0 }) })} · ` : ''}
                                         {item.value_usd === null ? NA : formatMarketCapUsd(item.value_usd)}
                                     </p>
+                                    {item.notice ? (
+                                        <p className="max-w-64 text-[11px] text-amber-300/90" role="status">{item.notice}</p>
+                                    ) : null}
                                 </div>
                             </div>
                             <p className="text-sm text-gray-400">
