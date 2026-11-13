@@ -81,4 +81,14 @@ describe('Flujos de dinero de Temas en inglés: textos del backend sin castellan
     const src = readFileSync('app/(root)/temas/_components/ThemeFlow.tsx', 'utf8');
     expect(src).toContain('localizeFlow(');
   });
+
+  it('el aviso de leases sin importe comparable se traduce desde los diccionarios', () => {
+    const note = 'Leases financieros sin importe comparable: moneda distinta o no disponible';
+    expect(flowText(note, 'es')).toBe(note);
+    expect(flowText(note, 'en')).toBe('Finance leases without a comparable amount: different or unavailable currency');
+    expect(flowText(note, 'en')).not.toMatch(SPANISH);
+    // El mapeo vive en los diccionarios, no en literales del .ts: el techo del guard no sube.
+    const src = readFileSync('lib/market/flow-text.ts', 'utf8');
+    expect(src).not.toContain(note);
+  });
 });
