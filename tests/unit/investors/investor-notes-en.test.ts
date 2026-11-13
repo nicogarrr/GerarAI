@@ -7,7 +7,11 @@ import { OWNERSHIP_TEXT_EN, ownershipLimitations, ownershipNote } from '@/lib/re
 
 // Las frases salen de investor_portfolio.py; se juntan los literales que Python
 // concatena entre paréntesis para poder buscarlas enteras.
-const BACKEND = readFileSync(path.resolve(__dirname, '../../../data-engine/app/services/investor_portfolio.py'), 'utf8')
+// Las notas de fila salen de investor_portfolio.py; los avisos de
+// comparación incompleta, de manager_holding_ingestion_service.py.
+const BACKEND = ['investor_portfolio.py', 'manager_holding_ingestion_service.py']
+    .map((file) => readFileSync(path.resolve(__dirname, `../../../data-engine/app/services/${file}`), 'utf8'))
+    .join('\n')
     .replace(/"\s*\n\s*"/g, '');
 
 describe('cartera de un inversor: notas del backend en inglés', () => {

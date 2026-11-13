@@ -1,4 +1,18 @@
 {
+  "backendText": {
+    "optionNotional": "Option (put/call): notional amount, not a share position.",
+    "quarterDiff": "Difference between two quarterly 13Fs (date = quarter end, not the trade date).",
+    "codeG": "Code G (gift/transfer): not an open-market purchase or sale.",
+    "codeJ": "Code J (other acquisition or disposition; see the Form 4 notes): not open market.",
+    "trumpHolder": "Holder: Donald J. Trump Revocable Trust (indirect ownership). 41.5% of 276,497,911 shares outstanding per 13D/A No. 3 (event 2025-12-18, filed 2025-12-22). No later 13D/A has been verified.",
+    "no13f": "No 13F: only positions documented in 13D/Forms 3/4. Value and weight are not available until there is a sourced valuation; this is not the full portfolio.",
+    "comparisonIncompleteRow": "Incomplete comparison: valid share counts are missing in one or both periods; no purchase, sale or unchanged position is inferred.",
+    "comparisonIncompleteLimitation": "Incomplete comparison for some positions: see each row notice.",
+    "limitQuarterlyLag": "Quarterly cadence with up to a 45-day reporting lag",
+    "limitLongOnly": "Long-only US-listed positions; no shorts, no non-13F securities",
+    "limitAsFiled": "Holdings as filed: CUSIP + issuer name; tickers never inferred",
+    "limitAmendments": "Amendments are separate immutable filings"
+  },
   "page": {
     "metaTitle": "Institutional ownership (13F)",
     "metaDescription": "Institutional managers' portfolios as filed with the SEC (Form 13F, EDGAR), with quarter-over-quarter changes.",
