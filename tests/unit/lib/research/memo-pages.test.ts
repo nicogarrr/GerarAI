@@ -59,11 +59,25 @@ describe('factStalenessNotice', () => {
         expect(factStalenessNotice(f, { isLatestForMetric: true, latestFiscalYear: 2025 })).toBe('Último dato disponible: 2022, sin refresco posterior');
     });
     it('un año de diferencia, no último, métrica de flujo o fechas ausentes: sin aviso', () => {
-        expect(factStalenessNotice(f, { isLatestForMetric: true, latestFiscalYear: 2023 })).toBeNull();
+        expect(factStalenessNotice(f, { isLatestForMetric: true, latestFiscalYear: 2023, currentYear: 2023 })).toBeNull();
         expect(factStalenessNotice(f, { isLatestForMetric: false, latestFiscalYear: 2025 })).toBeNull();
         expect(factStalenessNotice({ metric: 'revenue', fiscal_year: 2020 }, { isLatestForMetric: true, latestFiscalYear: 2025 })).toBeNull();
         expect(factStalenessNotice({ ...f, fiscal_year: null }, { isLatestForMetric: true, latestFiscalYear: 2025 })).toBeNull();
         expect(factStalenessNotice(f, { isLatestForMetric: true, latestFiscalYear: null })).toBeNull();
+    });
+    it('ficha entera vieja: avisa aunque el dato sea el más reciente de la empresa', () => {
+        // Efectivo de 2018 con latestFiscalYear=2018: antes no avisaba nada.
+        expect(factStalenessNotice(
+            { metric: 'cash_and_equivalents', fiscal_year: 2018 },
+            { isLatestForMetric: true, latestFiscalYear: 2018, currentYear: 2026 },
+        )).toBe('Último dato disponible: 2018, sin refresco posterior');
+        // Tolerancia de un ejercicio: el último cierre aún puede estar sin presentar.
+        expect(factStalenessNotice(
+            { metric: 'cash_and_equivalents', fiscal_year: 2025 },
+            { isLatestForMetric: true, latestFiscalYear: 2025, currentYear: 2026 },
+        )).toBeNull();
+        // La regla de cobertura no silencia la de retraso interno.
+        expect(factStalenessNotice(f, { isLatestForMetric: true, latestFiscalYear: 2025, currentYear: 2025 })).not.toBeNull();
     });
 });
 

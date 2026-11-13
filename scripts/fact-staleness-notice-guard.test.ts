@@ -24,8 +24,12 @@ test('la última foto de balance muy por detrás lleva aviso', () => {
 test('no avisa cuando el dato es reciente, histórico o no es de balance', () => {
   // fila histórica (no la última de la métrica): su antigüedad es evidente
   assert.equal(factStalenessNotice(jpmCash, { isLatestForMetric: false, latestFiscalYear: 2025 }), null);
-  // tolerancia de un ejercicio (calendarios fiscales distintos)
-  assert.equal(factStalenessNotice({ metric: 'total_debt', fiscal_year: 2024 }, { isLatestForMetric: true, latestFiscalYear: 2025 }), null);
+  // tolerancia de un ejercicio (calendarios fiscales distintos); reloj
+  // inyectado para que el caso no dependa del año en curso
+  assert.equal(factStalenessNotice({ metric: 'total_debt', fiscal_year: 2024 }, { isLatestForMetric: true, latestFiscalYear: 2025, currentYear: 2025 }), null);
+  // ficha entera vieja: el dato es el más reciente de la empresa pero va más
+  // de un ejercicio por detrás del año en curso — avisa igualmente
+  assert.match(factStalenessNotice({ metric: 'total_debt', fiscal_year: 2023 }, { isLatestForMetric: true, latestFiscalYear: 2023, currentYear: 2026 })!, /2023/);
   // series temporales (ingresos, BPA) no son una foto de estado actual
   assert.equal(factStalenessNotice({ metric: 'revenue', fiscal_year: 2018 }, { isLatestForMetric: true, latestFiscalYear: 2025 }), null);
   // sin año fiscal o sin referencia de empresa no se puede juzgar

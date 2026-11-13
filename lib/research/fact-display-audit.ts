@@ -53,12 +53,19 @@ const BALANCE_SNAPSHOT_METRICS = new Set([
  *  no llevan aviso: su antigüedad es evidente. */
 export function factStalenessNotice(
   fact: { metric: string; fiscal_year: number | null },
-  context: { isLatestForMetric: boolean; latestFiscalYear: number | null },
+  context: { isLatestForMetric: boolean; latestFiscalYear: number | null; currentYear?: number },
   locale: 'es' | 'en' = 'es',
 ): string | null {
   if (!context.isLatestForMetric || context.latestFiscalYear === null) return null;
   if (!BALANCE_SNAPSHOT_METRICS.has(fact.metric) || fact.fiscal_year === null) return null;
-  if (context.latestFiscalYear - fact.fiscal_year <= 1) return null;
+  const behindCompany = context.latestFiscalYear - fact.fiscal_year > 1;
+  // Ficha entera vieja: aunque el dato sea el más reciente de la empresa, si
+  // va más de un ejercicio por detrás del año en curso tampoco es el estado
+  // actual (efectivo de 2018 con latestFiscalYear=2018 antes no avisaba).
+  // La cifra se muestra igualmente: el aviso informa, no esconde.
+  const currentYear = context.currentYear ?? new Date().getFullYear();
+  const sheetStale = currentYear - fact.fiscal_year > 1;
+  if (!behindCompany && !sheetStale) return null;
   return locale === 'en'
     ? `Latest available figure: ${fact.fiscal_year}, not refreshed since`
     : `Último dato disponible: ${fact.fiscal_year}, sin refresco posterior`;
