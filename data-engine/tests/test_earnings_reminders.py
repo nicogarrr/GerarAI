@@ -382,3 +382,46 @@ def test_reminder_email_in_english_and_dispatch_reads_language(monkeypatch):
     for meta in ({"earnings": earnings, "language": "en"}, {"earnings": earnings}):
         ns.NotificationService()._dispatch_email(None, SimpleNamespace(alert_type="earnings_reminder", metadata_=meta), {})
     assert [c.subject for c in sent] == ["ZZG reports earnings tomorrow", "ZZG presenta resultados mañana"]
+
+
+def test_today_alert_carries_verified_live_link_only_for_registry_events(db):
+    # ASTS tiene webcast verificado en el registro IR para el 2026-11-09.
+    day = datetime(2026, 11, 9, 7, 0, tzinfo=UTC)
+    _watch(db, "ASTS", name="AST SpaceMobile", exchange="NASDAQ")
+    db.add(EarningsDate(ticker="ASTS", event_date=day.date(), session="after_market",
+                        confirmed=True, source="yahoo", source_label="Yahoo Finance (calendarEvents)",
+                        source_url="https://finance.yahoo.com/quote/ASTS", fetched_at=day))
+    _watch(db, "ZZQ")
+    db.add(EarningsDate(ticker="ZZQ", event_date=day.date(), session=None,
+                        confirmed=True, source="yahoo", source_label="Yahoo Finance (calendarEvents)",
+                        source_url="https://finance.yahoo.com/quote/ZZQ", fetched_at=day))
+    db.commit()
+    stats = er.emit_earnings_reminders(db, now=day)
+    assert stats["created"] == 2
+    meta = {a.metadata_["earnings"]["ticker"]: a.metadata_["earnings"] for a in _alerts(db)}
+    assert meta["ASTS"]["live_url"] == "https://event.choruscall.com/mediaframe/webcast.html?webcastid=QKToBNQI"
+    assert "live_url" not in meta["ZZQ"]
+    text = earnings_alert_copy.message_text(meta["ASTS"])
+    assert "Directo oficial (enlace verificado): https://event.choruscall.com/mediaframe/webcast.html?webcastid=QKToBNQI" in text
+
+
+def test_live_link_only_in_today_window_and_email_button(db):
+    payload = {
+        "ticker": "ASTS", "company_name": "AST SpaceMobile", "origin": "cartera",
+        "event_date": "2026-11-09", "session": "after_market", "fiscal_label": "Q3 2026",
+        "confirmed": True, "source": "Yahoo Finance (calendarEvents)",
+        "source_url": "https://finance.yahoo.com/quote/ASTS",
+        "rule_version": er.VERSION,
+    }
+    today = er._event_payload({**payload, "ticker": "ASTS", "company": "AST SpaceMobile", "date": "2026-11-09"}, "today")
+    assert today["live_url"].startswith("https://event.choruscall.com/")
+    week = er._event_payload({**payload, "company": "AST SpaceMobile", "date": "2026-11-09"}, "week")
+    assert "live_url" not in week
+    content = earnings_alert_copy.email_content(today)
+    assert "Ver directo oficial" in content.html and today["live_url"] in content.html
+    en = earnings_alert_copy.email_content(today, "en")
+    assert "Watch the official live stream" in en.html
+    assert "Official live stream (verified link)" in en.text
+    # Sin live_url no hay boton ni linea.
+    plain = earnings_alert_copy.email_content({**today, "live_url": None})
+    assert "directo" not in plain.text.lower() and "live stream" not in plain.html.lower()

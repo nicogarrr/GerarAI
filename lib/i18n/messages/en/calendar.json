@@ -84,6 +84,8 @@
       "investorRelations": "Investor relations"
     },
     "irAssetTip": "Official file · verified on {date}",
+    "liveWatch": "Watch the official live stream",
+    "liveWatchTip": "Official live stream link, verified on {date}. The company publishes the exact time.",
     "assetPresentacion": "Presentation",
     "assetDirecto": "Live",
     "assetWebcast": "Webcast",

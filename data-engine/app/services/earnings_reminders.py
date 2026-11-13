@@ -45,6 +45,7 @@ from app.services.earnings_dates_service import (
     market_timezone,
 )
 from app.services.email_delivery import smtp_configured
+from app.services.ir_live_links import live_link_for
 from app.services.propicks_price_service import yahoo_symbol
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,7 @@ def _fingerprint(tenant_id: int, ticker: str, event_date: date, window: str) -> 
 
 def _event_payload(event: dict[str, Any], window: str) -> dict[str, Any]:
     """Diccionario ``earnings`` del metadata de la alerta (lo lee la plantilla)."""
-    return {
+    payload: dict[str, Any] = {
         "ticker": str(event["ticker"]),
         "company_name": event.get("company"),
         "origin": event.get("origin"),
@@ -92,6 +93,13 @@ def _event_payload(event: dict[str, Any], window: str) -> dict[str, Any]:
         "window": window,
         "rule_version": VERSION,
     }
+    # El dia de la llamada, el enlace oficial al directo si esta verificado en el
+    # registro IR (fecha exacta; sin registro no hay enlace). Nunca una hora.
+    if window == "today":
+        live = live_link_for(payload["ticker"], payload["event_date"])
+        if live is not None:
+            payload["live_url"] = live["url"]
+    return payload
 
 
 def _market_today(company: Any, now: datetime) -> date:

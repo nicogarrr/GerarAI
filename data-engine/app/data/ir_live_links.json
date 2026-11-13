@@ -1,0 +1,21 @@
+{
+  "ASTS": {
+    "2026-11-09": {
+      "kind": "webcast",
+      "url": "https://event.choruscall.com/mediaframe/webcast.html?webcastid=QKToBNQI",
+      "source": "https://investors.ast-science.com/events"
+    },
+    "2026-08-10": {
+      "kind": "webcast",
+      "url": "https://event.choruscall.com/mediaframe/webcast.html?webcastid=LzBpQrob",
+      "source": "https://investors.ast-science.com/events"
+    }
+  },
+  "META": {
+    "2026-10-21": {
+      "kind": "webcast",
+      "url": "https://events.q4inc.com/attendee/132342320",
+      "source": "https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx"
+    }
+  }
+}

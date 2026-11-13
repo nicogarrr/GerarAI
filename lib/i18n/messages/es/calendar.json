@@ -84,6 +84,8 @@
       "investorRelations": "Relación con inversores"
     },
     "irAssetTip": "Archivo oficial · verificado el {date}",
+    "liveWatch": "Ver directo oficial",
+    "liveWatchTip": "Enlace oficial al directo, verificado el {date}. La hora exacta la publica la empresa.",
     "assetPresentacion": "Presentación",
     "assetDirecto": "Directo",
     "assetWebcast": "Webcast",
