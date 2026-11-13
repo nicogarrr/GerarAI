@@ -41,10 +41,13 @@ def parse_retail_revenue(rows: list[dict]) -> tuple[str, list[dict], float]:
                 continue
             if code in by_sector or row.get("revenue-units") != "million dollars":
                 raise ValueError("EIA duplicate sector or unexpected revenue unit")
-            value = float(row["revenue"])
-            if not math.isfinite(value) or value < 0:
+            if isinstance(row["revenue"], bool):
                 raise ValueError("EIA invalid revenue")
-            by_sector[code] = value * 1e6
+            value = float(row["revenue"])
+            amount = value * 1e6
+            if not math.isfinite(amount) or amount < 0:
+                raise ValueError("EIA invalid revenue")
+            by_sector[code] = amount
         if set(by_sector) != {*SECTORS, "ALL"}:
             continue
         total = by_sector.pop("ALL")
