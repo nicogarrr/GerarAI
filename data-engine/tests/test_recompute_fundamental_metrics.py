@@ -178,3 +178,31 @@ def test_broken_company_does_not_stop_the_sweep(monkeypatch) -> None:
         assert result["status"] == "partial"
     finally:
         _cleanup()
+
+
+def test_chain_survives_a_full_kpi_queue(monkeypatch) -> None:
+    """Cola KPI llena: el chunk siguiente se encola con delay, no se pierde."""
+    from app.workers.bounded_broker import QueueCapacityError
+
+    _cleanup()
+    tenant_id, user_id = _seed()
+    delayed: list[dict] = []
+
+    def full_queue(*args, **kwargs):
+        raise QueueCapacityError("La cola KPI esta llena; documento diferido")
+
+    monkeypatch.setattr(workers.recompute_fundamental_metrics, "send", full_queue)
+    monkeypatch.setattr(
+        workers.recompute_fundamental_metrics,
+        "send_with_options",
+        lambda **kwargs: delayed.append(kwargs),
+    )
+    try:
+        first = workers.recompute_fundamental_metrics(tenant_id, user_id, limit=1)
+        assert first["status"] != "error", first
+        assert first["next_start_from"] == "TRF1"
+        assert len(delayed) == 1
+        assert delayed[0]["kwargs"] == {"start_from": "TRF1", "limit": 1}
+        assert delayed[0]["delay"] > 0
+    finally:
+        _cleanup()
