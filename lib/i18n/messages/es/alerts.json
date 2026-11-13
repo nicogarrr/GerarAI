@@ -92,6 +92,8 @@
     "description": "¿Eliminar {label}? Esta acción no se puede deshacer."
   },
   "push": {
+    "errorLoad": "No se pudo consultar el estado de los avisos. Los datos mostrados pueden estar desactualizados.",
+    "retryLoad": "Reintentar consulta",
     "title": "Avisos en este dispositivo",
     "iosPre": "En iPhone o iPad los avisos solo funcionan con la app instalada (iOS 16.4 o posterior): en Safari toca ",
     "iosShare": "Compartir",

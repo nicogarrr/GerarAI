@@ -92,6 +92,8 @@
     "description": "Delete {label}? This action cannot be undone."
   },
   "push": {
+    "errorLoad": "Could not load notification status. The displayed data may be out of date.",
+    "retryLoad": "Retry status check",
     "title": "Notifications on this device",
     "iosPre": "On iPhone or iPad notifications only work with the app installed (iOS 16.4 or later): in Safari tap ",
     "iosShare": "Share",
