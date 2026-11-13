@@ -7,8 +7,17 @@
 import type { TranslationKey } from '@/lib/i18n/messages';
 
 export function sectionErrorKey(error: unknown): TranslationKey {
-    const message = error instanceof Error ? error.message : '';
-    if (/fetch|network|econn|timeout|timed out|abort/i.test(message)) {
+    // DOMException (TimeoutError/AbortError de AbortSignal.timeout) no
+    // extiende Error: message y name se leen de forma estructural.
+    const carrier = error as { message?: unknown; name?: unknown } | null;
+    const message = typeof carrier?.message === 'string' ? carrier.message : '';
+    const name = typeof carrier?.name === 'string' ? carrier.name : '';
+    // Un timeout del backend no es «sin conexión»: el servicio existe pero
+    // tardó demasiado. Se distingue para no culpar a la red del usuario.
+    if (/timeout|timed out|abort/i.test(message) || name === 'TimeoutError' || name === 'AbortError') {
+        return 'ui.sectionError.timeout';
+    }
+    if (/fetch|network|econn/i.test(message)) {
         return 'ui.sectionError.network';
     }
     if (/401|403|unauthor|forbidden|sesion|session/i.test(message)) {
