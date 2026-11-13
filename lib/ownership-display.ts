@@ -1,4 +1,9 @@
 /** Nombres de presentación; el CIK y el nombre oficial de SEC no se alteran. */
+// Import relativo con atributo: este módulo también se ejecuta en tests con
+// node --experimental-strip-types, que no resuelve el alias `@/`.
+import esOwnership from './i18n/messages/es/ownership.json' with { type: 'json' };
+import enOwnership from './i18n/messages/en/ownership.json' with { type: 'json' };
+
 const MANAGER_NAMES: Record<string, string> = {
   '0001067983': 'Berkshire Hathaway',
   '0002026053': 'Pershing Square',
@@ -39,19 +44,20 @@ export function ownershipManagerName(cik: string, officialName: string): string 
  * Aviso para un 13F servido sin verificar (Auditoría A): la API ya no dice
  * «ok» cuando los totales no cuadran con el resumen del propio filing o no se
  * pudieron contrastar. Las cifras se muestran, pero nunca como verificadas.
+ * Los textos viven en los diccionarios (ownership.verification.*).
  */
-export function holdingsVerificationNote(status: string): string | null {
-  if (status === 'mismatch') {
-    return 'Los totales guardados no cuadran con el resumen del propio 13F: cifras sin verificar.';
-  }
-  if (status === 'unverified') {
-    return 'No se pudo leer el resumen del 13F para contrastar los totales: cifras sin verificar.';
-  }
-  if (status === 'partial') {
-    return 'Datos parciales: parte del informe no se pudo descargar o verificar.';
-  }
-  if (status === 'snapshot') {
-    return 'Cifras servidas desde una copia local (snapshot) sin contrastar contra el 13F: sin verificar.';
-  }
-  return null;
+const VERIFICATION_KEYS = ['mismatch', 'unverified', 'partial', 'snapshot'] as const;
+// Uso por literal para el guard de i18n (claves consumidas por iteración).
+export const OWNERSHIP_VERIFICATION_KEY_LITERALS = [
+    'ownership.verification.mismatch',
+    'ownership.verification.unverified',
+    'ownership.verification.partial',
+    'ownership.verification.snapshot',
+] as const;
+const VERIFICATION_NOTE_EN: Record<string, string> = enOwnership.verification;
+const VERIFICATION_NOTE_ES: Record<string, string> = esOwnership.verification;
+
+export function holdingsVerificationNote(status: string, locale: 'es' | 'en' = 'es'): string | null {
+  const table = locale === 'en' ? VERIFICATION_NOTE_EN : VERIFICATION_NOTE_ES;
+  return table[status] ?? null;
 }

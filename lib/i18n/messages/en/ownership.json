@@ -14,6 +14,12 @@
     "limitAsFiled": "Holdings as filed: CUSIP + issuer name; tickers never inferred",
     "limitAmendments": "Amendments are separate immutable filings"
   },
+  "verification": {
+    "mismatch": "The stored totals do not match the 13F own summary: figures unverified.",
+    "unverified": "The 13F summary could not be read to check the totals: figures unverified.",
+    "partial": "Partial data: part of the filing could not be downloaded or verified.",
+    "snapshot": "Figures served from a local snapshot, not checked against the 13F: unverified."
+  },
   "page": {
     "metaTitle": "Institutional ownership (13F)",
     "metaDescription": "Institutional managers' portfolios as filed with the SEC (Form 13F, EDGAR), with quarter-over-quarter changes.",
