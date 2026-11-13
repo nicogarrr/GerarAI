@@ -732,6 +732,7 @@
     "lineTarget": "Objetivo analistas",
     "lineTargetDistance": "Objetivo analistas · {distance}",
     "lineAverageCost": "Tu precio medio",
+    "holdingNotice": "Coste medio no comparable: faltan cantidades/costes válidos o las divisas no coinciden. No se ha inferido un tipo de cambio.",
     "noData": "Sin datos",
     "aboveSma50": "Sobre SMA50",
     "belowSma50": "Bajo SMA50",

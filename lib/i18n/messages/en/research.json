@@ -732,6 +732,7 @@
     "lineTarget": "Analyst target",
     "lineTargetDistance": "Analyst target · {distance}",
     "lineAverageCost": "Your average cost",
+    "holdingNotice": "Average cost not comparable: missing valid quantities/costs or the currencies do not match. No exchange rate was inferred.",
     "noData": "No data",
     "aboveSma50": "Above SMA50",
     "belowSma50": "Below SMA50",
