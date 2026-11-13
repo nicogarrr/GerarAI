@@ -63,7 +63,8 @@ export async function getManagerHoldings(cik: string): Promise<ManagerHoldings> 
 }
 
 export type ManagerChangeRow = {
-  change: 'new' | 'closed' | 'increased' | 'decreased' | 'unchanged';
+  change: 'new' | 'closed' | 'increased' | 'decreased' | 'unchanged' | 'unknown';
+  notice?: string | null;
   name_of_issuer: string;
   title_of_class: string;
   cusip: string;
