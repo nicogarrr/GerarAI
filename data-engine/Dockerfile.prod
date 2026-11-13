@@ -114,4 +114,11 @@ USER cavaai
 # 300 req/min: tormenta de 429 con el backend sano (F53/F54/F55/F203).
 # Se confia solo en proxies del rango de redes docker (172.16.0.0/12);
 # configurable con FORWARDED_ALLOW_IPS.
-CMD ["sh", "-c", "python -m alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-172.16.0.0/12}\""]
+#
+# --timeout-keep-alive 75: el default de uvicorn son 5 s. El front (fetch de
+# Node 22/undici) cierra sus sockets ociosos a los 4 s por defecto, un margen de
+# 1 s: si el servidor Next va cargado y su temporizador se retrasa, reutiliza un
+# socket que uvicorn ya cerro (ECONNRESET). Con 75 s el servidor nunca cierra
+# antes que el cliente. Mitigacion de una carrera conocida, NO probada como
+# causa de ningun incidente concreto.
+CMD ["sh", "-c", "python -m alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 75 --proxy-headers --forwarded-allow-ips \"${FORWARDED_ALLOW_IPS:-172.16.0.0/12}\""]

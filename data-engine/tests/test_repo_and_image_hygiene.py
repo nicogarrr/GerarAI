@@ -125,3 +125,12 @@ def test_engine_image_execs_uvicorn(dockerfile):
         "`docker stop` no llega a uvicorn (SIGKILL a los 10 s, sin teardown "
         "del lifespan)"
     )
+
+
+def test_prod_uvicorn_keepalive_outlives_the_client():
+    """El front (undici) cierra sockets ociosos a los 4 s; uvicorn debe aguantar mas."""
+    text = (ROOT / "data-engine/Dockerfile.prod").read_text(encoding="utf-8")
+    cmd = " ".join(ln for ln in text.splitlines() if ln.startswith("CMD"))
+    match = re.search(r"--timeout-keep-alive\s+(\d+)", cmd)
+    assert match, "Dockerfile.prod: uvicorn sin --timeout-keep-alive (default 5 s, carrera con el cliente)"
+    assert int(match.group(1)) > 5
