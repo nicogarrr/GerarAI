@@ -148,6 +148,11 @@ export async function Portfolio({
           {t('investors.hub.partial')}
         </p>
       ) : null}
+      {portfolio.note ? (
+        <p role="status" className="text-sm text-amber-300">
+          {ownershipNote(portfolio.note, locale)}
+        </p>
+      ) : null}
       {paged.items.length === 0 ? (
         <p className="text-sm text-gray-500">
           {createFormatters(locale).na}

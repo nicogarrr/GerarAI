@@ -6,6 +6,7 @@ import { getInvestors } from '@/lib/actions/investors.actions';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getFormat, getT } from '@/lib/i18n/server';
 import { i18nPageMetadata } from '@/lib/i18n/metadata';
+import { ownershipNote } from '@/lib/research/ownership-display';
 
 import { InvestorSelector } from './_components/InvestorSelector';
 import { InvestorAvatar } from './_components/Avatar';
@@ -102,6 +103,9 @@ export default async function InvestorsPage({ searchParams }: PageProps) {
                                           : t('investors.hub.no13f')}
                                 </span>
                             )}
+                            {investor.report_date && investor.note ? (
+                                <span className="text-xs text-amber-300">{ownershipNote(investor.note, locale)}</span>
+                            ) : null}
                         </Link>
                     </li>
                 ))}
