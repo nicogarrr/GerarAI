@@ -14,6 +14,12 @@
     "limitAsFiled": "Posiciones tal como se declararon: CUSIP y nombre del emisor; nunca se infieren tickers",
     "limitAmendments": "Las enmiendas son declaraciones inmutables independientes"
   },
+  "verification": {
+    "mismatch": "Los totales guardados no cuadran con el resumen del propio 13F: cifras sin verificar.",
+    "unverified": "No se pudo leer el resumen del 13F para contrastar los totales: cifras sin verificar.",
+    "partial": "Datos parciales: parte del informe no se pudo descargar o verificar.",
+    "snapshot": "Cifras servidas desde una copia local (snapshot) sin contrastar contra el 13F: sin verificar."
+  },
   "page": {
     "metaTitle": "Propiedad institucional (13F)",
     "metaDescription": "Carteras de gestores institucionales tal como se declaran ante la SEC (Form 13F, EDGAR), con cambios trimestre a trimestre.",
