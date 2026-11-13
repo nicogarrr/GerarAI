@@ -135,6 +135,16 @@ def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None 
                 if sum(w for _, w in rows) > Decimal("105"):
                     out[etf] = "pesos incoherentes: se conserva la carga anterior"
                     continue
+                weights: dict[str, Decimal] = {}
+                conflicting = False
+                for ticker, weight in rows:
+                    if ticker in weights and weights[ticker] != weight:
+                        conflicting = True
+                        break
+                    weights[ticker] = weight
+                if conflicting:
+                    out[etf] = "pesos duplicados contradictorios: se conserva la carga anterior"
+                    continue
                 session.execute(delete(EtfHolding).where(EtfHolding.etf == etf))
                 seen: set[str] = set()
                 for ticker, weight in rows:
