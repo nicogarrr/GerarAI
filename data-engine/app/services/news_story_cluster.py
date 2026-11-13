@@ -176,7 +176,7 @@ def find_group(groups: list[StoryGroup], event: NewsEvent, company: Company | No
     for group in groups:
         if group.key != key:
             continue
-        if text_key and group.text_key == text_key:
+        if text_key and group.text_key == text_key and abs(group.event.date - event.date) <= WINDOW:
             return group
         if same_story(group.signature, sig, group.event.date, event.date):
             return group
@@ -211,7 +211,7 @@ class StoryClusterIndex:
       ningún token (las tres salidas True exigen intersección no vacía), así
       que el índice token -> grupos solo descarta pares que ya fallaban.
     - El camino de titular literal (``text_key``) se conserva con un mapa
-      (key, text_key) -> primer grupo; gana el primer grupo insertado igual
+      (key, text_key) -> grupos; gana el primer grupo dentro de ventana igual
       que en el recorrido lineal.
     - Los candidatos se examinan en orden de inserción: el primer grupo que
       casa es el mismo que devolvía ``find_group``.
@@ -220,7 +220,7 @@ class StoryClusterIndex:
     def __init__(self) -> None:
         self.groups: list[StoryGroup] = []
         self._by_token: dict[str, set[int]] = {}
-        self._literal: dict[tuple, dict[str, int]] = {}
+        self._literal: dict[tuple, dict[str, list[int]]] = {}
 
     def add(self, group: StoryGroup) -> int:
         """Inserta y devuelve la posición del grupo (la usa ``("story", i)``)."""
@@ -229,7 +229,7 @@ class StoryClusterIndex:
         for token in group.signature:
             self._by_token.setdefault(token, set()).add(idx)
         if group.text_key:
-            self._literal.setdefault(group.key, {}).setdefault(group.text_key, idx)
+            self._literal.setdefault(group.key, {}).setdefault(group.text_key, []).append(idx)
         return idx
 
     def find(self, event: NewsEvent, company: Company | None, sig: set[str]) -> StoryGroup | None:
@@ -239,14 +239,13 @@ class StoryClusterIndex:
         candidates: set[int] = set()
         for token in sig:
             candidates.update(self._by_token.get(token, ()))
-        literal_idx = self._literal.get(key, {}).get(text_key) if text_key else None
-        if literal_idx is not None:
-            candidates.add(literal_idx)
+        if text_key:
+            candidates.update(self._literal.get(key, {}).get(text_key, ()))
         for idx in sorted(candidates):
             group = self.groups[idx]
             if group.key != key:
                 continue
-            if text_key and group.text_key == text_key:
+            if text_key and group.text_key == text_key and abs(group.event.date - event.date) <= WINDOW:
                 return group
             if same_story(group.signature, sig, group.event.date, event.date):
                 return group
