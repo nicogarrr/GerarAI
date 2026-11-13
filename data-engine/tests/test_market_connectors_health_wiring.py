@@ -20,6 +20,7 @@ import pytest
 
 from app.services.connectors import damodaran, finnhub, fmp, stooq
 from app.services.connectors.base import UpstreamRateLimited
+from app.services.connectors.global_pacing import GlobalPacer
 from app.services.data_source_health import DataSourceHealthRegistry, get_data_source_registry
 
 
@@ -28,6 +29,36 @@ def fresh_registry():
     DataSourceHealthRegistry._instance = None
     yield
     DataSourceHealthRegistry._instance = None
+
+
+@pytest.fixture(autouse=True)
+def finnhub_test_clock(monkeypatch):
+    # These are health-registry tests, not wall-clock/Redis integration tests.
+    # The real singleton retains a 60s cooldown after the 429 case, making
+    # the next case sleep in real time and depend on its execution order.
+    # Keep the real pacing algorithm but give each case a private clock.
+    class Clock:
+        now = 0.0
+
+        def __init__(self):
+            self.waits = []
+
+        def monotonic(self):
+            return self.now
+
+        def sleep(self, seconds):
+            self.waits.append(seconds)
+            self.now += seconds
+
+    clock = Clock()
+    monkeypatch.setattr(finnhub, "_pacer", GlobalPacer(
+        "finnhub-health-unit-test",
+        min_interval_seconds=finnhub.FINNHUB_MIN_INTERVAL_SECONDS,
+        redis_client_factory=lambda: None,
+        monotonic=clock.monotonic,
+        sleep=clock.sleep,
+    ))
+    return clock
 
 
 def _mock_client(handler) -> httpx.AsyncClient:
@@ -146,6 +177,20 @@ def test_finnhub_exito_cierra(monkeypatch):
     payload = asyncio.run(client.quote("AAPL", max_retries=0))
     assert payload["c"] == 123.4
     assert registry.get_status("finnhub").consecutive_failures == 0
+
+
+def test_finnhub_cooldown_se_respeta_con_reloj_falso(monkeypatch, finnhub_test_clock):
+    _patch_module_client(monkeypatch, finnhub, _FakeResponse(429))
+    client = finnhub.FinnhubClient()
+    monkeypatch.setattr(client.settings, "finnhub_api_key", "test-key")
+    with pytest.raises(UpstreamRateLimited):
+        asyncio.run(client.quote("AAPL", max_retries=0))
+
+    _patch_module_client(monkeypatch, finnhub, _FakeResponse(200, {"c": 123.4}))
+    assert asyncio.run(client.quote("AAPL", max_retries=0))["c"] == 123.4
+    # No protection was disabled: the full cooldown elapsed on the fake clock.
+    assert finnhub_test_clock.waits == [60.0]
+    assert finnhub_test_clock.now == 60.0
 
 
 def test_fmp_402_entitlement_no_degrada(monkeypatch):
