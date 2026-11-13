@@ -52,3 +52,24 @@ def test_local_fallback_keeps_the_interval_between_concurrent_waiters():
     marks = asyncio.run(main())
     assert marks[1] - marks[0] >= 0.08
     assert marks[2] - marks[1] >= 0.08
+
+
+def test_local_fallback_revalidates_cooldown_arriving_during_the_wait():
+    """Un cool_down() que llega mientras un waiter duerme se respeta."""
+    pacer = GlobalPacer("fallback-cooldown", min_interval_seconds=0.15, redis_client_factory=lambda: None)
+
+    async def main() -> float:
+        await pacer.wait()  # consume el primer hueco
+        t0 = time.monotonic()
+
+        async def cooler():
+            await asyncio.sleep(0.03)
+            pacer.cool_down(0.4)  # vence a t0+~0,43
+
+        task = asyncio.create_task(cooler())
+        await pacer.wait()  # dormido ~0,15 s; el cooldown llega durante la espera
+        await task
+        return time.monotonic() - t0
+
+    salida = asyncio.run(main())
+    assert salida >= 0.38, f"salio a {salida:.3f}s con cooldown pendiente"

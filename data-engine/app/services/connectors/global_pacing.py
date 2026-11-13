@@ -132,17 +132,22 @@ class GlobalPacer:
             # el comportamiento actual (ninguno) en vez de degradar dev/tests
             # con esperas que en prod no protegen nada (alli Redis existe).
             return
-        # Claim-first y espera ASYNC fuera del lock: con `time.sleep` aqui el
-        # event loop entero (todas las rutas del proceso) se paraba mientras
-        # esperaba el hueco, y el lock se retenia durante la espera.
-        with self._local_lock:
-            now = self._monotonic()
-            start = max(now, self._local_next, self._local_blocked_until)
-            self._local_next = start + self.min_interval_seconds
-            wait = start - now
-        if wait > 0:
-            dormir = self._sleep_async if self._sleep_async is not None else asyncio.sleep
-            await dormir(wait)
+        # Espera ASYNC fuera del lock (con `time.sleep` el event loop entero se
+        # paraba). Tras cada espera se REVALIDA el cooldown local: un
+        # cool_down() (Retry-After) que llegue mientras se duerme debe
+        # respetarse, como hacia el bucle bloqueante original.
+        dormir = self._sleep_async if self._sleep_async is not None else asyncio.sleep
+        while True:
+            with self._local_lock:
+                now = self._monotonic()
+                start = max(now, self._local_next, self._local_blocked_until)
+                self._local_next = start + self.min_interval_seconds
+                wait = start - now
+            if wait > 0:
+                await dormir(wait)
+            with self._local_lock:
+                if self._monotonic() >= self._local_blocked_until:
+                    return
 
     def wait_sync(self) -> None:
         """Synchronous consumers reserve the SAME Redis slots as async ones."""
