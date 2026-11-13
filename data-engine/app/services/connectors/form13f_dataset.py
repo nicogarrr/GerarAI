@@ -135,6 +135,8 @@ def parse_dataset(source: str | IO[bytes], cusips: set[str], *, url: str = "") -
             period = _sec_date(_get(index, row, "PERIODOFREPORT"))
             if not acc or not filed or not period or form not in {"13F-HR", "13F-HR/A"}:
                 continue
+            if period > filed or filed > date.today():
+                continue
             filings[acc] = Filing(acc, _get(index, row, "CIK").zfill(10), filed, period, form)
         for index, row in _rows(zf, "COVERPAGE.tsv"):
             filing = filings.get(_get(index, row, "ACCESSION_NUMBER"))
