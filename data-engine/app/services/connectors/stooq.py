@@ -85,6 +85,8 @@ class StooqClient:
                     not (start <= day <= end)
                     or any(p <= 0 or not p.is_finite() for p in prices.values())
                     or volume < 0
+                    or not prices["low"] <= min(prices["open"], prices["close"])
+                    or not max(prices["open"], prices["close"]) <= prices["high"]
                 ):
                     raise ValueError("Invalid date, price or volume")
             except (ValueError, InvalidOperation, TypeError, KeyError) as exc:
