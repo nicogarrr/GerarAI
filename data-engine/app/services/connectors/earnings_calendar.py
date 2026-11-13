@@ -173,7 +173,9 @@ async def fetch_earnings_day(
     payload = await _get_json(EARNINGS_URL, {"date": day.isoformat()}, client)
     if not payload:
         return None
-    data = payload.get("data") or {}
+    data = payload.get("data")
+    if not isinstance(data, dict) or "rows" not in data:
+        return None
     rows = data.get("rows") or []
     events = [normalize_earnings_row(row, day) for row in rows if row.get("symbol")]
     return events
@@ -187,8 +189,12 @@ async def fetch_dividends_day(
     payload = await _get_json(DIVIDENDS_URL, {"date": day.isoformat()}, client)
     if not payload:
         return None
-    data = payload.get("data") or {}
-    calendar = data.get("calendar") or data
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return None
+    calendar = data.get("calendar") if "calendar" in data else data
+    if not isinstance(calendar, dict) or "rows" not in calendar:
+        return None
     rows = calendar.get("rows") or []
     return [normalize_dividend_row(row, day) for row in rows if row.get("symbol")]
 
