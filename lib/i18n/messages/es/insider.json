@@ -154,7 +154,9 @@
       "W": "Herencia",
       "X": "Ejercicio de opción"
     },
-    "excludedFutureRows": "{count} operaciones con fecha futura excluidas del feed observado; no entran en los totales."
+    "excludedFutureRows": "{count} operaciones con fecha futura excluidas del feed observado; no entran en los totales.",
+    "amountMinKnown": "≥ {known} como mínimo · {missing} sin importe",
+    "amountNa": "importe N/D"
   },
   "statusCopy": {
     "reason": {
