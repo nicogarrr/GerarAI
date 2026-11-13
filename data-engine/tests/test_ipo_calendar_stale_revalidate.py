@@ -52,7 +52,9 @@ def test_expired_month_is_served_at_once_and_refreshed(monkeypatch):
         ipo._month_cache[MONTH] = (_expired(), OLD)  # noqa: SLF001
         first = await asyncio.wait_for(ipo.fetch_ipo_month(MONTH), 1.0)
         second = await asyncio.wait_for(ipo.fetch_ipo_month(MONTH), 1.0)
-        assert first is OLD and second is OLD
+        assert first["events"] == OLD["events"] and second["events"] == OLD["events"]
+        assert first["status"] == second["status"] == "partial"
+        assert OLD["status"] == "ok"
         await asyncio.sleep(0)
         assert calls == ["2026-10"]
         release.set()
@@ -75,10 +77,14 @@ def test_failed_refresh_keeps_the_good_copy(monkeypatch):
     async def run():
         monkeypatch.setattr(ipo, "_get_json", down)
         ipo._month_cache[MONTH] = (_expired(), OLD)  # noqa: SLF001
-        assert await ipo.fetch_ipo_month(MONTH) is OLD
+        assert (await ipo.fetch_ipo_month(MONTH))["events"] == OLD["events"]
         for _ in range(3):
             await asyncio.sleep(0)
-        assert await ipo.fetch_ipo_month(MONTH) is OLD
+        fallback = await ipo.fetch_ipo_month(MONTH)
+        assert fallback["events"] == OLD["events"]
+        assert fallback["status"] == "partial" and fallback["stale"] is True
+        assert fallback["cache_age_seconds"] >= ipo._MONTH_CACHE_TTL_S
+        assert OLD["errors"] == []
         for _ in range(3):
             await asyncio.sleep(0)
         assert calls == ["2026-10"]  # sin reintento durante la cache negativa

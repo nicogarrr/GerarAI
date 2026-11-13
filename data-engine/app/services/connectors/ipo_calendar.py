@@ -155,6 +155,17 @@ def _refresh_month(first: date) -> None:
     task.add_done_callback(_done)
 
 
+def _stale_month(result: dict[str, Any], age: float) -> dict[str, Any]:
+    # Copy, never mutate the good cache or reset its original observation time.
+    return {
+        **result,
+        "status": "partial",
+        "stale": True,
+        "cache_age_seconds": int(age),
+        "errors": [*result["errors"], f"{result['month']}: copia guardada hace más de una hora; actualización pendiente o fallida."],
+    }
+
+
 async def fetch_ipo_month(
     month: date,
     client: httpx.AsyncClient | None = None,
@@ -170,12 +181,14 @@ async def fetch_ipo_month(
                     return hit[1]
                 if age < _MONTH_STALE_MAX_S:
                     _refresh_month(first)
-                    return hit[1]
+                    return _stale_month(hit[1], age)
             elif age < _MONTH_FAILURE_TTL_S:
                 return hit[1]
         result = await _fetch_ipo_month(first, None)
         _store_month(first, result)
-        return _month_cache[first][1]
+        cached_at, cached = _month_cache[first]
+        age = time.monotonic() - cached_at
+        return _stale_month(cached, age) if cached["status"] == "ok" and age >= _MONTH_CACHE_TTL_S else cached
     return await _fetch_ipo_month(first, client)
 
 
@@ -216,7 +229,7 @@ async def fetch_ipo_calendar(
     """
     unique = sorted({first_of_month(m) for m in months})[:MAX_MONTHS]
     if not unique:
-        return {"status": "ok", "months": [], "count": 0, "events": [], "errors": []}
+        return {"status": "ok", "months": [], "count": 0, "events": [], "errors": [], "stale_months": []}
     per_month = await asyncio.gather(*(fetch_ipo_month(m, client) for m in unique))
     events: list[dict[str, Any]] = []
     errors: list[str] = []
@@ -224,16 +237,17 @@ async def fetch_ipo_calendar(
         events.extend(result["events"])
         errors.extend(result["errors"])
     events.sort(key=lambda e: (e["date"] is None, e["date"] or "", e["company"] or ""))
-    answered = sum(1 for r in per_month if r["status"] == "ok")
+    answered = sum(1 for r in per_month if r["status"] in {"ok", "partial"})
     if answered == 0:
         status = "unavailable"
-    elif answered < len(per_month):
+    elif answered < len(per_month) or any(r["status"] == "partial" for r in per_month):
         status = "partial"
     else:
         status = "ok"
     return {
         "status": status,
         "months": [r["month"] for r in per_month],
+        "stale_months": [r["month"] for r in per_month if r.get("stale")],
         "count": len(events),
         "events": events,
         "errors": errors,
