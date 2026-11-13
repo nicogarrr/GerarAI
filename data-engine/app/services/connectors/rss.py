@@ -128,11 +128,14 @@ class RSSConnector:
 
         channel = next(
             (child for child in root if _local_name(child.tag) == "channel"),
-            root,
+            None,
         )
+        if channel is None:
+            raise ValueError("el feed RSS/RDF no contiene channel")
         # RSS 1.0/RDF: channel carries metadata, while items are its siblings.
         item_parent = root if _local_name(root.tag) == "rdf" else channel
         return _child_text(channel, "title"), [child for child in item_parent if _local_name(child.tag) == "item"]
+
 
     def _parse_entry(
         self,
