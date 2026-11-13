@@ -102,6 +102,7 @@
   },
   "sectionError": {
     "network": "No se pudo conectar con el servicio. Reintenta en unos segundos.",
+    "timeout": "El servicio tardó demasiado en responder. Reintenta en unos segundos.",
     "session": "Tu sesión ha caducado. Vuelve a entrar para ver esta sección.",
     "server": "El servicio ha fallado. Reintenta en unos segundos.",
     "generic": "No se pudieron cargar los datos. Reintenta en unos segundos."

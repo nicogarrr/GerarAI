@@ -102,6 +102,7 @@
   },
   "sectionError": {
     "network": "Could not connect to the service. Try again in a few seconds.",
+    "timeout": "The service took too long to respond. Try again in a few seconds.",
     "session": "Your session has expired. Sign in again to see this section.",
     "server": "The service has failed. Try again in a few seconds.",
     "generic": "The data could not be loaded. Try again in a few seconds."
