@@ -184,6 +184,7 @@ async def catalysts_calendar(
             "status": "ok",
             "desde": start.isoformat(),
             "hasta": end.isoformat(),
+            "stale_days": [],
             "held_count": 0,
             "watchlist_count": 0,
             "count": 0,
@@ -243,6 +244,7 @@ async def catalysts_calendar(
         "count": len(events),
         "events": events,
         "errors": earnings["errors"] + dividends["errors"] + filings["errors"],
+        "stale_days": sorted(set(earnings.get("stale_days", []) + dividends.get("stale_days", []))),
     }
 
 
