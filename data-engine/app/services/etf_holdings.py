@@ -51,6 +51,8 @@ def _pct(raw: str | None, *, fraction: bool) -> Decimal | None:
         value = Decimal((raw or "").strip().rstrip("%").replace(",", ""))
     except InvalidOperation:
         return None
+    if not value.is_finite() or value < 0 or value > (1 if fraction else 100):
+        return None
     return value * 100 if fraction else value
 
 
@@ -64,8 +66,10 @@ def parse_procure(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
             day = datetime.strptime((rec.get("Date") or "").strip(), "%m/%d/%Y").date()
         except ValueError:
             continue
-        if not _TICKER.match(ticker) or weight is None:
+        if not _TICKER.match(ticker):
             continue
+        if weight is None:
+            raise ValueError("ETF invalid equity weight")
         if as_of is not None and as_of != day:
             raise ValueError("ETF mixed snapshot dates")
         as_of = day
@@ -82,7 +86,7 @@ def parse_tema(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
         if (rec.get("is_cash") or "0").strip() not in ("0", ""):
             continue
         # Solo cotizadas en EEUU con CUSIP (excluye «SPACEX SPV», «FTC LN», «3491 TT»).
-        if not _TICKER.match(ticker) or not (rec.get("cusip") or "").strip() or weight is None:
+        if not _TICKER.match(ticker) or not (rec.get("cusip") or "").strip():
             continue
         if (rec.get("country") or "").strip() != "United States":
             continue
@@ -90,6 +94,8 @@ def parse_tema(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
             day = datetime.strptime((rec.get("holdings_date") or "").strip(), "%Y-%m-%d").date()
         except ValueError:
             continue
+        if weight is None:
+            raise ValueError("ETF invalid equity weight")
         if as_of is not None and as_of != day:
             raise ValueError("ETF mixed snapshot dates")
         as_of = day
