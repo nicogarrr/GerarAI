@@ -169,14 +169,21 @@ class CompanyEventsService:
 
         calendar_rows: list[dict[str, Any]] = []
         calendar_chunks_ok = 0
+        calendar_chunks_usable = 0
         for chunk_start, chunk_end in chunks:
             payload = await self._calendar_fetcher(
                 chunk_start.isoformat(), chunk_end.isoformat()
             )
             if not isinstance(payload, dict) or not isinstance(payload.get("earningsCalendar"), list):
                 continue
-            calendar_chunks_ok += 1
-            for row in payload.get("earningsCalendar") or []:
+            rows = payload["earningsCalendar"]
+            valid_rows = [row for row in rows if isinstance(row, dict)]
+            if len(valid_rows) == len(rows):
+                calendar_chunks_ok += 1
+                calendar_chunks_usable += 1
+            elif valid_rows:
+                calendar_chunks_usable += 1
+            for row in valid_rows:
                 if str(row.get("symbol", "")).upper() == company.ticker.upper():
                     calendar_rows.append(row)
 
@@ -196,7 +203,7 @@ class CompanyEventsService:
         next_event = self._next_event(calendar_rows, today)
         history = self._history(calendar_rows, eps_rows, today)
         calendar_status = (
-            "unavailable" if not calendar_chunks_ok else
+            "unavailable" if not calendar_chunks_usable else
             "ok" if calendar_chunks_ok == len(chunks) else "partial"
         )
         warnings = []
