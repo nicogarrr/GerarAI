@@ -64,4 +64,24 @@ describe('InsiderFeed responsivo (una fila por operación)', () => {
         // http ausente: sin enlace de importe en la segunda fila.
         expect(within(rows[2]).queryByRole('link', { name: /12\.500/ })).not.toBeInTheDocument();
     });
+
+    it('el orden DOM de la fila coincide con el orden visual en 390 (WCAG 1.3.2)', () => {
+        render(<InsiderFeed feed={feed()} side="all" days={90} />);
+        const rows = within(screen.getByRole('table')).getAllByRole('row');
+        const cells = within(rows[1]).getAllByRole('cell');
+        const texts = cells.map((c) => c.textContent ?? '');
+        // Orden visual medido en capturas 390 (2026-11-14): Ticker, Fecha,
+        // Operacion, Insider, Rol, Acciones, Precio, Importe. El lector de
+        // pantalla recorre el DOM: debe anunciar la misma secuencia.
+        expect(texts[0]).toContain('ASTS');
+        expect(texts[1]).toMatch(/oct 2026/);
+        expect(texts[2]).toContain('Compra');
+        expect(texts[3]).toContain('Doe John');
+        expect(texts[4]).toContain('CFO');
+        expect(texts[5]).toContain('1.000');
+        expect(texts[6]).toContain('12,5');
+        expect(texts[7]).toContain('12.500');
+        // Sin clases order-N: la secuencia visual no puede divergir del DOM.
+        for (const cell of cells) expect(cell.className).not.toMatch(/\border-\d/);
+    });
 });
