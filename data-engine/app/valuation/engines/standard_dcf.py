@@ -13,6 +13,7 @@ crecimiento × WACC; reverse DCF: crecimiento requerido al precio actual.
 
 from __future__ import annotations
 
+import logging
 from datetime import date
 
 from app.valuation.cyclical_midcycle import cyclical_midcycle
@@ -54,6 +55,8 @@ from app.valuation.wacc_band import (
     BandWacc,
     resolve_band_wacc,
 )
+
+logger = logging.getLogger(__name__)
 
 # The facts the standard FCFF DCF actually reads. Used to scope
 # ``evidence_confidence`` so unrelated ingested facts cannot move the
@@ -285,7 +288,10 @@ def _own_history(context: ValuationContext, company_id: int) -> dict | None:
             context.as_of,
             metrics=("revenue", "operating_cash_flow", "capital_expenditure"),
         )
-    except Exception:  # noqa: BLE001 - sin historial, amplitud mecánica
+    except Exception as exc:  # noqa: BLE001 - sin historial, amplitud mecánica
+        logger.warning(
+            "historial FY ilegible para company_id=%s (%s); amplitud mecanica", company_id, type(exc).__name__
+        )
         return None
     rows: dict[int, dict[str, float | None]] = {}
     for year, row in history.items():

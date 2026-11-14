@@ -10,6 +10,7 @@ consenso devuelve ``None`` y la conciliación sigue su curso.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import date
@@ -20,6 +21,8 @@ from sqlalchemy.orm import Session
 
 from app.services.declared_input_service import DeclaredInputService
 from app.valuation.consensus_sanity import DCF_INPUT_NAMES, StepLabel
+
+logger = logging.getLogger(__name__)
 
 #: Claves de ``declared_input_values`` que alimentan cada input del DCF.
 _KEY_TO_DCF: dict[str, str] = {
@@ -206,7 +209,8 @@ def load_consensus(
         if targets is None:
             return None
         return _snapshot_from_targets(ticker, targets)
-    except Exception:  # noqa: BLE001 - el control nunca puede romper la tesis
+    except Exception as exc:  # noqa: BLE001 - el control nunca puede romper la tesis
+        logger.warning("consenso: control omitido para %s (%s)", ticker, type(exc).__name__)
         return None
 
 

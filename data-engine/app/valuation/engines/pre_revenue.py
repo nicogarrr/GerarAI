@@ -15,6 +15,7 @@ bootstrap). ``net_debt`` ausente nunca es 0: se declara como input faltante.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -56,6 +57,8 @@ from app.valuation.scenario_definitions import (
 )
 from app.valuation.scenario_model import Scenario, probability_weighted_value
 from app.valuation.sensitivity import sensitivity_grid
+
+logger = logging.getLogger(__name__)
 
 
 class PreRevenueScenarioEngine(ValuationEngine):
@@ -136,7 +139,11 @@ class PreRevenueScenarioEngine(ValuationEngine):
             if context.as_of is not None and row.as_of is not None and row.as_of > context.as_of:
                 return None
             value = float(row.base)
-        except Exception:  # noqa: BLE001 - un input opcional nunca rompe el motor
+        except Exception as exc:  # noqa: BLE001 - un input opcional nunca rompe el motor
+            logger.warning(
+                "input fcf_margin ilegible para company_id=%s (%s); se usa el supuesto por defecto",
+                company.id, type(exc).__name__,
+            )
             return None
         unit = str(getattr(row, "unit", "") or "").lower()
         if unit in {"percent", "%", "pct"} or "percent" in unit or abs(value) > 1.5:
