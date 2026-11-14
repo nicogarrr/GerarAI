@@ -12,8 +12,9 @@ test('market dates stay on the quoted day and show a Spanish month', () => {
 test('watchlist and movers do not interpolate raw quote dates', () => {
   const watchlist = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
   const movers = (readFileSync('components/market/MoversTable.tsx', 'utf8') + readFileSync('app/(root)/screener/page.tsx', 'utf8'));
-  assert.equal(watchlist.match(/formatMarketDate\(stock.priceAsOf\)/g)?.length, 2);
-  assert.ok(watchlist.includes('col-span-2 min-w-0'));
+  assert.equal(watchlist.match(/formatMarketDate\(stock.priceAsOf\)/g)?.length, 1);
+  // Tabla responsiva única (2026-11-14): la etiqueta móvil del precio existe.
+  assert.match(watchlist, /xl:hidden">\{t\('watchlist\.page\.sort\.price'\)\}/);
   assert.ok(movers.includes('formatMarketDate(row.date)'));
   assert.ok(movers.includes("timeZoneName: 'short'"));
   assert.ok(!movers.includes('{row.date}'));

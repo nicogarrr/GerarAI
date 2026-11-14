@@ -60,8 +60,9 @@ describe('/watchlist con cierre datado diferido', () => {
       new Promise((resolve) => setTimeout(() => resolve('bloqueada'), 1000)),
     ]);
     expect(page).not.toBe('bloqueada');
+    // Una fila por empresa (tabla responsiva única, 2026-11-14): un DatedRow.
     const rows = find(page, 'DatedRow');
-    expect(rows.length).toBe(2);
+    expect(rows.length).toBe(1);
     expect(text(page)).not.toContain('watchlist.page.closeOn');
   });
 
@@ -70,7 +71,7 @@ describe('/watchlist con cierre datado diferido', () => {
     const { default: WatchlistPage } = await import('@/app/(root)/watchlist/page');
     const page = await WatchlistPage({ searchParams: Promise.resolve({}) });
     const rows = find(page, 'DatedRow');
-    expect(rows.length).toBe(2);
+    expect(rows.length).toBe(1);
     const fn = rows[0].type as unknown as (p: unknown) => Promise<unknown>;
     const inner = await fn(rows[0].props);
     expect(text(inner)).toContain('watchlist.page.closeOn:2026-11-06');

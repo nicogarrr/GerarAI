@@ -92,7 +92,7 @@ describe('/watchlist con datos de entrada diferidos', () => {
     });
     const page = await renderPage();
     const streams = find(page, 'EntryRowStream');
-    expect(streams.length).toBeGreaterThanOrEqual(2); // tarjeta movil + fila de tabla
+    expect(streams.length).toBe(1); // una fila por empresa (tabla responsiva única)
     const resolved = await (streams[0].type as (p: Record<string, unknown>) => Promise<unknown>)(streams[0].props ?? {});
     expect(text(resolved)).toContain('$100');
   });
@@ -116,17 +116,15 @@ describe('/watchlist con datos de entrada diferidos', () => {
         ? { symbol, name: symbol, exchange: 'NASDAQ', currency: 'USD', price: null, change: null, changePercent: null, marketCap: null, peRatio: null, priceKind: null, priceAsOf: null, quoteSymbol: null }
         : { symbol, name: symbol, exchange: 'NASDAQ', currency: 'USD', price: 100, change: 1, changePercent: 1, marketCap: 1, peRatio: 10, priceKind: 'live', priceAsOf: null, quoteSymbol: null });
     const page = await renderPage();
-    // 2 vistas (tarjeta + tabla) x 2 filas, siempre en orden de la watchlist:
-    // NOPRICE primero en ambas, con su «sin datos» explicito, y WITHPRICE
-    // detras con su cotizacion. El hundido de N/D no vuelve a ocurrir.
+    // Una fila por empresa (tabla responsiva única, 2026-11-14), siempre en
+    // orden de la watchlist: NOPRICE primero, con su «sin datos» explicito,
+    // y WITHPRICE detras con su cotizacion. El hundido de N/D no vuelve a ocurrir.
     const streams = find(page, 'EntryRowStream');
-    expect(streams).toHaveLength(4);
+    expect(streams).toHaveLength(2);
     const painted = await Promise.all(streams.map((s) => (s.type as (p: Record<string, unknown>) => Promise<unknown>)(s.props ?? {})));
     expect(text(painted[0])).toContain('NOPRICE');
     expect(text(painted[0])).toContain('watchlist.page.noData');
     expect(text(painted[1])).toContain('WITHPRICE');
     expect(text(painted[1])).toContain('$100');
-    expect(text(painted[2])).toContain('NOPRICE');
-    expect(text(painted[3])).toContain('WITHPRICE');
   });
 });
