@@ -1,6 +1,6 @@
 import { expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
 
-import { isDisabledChatAvailabilityResponse } from "./brain-request-classifier";
+import { isDisabledChatAvailabilityResponse } from "../../tests/unit/helpers/brain-request-classifier";
 
 for (const vp of VIEWPORTS) {
   test.describe(`404 y Cerebro (${vp.name})`, () => {
