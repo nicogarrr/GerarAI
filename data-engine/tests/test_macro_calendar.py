@@ -246,8 +246,8 @@ def test_digest_without_text_is_insufficient_not_invented(db) -> None:
     assert entry["status"] == "insufficient_data" and entry["items"] == []
 
 
-def test_digest_derives_filed_at_from_filing_name(db) -> None:
-    """QA 10: sin published_at, la fecha sale del nombre del filing."""
+def test_digest_does_not_infer_filed_at_from_filing_name(db) -> None:
+    """Sin published_at, el nombre puede llevar fecha del hecho, no de presentación."""
     doc = _filing(
         db,
         company=db.info["held"],
@@ -257,7 +257,7 @@ def test_digest_derives_filed_at_from_filing_name(db) -> None:
     doc.published_at = None
     db.commit()
     entry = eight_k_digest(db)["items"][0]
-    assert entry["filed_at"] == "2026-10-13"
+    assert entry["filed_at"] is None
 
 
 def test_digest_without_any_date_keeps_none_not_invented(db) -> None:
