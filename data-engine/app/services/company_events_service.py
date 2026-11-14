@@ -177,7 +177,10 @@ class CompanyEventsService:
             if not isinstance(payload, dict) or not isinstance(payload.get("earningsCalendar"), list):
                 continue
             rows = payload["earningsCalendar"]
-            valid_rows = [row for row in rows if isinstance(row, dict)]
+            valid_rows = [
+                row for row in rows
+                if isinstance(row, dict) and self._parse_day(row.get("date")) is not None
+            ]
             if len(valid_rows) == len(rows):
                 calendar_chunks_ok += 1
                 calendar_chunks_usable += 1
@@ -213,7 +216,10 @@ class CompanyEventsService:
                 "rangos consultados. Pueden faltar eventos; una ausencia no confirma que no haya resultados."
             )
         elif calendar_status == "unavailable":
-            warnings.append("Calendario de resultados no disponible: Finnhub sin respuesta o sin cobertura.")
+            warnings.append(
+                "Calendario de resultados no disponible: Finnhub sin respuesta, sin cobertura "
+                "o con filas/fechas no verificables."
+            )
         if eps_status == "partial":
             warnings.append(
                 "Histórico de BPA parcial: se han omitido filas con periodo ausente, inválido o futuro."
