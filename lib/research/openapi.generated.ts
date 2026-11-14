@@ -901,8 +901,8 @@ export interface paths {
          *     resolviendo en ~0,9 s desde el front). La resolucion va por ticker
          *     con la MISMA funcion del endpoint individual (resolve_company), asi
          *     la politica de alias (SAN.MC -> SAN) no puede divergir entre ambos;
-         *     son lecturas por clave primaria, baratas, y van en una sola peticion
-         *     HTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el
+         *     los exactos se leen juntos y los alias conservan el resolver individual.
+         *     Todo va en una sola peticion HTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el
          *     canonico, para que el caller no reimplemente la resolucion.
          */
         get: operations["companies_basics_batch_api_companies_basics_get"];
