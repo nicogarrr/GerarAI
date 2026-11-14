@@ -25,8 +25,8 @@ describe('Flujo de dinero dentro del detalle de cada tema', () => {
   });
 
   it('flujo declarado por el backend pero no entregado: N/D visible con causa, nunca ausencia silenciosa', () => {
-    assert.ok(pagina.includes('failedFlowIds'), 'la página registra los flujos declarados no entregados');
-    assert.ok(pagina.includes('failedFlowIds.has(theme.id)'), 'la tarjeta recibe el fallo de SU tema');
+    assert.ok(pagina.includes('flowIds.some((item) => item.id === themeId)'), 'la tarjeta consulta el flujo declarado de SU tema');
+    assert.ok(pagina.includes('const flow = await getMoneyFlow(themeId);'), 'solo entonces pide el detalle');
     assert.ok(pagina.includes('<ThemeFlowUnavailable />'), 'la tarjeta monta el estado N/D');
     assert.match(flujoTexto, /Flujo de dinero N\/D: el backend declara este flujo pero no lo ha devuelto/);
     assert.match(flujoTexto, /Sin importes en lugar de inventarlos/);
@@ -36,7 +36,7 @@ describe('Flujo de dinero dentro del detalle de cada tema', () => {
   it('degrada en silencio si el endpoint no existe (no rompe /temas)', () => {
     assert.match(acciones, /catch \{\s*return \[\];/);
     assert.match(acciones, /catch \{\s*return null;/);
-    assert.ok(pagina.includes('flowsById.get(theme.id) ?? null'));
+    assert.match(pagina, /if \(!flowIds\.some\(\(item\) => item\.id === themeId\)\) return null;/);
   });
 
   it('la estimación de terceros se distingue visualmente del dato reportado', () => {

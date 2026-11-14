@@ -5,13 +5,14 @@ import { TrendingDown, TrendingUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
 import BackendOffline from '@/components/system/BackendOffline';
+import { MarketThemesRefreshing } from './_components/MarketThemesRefreshing';
 import { ThemeBrainButton } from './_components/ThemeBrainButton';
 import { ThemeOrderToggle } from './_components/ThemeOrderToggle';
 import { isBackendUnavailableError } from '@/lib/backend-offline';
 import { getBottlenecks } from '@/lib/actions/bottlenecks.actions';
 import { getMarketThemes } from '@/lib/actions/market-themes.actions';
 import { getFlowHoldings, getMoneyFlow, getMoneyFlowThemes } from '@/lib/actions/money-flows.actions';
-import type { MoneyFlow } from '@/lib/market/flows';
+import type { MoneyFlowThemeSummary } from '@/lib/market/flows';
 import { themeReasonText } from '@/lib/market/theme-reason-text';
 import { themeMethodText } from '@/lib/market/theme-method-text';
 import { ThemeFlow, ThemeFlowUnavailable } from './_components/ThemeFlow';
@@ -61,14 +62,18 @@ const TONE_CARD = {
 const TONE_TEXT = { up: 'text-teal-300', down: 'text-red-400', none: 'text-gray-500' } as const;
 
 type FlowHoldings = { portfolio: Set<string>; watchlist: Set<string>; unavailable: boolean };
+type BottlenecksPayload = Awaited<ReturnType<typeof getBottlenecks>> | null;
+
+type DeferredThemeData = {
+  bottlenecks: Promise<BottlenecksPayload>;
+  flowIds: Promise<MoneyFlowThemeSummary[]>;
+  holdings: Promise<FlowHoldings>;
+};
 
 function ThemeCard({
   theme,
   order,
-  flow,
-  flowUnavailable,
-  holdings,
-  detectedBottleneck,
+  deferred,
   t,
   fmt,
 }: {
@@ -76,10 +81,7 @@ function ThemeCard({
   fmt: Formatters;
   theme: MarketTheme;
   order: ThemeOrder;
-  flow: MoneyFlow | null;
-  flowUnavailable: boolean;
-  holdings: FlowHoldings;
-  detectedBottleneck: string | null;
+  deferred: DeferredThemeData;
 }) {
   const pct = pctWith(fmt);
   const NA = fmt.na;
@@ -188,26 +190,76 @@ function ThemeCard({
             </table>
           </div>
           <ThemeFundamentals themeId={theme.id} />
-          {flow ? (
-            <ThemeFlow flow={flow} holdings={holdings} />
-          ) : flowUnavailable ? (
-            <ThemeFlowUnavailable />
-          ) : null}
+          <Suspense fallback={null}>
+            <ThemeFlowSection flowIdsPromise={deferred.flowIds} holdingsPromise={deferred.holdings} themeId={theme.id} />
+          </Suspense>
           <ThemeBrainButton question={brainQuestion} />
-          {!holdings.unavailable ? (
-            <HoldingsLines constituents={theme.constituents} holdings={holdings} t={t} />
-          ) : null}
-          {detectedBottleneck ? (
-            <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
-              {t('themes.page.bottleneck')}{' '}
-              <Link className="text-teal-300 underline hover:text-teal-200" href="/cuellos">
-                {bottleneckThemeName(detectedBottleneck, t)}
-              </Link>
-            </p>
-          ) : null}
+          <Suspense fallback={null}>
+            <ThemeHoldingsSection constituents={theme.constituents} holdingsPromise={deferred.holdings} t={t} />
+          </Suspense>
+          <Suspense fallback={null}>
+            <ThemeBottleneckSection bottlenecksPromise={deferred.bottlenecks} t={t} themeId={theme.id} />
+          </Suspense>
         </div>
       </details>
     </li>
+  );
+}
+
+async function ThemeFlowSection({
+  flowIdsPromise,
+  holdingsPromise,
+  themeId,
+}: {
+  flowIdsPromise: Promise<MoneyFlowThemeSummary[]>;
+  holdingsPromise: Promise<FlowHoldings>;
+  themeId: string;
+}) {
+  const [flowIds, holdings] = await Promise.all([flowIdsPromise, holdingsPromise]);
+  if (!flowIds.some((item) => item.id === themeId)) return null;
+  // Si el backend declara el flujo pero el detalle no llega, la tarjeta dice
+  // N/D con causa; nunca desaparece en silencio ni inventa importes.
+  const flow = await getMoneyFlow(themeId);
+  return flow ? <ThemeFlow flow={flow} holdings={holdings} /> : <ThemeFlowUnavailable />;
+}
+
+async function ThemeHoldingsSection({
+  constituents,
+  holdingsPromise,
+  t,
+}: {
+  constituents: MarketTheme['constituents'];
+  holdingsPromise: Promise<FlowHoldings>;
+  t: TranslateFn;
+}) {
+  const holdings = await holdingsPromise;
+  if (holdings.unavailable) return null;
+  return <HoldingsLines constituents={constituents} holdings={holdings} t={t} />;
+}
+
+async function ThemeBottleneckSection({
+  bottlenecksPromise,
+  t,
+  themeId,
+}: {
+  bottlenecksPromise: Promise<BottlenecksPayload>;
+  t: TranslateFn;
+  themeId: string;
+}) {
+  const bottleneck = THEME_TO_BOTTLENECK[themeId];
+  if (!bottleneck) return null;
+  const bottlenecks = await bottlenecksPromise;
+  const detected = (bottlenecks?.signals ?? []).some(
+    (signal) => signal.status === 'detectado' && signal.theme === bottleneck,
+  );
+  if (!detected) return null;
+  return (
+    <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
+      {t('themes.page.bottleneck')}{' '}
+      <Link className="text-teal-300 underline hover:text-teal-200" href="/cuellos">
+        {bottleneckThemeName(bottleneck, t)}
+      </Link>
+    </p>
   );
 }
 
@@ -269,12 +321,18 @@ type TemasBodyProps = { order: ReturnType<typeof parseThemeOrder>; requestedPage
 
 async function TemasBody({ order, requestedPage }: TemasBodyProps) {
   const [t, fmt] = await Promise.all([getT(), getFormat()]);
-  // Todas las peticiones independientes se disparan a la vez (antes eran
-  // secuenciales: cada una esperaba a la anterior; LCP medido 7,3 s en prod).
+  // Todas las peticiones independientes se disparan a la vez. Solo el ranking
+  // de temas bloquea las tarjetas; flujos, exposición y cuellos se resuelven
+  // en secciones Suspense propias para no volver a sumar sus esperas al LCP.
   const themesPromise = getMarketThemes();
   const bottlenecksPromise = getBottlenecks().catch(() => null);
   const flowIdsPromise = getMoneyFlowThemes();
   const holdingsPromise = getFlowHoldings();
+  const deferred = {
+    bottlenecks: bottlenecksPromise,
+    flowIds: flowIdsPromise,
+    holdings: holdingsPromise,
+  };
   let data;
   try {
     data = await themesPromise;
@@ -283,36 +341,14 @@ async function TemasBody({ order, requestedPage }: TemasBodyProps) {
     throw error;
   }
 
-  // Cruce con Cuellos de botella: si ese carril falla, la pagina sigue sin el enlace.
-  const bottlenecks = await bottlenecksPromise;
-  const detectedThemes = new Set(
-    (bottlenecks?.signals ?? [])
-      .filter((signal) => signal.status === 'detectado')
-      .map((signal) => signal.theme),
-  );
+  // En frío el backend devuelve refreshing=true y calcula en segundo plano:
+  // eso es un estado transitorio, nunca un «sin datos» definitivo.
+  if (data.refreshing === true && data.themes.length === 0) {
+    return <MarketThemesRefreshing />;
+  }
 
   const sortedThemes = sortThemes(data.themes, order);
   const { items: themes, page, pages } = paginateThemes(sortedThemes, requestedPage);
-  // Flujos de dinero por tema: degradan en silencio (la página se pinta igual
-  // si el endpoint no existe o el backend no responde); jamás un importe
-  // inventado en su lugar.
-  const flowIds = await flowIdsPromise;
-  const [flowPayloads, holdings] = await Promise.all([
-    Promise.all(flowIds.map((item) => getMoneyFlow(item.id))),
-    holdingsPromise,
-  ]);
-  const flowsById = new Map<string, MoneyFlow>();
-  const failedFlowIds = new Set<string>();
-  flowIds.forEach((item, index) => {
-    const payload = flowPayloads[index];
-    if (payload) {
-      flowsById.set(item.id, payload);
-    } else {
-      // El backend declara el flujo pero no lo entrega (fuente caida, 500,
-      // timeout): ausencia con causa -> N/D visible, nunca silencio.
-      failedFlowIds.add(item.id);
-    }
-  });
 
 
   return (
@@ -323,22 +359,16 @@ async function TemasBody({ order, requestedPage }: TemasBodyProps) {
         </section>
       ) : (
         <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {themes.map((theme) => {
-            const bottleneck = THEME_TO_BOTTLENECK[theme.id];
-            return (
-              <ThemeCard
-                detectedBottleneck={bottleneck && detectedThemes.has(bottleneck) ? bottleneck : null}
-                flow={flowsById.get(theme.id) ?? null}
-                flowUnavailable={failedFlowIds.has(theme.id)}
-                holdings={holdings}
-                key={theme.id}
-                order={order}
-                theme={theme}
-                t={t}
-                fmt={fmt}
-              />
-            );
-          })}
+          {themes.map((theme) => (
+            <ThemeCard
+              deferred={deferred}
+              key={theme.id}
+              order={order}
+              theme={theme}
+              t={t}
+              fmt={fmt}
+            />
+          ))}
         </ul>
       )}
 

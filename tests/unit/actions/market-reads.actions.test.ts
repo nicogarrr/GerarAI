@@ -144,6 +144,24 @@ describe('macro-calendar y market-themes', () => {
         researchRequest.mockResolvedValue(null);
         await expect(getMarketThemes()).rejects.toThrow('no válida');
     });
+
+    it('themes: acepta el contrato de caché fría refreshing=true con generated_at null', async () => {
+        const payload = {
+            status: 'sin_datos',
+            as_of: null,
+            intraday: false,
+            generated_at: null,
+            source: 'yahoo',
+            method: 'media_simple',
+            symbols_total: 0,
+            symbols_with_data: 0,
+            themes: [],
+            stale: false,
+            refreshing: true,
+        };
+        researchRequest.mockResolvedValue(payload);
+        expect(await getMarketThemes()).toEqual(payload);
+    });
 });
 
 describe('knowledge document context', () => {
