@@ -17,6 +17,7 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
     t: TranslateFn;
     formatMarketDate: Formatters['formatMarketDate'];
 }) {
+    const visibleDetail = (event: PriceEvent) => event.kind === 'results' || (event.kind === 'ex_dividend' && event.detail === t('research.chart.storedEvent.exDividendUncertain'));
     const [open, setOpen] = useState<string | null>(null);
     const shown = events.filter((event) => !hiddenKinds.has(event.kind));
     const present = new Set(events.map((event) => event.kind));
@@ -44,9 +45,9 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
                                     línea, ilegible. Desde sm vuelve al comportamiento en línea. */}
                                 <span className="min-w-0 flex-1 basis-full text-gray-200 sm:basis-auto">{event.title}</span>
                                 {event.source_url ? <a href={event.source_url} target="_blank" rel="noreferrer" className="text-[10px] text-gray-500 underline">{event.source}</a> : <span className="text-[10px] text-gray-500">{event.source}</span>}
-                                {event.detail && event.kind !== 'results' ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="text-[10px] text-gray-500 hover:text-gray-200">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
+                                {event.detail && !visibleDetail(event) ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="text-[10px] text-gray-500 hover:text-gray-200">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
                             </div>
-                            {event.detail && (event.kind === 'results' || open === event.id) ? <p className="mt-1 whitespace-pre-line text-gray-400">{event.detail}</p> : null}
+                            {event.detail && (visibleDetail(event) || open === event.id) ? <p className="mt-1 whitespace-pre-line text-gray-400">{event.detail}</p> : null}
                         </li>
                     ))}
                 </ol>

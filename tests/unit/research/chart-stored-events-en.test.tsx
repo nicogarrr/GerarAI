@@ -91,3 +91,17 @@ it('keeps estimated and unknown dates explicit in both languages', () => {
         expect(storedEventText({ ...base, detail: es }, 'es').detail).toBe(es);
     }
 });
+
+it('translates uncertain dividend notices from the Spanish catalogue', () => {
+    const event: PriceEvent = { id: 'uncertain', date: '2026-11-20', kind: 'ex_dividend', title: 'Ex-dividendo', detail: 'Importe incierto: la fuente guarda varios importes para esta fecha', source: 'yahoo_finance' };
+    expect(storedEventText(event, 'en').detail).toBe('Uncertain amount: the source stores several amounts for this date');
+    expect(storedEventText(event, 'es')).toEqual(event);
+});
+
+it('preserves unrecognized stored source text', () => {
+    const base: PriceEvent = {id:'fallback', date:'2026-11-20', kind:'results', title:'Source title', detail:'Source detail', source:'Source'};
+    for (const kind of ['results', 'ex_dividend', 'insider'] as const) {
+        expect(storedEventText({...base, kind}, 'en')).toEqual({...base, kind});
+        expect(storedEventText({...base, kind, detail:null}, 'en')).toEqual({...base, kind, detail:null});
+    }
+});

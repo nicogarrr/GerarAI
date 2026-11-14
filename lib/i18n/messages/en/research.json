@@ -818,6 +818,7 @@
       "resultsConfirmed": "Date confirmed by the source",
       "resultsEstimated": "Date estimated by the source; it may change",
       "resultsUnknown": "The source does not say whether the date is confirmed",
+      "exDividendUncertain": "Uncertain amount: the source stores several amounts for this date",
       "exDividendTitle": "Ex-dividend",
       "exDividendDetail": "{amount} {currency} per share",
       "insiderSomeone": "An insider",

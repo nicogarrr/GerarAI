@@ -818,6 +818,7 @@
       "resultsConfirmed": "Fecha confirmada por la fuente",
       "resultsEstimated": "Fecha estimada por la fuente; puede cambiar",
       "resultsUnknown": "La fuente no indica si la fecha está confirmada",
+      "exDividendUncertain": "Importe incierto: la fuente guarda varios importes para esta fecha",
       "exDividendTitle": "Ex-dividendo",
       "exDividendDetail": "{amount} {currency} por acción",
       "insiderSomeone": "Un directivo",

@@ -66,3 +66,10 @@ it('supports filters, focus, and expandable source details', () => {
     rerender(<PriceEventsPanel events={[event]} hiddenKinds={new Set(['news'])} onToggleKind={toggle} onFocus={focus} hourly t={t} formatMarketDate={d=>String(d)}/>);
     expect(screen.getByText('research.chart.eventsEmpty')).toBeVisible();
 });
+
+it('shows uncertain dividend details without a click', () => {
+    const detail = 'research.chart.storedEvent.exDividendUncertain';
+    render(<PriceEventsPanel events={[{ ...EVENTS[0], kind: 'ex_dividend', detail }]} hiddenKinds={new Set()} onToggleKind={() => {}} onFocus={() => {}} hourly={false} t={t} formatMarketDate={d=>String(d)}/>);
+    expect(screen.getByText(detail)).toBeVisible();
+    expect(screen.queryByRole('button', {name: 'research.chart.detail'})).toBeNull();
+});
