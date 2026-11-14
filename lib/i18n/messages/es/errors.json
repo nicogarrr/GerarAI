@@ -56,6 +56,11 @@
     "unknown": "No se pudo completar la operación. Inténtalo de nuevo.",
     "reload": "Recargar"
   },
+  "backendThesis": {
+    "expertTeamOff": "El equipo de expertos no está activado.",
+    "expertThesisRunNotFound": "No se encontró la ejecución del equipo de expertos.",
+    "generationFailedRef": "No se pudo generar la tesis (ref {ref}). Inténtalo de nuevo."
+  },
   "backendValidation": {
     "currencyCode": "La divisa debe ser un código como EUR, USD o GBp.",
     "currencyIso": "La divisa debe ser un código ISO 4217 como EUR o USD.",

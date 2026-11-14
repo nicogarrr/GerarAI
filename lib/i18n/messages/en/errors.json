@@ -56,6 +56,11 @@
     "unknown": "The operation couldn't be completed. Please try again.",
     "reload": "Reload"
   },
+  "backendThesis": {
+    "expertTeamOff": "The expert team is not enabled.",
+    "expertThesisRunNotFound": "The expert team run could not be found.",
+    "generationFailedRef": "The thesis could not be generated (ref {ref}). Please retry."
+  },
   "backendValidation": {
     "currencyCode": "Currency must be a code such as EUR, USD or GBp.",
     "currencyIso": "Currency must be an ISO 4217 code such as EUR or USD.",
