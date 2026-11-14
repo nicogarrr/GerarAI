@@ -565,6 +565,9 @@ def stored_holding(db: Session, company: Company) -> dict[str, Any] | None:
 
 def stored_timeline_events(db: Session, company: Company, desde: date, hasta: date) -> list[dict[str, Any]]:
     """Eventos fechados y con fuente entre ``desde`` y ``hasta`` (ambos incluidos), más recientes primero."""
+    from app.services.earnings_dates_service import STALE_AFTER
+
+    now = _utcnow()
     events: list[dict[str, Any]] = []
     ticker = (company.ticker or "").upper()
     for row in db.scalars(
@@ -577,16 +580,25 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
         source = row.source_label or row.source
         if not source:
             continue
+        detail = (
+            "Fecha confirmada por la fuente" if row.confirmed is True
+            else "Fecha estimada por la fuente; puede cambiar" if row.confirmed is False
+            else "La fuente no indica si la fecha está confirmada"
+        )
+        if row.source != "manual" and row.event_date >= now.date():
+            fetched = row.fetched_at
+            if fetched is None:
+                detail += "\nFecha de consulta no disponible; no se puede verificar la vigencia"
+            else:
+                fetched = fetched.replace(tzinfo=UTC) if fetched.tzinfo is None else fetched.astimezone(UTC)
+                if fetched < now - STALE_AFTER:
+                    detail += f"\nDato desactualizado: última consulta {fetched.date().isoformat()}; la fecha puede haber cambiado"
         events.append({
             "id": f"earnings-{row.id}",
             "date": row.event_date.isoformat(),
             "kind": "results",
             "title": f"Resultados {row.fiscal_label}" if row.fiscal_label else "Resultados",
-            "detail": (
-                "Fecha confirmada por la fuente" if row.confirmed is True
-                else "Fecha estimada por la fuente; puede cambiar" if row.confirmed is False
-                else "La fuente no indica si la fecha está confirmada"
-            ),
+            "detail": detail,
             "source": source,
             "source_url": row.source_url,
         })

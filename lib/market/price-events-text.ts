@@ -25,9 +25,17 @@ function resultsText(event: PriceEvent, t: TranslateFn): PriceEvent {
   const title = event.title === 'Resultados'
     ? t('research.chart.storedEvent.resultsTitle')
     : label ? t('research.chart.storedEvent.resultsTitleLabel', { label: label[1] }) : event.title;
-  const detail = event.detail === sourceText('research.chart.storedEvent.resultsConfirmed') ? t('research.chart.storedEvent.resultsConfirmed')
-    : event.detail === sourceText('research.chart.storedEvent.resultsEstimated') ? t('research.chart.storedEvent.resultsEstimated')
-    : event.detail === sourceText('research.chart.storedEvent.resultsUnknown') ? t('research.chart.storedEvent.resultsUnknown') : event.detail;
+  const detail = event.detail?.split('\n').map(line => {
+    for (const key of ['research.chart.storedEvent.resultsConfirmed', 'research.chart.storedEvent.resultsEstimated', 'research.chart.storedEvent.resultsUnknown', 'research.chart.storedEvent.resultsFreshnessUnknown'] as const) {
+      if (line === sourceText(key)) return t(key);
+    }
+    const [prefix, suffix] = sourceText('research.chart.storedEvent.resultsStale', {date: '{date}'}).split('{date}');
+    if (line.startsWith(prefix) && line.endsWith(suffix)) {
+      const date = line.slice(prefix.length, line.length - suffix.length);
+      if (/^\d{4}-\d{2}-\d{2}$/.test(date)) return t('research.chart.storedEvent.resultsStale', {date});
+    }
+    return line;
+  }).join('\n') ?? event.detail;
   return { ...event, title, detail };
 }
 

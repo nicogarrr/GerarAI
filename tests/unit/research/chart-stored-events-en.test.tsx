@@ -105,3 +105,16 @@ it('preserves unrecognized stored source text', () => {
         expect(storedEventText({...base, kind, detail:null}, 'en')).toEqual({...base, kind, detail:null});
     }
 });
+
+it('keeps confirmation and freshness separate in both languages', () => {
+    const base: PriceEvent = {id:'stale',date:'2026-11-20',kind:'results',title:'Resultados',source:'Yahoo Finance'};
+    for (const [es,en] of [
+        ['Fecha confirmada por la fuente\nDato desactualizado: última consulta 2026-10-15; la fecha puede haber cambiado','Date confirmed by the source\nOutdated data: last checked 2026-10-15; the date may have changed'],
+        ['La fuente no indica si la fecha está confirmada\nFecha de consulta no disponible; no se puede verificar la vigencia','The source does not say whether the date is confirmed\nLast checked date unavailable; freshness cannot be verified'],
+    ]) {
+        expect(storedEventText({...base,detail:es},'en').detail).toBe(en);
+        expect(storedEventText({...base,detail:es},'es').detail).toBe(es);
+    }
+    const malformed = 'Dato desactualizado: última consulta UNKNOWN; la fecha puede haber cambiado';
+    expect(storedEventText({...base,detail:malformed},'en').detail).toBe(malformed);
+});

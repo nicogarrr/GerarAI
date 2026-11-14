@@ -819,6 +819,8 @@
       "resultsEstimated": "Fecha estimada por la fuente; puede cambiar",
       "resultsUnknown": "La fuente no indica si la fecha está confirmada",
       "exDividendUncertain": "Importe incierto: la fuente guarda varios importes para esta fecha",
+      "resultsStale": "Dato desactualizado: última consulta {date}; la fecha puede haber cambiado",
+      "resultsFreshnessUnknown": "Fecha de consulta no disponible; no se puede verificar la vigencia",
       "exDividendTitle": "Ex-dividendo",
       "exDividendDetail": "{amount} {currency} por acción",
       "insiderSomeone": "Un directivo",
