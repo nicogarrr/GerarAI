@@ -161,6 +161,31 @@ jobs:
       - run: npm run build
       - name: Bundle budget
         run: node scripts/check-bundle-budget.mjs
+      - name: Bundle report por ruta (informativo, no bloquea)
+        # `next build` ya no imprime la tabla First Load JS en el log: sin
+        # este informe no hay medicion por ruta para auditar presupuesto de
+        # JS. El script reconstruye la tabla desde app-build-manifest y la
+        # sube como artefacto; nunca rompe CI (el budget de arriba manda).
+        if: ${{ always() }}
+        continue-on-error: true
+        run: |
+          node scripts/bundle-report.mjs --json bundle-report.json --markdown bundle-report.md
+          if [ -f bundle-report.md ]; then
+            cat bundle-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Sin bundle-report.md: el script ya registro la causa." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Publish bundle report artifact
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: bundle-report
+          path: |
+            bundle-report.json
+            bundle-report.md
+          if-no-files-found: warn
+          retention-days: 14
 
   auth-store:
     name: Auth store smoke (Mongo)
