@@ -48,7 +48,7 @@ function order(node: unknown, out: string[] = []): string[] {
   if (Array.isArray(node)) node.forEach((n) => order(n, out));
   else if (node && typeof node === 'object') {
     const el = node as El;
-    if (el.props?.as === 'article' && typeof el.props.symbol === 'string') out.push(el.props.symbol);
+    if (el.props?.as === 'tr' && typeof el.props.symbol === 'string') out.push(el.props.symbol);
     if (el.props) Object.values(el.props).forEach((v) => order(v, out));
   }
   return out;
@@ -177,7 +177,7 @@ describe('/watchlist escenarios', () => {
     const items = Array.from({ length: 30 }, (_, i) => item(`S${i}`));
     m.state.mockResolvedValue({ items, unavailable: false });
     const p2 = await render({ page: '2' });
-    expect(find(p2, 'DatedRow').length).toBe(2 * 12);
+    expect(find(p2, 'DatedRow').length).toBe(12);
     const names = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `S${a + i}`).join(',');
     expect(order(p2).join(',')).toBe(names(12, 23));
     expect(order(await render({ page: 'abc' })).join(',')).toBe(names(0, 11));
@@ -200,11 +200,15 @@ describe('/watchlist escenarios', () => {
       });
     });
     const tree = await render();
-    // Las filas son async server components (DatedRow, una por empresa y
-    // vista: tarjeta movil + fila de tabla): hay que resolverlas para ver lo
-    // pintado; el arbol crudo solo envuelve promesas.
-    const rows = find(tree, 'DatedRow');
-    expect(rows).toHaveLength(6);
+    // Las filas llegan por streaming (EntryRowStream, una por empresa y
+    // vista: tarjeta móvil + fila de tabla) y dentro van en DatedRow: hay
+    // que resolver ambas capas para ver lo pintado; el árbol crudo solo
+    // envuelve promesas.
+    const streams = find(tree, 'EntryRowStream');
+    expect(streams).toHaveLength(3);
+    const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const rows = find(streamed, 'DatedRow');
+    expect(rows).toHaveLength(3);
     const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
     // Ninguna etiqueta visible de proveedor junto al PER, ni en tarjeta ni en tabla.
     const visible = painted.map(rawText).join('');
@@ -221,15 +225,19 @@ describe('/watchlist escenarios', () => {
     m.state.mockResolvedValue({ items: [item('AAPL')], unavailable: false });
     m.dated.mockReturnValue(Promise.reject(new Error('caído')));
     const page = await render();
-    const rows = find(page, 'DatedRow');
+    const streams = find(page, 'EntryRowStream');
+    const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const rows = find(streamed, 'DatedRow');
     const fn = rows[0].type as (p: unknown) => Promise<unknown>;
     expect(text(await fn(rows[0].props))).not.toContain('watchlist.page.closeOn');
-    const grid = find(page, 'DatedValuationGrid')[0];
+    const gridHost = await Promise.all(find(page, 'StocksStream').map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const grid = find(gridHost, 'DatedValuationGrid')[0];
     expect(await (grid.type as (p: unknown) => Promise<unknown>)(grid.props)).toBeTruthy();
     // live manda sobre el cierre datado
     m.dated.mockResolvedValue({ AAPL: { price: 1, currency: 'USD', change: 0, changePercent: 0, previousClose: 1, date: '2026-11-06' } });
     const page2 = await render();
-    const r2 = find(page2, 'DatedRow')[0];
+    const streamed2 = await Promise.all(find(page2, 'EntryRowStream').map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const r2 = find(streamed2, 'DatedRow')[0];
     expect(text(await (r2.type as (p: unknown) => Promise<unknown>)(r2.props))).not.toContain('closeOn:2026-11-06');
   });
 });

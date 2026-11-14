@@ -63,8 +63,8 @@ test('la divisa visible la pone solo el master: nunca un USD inventado', () => {
 test('el market cap declara su divisa (formato multi-divisa con la divisa real)', () => {
     assert.equal(
         page.match(/stock\.marketCap !== null \? formatMarketCap\(stock\.marketCap, stock\.currency\) : NA/g)?.length ?? 0,
-        2,
-        'tarjeta y tabla: valor con divisa real solo con dato; null es NA pelado',
+        1,
+        'fila única (tabla responsiva, 2026-11-14): valor con divisa real solo con dato; null es NA pelado',
     );
     assert.ok(
         !/formatMarketCapUsd\(stock\.marketCap\)/.test(page),
