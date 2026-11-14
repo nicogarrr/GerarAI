@@ -187,27 +187,13 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                         {holdingsVerificationNote(holdings.status, fmt.locale) ? (
                             <p className="mt-2 text-sm text-amber-300">{holdingsVerificationNote(holdings.status, fmt.locale)}</p>
                         ) : null}
-                        <div className="mt-4 space-y-3 md:hidden">
-                            {holdings.holdings.map((row) => (
-                                <article aria-label={row.name_of_issuer ?? NA} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]" key={`${row.accession_number}-${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
-                                    <h3 className="text-sm font-medium text-gray-200">{row.name_of_issuer ?? NA}
-                                        {row.is_amendment ? <Badge className="ml-2" variant="outline">{t('ownership.page.amendment')}</Badge> : null}
-                                    </h3>
-                                    <dl className="mt-3 space-y-2 text-sm">
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.class')}</dt><dd className="text-gray-200">{row.title_of_class || NA}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">CUSIP</dt><dd className="font-mono text-gray-200">{row.cusip ?? NA}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.value')}</dt><dd className="tabular-nums text-gray-200">{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.shares')}</dt><dd className="tabular-nums text-gray-200">{formatShares(row.shares, fmt)}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.type')}</dt><dd className="text-gray-200">{row.put_call ?? row.share_type ?? NA}</dd></div>
-                                    </dl>
-                                    {row.filing_url ? <a className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm text-teal-300" href={row.filing_url} rel="noreferrer" target="_blank"><FileText aria-hidden="true" className="h-3.5 w-3.5" />XML<ExternalLink aria-hidden="true" className="h-3 w-3" /></a> : null}
-                                </article>
-                            ))}
-                        </div>
-                        <OverflowScrollRegion label={t('ownership.page.holdingsAria')} className="mt-4 hidden md:block">
-                            <table className="w-full min-w-[820px] text-left text-sm [&_th]:px-2 [&_td]:px-2 [&_th:first-child]:pl-0 [&_td:first-child]:pl-0 [&_th:last-child]:pr-0 [&_td:last-child]:pr-0">
+                        {/* Una sola tabla responsiva (decisión de diseño, 2026-11-14): fila
+                            tarjeta debajo de md, fila de tabla desde md; mismo contenido en
+                            ambos viewports, una participación = una fila. */}
+                        <OverflowScrollRegion label={t('ownership.page.holdingsAria')} className="mt-4">
+                            <table className="block w-full text-left text-sm md:table md:min-w-[820px] [&_th]:md:px-2 [&_td]:md:px-2 [&_th:first-child]:md:pl-0 [&_td:first-child]:md:pl-0 [&_th:last-child]:md:pr-0 [&_td:last-child]:md:pr-0">
                                 <caption className="sr-only">{t('ownership.page.holdingsCaption')}</caption>
-                                <thead className="text-xs uppercase text-gray-500">
+                                <thead className="hidden text-xs uppercase text-gray-500 md:table-header-group">
                                     <tr>
                                         <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.issuerDeclared')}</th>
                                         <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.class')}</th>
@@ -218,21 +204,22 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                         <th className="border-b border-gray-800 py-2" scope="col">Filing</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="block space-y-3 md:table-row-group md:space-y-0">
                                     {holdings.holdings.map((row) => (
-                                        <tr className="border-b border-gray-900" key={`${row.accession_number}-${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
-                                            <th className="py-3 text-left text-sm font-normal text-gray-200" scope="row">
-                                                {row.name_of_issuer}
+                                        <tr aria-label={row.name_of_issuer ?? NA} className="block rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere] md:table-row md:rounded-none md:border-0 md:border-b md:border-gray-900 md:p-0" key={`${row.accession_number}-${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
+                                            <th className="block py-0 text-left text-sm font-normal text-gray-200 md:table-cell md:py-3" scope="row">
+                                                {row.name_of_issuer ?? NA}
                                                 {row.is_amendment ? (
                                                     <Badge className="ml-2" variant="outline">{t('ownership.page.amendment')}</Badge>
                                                 ) : null}
                                             </th>
-                                            <td className="py-3 text-gray-400">{row.title_of_class || NA}</td>
-                                            <td className="py-3 font-mono text-xs text-gray-400">{row.cusip ?? NA}</td>
-                                            <td className="py-3 text-right text-gray-200">{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</td>
-                                            <td className="py-3 text-right text-gray-400">{formatShares(row.shares, fmt)}</td>
-                                            <td className="py-3 text-gray-400">{row.put_call ?? row.share_type}</td>
-                                            <td className="py-3">
+                                            <td className="block text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.class')}</span>{row.title_of_class || NA}</td>
+                                            <td className="block font-mono text-xs text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">CUSIP</span>{row.cusip ?? NA}</td>
+                                            <td className="block tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.value')}</span>{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</td>
+                                            <td className="block tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.shares')}</span>{formatShares(row.shares, fmt)}</td>
+                                            <td className="block text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.type')}</span>{row.put_call ?? row.share_type ?? NA}</td>
+                                            <td className="block md:table-cell md:py-3">
+                                                <span className="block text-xs text-gray-400 md:hidden">Filing</span>
                                                 {row.filing_url ? (
                                                     <a
                                                         className="inline-flex min-h-11 items-center gap-1 text-teal-300 hover:text-teal-200"
@@ -280,26 +267,12 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                             </Badge>
                         </div>
                         <p className="mt-2 text-xs text-gray-500">{changes.compared_accessions?.rule}</p>
-                        <div className="mt-4 space-y-3 md:hidden">
-                            {changes.changes.filter((row) => row.change !== 'unchanged').map((row) => (
-                                <article aria-label={row.name_of_issuer ?? NA} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]" key={`${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
-                                    <h3 className="text-sm font-medium text-gray-200">{row.name_of_issuer ?? NA}</h3>
-                                    <Badge className="mt-2" variant="outline">{isChangeKey(row.change) ? t(CHANGE_LABELS[row.change]) : row.change}</Badge>
-                                    {row.notice ? <p className="mt-2 text-xs text-amber-400/90">{ownershipNote(row.notice, fmt.locale)}</p> : null}
-                                    <dl className="mt-3 space-y-2 text-sm">
-                                        <div><dt className="text-xs text-gray-400">CUSIP</dt><dd className="font-mono text-gray-200">{row.cusip ?? NA}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.sharesBefore')}</dt><dd className="tabular-nums text-gray-200">{formatShares(row.shares_previous, fmt)}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.sharesNow')}</dt><dd className="tabular-nums text-gray-200">{formatShares(row.shares_latest, fmt)}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.valueBefore')}</dt><dd className="tabular-nums text-gray-200">{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report, fmt)}</dd></div>
-                                        <div><dt className="text-xs text-gray-400">{t('ownership.page.col.valueNow')}</dt><dd className="tabular-nums text-gray-200">{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report, fmt)}</dd></div>
-                                    </dl>
-                                </article>
-                            ))}
-                        </div>
-                        <OverflowScrollRegion label={t('ownership.page.changesAria')} className="mt-4 hidden md:block">
-                            <table className="w-full min-w-[720px] text-left text-sm">
+                        {/* Una sola tabla responsiva (decisión de diseño, 2026-11-14), mismo
+                            patrón que participaciones: un movimiento = una fila. */}
+                        <OverflowScrollRegion label={t('ownership.page.changesAria')} className="mt-4">
+                            <table className="block w-full text-left text-sm md:table md:min-w-[720px]">
                                 <caption className="sr-only">{t('ownership.page.changesCaption')}</caption>
-                                <thead className="text-xs uppercase text-gray-500">
+                                <thead className="hidden text-xs uppercase text-gray-500 md:table-header-group">
                                     <tr>
                                         <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.issuer')}</th>
                                         <th className="border-b border-gray-800 py-2" scope="col">CUSIP</th>
@@ -310,19 +283,20 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                         <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.valueNow')}</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody className="block space-y-3 md:table-row-group md:space-y-0">
                                     {changes.changes.filter((row) => row.change !== 'unchanged').map((row) => (
-                                        <tr className="border-b border-gray-900" key={`${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
-                                            <th className="py-3 text-left text-sm font-normal text-gray-200" scope="row">{row.name_of_issuer ?? NA}</th>
-                                            <td className="py-3 font-mono text-xs text-gray-400">{row.cusip ?? NA}</td>
-                                            <td className="py-3">
+                                        <tr aria-label={row.name_of_issuer ?? NA} className="block rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere] md:table-row md:rounded-none md:border-0 md:border-b md:border-gray-900 md:p-0" key={`${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
+                                            <th className="block py-0 text-left text-sm font-normal text-gray-200 md:table-cell md:py-3" scope="row">{row.name_of_issuer ?? NA}</th>
+                                            <td className="block font-mono text-xs text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">CUSIP</span>{row.cusip ?? NA}</td>
+                                            <td className="block md:table-cell md:py-3">
+                                                <span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.change')}</span>
                                                 <Badge variant="outline">{isChangeKey(row.change) ? t(CHANGE_LABELS[row.change]) : row.change}</Badge>
                                                 {row.notice ? <p className="mt-1 text-xs text-amber-400/90">{ownershipNote(row.notice, fmt.locale)}</p> : null}
                                             </td>
-                                            <td className="py-3 text-right text-gray-400">{formatShares(row.shares_previous, fmt)}</td>
-                                            <td className="py-3 text-right text-gray-200">{formatShares(row.shares_latest, fmt)}</td>
-                                            <td className="py-3 text-right text-gray-400">{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report, fmt)}</td>
-                                            <td className="py-3 text-right text-gray-200">{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report, fmt)}</td>
+                                            <td className="block tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.sharesBefore')}</span>{formatShares(row.shares_previous, fmt)}</td>
+                                            <td className="block tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.sharesNow')}</span>{formatShares(row.shares_latest, fmt)}</td>
+                                            <td className="block tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.valueBefore')}</span>{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report, fmt)}</td>
+                                            <td className="block tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.valueNow')}</span>{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report, fmt)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

@@ -12,10 +12,13 @@ vi.mock('@/app/(root)/inversores/_components/SyncPortfoliosButton',()=>({SyncPor
 vi.mock('@/app/(root)/ownership/_components/MostBought',()=>({MostBought:()=> <p>Most bought fixture</p>}));
 vi.mock('@/app/(root)/ownership/_components/Overlap',()=>({Overlap:()=> <p>Overlap fixture</p>}));
 import OwnershipPage, {generateMetadata} from '@/app/(root)/ownership/page';
+// Tabla responsiva única (2026-11-14): las filas de datos son <tr> con aria-label
+// (antes: tarjetas <article> duplicadas con la tabla escritorio).
+const dataRows=()=>screen.queryAllByRole('row').filter(r=>r.getAttribute('aria-label'));
 beforeEach(()=>{mocks.locale='es';mocks.managers.mockReset().mockResolvedValue({managers:[{cik:'1',name:'Fixture Fund'}],limitations:[]});mocks.holdings.mockReset().mockResolvedValue(structuredClone(mobileHoldings));mocks.changes.mockReset().mockResolvedValue(structuredClone(mobileChanges));});
 it('shows labelled mobile holding cards with CUSIP, amendment, declared class and filing',async()=>{
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- const cards=screen.getAllByRole('article');
+ const cards=dataRows();
  expect(cards).toHaveLength(2);
  const holding=within(cards[0]);
  expect(holding.getByText('123456789')).toBeVisible();
@@ -25,7 +28,7 @@ it('shows labelled mobile holding cards with CUSIP, amendment, declared class an
 });
 it('keeps comparison report dates and values attached to their previous/current labels',async()=>{
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- const change=within(screen.getAllByRole('article')[1]);
+ const change=within(dataRows()[1]);
  expect(change.getByText('123456789')).toBeVisible();
  expect(change.getByText('100.000')).toBeVisible();
  expect(change.getByText('123.456')).toBeVisible();
@@ -41,7 +44,7 @@ it('keeps nullable snapshot fields honest and shows no filing link when absent',
  mocks.holdings.mockResolvedValue({...mobileHoldings,manager:null,report_date:null,coverage:null,provenance:{fetched_at:'2026-11-01',source:'fixture'},holdings:[{...mobileHoldings.holdings[0],name_of_issuer:null,title_of_class:null,cusip:null,put_call:'PUT',share_type:null,shares:null,value_usd_thousands:null,is_amendment:false,filing_url:null}]});
  mocks.changes.mockResolvedValue({...mobileChanges,previous_report:null,latest_report:null,changes:[{...mobileChanges.changes[0],name_of_issuer:null,cusip:null,shares_previous:null,shares_latest:null,value_usd_thousands_previous:null,value_usd_thousands_latest:null,change:'backend-new-code'}]});
  render(await OwnershipPage({searchParams:Promise.resolve({cik:'1'})}));
- const cards=screen.getAllByRole('article');
+ const cards=dataRows();
  expect(within(cards[0]).queryByRole('link')).toBeNull();
  expect(within(cards[0]).getByText('PUT')).toBeVisible();
  expect(within(cards[0]).getAllByText('N/D').length).toBeGreaterThan(3);
@@ -51,19 +54,19 @@ it('keeps nullable snapshot fields honest and shows no filing link when absent',
 it('keeps unchanged rows out of both mobile and desktop movement lists',async()=>{
  mocks.changes.mockResolvedValue({...mobileChanges,changes:[{...mobileChanges.changes[0],change:'unchanged'}]});
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- expect(screen.getAllByRole('article')).toHaveLength(1);
+ expect(dataRows()).toHaveLength(1);
  expect(screen.getByText(/Sin movimientos entre/)).toBeVisible();
 });
 it('handles missing names, absent type and verified holdings without warning',async()=>{
  mocks.holdings.mockResolvedValue({...mobileHoldings,status:'ok',holdings:[{...mobileHoldings.holdings[0],share_type:null,put_call:null,filing_url:null,is_amendment:false}]});
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- expect(within(screen.getAllByRole('article')[0]).getByText('N/D')).toBeVisible();
+ expect(within(dataRows()[0]).getAllByText('N/D').length).toBeGreaterThan(0);
  expect(screen.queryByText(/cifras sin verificar/)).toBeNull();
 });
 it('renders empty managers without fake holdings',async()=>{
  mocks.managers.mockResolvedValue({managers:[],limitations:['Fixture limitation']});
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- expect(screen.queryByRole('article')).toBeNull();
+ expect(dataRows()).toHaveLength(0);
  expect(screen.getByText('Fixture limitation')).toBeInTheDocument();
 });
 it.each(['mas-compradas','solape'])('preserves alternate view %s without fetching a manager',async vista=>{
@@ -77,12 +80,12 @@ it('preserves source metadata title generation',async()=>{
 it('keeps unavailable changes distinct from insufficient history',async()=>{
  mocks.changes.mockResolvedValue({...mobileChanges,status:'unavailable'});
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- expect(screen.getAllByRole('article')).toHaveLength(1);
+ expect(dataRows()).toHaveLength(1);
 });
 it.each(['managers','holdings','changes'] as const)('shows backend offline when %s cannot be read',async key=>{
  mocks[key].mockRejectedValue(new ExternalAPIError('fetch failed','research'));
  render(await OwnershipPage({searchParams:Promise.resolve({cik:'1'})}));
- expect(screen.queryByRole('article')).toBeNull();
+ expect(dataRows()).toHaveLength(0);
 });
 it('does not swallow a programming error in the essential managers read',async()=>{
  const error=new Error('programming defect');mocks.managers.mockRejectedValue(error);
@@ -92,20 +95,16 @@ it('handles non-network optional errors without fabricating rows',async()=>{
  mocks.holdings.mockRejectedValue(new Error('denied'));
  mocks.changes.mockRejectedValue(new Error('denied'));
  render(await OwnershipPage({searchParams:Promise.resolve({cik:'1'})}));
- expect(screen.queryByRole('article')).toBeNull();
+ expect(dataRows()).toHaveLength(0);
 });
-it('uses the same formatted values in cards and desktop tables and preserves English labels',async()=>{
+it('keeps English mobile labels and formatted values in the single responsive rows',async()=>{
  mocks.locale='en';
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- const articles=screen.getAllByRole('article');
- const tables=screen.getAllByRole('table');
- for(let i=0;i<articles.length;i++){
-  const cells=within(tables[i]).getAllByRole('row')[1].querySelectorAll('td');
-  for(const cell of cells){
-   const text=cell.textContent?.trim();
-   if(text)expect(articles[i].textContent).toContain(text);
-  }
- }
- expect(within(articles[0]).getByText('Shares')).toBeInTheDocument();
- expect(within(articles[1]).getByText('Shares before')).toBeInTheDocument();
+ const rows=dataRows();
+ expect(rows).toHaveLength(2);
+ // Cada valor aparece UNA vez por fila (antes iba duplicado: tarjeta + tabla).
+ expect(within(rows[0]).getAllByText('123456789')).toHaveLength(1);
+ expect(within(rows[0]).getByText('Shares')).toBeInTheDocument();
+ expect(within(rows[1]).getByText('Shares before')).toBeInTheDocument();
+ expect(within(rows[1]).getByText('Value now')).toBeInTheDocument();
 });
