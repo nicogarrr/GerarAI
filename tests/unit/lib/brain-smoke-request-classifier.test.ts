@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isDisabledChatAvailabilityResponse } from '../../../e2e/user-flows/brain-request-classifier';
+import { isDisabledChatAvailabilityResponse } from '../helpers/brain-request-classifier';
 
 const disabled = { feature: 'chat', state: 'off', can_start: false, reason: 'disabled', retry_after_seconds: null };
 const flight = (value: unknown) => `0:{"a":"$@1","b":"development"}\n1:D"$2"\n1:${JSON.stringify(value)}\n`;
