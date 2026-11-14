@@ -20,7 +20,7 @@ export default function PortfolioDataNotice({ quality }: { quality?: PortfolioDa
                 {ti('portfolio.dataNotice.screenshotLine3')}
             </p>}
             <details className="mt-2">
-                <summary className="cursor-pointer">{ti('portfolio.dataNotice.detailsSummary')}</summary>
+                <summary className="min-h-11 cursor-pointer py-2 sm:min-h-10">{ti('portfolio.dataNotice.detailsSummary')}</summary>
                 <p className="mt-2">{ti('portfolio.dataNotice.datesLine', {
                         positionDates: quality.position_dates.map((d) => f.formatDate(d)).join(', ') || ti('portfolio.dataNotice.dateUnavailable'),
                         cashDates: quality.cash_dates.map((d) => f.formatDate(d)).join(', ') || ti('portfolio.dataNotice.dateUnavailable'),
