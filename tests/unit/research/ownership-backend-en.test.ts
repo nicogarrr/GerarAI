@@ -20,8 +20,8 @@ const IDENTITY = [...OVERLAP.matchAll(/return None, "([^"]+)"/g)].map((m) => m[1
 const SPANISH = /[áéíóúñ]|\b(Sin|sin|de|los|las|en|no hay|Compras|Ventas|Identidad|registrado|Referencia)\b/;
 
 describe('Insiders y 13F: lectura y motivos del backend en inglés', () => {
-    it('lee las 4 lecturas, los motivos y las identidades del backend', () => {
-        expect(READINGS).toEqual([`Compras en grupo de insiders (${CLUSTER} o más)`, 'Compras netas de insiders', 'Ventas netas de insiders', 'Sin balance claro de insiders']);
+    it('lee las 5 lecturas, los motivos y las identidades del backend', () => {
+        expect(READINGS).toEqual([`Compras en grupo de insiders (${CLUSTER} o más)`, 'Saldo neto no estimable: faltan importes', 'Compras netas de insiders', 'Ventas netas de insiders', 'Sin balance claro de insiders']);
         expect(DETAILS.length).toBeGreaterThanOrEqual(5);
         expect(IDENTITY.length).toBeGreaterThanOrEqual(7);
     });

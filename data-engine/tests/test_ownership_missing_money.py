@@ -1,0 +1,60 @@
+from datetime import date
+
+import pytest
+
+from app.services.ticker_ownership_signals import insider_signal, ownership_fact_lines, ownership_markdown
+from tests.test_ticker_ownership_signals import _db, _filing, _tx
+
+
+@pytest.mark.parametrize('side', ['P', 'S'])
+def test_missing_money_is_not_zero_or_a_net_flow(side):
+    db = _db()
+    filing = _filing(db, 'UBER', date.today().isoformat())
+    _tx(db, filing, insider='Unknown Price', code=side, shares=1000, price=None, tx_date=date.today().isoformat())
+    _tx(db, filing, insider='Known Price', code=side, shares=100, price=10, tx_date=date.today().isoformat())
+    db.commit()
+    result = insider_signal(db, 'UBER')
+    target = result['buys' if side == 'P' else 'sells']
+    assert target['trades'] == 2
+    assert target['value'] is None
+    assert target['value_missing'] == 1
+    assert result['net_value'] is None
+    assert result['reading'] == 'Saldo neto no estimable: faltan importes'
+    evidence = {'ticker': 'UBER', 'insider': result, 'holders': {'status': 'sin_datos'}}
+    text = ownership_fact_lines(evidence)[0][0]
+    assert 'N/D' in text
+    assert '1 sin importe' in text
+    assert '2 operaciones por N/D' in text
+    assert 'N/D' in ownership_markdown(evidence)
+    db.close()
+
+
+@pytest.mark.parametrize('price, expected', [(0, 0), (10, 10000)])
+def test_known_zero_and_price_times_shares_remain_known(price, expected):
+    db = _db()
+    filing = _filing(db, 'UBER', date.today().isoformat())
+    _tx(db, filing, insider='Known', code='P', shares=1000, price=price, tx_date=date.today().isoformat())
+    db.flush()
+    from app.models.entities import InsiderTransaction
+    db.query(InsiderTransaction).update({'value': None})
+    db.commit()
+    result = insider_signal(db, 'UBER')
+    assert result['buys']['value'] == expected
+    assert result['net_value'] == expected
+    assert 'value_missing' not in result['buys']
+    db.close()
+
+
+def test_missing_amount_does_not_erase_cluster_by_count():
+    db = _db()
+    filing = _filing(db, 'UBER', date.today().isoformat())
+    for name in ['One', 'Two', 'Three']:
+        _tx(db, filing, insider=name, code='P', shares=10, price=None, tx_date=date.today().isoformat())
+    db.commit()
+    result = insider_signal(db, 'UBER')
+    assert result['cluster_buying'] is True
+    assert result['net_value'] is None
+    assert result['buys']['value_missing'] == 3
+    assert 'Compras en grupo' in result['reading']
+    assert 'N/D (3 sin importe)' in ownership_fact_lines({'ticker':'UBER','insider':result})[0][0]
+    db.close()
