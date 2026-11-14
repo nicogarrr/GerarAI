@@ -417,6 +417,7 @@ class WaccInputService:
 
     def _decimal(self, value) -> Decimal | None:
         try:
-            return Decimal(str(value))
+            parsed = Decimal(str(value))
+            return parsed if parsed.is_finite() else None
         except (InvalidOperation, TypeError, ValueError):
             return None

@@ -472,3 +472,34 @@ def test_upsert_refreshes_legacy_monetary_unit_without_new_row(db):
     assert refreshed.value == Decimal("11492166656")
     assert refreshed.source_id == source.id
     assert db.scalar(select(func.count()).select_from(FinancialFact).where(FinancialFact.metric == "market_cap")) == 1
+
+
+@pytest.mark.parametrize('value', ['NaN', 'sNaN', 'Infinity', '-Infinity', float('nan'), float('inf')])
+def test_decimal_rejects_non_finite_market_values(value):
+    assert WaccInputService()._decimal(value) is None
+
+
+@pytest.mark.parametrize('value', ['NaN', 'Infinity', '-Infinity'])
+def test_refresh_non_finite_fred_remains_missing(db, monkeypatch, value):
+    _patch_no_yfinance(monkeypatch)
+    stub = _StubFred(configured=True)
+    stub.observations = [{'date': '2026-09-21', 'value': value}]
+    _patch_fred(monkeypatch, stub)
+    company = _company(db)
+    result = _run(WaccInputService().refresh(db, company))
+    assert 'risk_free_rate' in result['missing']
+    assert db.scalar(select(FinancialFact).where(FinancialFact.metric == 'risk_free_rate')) is None
+    assert db.scalar(select(Document).where(Document.source_type == 'FRED')) is None
+
+
+@pytest.mark.parametrize('field', ['beta', 'marketCap'])
+@pytest.mark.parametrize('value', ['NaN', 'Infinity', '-Infinity'])
+def test_yahoo_non_finite_inputs_are_absent(monkeypatch, field, value):
+    import sys
+    from types import SimpleNamespace
+    info = {'beta': '1.2', 'marketCap': '1000000', field: value}
+    monkeypatch.setitem(sys.modules, 'yfinance', SimpleNamespace(Ticker=lambda ticker: SimpleNamespace(info=info)))
+    result = _run(WaccInputService()._yfinance_market_inputs('AAPL'))
+    rejected = 'market_cap' if field == 'marketCap' else field
+    assert rejected not in result
+    assert result.get('beta' if field == 'marketCap' else 'market_cap') is not None
