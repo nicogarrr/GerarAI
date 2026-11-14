@@ -27,15 +27,14 @@ const FILES = [
   'components/research/MoatPanel.tsx',
   'components/research/ScenarioAssumptions.tsx',
   'components/research/sections/ManagementAlignmentSection.tsx',
+  'components/research/SotpBreakdownSection.tsx',
+  'components/research/ThesisHumanInputForm.tsx',
+  'components/research/ThesisInvalidationRulesForm.tsx',
 ];
 
 // <summary> excluidos de la convención, fichero + marca textual del propio tag:
 //   - search: el toggle de filtros avanzados lleva list-none + icono propio;
 //     su flex es intencional (no es un details de texto).
-// Fuera de este guard por zona protegida (cerebro/tesis/valor; solo se tocan
-// con OK explícito): components/research/SotpBreakdownSection.tsx,
-// components/research/ThesisHumanInputForm.tsx y
-// components/research/ThesisInvalidationRulesForm.tsx.
 const EXCLUDED = [
   { file: 'app/(root)/search/page.tsx', marker: 'list-none' },
 ];

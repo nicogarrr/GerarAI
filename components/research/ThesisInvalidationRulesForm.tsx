@@ -118,7 +118,7 @@ export default function ThesisInvalidationRulesForm({
         </p>
       )}
       <details className="mt-2">
-        <summary className="cursor-pointer text-xs text-red-300">{t('research.thesisInvalidation.add')}</summary>
+        <summary className="min-h-11 cursor-pointer py-2 text-xs text-red-300 sm:min-h-10">{t('research.thesisInvalidation.add')}</summary>
         <form onSubmit={add} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <label className="col-span-2 text-xs text-gray-300 sm:col-span-1">{t('research.thesisInvalidation.metric')}
             <select value={metric} onChange={(e) => setMetric(e.target.value)} className={inputClass}>
