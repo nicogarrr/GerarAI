@@ -138,6 +138,8 @@ def build_ics(
             title = f"{event['company']} ({event['ticker']}): resultados"
             if event["confirmed"] is False:
                 title += " (fecha estimada)"
+            elif event["confirmed"] is None:
+                title += " (confirmación no indicada por la fuente)"
             details = []
             if event["session"]:
                 details.append(f"Franja: {_SESSION[event['session']]}")
