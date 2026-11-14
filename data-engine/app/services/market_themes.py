@@ -498,11 +498,13 @@ def symbol_returns(candles: dict | None, session: date) -> dict:
     year_start = date(session.year, 1, 1)
     base_ytd = _last_on_or_before(bars, year_start - timedelta(days=1), year_start - timedelta(days=12))
     if base_ytd is not None:
-        result["ytd"] = (last_close / base_ytd - 1.0) * 100.0
+        value = (last_close / base_ytd - 1.0) * 100.0
+        result["ytd"] = value if math.isfinite(value) else None
     target = _month_back(session)
     base_1m = _last_on_or_before(bars, target, target - timedelta(days=MAX_STALE_DAYS))
     if base_1m is not None:
-        result["m1"] = (last_close / base_1m - 1.0) * 100.0
+        value = (last_close / base_1m - 1.0) * 100.0
+        result["m1"] = value if math.isfinite(value) else None
     return result
 
 
