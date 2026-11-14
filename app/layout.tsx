@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
+import { headers } from "next/headers";
 import { Toaster } from "@/components/ui/sonner";
 import ServiceWorkerRegister from "@/components/pwa/ServiceWorkerRegister";
+import { EARLY_OPEN_CAPTURE_JS } from "@/lib/early-open";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { getLocale, getT } from "@/lib/i18n/server";
 import "./globals.css";
@@ -84,9 +86,12 @@ export default async function RootLayout({
   // español por defecto. Leerla aquí hace dinámicas las rutas: el copy ya
   // depende de la request.
   const locale = await getLocale();
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
   return (
     <html lang={locale} className="dark" suppressHydrationWarning>
       <body className="antialiased" suppressHydrationWarning>
+        {/* nosemgrep: semgrep.gerarai-dangerously-set-inner-html -- script estatico de captura pre-hidratacion: constante controlada de lib/early-open.ts, sin datos de usuario ni de terceros; el nonce CSP lo autoriza en cada peticion. Va en el layout RAIZ: este no se remonta en navegaciones cliente, asi que React nunca lo renderiza en cliente (el error "Encountered a script tag" y su omision silenciosa solo ocurren al montar un arbol nuevo); llega siempre en el HTML inicial, que es donde corre. */}
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: EARLY_OPEN_CAPTURE_JS }} />
         <LocaleProvider locale={locale}>{children}</LocaleProvider>
         <Toaster />
         {/* Service worker (app shell + fallback offline). Solo en build de
