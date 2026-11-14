@@ -34649,7 +34649,7 @@
     },
     "/api/companies/basics": {
       "get": {
-        "description": "Basics (ticker/nombre/bolsa/divisa) de varias empresas en UNA llamada.\n\nSustituye el fan-out de GET /{ticker} por simbolo de la watchlist\n(20+ round trips por carga de pagina; medido 2026-10-30: oleada de 16\nresolviendo en ~0,9 s desde el front). La resolucion va por ticker\ncon la MISMA funcion del endpoint individual (resolve_company), asi\nla politica de alias (SAN.MC -> SAN) no puede divergir entre ambos;\nson lecturas por clave primaria, baratas, y van en una sola peticion\nHTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el\ncanonico, para que el caller no reimplemente la resolucion.",
+        "description": "Basics (ticker/nombre/bolsa/divisa) de varias empresas en UNA llamada.\n\nSustituye el fan-out de GET /{ticker} por simbolo de la watchlist\n(20+ round trips por carga de pagina; medido 2026-10-30: oleada de 16\nresolviendo en ~0,9 s desde el front). La resolucion va por ticker\ncon la MISMA funcion del endpoint individual (resolve_company), asi\nla politica de alias (SAN.MC -> SAN) no puede divergir entre ambos;\nlos exactos se leen juntos y los alias conservan el resolver individual.\nTodo va en una sola peticion HTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el\ncanonico, para que el caller no reimplemente la resolucion.",
         "operationId": "companies_basics_batch_api_companies_basics_get",
         "parameters": [
           {
