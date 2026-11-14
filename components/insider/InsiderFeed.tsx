@@ -196,11 +196,11 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                             <Table className="block md:table md:min-w-[720px]">
                                 <TableHeader className="hidden md:table-header-group">
                                     <TableRow className="border-gray-900 hover:bg-transparent">
-                                        <TableHead className="py-1 pr-3 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colDate')}</TableHead>
-                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colTicker')}</TableHead>
+                                        <TableHead className="py-1 pr-3 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colTicker')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colDate')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colOperation')}</TableHead>
                                         <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colInsider')}</TableHead>
                                         <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colRole')}</TableHead>
-                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colOperation')}</TableHead>
                                         <TableHead className="px-3 py-1 text-right text-xs font-medium uppercase text-gray-500">{t('insider.feed.colShares')}</TableHead>
                                         <TableHead className="px-3 py-1 text-right text-xs font-medium uppercase text-gray-500">{t('insider.feed.colPrice')}</TableHead>
                                         <TableHead className="py-1 pl-3 text-right text-xs font-medium uppercase text-gray-500">{t('insider.feed.colAmount')}</TableHead>
@@ -211,36 +211,36 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                         const note = trancheNote(t, f, tx.tranches);
                                         return (
                                             <TableRow className="grid grid-cols-2 gap-x-3 gap-y-1 break-words rounded-lg border border-gray-800 bg-gray-900/50 p-3 md:table-row md:gap-0 md:rounded-none md:border-0 md:border-t md:border-gray-900 md:bg-transparent md:p-0" key={`${tx.accession_number}-${index}`}>
-                                                <TableCell className="order-2 self-center whitespace-nowrap p-0 text-right text-xs tabular-nums text-gray-500 md:table-cell md:py-2 md:pr-3 md:text-left md:text-sm md:text-gray-400">
-                                                    {tx.date ? f.formatDate(tx.date) : '—'}
-                                                </TableCell>
-                                                <TableCell className="order-1 p-0 font-semibold md:table-cell md:px-3 md:py-2">
+                                                <TableCell className="p-0 font-semibold md:table-cell md:py-2 md:pr-3">
                                                     <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
                                                         {tx.ticker}
                                                     </Link>
                                                     {tx.form === 'PDMR' ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.pdmrBadge')}</span> : null}
                                                     {tx.form === 'CA-INSIDER' ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.canadaBadge')}</span> : null}
                                                 </TableCell>
-                                                <TableCell className="order-4 col-span-2 p-0 text-sm font-medium text-gray-100 md:table-cell md:px-3 md:py-2 md:font-normal">
-                                                    {insiderName(tx.insider)}
+<TableCell className="self-center whitespace-nowrap p-0 text-right text-xs tabular-nums text-gray-500 md:table-cell md:px-3 md:py-2 md:text-left md:text-sm md:text-gray-400">
+                                                    {tx.date ? f.formatDate(tx.date) : '—'}
                                                 </TableCell>
-                                                <TableCell className="order-5 col-span-2 p-0 text-xs text-gray-500 md:table-cell md:px-3 md:py-2 md:text-sm md:text-gray-400">
-                                                    {insiderRole(tx.role, tx.officer_title, f.locale)}
-                                                </TableCell>
-                                                <TableCell className={`order-3 self-center p-0 text-sm font-medium md:table-cell md:px-3 md:py-2 ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
+<TableCell className={`self-center p-0 text-sm font-medium md:table-cell md:px-3 md:py-2 ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
                                                     {sideLabel(tx.side, t)}
                                                     {tx.rule_10b5_1 ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.plan10b51Badge')}</span> : null}
                                                 </TableCell>
-                                                <TableCell className="order-6 whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
+<TableCell className="col-span-2 p-0 text-sm font-medium text-gray-100 md:table-cell md:px-3 md:py-2 md:font-normal">
+                                                    {insiderName(tx.insider)}
+                                                </TableCell>
+<TableCell className="col-span-2 p-0 text-xs text-gray-500 md:table-cell md:px-3 md:py-2 md:text-sm md:text-gray-400">
+                                                    {insiderRole(tx.role, tx.officer_title, f.locale)}
+                                                </TableCell>
+<TableCell className="whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
                                                     <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colShares')}</span>
                                                     {f.formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })}
                                                     {note ? <span className="block text-xs font-normal text-gray-500">{note}</span> : null}
                                                 </TableCell>
-                                                <TableCell className="order-7 whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
+<TableCell className="whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
                                                     <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colPrice')}</span>
                                                     {usd(f, tx.price, 2, txCurrency(tx))}
                                                 </TableCell>
-                                                <TableCell className="order-8 col-span-2 p-0 tabular-nums md:table-cell md:py-2 md:pl-3 md:text-right">
+<TableCell className="col-span-2 p-0 tabular-nums md:table-cell md:py-2 md:pl-3 md:text-right">
                                                     <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colAmount')}</span>
                                                     <span className="whitespace-nowrap">
                                                         {tx.source_url ? (
