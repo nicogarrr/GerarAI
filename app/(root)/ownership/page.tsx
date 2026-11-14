@@ -214,11 +214,11 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                                 ) : null}
                                             </th>
                                             <td className="block text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.class')}</span>{row.title_of_class || NA}</td>
-                                            <td className="block font-mono text-xs text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">CUSIP</span>{row.cusip ?? NA}</td>
-                                            <td className="block tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.value')}</span>{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</td>
-                                            <td className="block tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.shares')}</span>{formatShares(row.shares, fmt)}</td>
-                                            <td className="block text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.type')}</span>{row.put_call ?? row.share_type ?? NA}</td>
-                                            <td className="block md:table-cell md:py-3">
+                                            <td className="block whitespace-nowrap font-mono text-xs text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">CUSIP</span>{row.cusip ?? NA}</td>
+                                            <td className="block whitespace-nowrap tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.value')}</span>{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</td>
+                                            <td className="block whitespace-nowrap tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.shares')}</span>{formatShares(row.shares, fmt)}</td>
+                                            <td className="block whitespace-nowrap text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.type')}</span>{row.put_call ?? row.share_type ?? NA}</td>
+                                            <td className="block whitespace-nowrap md:table-cell md:py-3">
                                                 <span className="block text-xs text-gray-400 md:hidden">Filing</span>
                                                 {row.filing_url ? (
                                                     <a
@@ -287,16 +287,16 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                     {changes.changes.filter((row) => row.change !== 'unchanged').map((row) => (
                                         <tr aria-label={row.name_of_issuer ?? NA} className="block rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere] md:table-row md:rounded-none md:border-0 md:border-b md:border-gray-900 md:p-0" key={`${row.cusip}-${row.title_of_class}-${row.put_call ?? ''}`}>
                                             <th className="block py-0 text-left text-sm font-normal text-gray-200 md:table-cell md:py-3" scope="row">{row.name_of_issuer ?? NA}</th>
-                                            <td className="block font-mono text-xs text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">CUSIP</span>{row.cusip ?? NA}</td>
+                                            <td className="block whitespace-nowrap font-mono text-xs text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">CUSIP</span>{row.cusip ?? NA}</td>
                                             <td className="block md:table-cell md:py-3">
                                                 <span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.change')}</span>
                                                 <Badge variant="outline">{isChangeKey(row.change) ? t(CHANGE_LABELS[row.change]) : row.change}</Badge>
                                                 {row.notice ? <p className="mt-1 text-xs text-amber-400/90">{ownershipNote(row.notice, fmt.locale)}</p> : null}
                                             </td>
-                                            <td className="block tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.sharesBefore')}</span>{formatShares(row.shares_previous, fmt)}</td>
-                                            <td className="block tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.sharesNow')}</span>{formatShares(row.shares_latest, fmt)}</td>
-                                            <td className="block tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.valueBefore')}</span>{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report, fmt)}</td>
-                                            <td className="block tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.valueNow')}</span>{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report, fmt)}</td>
+                                            <td className="block whitespace-nowrap tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.sharesBefore')}</span>{formatShares(row.shares_previous, fmt)}</td>
+                                            <td className="block whitespace-nowrap tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.sharesNow')}</span>{formatShares(row.shares_latest, fmt)}</td>
+                                            <td className="block whitespace-nowrap tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.valueBefore')}</span>{formatValueUsd(row.value_usd_thousands_previous, changes.previous_report, fmt)}</td>
+                                            <td className="block whitespace-nowrap tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.valueNow')}</span>{formatValueUsd(row.value_usd_thousands_latest, changes.latest_report, fmt)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

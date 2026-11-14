@@ -48,3 +48,17 @@ it('la fila única conserva etiquetas móviles, distintivos y enlace al filing',
     const change = dataRows()[1];
     expect(within(change).getByText(/aumentada/)).toBeInTheDocument();
 });
+
+it('las celdas numéricas y de filing no parten cifras (whitespace-nowrap)', async () => {
+    // Captura 1440px (2026-11-14): con un emisor largo, CUSIP se partía 8+1,
+    // acciones 123,456 se partían y el enlace XML se cortaba "XM/L".
+    render(await OwnershipPage({ searchParams: Promise.resolve({}) }));
+    const [holding, change] = dataRows();
+    for (const text of ['123456789', '123.456']) {
+        expect(within(holding).getByText(text).closest('td')?.className).toContain('whitespace-nowrap');
+    }
+    expect(within(holding).getByRole('link', { name: /XML/ }).closest('td')?.className).toContain('whitespace-nowrap');
+    for (const text of ['123456789', '123.456', '100.000']) {
+        expect(within(change).getByText(text).closest('td')?.className).toContain('whitespace-nowrap');
+    }
+});
