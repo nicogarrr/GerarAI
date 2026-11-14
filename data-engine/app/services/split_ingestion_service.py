@@ -223,7 +223,7 @@ class ProviderIngestionService:
         results = await self.sync_each(db, self._portfolio_tickers(db))
         ok = sum(1 for r in results if r["status"] == "ok")
         failed = sum(1 for r in results if r["status"] == "failed")
-        unavailable = sum(1 for r in results if r["status"] == "unavailable") + failed
+        unavailable = sum(1 for r in results if r["status"] in {"unavailable", "no_safe_symbol"}) + failed
         summary: dict[str, Any] = {
             "companies": len(results),
             "synced": ok,

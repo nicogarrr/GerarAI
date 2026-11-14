@@ -109,8 +109,9 @@ def test_sync_no_safe_symbol_variant_wire(monkeypatch) -> None:
     PortfolioDividendSyncOut.model_validate(payload)
     assert payload["companies"] == 1
     assert payload["synced"] == 0
-    # Medido en sync_portfolio: no_safe_symbol no cuenta como unavailable.
-    assert payload["unavailable"] == 0
+    # Sin símbolo seguro no se sincronizó nada: la cobertura no puede decir OK.
+    assert payload["unavailable"] == 1
+    assert payload["provenance"]["coverage"] == "unavailable"
     assert payload["currency_unknown"] == 0
     item = payload["results"][0]
     # Las 5 claves de la variante, ni una mas (exclude_unset en la ruta).
