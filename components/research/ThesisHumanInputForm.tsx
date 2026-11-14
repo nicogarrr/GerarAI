@@ -46,7 +46,7 @@ export default function ThesisHumanInputForm({ ticker }: { ticker: string }) {
 
   return (
     <details className="rounded-lg border border-gray-800 p-4">
-      <summary className="cursor-pointer text-sm font-semibold text-gray-200">{t('research.thesisHumanInput.summary')}</summary>
+      <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-gray-200 sm:min-h-10">{t('research.thesisHumanInput.summary')}</summary>
       <p className="mt-2 text-xs leading-5 text-gray-400">
         {t('research.thesisHumanInput.intro')}
       </p>
