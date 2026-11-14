@@ -308,10 +308,11 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                         </div>
                     </CardHeader>
                     <CardContent className="min-w-0 pt-4">
-                        <div className="hidden md:block">
-                        <Table regionLabel={ti('insider.signals.tableRegion')}>
+                        {/* Una sola tabla responsiva (decisión de diseño, 2026-11-14): fila
+                            tarjeta debajo de md, fila de tabla desde md; una señal = una fila. */}
+                        <Table className="block md:table" regionLabel={ti('insider.signals.tableRegion')}>
                             <TableCaption className="sr-only">{ti('insider.signals.tableCaption')}</TableCaption>
-                            <TableHeader>
+                            <TableHeader className="hidden md:table-header-group">
                                 <TableRow className="border-gray-700 hover:bg-transparent">
                                     <TableHead className="text-xs font-semibold uppercase text-gray-500">{ti('insider.signal')}</TableHead>
                                     <TableHead className="text-xs font-semibold uppercase text-gray-500">{ti('insider.insider')}</TableHead>
@@ -320,10 +321,11 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                     <TableHead className="text-xs font-semibold uppercase text-gray-500">{ti('insider.detail')}</TableHead>
                                 </TableRow>
                             </TableHeader>
-                            <TableBody>
+                            <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
                                 {signals.map((signal) => (
-                                    <TableRow key={signalKey(signal)} className="border-gray-700/50">
-                                        <TableCell>
+                                    <TableRow key={signalKey(signal)} className="block break-words rounded-lg border border-gray-700/50 bg-gray-900/50 p-4 md:table-row md:rounded-none md:border-0 md:border-b md:bg-transparent md:p-0">
+                                        <TableCell className="block md:table-cell">
+                                            <span className="block text-xs text-gray-500 md:hidden">{ti('insider.signal')}</span>
                                             <Badge
                                                 variant={signalTone(signal.signal)}
                                                 title={signalTooltip(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}
@@ -331,7 +333,8 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                 {signalLabel(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="text-sm text-gray-200">
+                                        <TableCell className="block text-sm text-gray-200 md:table-cell">
+                                            <span className="block text-xs text-gray-500 md:hidden">{ti('insider.insider')}</span>
                                             {formatRecordValue(signal.insider)}
                                             {signal.officer_title ?? signal.role ? (
                                                 <span className="block text-xs text-gray-500">
@@ -343,13 +346,16 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                 </span>
                                             ) : null}
                                         </TableCell>
-                                        <TableCell className="text-sm text-gray-300">
+                                        <TableCell className="block text-sm text-gray-300 md:table-cell">
+                                            <span className="block text-xs text-gray-500 md:hidden">{ti('insider.date')}</span>
                                             {filingDateText(f, signal.date ?? signal.window_start)}
                                         </TableCell>
-                                        <TableCell className="text-right text-sm font-semibold text-gray-100">
+                                        <TableCell className="block text-sm font-semibold text-gray-100 md:table-cell md:text-right">
+                                            <span className="block text-xs font-normal text-gray-500 md:hidden">{ti('insider.value')}</span>
                                             {moneyText(f, signal.value ?? signal.total_value)}
                                         </TableCell>
-                                        <TableCell className="max-w-md text-sm text-gray-400">
+                                        <TableCell className="block text-sm text-gray-400 md:table-cell md:max-w-md">
+                                            <span className="block text-xs text-gray-500 md:hidden">{ti('insider.detail')}</span>
                                             <span className="line-clamp-3">{formatRecordValue(signal.detail, ti)}</span>
                                             <span className="mt-1 flex flex-wrap items-center gap-2">
                                                 {formBadge(ti, signal.form) ? (
@@ -374,42 +380,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                 ))}
                             </TableBody>
                         </Table>
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 md:hidden">
-                            {signals.map((signal) => (
-                                <article className="min-w-0 rounded-lg border border-gray-700/50 bg-gray-900/50 p-4 break-words" key={signalKey(signal)}>
-                                    <div className="flex flex-wrap items-center gap-2">
-                                        <Badge variant={signalTone(signal.signal)} title={signalTooltip(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}>{signalLabel(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}</Badge>
-                                        <span className="ml-auto text-sm font-semibold text-gray-100">{moneyText(f, signal.value ?? signal.total_value)}</span>
-                                    </div>
-                                    <div className="mt-3 text-sm font-medium text-gray-200">{formatRecordValue(signal.insider)}</div>
-                                    {signal.officer_title ?? signal.role ? (
-                                        <div className="text-xs text-gray-500">
-                                            {insiderRole(
-                                                typeof signal.role === 'string' ? signal.role : null,
-                                                typeof signal.officer_title === 'string' ? signal.officer_title : null, f.locale
-                                            )}
-                                        </div>
-                                    ) : null}
-                                    <div className="mt-1 text-xs text-gray-500">{filingDateText(f, signal.date ?? signal.window_start)}</div>
-                                    <div className="mt-2 text-sm leading-6 text-gray-400"><span className="line-clamp-3">{formatRecordValue(signal.detail, ti)}</span></div>
-                                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                                        {formBadge(ti, signal.form) ? <Badge variant="outline">{formBadge(ti, signal.form)!.label}</Badge> : null}
-                                        {signal.multi_reporter === true ? <span className="text-xs text-gray-500">{ti('insider.multiReporter')}</span> : null}
-                                        {secLink(signal.source_url) ? (
-                                            <a
-                                                href={secLink(signal.source_url)!}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
-                                            >
-                                                {ti('insider.viewSecFiling')} <ExternalLink aria-hidden="true" className="h-3 w-3" />
-                                            </a>
-                                        ) : null}
-                                    </div>
-                                </article>
-                            ))}
-                        </div>
+
                     </CardContent>
                 </Card>
                     )}

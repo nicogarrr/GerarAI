@@ -72,7 +72,8 @@ describe('Insider: cargos comunes en español', () => {
 
   it('la vista de señales pasa por insiderRole (antes mostraba el cargo SEC en crudo)', () => {
     const usos = signalsView.match(/insiderRole\(\s*typeof signal\.role/g) ?? [];
-    assert.equal(usos.length, 2, `la tabla y las tarjetas móviles tienen que usar insiderRole (${usos.length}/2)`);
+    // Tabla responsiva única (2026-11-14): una sola llamada en la fila única.
+    assert.equal(usos.length, 1, `la fila única usa insiderRole (${usos.length}/1)`);
     assert.ok(!signalsView.includes('formatRecordValue(signal.officer_title ?? signal.role)'), 'sigue el cargo en crudo');
   });
 
