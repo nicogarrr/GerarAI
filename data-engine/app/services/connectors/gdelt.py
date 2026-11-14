@@ -271,6 +271,14 @@ class GDELTClient:
                 # 200 con HTML (pagina de error de GDELT): la fuente cambio.
                 registry.record_failure(REGISTRY_KEY, "respuesta no JSON")
                 raise
+            if not isinstance(payload, dict) or (
+                "articles" in payload and (
+                    not isinstance(payload["articles"], list)
+                    or any(not isinstance(article, dict) for article in payload["articles"])
+                )
+            ):
+                registry.record_failure(REGISTRY_KEY, "respuesta JSON con artículos no verificables")
+                raise ValueError("GDELT payload is not an object with an article list")
             registry.record_success(REGISTRY_KEY, (time.monotonic() - started) * 1000)
             return payload
 
