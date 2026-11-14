@@ -220,13 +220,16 @@ def test_event_type_catalog_is_exactly_the_known_six():
         "earnings",
         "regulatory",
     ]
-    labels_ts = (
-        Path(__file__).resolve().parents[2] / "lib" / "labels.ts"
-    ).read_text(encoding="utf-8")
-    for event_type in [*MATERIAL_KEYWORDS, "general_news"]:
-        assert f"{event_type}:" in labels_ts, (
-            f"etiquetaTipoEvento no traduce '{event_type}' y se pintaría crudo"
-        )
+    import json
+
+    catalog_root = Path(__file__).resolve().parents[2] / "lib" / "i18n" / "messages"
+    for locale in ("es", "en"):
+        labels = json.loads((catalog_root / locale / "labels.json").read_text(encoding="utf-8"))["eventTypes"]
+        for event_type in [*MATERIAL_KEYWORDS, "general_news"]:
+            translated = labels.get(event_type)
+            assert isinstance(translated, str) and translated.strip() and translated != event_type, (
+                f"eventTypes ({locale}) no traduce '{event_type}' y se pintaría crudo"
+            )
 
 
 def test_portfolio_weight_convierte_a_divisa_base_con_divisas_mezcladas():
