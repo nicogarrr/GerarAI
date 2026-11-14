@@ -256,6 +256,7 @@
     "onTime": "{pct}% on time",
     "noDates": "no dates",
     "topTickers": "Most traded",
+    "partialStatistics": "Partial statistics: readable trades only. Unread blocks: {count}; trades, amounts and dates may be missing.",
     "volume": "Disclosed volume: {range}",
     "volumePartial": "Partial volume (known amounts only): {range}. Trades without a verifiable amount: {count}.",
     "volumeUnavailable": "Volume unavailable: Trades without a verifiable amount: {count}.",

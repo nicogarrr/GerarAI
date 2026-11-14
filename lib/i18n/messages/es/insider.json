@@ -256,6 +256,7 @@
     "onTime": "{pct} % a tiempo",
     "noDates": "sin fechas",
     "topTickers": "Más operados",
+    "partialStatistics": "Estadísticas parciales: solo operaciones legibles. Bloques no leídos: {count}; pueden faltar operaciones, importes y fechas.",
     "volume": "Volumen declarado: {range}",
     "volumePartial": "Volumen parcial (solo importes conocidos): {range}. Operaciones sin importe verificable: {count}.",
     "volumeUnavailable": "Volumen no disponible: Operaciones sin importe verificable: {count}.",

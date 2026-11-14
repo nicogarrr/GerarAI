@@ -33,6 +33,9 @@ export function PoliticianCardView({ card, locale = DEFAULT_LOCALE }: { card: Po
         {card.party ? <Badge className={partyTone(card.party)} variant="outline">{t(PARTY_KEYS[card.party])}</Badge> : null}
       </div>
       <p className="text-xs text-gray-500">{t('insider.politicians.houseLabel')} · {districtLabel(card.state_district)}</p>
+      {(card.unparsed_blocks ?? 0) > 0 ? (
+        <p className="mt-2 text-xs text-amber-300">{t('insider.politicians.partialStatistics', { count: card.unparsed_blocks ?? 0 })}</p>
+      ) : null}
       <p className="mt-2 text-sm text-gray-300">{t('insider.politicians.tradesTickers', { trades: card.trades, tickers: card.tickers })}</p>
       <p className="text-xs text-gray-400">{t('insider.politicians.lastTrade', { date: fmtIsoDate(card.last_trade, locale) })}</p>
       <p className={`mt-1 text-xs ${card.late ? 'text-amber-300' : 'text-gray-500'}`}>{t('insider.politicians.lateCounts', { late: card.late, late30: card.late_over_30 })}</p>

@@ -27,3 +27,16 @@ describe('importes desconocidos de políticos', () => {
     expect(screen.queryByText(/Volumen parcial/)).toBeNull();
   });
 });
+
+it.each(['es', 'en'] as const)('advierte estadísticas parciales por bloques no leídos (%s)', (locale) => {
+  render(<PoliticianCardView locale={locale} card={{ ...card, unparsed_blocks: 2 }} />);
+  expect(screen.getByText(locale === 'es' ? /Estadísticas parciales/ : /Partial statistics/)).toHaveTextContent(
+    locale === 'es' ? 'Bloques no leídos: 2' : 'Unread blocks: 2',
+  );
+  expect(screen.getByText(locale === 'es' ? /Volumen declarado/ : /Disclosed volume/)).toBeInTheDocument();
+});
+
+it('sin bloques no leídos no inventa un aviso de cobertura parcial', () => {
+  render(<PoliticianCardView card={{ ...card, unparsed_blocks: 0 }} />);
+  expect(screen.queryByText(/Estadísticas parciales/)).toBeNull();
+});
