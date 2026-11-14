@@ -255,6 +255,9 @@ async def _short_interest_page(
     if not isinstance(data, list):
         registry.record_failure(REGISTRY_KEY, "payload no lista")
         return None
+    if any(not isinstance(row, dict) for row in data):
+        registry.record_failure(REGISTRY_KEY, "payload con elementos no objeto")
+        return None
     registry.record_success(REGISTRY_KEY)
     return data
 
