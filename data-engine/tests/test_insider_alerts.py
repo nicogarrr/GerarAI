@@ -333,6 +333,10 @@ def test_recency_window_skips_old_purchases_and_unreadable_dates():
         old = insider_alerts.evaluate(db, today=date(d.year + 1, d.month, d.day))
         assert old["candidates"] == 0 and old["alerts_created"] == 0
         assert db.scalars(select(ResearchAlert)).all() == []
+        # Este caso prueba recencia; el filing debe estar publicado a la fecha
+        # evaluada. El fixture original se presentaba un día después de la compra.
+        db.scalars(select(InsiderFiling)).one().filing_date = d.isoformat()
+        db.commit()
         fresh = insider_alerts.evaluate(db, today=d)
         assert fresh["alerts_created"] >= 1
     finally:
