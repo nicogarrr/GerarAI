@@ -59,8 +59,6 @@ interface WatchlistStock extends WatchlistEntryData {
     /** true = la cadena de cotización agotó su presupuesto (3 s): las celdas
         sin dato lo dicen como espera, nunca como fallo de la fuente. */
     timedOut: boolean;
-    /** true = fuera del master y el proveedor no conoce el símbolo («No encontrado»). */
-    notFound: boolean;
     addedAt: Date;
 }
 
@@ -77,6 +75,36 @@ function applyDated<T extends WatchlistEntryData>(entry: T, dated: DatedMap): T 
 async function DatedRow<T extends WatchlistEntryData>({ stock, promise, render }: { stock: T; promise: Promise<DatedMap>; render: (stock: T) => ReactNode }) {
     const dated = await promise.catch((): DatedMap => ({}));
     return <>{render(applyDated(stock, dated))}</>;
+}
+
+/** Badge «No encontrado» por streaming: el documento NO espera al perfil del
+    proveedor (Finnhub getProfile, que en frío agota su presupuesto de 3 s
+    después de los basics). Medido en prod (rendimiento móvil, 2026-11-14):
+    LCP 10 s con la primera empresa a 7,5 s. Mismo patrón que DatedRow. */
+async function NotFoundBadgeStream({ promise, render }: { promise: Promise<boolean>; render: (notFound: boolean) => ReactNode }) {
+    const notFound = await promise.catch(() => false);
+    return <>{render(notFound)}</>;
+}
+
+type DcaSignalsResult = Awaited<ReturnType<typeof getDcaSignals>>;
+
+/** Panel DCA por streaming (autorizado por Nico, 2026-11-14): getDcaSignals
+    medido a 7,9 s en prod bloqueaba el documento entero (`await` antes del
+    return). Ahora el panel aparece cuando llega la promesa. Lógica, datos y
+    componentes DCA intactos: solo cambia DÓNDE se espera la promesa. */
+async function DcaPanelStream({ promise, ti, locale }: { promise: Promise<DcaSignalsResult>; ti: Parameters<typeof DcaSignalsPanel>[0]['ti']; locale: Parameters<typeof DcaSignalsPanel>[0]['locale'] }) {
+    const dca = await promise;
+    return <DcaSignalsPanel data={dca.data} unavailable={dca.unavailable} ti={ti} locale={locale} />;
+}
+
+/** Badge DCA de la fila por streaming: sin señal el badge compacto no pinta
+    nada, así que la fila no lo necesita para el primer pintado. La selección
+    por símbolo es la MISMA de antes (Map: si viniera un duplicado, gana el
+    último) — solo cambia DÓNDE se espera la promesa, nunca qué dato se elige. */
+async function DcaBadgeStream({ promise, symbol }: { promise: Promise<DcaSignalsResult>; symbol: string }) {
+    const dca = await promise;
+    const dcaBySymbol = new Map<string, DcaSignalItem>((dca.data?.items ?? []).map((item) => [item.symbol.toUpperCase(), item]));
+    return <DcaLevelBadge item={dcaBySymbol.get(symbol)} signalMonths={dca.data?.signal_months ?? null} compact />;
 }
 
 async function DatedValuationGrid({ stocks, promise }: { stocks: WatchlistEntryData[]; promise: Promise<DatedMap> }) {
@@ -185,8 +213,10 @@ export default async function WatchlistPage({
         );
     });
     // «No encontrado»: solo para filas fuera del master, con el mismo criterio
-    // que la ficha (perfil del proveedor sin nombre propio). Presupuesto
-    // propio; si el proveedor tarda o falla, sin etiqueta.
+    // que la ficha (perfil del proveedor sin nombre propio). La promesa NO se
+    // espera: el badge llega por streaming (NotFoundBadgeStream) porque en
+    // frío esta lectura agotaba su presupuesto de 3 s tras los basics y
+    // estiraba el documento (LCP 10 s medido en prod, 2026-11-14).
     const notFoundPromises = basicsPromises.map((basicsPromise, index) =>
         basicsPromise
             .then((basics) => {
@@ -204,7 +234,10 @@ export default async function WatchlistPage({
             })
             .catch(() => false),
     );
-    const [datedChanges, monitorData, basicsList, notFoundList] = await Promise.all([metricSort ? datedChangesPromise : Promise.resolve({} as DatedMap), monitorPromise, Promise.all(basicsPromises), Promise.all(notFoundPromises)]);
+    const notFoundBySymbol = new Map<string, Promise<boolean>>(
+        pageItems.map((item, index) => [item.symbol.trim().toUpperCase(), notFoundPromises[index]]),
+    );
+    const [datedChanges, monitorData, basicsList] = await Promise.all([metricSort ? datedChangesPromise : Promise.resolve({} as DatedMap), monitorPromise, Promise.all(basicsPromises)]);
     const watchlistStocks: WatchlistStock[] = await Promise.all(
         pageItems.map(async (item, index) => {
             try {
@@ -225,7 +258,6 @@ export default async function WatchlistPage({
                     analysis: item.analysis,
                     monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
                     timedOut,
-                    notFound: notFoundList[index] === true && data.price === null,
                     addedAt: item.addedAt
                 };
             } catch {
@@ -235,7 +267,6 @@ export default async function WatchlistPage({
                     analysis: item.analysis,
                     monitor: null,
                     timedOut: false,
-                    notFound: notFoundList[index] === true,
                     addedAt: item.addedAt
                 };
             }
@@ -374,9 +405,26 @@ export default async function WatchlistPage({
             </Suspense>
         );
 
-    const dca = await dcaPromise;
-    const dcaBySymbol = new Map<string, DcaSignalItem>((dca.data?.items ?? []).map((item) => [item.symbol.toUpperCase(), item]));
-    const dcaSignalMonths = dca.data?.signal_months ?? null;
+    // Badge «No encontrado»/«sin datos» por streaming: el documento no espera
+    // al perfil del proveedor (cadena de 3 s en frío tras los basics); el
+    // fallback pinta «sin datos» cuando toca y el badge lo repinta al llegar.
+    const notFoundBadge = (stock: WatchlistStock, amberClass: string, grayClass: string): ReactNode => {
+        const cluster = (notFound: boolean): ReactNode =>
+            notFound && stock.price === null ? (
+                <Badge variant="outline" className={amberClass} title={t('watchlist.page.notFound.title')}>
+                    {t('watchlist.page.notFound.label')}
+                </Badge>
+            ) : stock.price === null ? (
+                <Badge variant="outline" className={grayClass}>
+                    {stock.timedOut ? t('watchlist.page.noDataTimedOut') : stock.quoteTimedOut ? t('watchlist.page.noDataQuoteTimedOut') : t('watchlist.page.noData')}
+                </Badge>
+            ) : null;
+        return (
+            <Suspense fallback={cluster(false)}>
+                <NotFoundBadgeStream promise={notFoundBySymbol.get(stock.symbol.trim().toUpperCase()) ?? Promise.resolve(false)} render={cluster} />
+            </Suspense>
+        );
+    };
 
     return (
         <WatchlistMembership key={watchlistItems.map((item) => item.symbol).sort().join('|')}>
@@ -468,16 +516,8 @@ export default async function WatchlistPage({
                                         >
                                             {stock.symbol}
                                         </Link>
-                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />{valueRankNote(stock)}
-                                        {stock.notFound ? (
-                                            <Badge variant="outline" className="mt-1 border-amber-800/60 text-amber-300/90" title={t('watchlist.page.notFound.title')}>
-                                                {t('watchlist.page.notFound.label')}
-                                            </Badge>
-                                        ) : stock.price === null ? (
-                                            <Badge variant="outline" className="mt-1 border-gray-700 text-gray-400">
-                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : stock.quoteTimedOut ? t('watchlist.page.noDataQuoteTimedOut') : t('watchlist.page.noData')}
-                                            </Badge>
-                                        ) : null}
+                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><Suspense fallback={null}><DcaBadgeStream promise={dcaPromise} symbol={stock.symbol.trim().toUpperCase()} /></Suspense>{valueRankNote(stock)}
+                                        {notFoundBadge(stock, 'mt-1 border-amber-800/60 text-amber-300/90', 'mt-1 border-gray-700 text-gray-400')}
                                     </div>
                                     <div className={`flex shrink-0 items-center gap-1 font-mono text-sm ${stock.changePercent === null ? 'text-gray-500' : stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                         {stock.changePercent === null ? null : stock.changePercent >= 0 ? <TrendingUp className="h-4 w-4" aria-hidden="true" /> : <TrendingDown className="h-4 w-4" aria-hidden="true" />}
@@ -570,22 +610,14 @@ export default async function WatchlistPage({
                                                 <div>
                                                     <div className="flex items-center gap-2 font-bold text-gray-200 transition-colors group-hover:text-blue-400">
                                                         {stock.symbol}
-                                                        {stock.notFound ? (
-                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.notFound.title')}>
-                                                                {t('watchlist.page.notFound.label')}
-                                                            </Badge>
-                                                        ) : stock.price === null ? (
-                                                            <Badge variant="outline" className="border-gray-700 font-normal text-gray-400">
-                                                                {stock.timedOut ? t('watchlist.page.noDataTimedOut') : stock.quoteTimedOut ? t('watchlist.page.noDataQuoteTimedOut') : t('watchlist.page.noData')}
-                                                            </Badge>
-                                                        ) : null}
+                                                        {notFoundBadge(stock, 'border-amber-800/60 font-normal text-amber-300/90', 'border-gray-700 font-normal text-gray-400')}
                                                         {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
                                                             <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w), sessions: stock.monitor.low_52w_sessions })}>
                                                                 {t('watchlist.page.low52')}
                                                             </Badge>
                                                         ) : null}
                                                     </div>
-                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><DcaLevelBadge item={dcaBySymbol.get(stock.symbol.toUpperCase())} signalMonths={dcaSignalMonths} compact />{valueRankNote(stock)}
+                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><Suspense fallback={null}><DcaBadgeStream promise={dcaPromise} symbol={stock.symbol.trim().toUpperCase()} /></Suspense>{valueRankNote(stock)}
                                                 </div>
                                             </Link>
                                             <div className="ml-2 flex items-center gap-1">
@@ -654,7 +686,11 @@ export default async function WatchlistPage({
                 </>
             )}
 
-            <DcaSignalsPanel data={dca.data} unavailable={dca.unavailable} ti={t} locale={locale} />
+            {/* Panel DCA en su propio Suspense (autorizado por Nico): aparece
+                cuando llega getDcaSignals, sin frenar el documento. */}
+            <Suspense fallback={null}>
+                <DcaPanelStream promise={dcaPromise} ti={t} locale={locale} />
+            </Suspense>
         {metricSort ? (
             <ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />
         ) : (

@@ -98,7 +98,7 @@ function ErrorFallback({ error, errorInfo, onReset }: { error: Error | null; err
                 <CardContent className="space-y-4">
                     {process.env.NODE_ENV === 'development' && error && (
                         <details className="text-sm">
-                            <summary className="cursor-pointer text-muted-foreground mb-2">
+                            <summary className="min-h-11 cursor-pointer py-2 text-muted-foreground mb-2 sm:min-h-10">
                                 {t('shell.error.devDetails')}
                             </summary>
                             <pre className="bg-muted p-2 rounded overflow-auto text-xs">

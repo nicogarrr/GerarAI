@@ -78,7 +78,7 @@ export function PaperTradingContent({ data, locale = DEFAULT_LOCALE }: { data: P
             </div>
         )}
         {data.trades.map(trade => <PaperProposalCard key={trade.id} trade={trade} locale={locale} />)}
-        <details className="text-xs text-gray-400"><summary>{t('propicks.paper.basisTitle')}</summary><p className="mt-2">{t('propicks.paper.basisText')}</p></details>
+        <details className="text-xs text-gray-400"><summary className="min-h-11 cursor-pointer py-2 sm:min-h-10">{t('propicks.paper.basisTitle')}</summary><p className="mt-2">{t('propicks.paper.basisText')}</p></details>
     </section>;
 }
 

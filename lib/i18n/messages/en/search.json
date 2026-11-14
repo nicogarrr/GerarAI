@@ -36,6 +36,15 @@
   "submitSearch": "Search",
   "libraryLink": "Library",
   "command": {
-    "heading": "Command"
+    "heading": "Command",
+    "labels": {
+      "des": "Overview",
+      "fa": "Financials",
+      "hds": "Holders, 13F & insiders",
+      "n": "News",
+      "gp": "Chart",
+      "tesis": "Thesis",
+      "alert": "Alerts"
+    }
   }
 }

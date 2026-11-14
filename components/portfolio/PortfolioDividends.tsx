@@ -403,7 +403,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
             ) : null}
 
             <details className="rounded-lg border border-gray-800 p-3 text-xs text-gray-500">
-                <summary className="cursor-pointer select-none text-gray-400">{ti('portfolio.dividends.assumptions')}</summary>
+                <summary className="min-h-11 cursor-pointer select-none py-2 text-gray-400 sm:min-h-10">{ti('portfolio.dividends.assumptions')}</summary>
                 <ul className="mt-2 list-disc space-y-1 pl-5 leading-5">
                     {projection.fiscal_conditions.map((condition) => (
                         <li key={condition}>{dividendProjectionText(condition, f.locale)}</li>
