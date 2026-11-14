@@ -118,5 +118,7 @@
     "next": "Next",
     "page": "Page {page} of {total}",
     "periods": "13F periods: {periods}"
-  }
+  },
+  "amountMissing": "N/D ({n} amount missing)",
+  "netAmountMissing": "Net flow unavailable: amounts are missing"
 }

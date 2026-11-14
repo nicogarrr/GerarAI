@@ -1,3 +1,6 @@
+// @ts-expect-error TS5097: node --experimental-strip-types requires the extension.
+import { createTranslator } from '../i18n/translate.ts';
+
 /**
  * Insiders (Form 4) y fondos 13F de un ticker para la ficha (conexión 10b).
  *
@@ -103,7 +106,6 @@ export function holdersTone(block: HoldersOwnershipBlock): OwnershipTone {
  */
 const TEXT_EN: Record<string, string> = {
   'Compras en grupo de insiders (3 o más)': 'Cluster buying by insiders (3 or more)',
-  'Saldo neto no estimable: faltan importes': 'Net flow unavailable: amounts are missing',
   'Compras netas de insiders': 'Net insider buying',
   'Ventas netas de insiders': 'Net insider selling',
   'Sin balance claro de insiders': 'No clear insider balance',
@@ -127,6 +129,7 @@ const NOT_IN_UNIVERSE_RE = /^(.+) no está en el universo de empresas: sin cruce
 /** Lectura o motivo del backend en el idioma de la pantalla. */
 export function ownershipText(text: string, locale: OwnershipLocale = 'es'): string {
   if (locale !== 'en') return text;
+  if (text === createTranslator('es')('ownership.netAmountMissing')) return createTranslator(locale)('ownership.netAmountMissing');
   if (Object.hasOwn(TEXT_EN, text)) return TEXT_EN[text];
   const noTrades = NO_TRADES_RE.exec(text);
   if (noTrades) return `No open-market insider buys or sells (Form 4) stored for ${noTrades[1]} in the last ${noTrades[2]} days.`;
@@ -140,7 +143,7 @@ export function insiderLines(block: InsiderOwnershipBlock, locale: OwnershipLoca
   if (block.status !== 'ok') return [block.detail ? ownershipText(block.detail, locale) : (locale === 'en' ? 'No insider data.' : 'Sin datos de insiders.')];
   const amount = (side: InsiderSide) => {
     const missing = side.value_missing ?? 0;
-    if (missing > 0 || side.value == null) return missing > 0 ? `N/D (${missing} ${locale === 'en' ? 'amount missing' : 'sin importe'})` : 'N/D';
+    if (missing > 0 || side.value == null) return missing > 0 ? createTranslator(locale)('ownership.amountMissing', { n: missing }) : 'N/D';
     return ownershipMoney(side.value, locale);
   };
   const planned = block.sells.planned_10b5_1 ?? 0;

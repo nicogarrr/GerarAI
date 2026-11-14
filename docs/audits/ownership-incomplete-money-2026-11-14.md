@@ -28,3 +28,14 @@ production screenshot or full VM-suite claim.
 Overlaps publication cutoff f3083d8 and PDMR quarantine #5666 in the same
 backend reader, but this patch is based on main only and does not incorporate
 or undo either policy. Integrate and re-audit the final exact SHA.
+
+## i18n rejection follow-up
+
+The original patch exceeded the hardcoded Spanish literal ceiling (30 vs 29).
+Moved missing-amount text and the unknown-net reading into ownership dictionary
+keys in ES/EN and regenerated en.compact.json. No baseline increase. Relative
+.ts import preserves the existing standalone node guard contract.
+
+check-i18n passes. Full guards: 3063 passed, 0 failed, 1 skipped.
+36 formatter/panel tests pass, 100% lines and 94.68% branches. Typecheck and
+ESLint pass. This changes text storage, not rendered text or amount semantics.
