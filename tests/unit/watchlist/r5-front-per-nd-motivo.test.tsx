@@ -145,8 +145,13 @@ describe('/watchlist: PER N/D con motivo', () => {
       return full(symbol, 100, { peKind: 'fy', peSource: 'PER: cierre 2026-11-06 / eps_diluted FY2025 (SEC)' });
     });
     const tree = await render();
-    const rows = find(tree, 'DatedRow');
-    // Una DatedRow por empresa y vista (tarjeta + fila de tabla).
+    // Las filas llegan por streaming (EntryRowStream) y dentro van en
+    // DatedRow: una por empresa y vista (tarjeta + fila de tabla). Hay que
+    // resolver ambas capas para ver lo pintado.
+    const streams = find(tree, 'EntryRowStream');
+    expect(streams).toHaveLength(6);
+    const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const rows = find(streamed, 'DatedRow');
     expect(rows).toHaveLength(6);
     const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
     const visible = painted.map(rawText);
