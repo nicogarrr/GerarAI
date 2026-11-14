@@ -24,19 +24,19 @@ const sharesText = (f: Formatters, side: InsiderOperationsSide) =>
 /** El total con filas sin importe es un mínimo: se marca en la cifra, no solo en el pie. */
 const minMark = (side: InsiderOperationsSide) => (side.rows_without_value > 0 ? '≥ ' : '');
 
-function SideCells({ side, empty, label }: { side: InsiderOperationsSide; empty?: string; label: string }) {
+function SideCells({ side, empty, label, className = '' }: { side: InsiderOperationsSide; empty?: string; label: string; className?: string }) {
     const t = useT();
     const f = useFormat();
     if (side.trades === 0) {
         return (
-            <TableCell className="block text-sm text-gray-500 md:table-cell md:text-right">
+            <TableCell className={`block p-0 text-sm text-gray-500 md:table-cell md:text-right ${className}`}>
                 <span className="block text-xs text-gray-500 md:hidden">{label}</span>
                 {empty ?? '—'}
             </TableCell>
         );
     }
     return (
-        <TableCell className="block text-sm md:table-cell md:text-right">
+        <TableCell className={`block p-0 text-sm md:table-cell md:text-right ${className}`}>
             <span className="block text-xs font-normal text-gray-500 md:hidden">{label}</span>
             <span className="font-semibold tabular-nums text-gray-100">{usdCompact(f, side.value)}</span>
             <span className="block text-xs font-normal text-gray-500">
@@ -99,23 +99,23 @@ export function CompanyCard({ company }: { company: InsiderOperationsCompany }) 
                     </TableHeader>
                     <TableBody className="block space-y-2 md:table-row-group md:space-y-0">
                         {company.insiders.map((row) => (
-                            <TableRow aria-label={insiderName(row.insider)} key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`} className="block rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 md:table-row md:rounded-none md:border-0 md:border-b md:bg-transparent md:p-0">
-                                <TableCell className="block text-sm text-gray-200 md:table-cell">
+                            <TableRow aria-label={insiderName(row.insider)} key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`} className="grid grid-cols-2 gap-x-3 gap-y-1 rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 md:table-row md:gap-0 md:rounded-none md:border-0 md:border-b md:bg-transparent md:p-0">
+                                <TableCell className="order-1 col-span-2 p-0 text-sm text-gray-200 md:table-cell">
                                     <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colInsider')}</span>
                                     <span className="font-medium md:font-normal">{insiderName(row.insider)}</span>
                                 </TableCell>
-                                <TableCell className="block text-sm text-gray-400 md:table-cell">
+                                <TableCell className="order-2 col-span-2 p-0 text-sm text-gray-400 md:table-cell">
                                     <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colRole')}</span>
                                     {insiderRole(row.role, row.officer_title, f.locale)}
                                 </TableCell>
-                                <SideCells side={row.sell} label={t('insider.operations.colSales')} />
-                                <SideCells side={row.buy} label={t('insider.operations.colBuys')} />
-                                <TableCell className="block text-sm tabular-nums text-gray-300 md:table-cell md:text-right">
+                                <SideCells className="order-3" side={row.sell} label={t('insider.operations.colSales')} />
+                                <SideCells className="order-4" side={row.buy} label={t('insider.operations.colBuys')} />
+                                <TableCell className="order-5 p-0 text-sm tabular-nums text-gray-300 md:table-cell md:text-right">
                                     <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colOps')}</span>
                                     {f.formatNumber(row.sell.trades + row.buy.trades, { maximumFractionDigits: 0 })}
                                 </TableCell>
-                                <TableCell className="block text-sm text-gray-400 md:table-cell md:text-right">
-                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colLast')}</span>
+                                <TableCell className="order-6 self-center p-0 text-right text-xs text-gray-500 md:table-cell md:text-right md:text-sm md:text-gray-400">
+                                    <span className="block text-left text-xs text-gray-500 md:hidden">{t('insider.operations.colLast')}</span>
                                     {row.last_tx ? f.formatDate(row.last_tx) : '—'}
                                 </TableCell>
                             </TableRow>
