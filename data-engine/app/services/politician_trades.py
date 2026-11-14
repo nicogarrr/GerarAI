@@ -242,6 +242,7 @@ def _member_card(key: str, recs: list[dict[str, Any]]) -> dict[str, Any]:
         "bioguide": head.get("bioguide"),
         "filings": len(recs),
         "scanned_filings": sum(1 for r in recs if not r.get("readable")),
+        "unparsed_blocks": sum(r.get("unparsed_blocks") or 0 for r in recs),
         "trades": len(trades),
         "tickers": len(tickers),
         "top_tickers": [{"ticker": t, "trades": n} for t, n in sorted(tickers.items(), key=lambda kv: (-kv[1], kv[0]))[:5]],

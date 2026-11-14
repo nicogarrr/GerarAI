@@ -114,6 +114,7 @@ export interface PoliticianCard {
   volume_min: number;
   volume_max: number | null;
   volume_unknown_trades?: number;
+  unparsed_blocks?: number;
 }
 
 export interface PoliticiansList {
