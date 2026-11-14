@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from heapq import nlargest
 from typing import Any
 
 from sqlalchemy import select
@@ -136,15 +137,30 @@ def comparison(db: Session, company_id: int, form: str, page: int) -> dict[str, 
     tenant = db.info.get("tenant_id")
     if tenant is None:
         raise ValueError("Tenant context required")
-    documents = [
-        doc for doc in db.scalars(select(Document).where(
-            Document.tenant_id == tenant, Document.company_id == company_id,
-            Document.metadata_["form"].as_string() == form,
-        ).limit(MAX_DOCUMENTS)).all()
-        if official_document(doc)
-        and (period := reported_period(doc.metadata_ or {})) is not None
-        and period <= date.today()
-    ]
+    # Stream only provenance and period fields, not full metadata/analysis. Validate
+    # before the bounded newest-N selection so bad rows cannot displace reports.
+    candidates = db.execute(select(
+        Document.id, Document.source_url, Document.source_type,
+        Document.metadata_["period_of_report"].as_string().label("period_of_report"),
+        Document.metadata_["report_date"].as_string().label("report_date"),
+    ).where(
+        Document.tenant_id == tenant, Document.company_id == company_id,
+        Document.metadata_["form"].as_string() == form,
+    ).execution_options(yield_per=MAX_DOCUMENTS))
+    today = date.today()
+    newest = nlargest(MAX_DOCUMENTS, (
+        (period, row.id) for row in candidates
+        if official_document(row)
+        and (period := reported_period({"period_of_report": row.period_of_report,
+                                       "report_date": row.report_date})) is not None
+        and period <= today
+    ))
+    # Full documents stay capped; use explicit tenant/company checks on both reads.
+    ids = [document_id for _, document_id in newest]
+    documents = list(db.scalars(select(Document).where(
+        Document.tenant_id == tenant, Document.company_id == company_id,
+        Document.id.in_(ids),
+    ).limit(MAX_DOCUMENTS)).all()) if ids else []
     documents.sort(key=lambda d: (reported_period(d.metadata_ or {}), d.id), reverse=True)
     base: dict[str, Any] = {"form": form, "page": page, "total": len(documents)}
     if not documents or page > len(documents):
