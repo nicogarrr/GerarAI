@@ -142,14 +142,28 @@ def fetch_insider_transactions(symbol: str, client: httpx.Client, crumb: str) ->
         # ausencia ambigua -> fallo de formato, nunca "sin actividad".
         get_data_source_registry().record_failure(_REGISTRY_KEY, "200 con 'result' no lista (parse failed)")
         raise ValueError("yahoo quoteSummary result is not a list")
-    # Éxito tras validar envoltura, error nulo y result lista (vacía = símbolo
-    # sin módulo, dato ausente legítimo; no vacía = hay movimientos).
+    # Ausencia del modulo es legitima; una forma explicita erronea no lo es.
+    try:
+        if not result:
+            transactions = []
+        else:
+            if not isinstance(result[0], dict):
+                raise ValueError("yahoo quoteSummary result entry is not an object")
+            module = result[0].get("insiderTransactions")
+            if module is None:
+                module = {}
+            if not isinstance(module, dict):
+                raise ValueError("yahoo insiderTransactions is not an object")
+            transactions = module.get("transactions")
+            if transactions is None:
+                transactions = []
+            if not isinstance(transactions, list) or any(not isinstance(row, dict) for row in transactions):
+                raise ValueError("yahoo transactions is not a list of objects")
+    except ValueError:
+        get_data_source_registry().record_failure(_REGISTRY_KEY, "200 con movimientos no verificables (parse failed)")
+        raise
     get_data_source_registry().record_success(_REGISTRY_KEY)
-    if not result:
-        return []
-    module = result[0].get("insiderTransactions") or {}
-    transactions = module.get("transactions")
-    return transactions if isinstance(transactions, list) else []
+    return transactions
 
 
 def map_transaction_code(text: str | None) -> str | None:
