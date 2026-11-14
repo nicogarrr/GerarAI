@@ -22,36 +22,43 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
                 "reasons": ["no_portfolio"]}
     positions = list(db.scalars(select(Position).where(Position.portfolio_id == portfolio.id)))
     cash = list(db.scalars(select(CashBalance)))
-    snapshots = list(db.scalars(select(PortfolioDailySnapshot).where(
+    # Only diagnostic columns, streamed: no historical valuation objects or
+    # unrelated JSON payloads. Keep JSON truthiness in Python exactly as before.
+    snapshot_rows = db.execute(select(
+        PortfolioDailySnapshot.snapshot_date,
+        PortfolioDailySnapshot.pricing_coverage,
+        PortfolioDailySnapshot.daily_return,
+        PortfolioDailySnapshot.cumulative_twr,
+        PortfolioDailySnapshot.metadata_["twr_base_after_scope_change"],
+    ).where(
         PortfolioDailySnapshot.portfolio_id == portfolio.id,
-    ).order_by(PortfolioDailySnapshot.snapshot_date)))
+    ).order_by(PortfolioDailySnapshot.snapshot_date).execution_options(yield_per=500))
+    snapshots = complete = returns = unlinked = 0
+    first_unlinked_date = None
+    latest_snapshot_date = latest_pricing_coverage = None
+    for day, coverage, daily_return, cumulative_twr, scope_base in snapshot_rows:
+        # The first snapshot is the base, never a broken link. A declared
+        # base after a scope change is also exempt, regardless of coverage.
+        if snapshots and (daily_return is None or cumulative_twr is None) and not scope_base:
+            unlinked += 1
+            if first_unlinked_date is None:
+                first_unlinked_date = day.isoformat()
+        snapshots += 1
+        if coverage == Decimal("1"):
+            complete += 1
+            if daily_return is not None and cumulative_twr is not None:
+                returns += 1
+        latest_snapshot_date = day.isoformat()
+        latest_pricing_coverage = coverage
     missing_cost = sum(1 for p in positions if p.quantity != 0 and (
         p.average_cost <= 0 or p.cost_basis_base is None or p.cost_basis_base == 0
     ))
     pdates = sorted({p.as_of.isoformat() for p in positions})
     cdates = sorted({c.as_of.isoformat() for c in cash})
-    complete = [s for s in snapshots if s.pricing_coverage == Decimal("1")]
-    returns = [s for s in snapshots if s.daily_return is not None and s.cumulative_twr is not None and s.pricing_coverage == Decimal("1")]
-    # Cadena TWR: la primera foto de la serie es la base (sin retorno por
-    # definicion); cualquier foto posterior sin daily_return/cumulative_twr es
-    # un eslabon roto y, por diseno, la cadena no se reinicia sola (ver
-    # PortfolioSnapshotService). Una cadena rota es la causa observable de que
-    # las bandas de Factores salgan SIN DATOS aun existiendo snapshots: se
-    # diagnostica aqui con su primera fecha para no adivinarla en produccion.
-    # La primera foto real tras una serie reconstruida solo-posiciones es base
-    # nueva declarada (twr_base_after_scope_change, ver #2890): sin retorno por
-    # diseño, no es un eslabón roto.
-    unlinked = [
-        s for s in snapshots[1:]
-        if (s.daily_return is None or s.cumulative_twr is None)
-        and not (s.metadata_ or {}).get("twr_base_after_scope_change")
-    ]
     twr_chain = {
-        "status": (
-            "no_snapshots" if not snapshots else "broken" if unlinked else "linked"
-        ),
-        "unlinked_snapshots": len(unlinked),
-        "first_unlinked_date": unlinked[0].snapshot_date.isoformat() if unlinked else None,
+        "status": "no_snapshots" if not snapshots else "broken" if unlinked else "linked",
+        "unlinked_snapshots": unlinked,
+        "first_unlinked_date": first_unlinked_date,
     }
     cash_native: dict[str, float] = {}
     for row in cash:
@@ -71,9 +78,9 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
         reasons.append("missing_cost_basis")
     if len(set(pdates + cdates)) > 1:
         reasons.append("mixed_valuation_dates")
-    if snapshots and snapshots[-1].pricing_coverage != Decimal("1"):
+    if snapshots and latest_pricing_coverage != Decimal("1"):
         reasons.append("latest_snapshot_incomplete")
-    if len(returns) < 2:
+    if returns < 2:
         reasons.append("insufficient_verified_returns")
     if unlinked:
         reasons.append("twr_chain_broken")
@@ -83,10 +90,10 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
         "cash_native": cash_native,
         "position_sources": sorted({p.source for p in positions}),
         "cash_sources": sorted({c.source for c in cash}),
-        "snapshots": len(snapshots), "complete_snapshots": len(complete),
-        "return_observations": len(returns),
-        "latest_snapshot_date": snapshots[-1].snapshot_date.isoformat() if snapshots else None,
-        "latest_pricing_coverage": float(snapshots[-1].pricing_coverage) if snapshots else None,
+        "snapshots": snapshots, "complete_snapshots": complete,
+        "return_observations": returns,
+        "latest_snapshot_date": latest_snapshot_date,
+        "latest_pricing_coverage": float(latest_pricing_coverage) if snapshots else None,
         "twr_chain": twr_chain,
         "reasons": reasons,
     }
