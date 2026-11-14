@@ -19,9 +19,11 @@ operativo **reportado**, no verificado por esta PR (14-nov-2026; re-verificar en
 el entorno en el despliegue): producción corría `b19d5822` (despliegue del
 12-nov); `worker-kpis` no corría (el deploy efectivo omitía el servicio; es gate
 de cierre, ver `docs/RELEASE_READINESS.md`); la cuota de OpenCode Go estaba
-agotada (reinicio estimado ~25-nov). Comprobado en la API de CI el 14-nov: el
-workflow «User flows (smoke, no bloquea)» falla de forma no bloqueante en
-`ac20676d`.
+agotada (reinicio estimado ~25-nov). El smoke «User flows» (no bloqueante)
+registró un job fallido dentro del run
+[43581490549](https://github.com/nicogarrr/GerarAI/actions/runs/43581490549) de
+`ac20676d`, run que terminó en success (14-nov 09:45 UTC; comprobado en la API
+de GitHub el 14-nov 10:53 CET).
 
 ### Lo más destacado
 
