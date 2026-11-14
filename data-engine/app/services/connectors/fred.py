@@ -10,8 +10,10 @@ que devuelven ``None`` sin clave.
 
 from __future__ import annotations
 
+import csv
 import os
 import time
+from io import StringIO
 from typing import Any
 
 import httpx
@@ -107,12 +109,15 @@ class FREDClient:
             registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
             raise
         text = response.text
-        header = text.split("\n", 1)[0].strip().lower()
-        first_col = header.split(",", 1)[0]
+        header = next(csv.reader(StringIO(text.lstrip("\ufeff"))), [])
+        header = [column.strip() for column in header]
         # Cabecera real verificada contra la fuente viva el 2026-10-31:
         # "observation_date,CPIAUCSL" (primera columna observation_date; la
         # segunda es el propio id de serie). "DATE" era el formato legado.
-        if text.lstrip().startswith("<") or first_col not in ("observation_date", "date"):
+        if (len(header) != 2 or header[0].lower() not in ("observation_date", "date")
+                or header[1].casefold() != series_id.strip().casefold()):
+            # La columna de valor debe ser la serie pedida: una fecha valida
+            # no convierte CPI/UNRATE en el bono DGS10 para el calculo WACC.
             # Un 200 con HTML (challenge) o un CSV con cabecera distinta no es
             # salud: validar el esquema ANTES de registrar el exito.
             registry.record_failure(REGISTRY_KEY, "respuesta no CSV (challenge o cambio de formato)")
