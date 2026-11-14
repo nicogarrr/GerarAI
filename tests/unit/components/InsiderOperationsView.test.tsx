@@ -106,7 +106,7 @@ describe('InsiderOperationsView', () => {
         const rows = screen.getAllByRole('row');
         expect(within(rows[1]).getAllByText('—').length).toBeGreaterThan(0);
         expect(within(rows[1]).getByText('2')).toBeInTheDocument();
-        expect(screen.getAllByText(/ops/).length).toBeGreaterThan(0);
+        expect(screen.getAllByText(/ops/i).length).toBeGreaterThan(0);
         expect(screen.getAllByText(/última/).length).toBeGreaterThan(0);
     });
 

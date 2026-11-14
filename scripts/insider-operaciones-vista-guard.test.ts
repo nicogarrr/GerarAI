@@ -51,12 +51,21 @@ describe('Insider operaciones: vista del agregado por empresa', () => {
     assert.ok(vista.includes('amended_filings'), 'las enmiendas 4/A no enlazables se declaran');
     assert.ok(vista.includes('insider.operations.footAmended'), 'la vista usa el aviso de enmiendas');
     assert.ok(esOps.footAmended.includes('doble conteo'), 'el aviso de enmiendas advierte el posible doble conteo de 4/A');
-    assert.ok(vista.includes('insider.operations.avgNa'), 'la vista usa la marca de precio medio parcial');
-    assert.ok(esOps.avgNa.includes('precio medio N/D'), 'el precio medio parcial no se muestra como dato');
+    assert.ok(vista.includes('insider.operations.avgNaReason'), 'la vista usa la marca de precio medio parcial');
+    assert.ok(esOps.avgNaReason.includes('precio medio N/D'), 'el precio medio parcial no se muestra como dato');
+    // La fila única (2026-11-14) usa avgNaReason en ambos viewports; las claves
+    // avgNa/opsLine/lastSuffix quedaron sin uso y se retiraron del diccionario.
+    assert.equal(esOps.avgNa, undefined, 'avgNa huérfana retirada');
+    assert.equal(esOps.opsLine, undefined, 'opsLine huérfana retirada');
+    assert.equal(esOps.lastSuffix, undefined, 'lastSuffix huérfana retirada');
     assert.ok(!vista.includes('n/d') && !JSON.stringify(esOps).includes('n/d'), 'la convención del repo es N/D mayúscula');
     assert.ok(vista.includes('minMark(totals.sell)'), 'el total vendido mínimo se marca en la cifra');
     assert.ok(vista.includes('minMark(totals.buy)'), 'el total comprado mínimo se marca en la cifra');
-    assert.ok(vista.includes('avgText(t, f, row.sell)') && vista.includes('avgText(t, f, row.buy)'), 'móvil declara el medio N/D igual que desktop');
+    // Tabla responsiva única (2026-11-14): sin árbol duplicado móvil/escritorio.
+    assert.ok(!vista.includes('grid grid-cols-1 gap-2 md:hidden'), 'sin tarjetas duplicadas: una fila responsiva por insider');
+    assert.ok(vista.includes('hidden md:table-header-group'), 'cabecera solo >= md en la tabla única');
+    assert.ok(vista.includes('md:table-row-group'), 'filas tarjeta < md, filas de tabla >= md');
+    assert.match(vista, /md:hidden">\{label\}/, 'etiquetas móviles por celda');
     assert.ok(vista.includes('insider.operations.withoutData'), 'la vista declara las empresas sin Form 4');
     assert.match(esOps.withoutData, /No es «sin actividad»: es lo que el monitor aún no ha guardado/);
     assert.match(vista, /status !== 'ok'/, 'estado de error honesto');
