@@ -193,6 +193,10 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
             if tx.is_derivative:
                 excluded_derivative += 1
                 continue
+            # Publication and transaction date are independent eligibility gates.
+            if (filing.filing_date or "") > today.isoformat():
+                excluded_future_rows += 1
+                continue
             effective = tx.tx_date or filing.filing_date or ""
             if not effective:
                 rows_without_date += 1

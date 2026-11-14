@@ -240,8 +240,13 @@ def build_feed(
             if wanted in ticker_list(row["tx_issuer_ticker"] or row["filing_issuer_ticker"])
         ]
 
-    future_rows = [row for row in rows if (row["tx_date"] or row["filing_date"] or "") > today.isoformat()]
-    rows = [row for row in rows if (row["tx_date"] or row["filing_date"] or "") <= today.isoformat()]
+    def is_future(row: Any) -> bool:
+        # A past transaction is not observable until its filing is published.
+        return ((row["tx_date"] or row["filing_date"] or "") > today.isoformat()
+                or (row["filing_date"] or "") > today.isoformat())
+
+    future_rows = [row for row in rows if is_future(row)]
+    rows = [row for row in rows if not is_future(row)]
     txs = [_tx_dict_from_row(row, i) for i, row in enumerate(rows)]
     txs.sort(key=lambda t: (str(t["date"] or ""), str(t["accession_number"])), reverse=True)
 
