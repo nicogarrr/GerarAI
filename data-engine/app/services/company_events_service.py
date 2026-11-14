@@ -196,6 +196,10 @@ class CompanyEventsService:
             usable_eps = [
                 row for row in eps_rows
                 if isinstance(row, dict)
+                and (
+                    row.get("symbol") is None
+                    or str(row["symbol"]).strip().upper() == company.ticker.strip().upper()
+                )
                 and (day := self._parse_day(row.get("period"))) is not None
                 and day <= today
             ]
@@ -222,7 +226,7 @@ class CompanyEventsService:
             )
         if eps_status == "partial":
             warnings.append(
-                "Histórico de BPA parcial: se han omitido filas con periodo ausente, inválido o futuro."
+                "Histórico de BPA parcial: se han omitido filas con periodo ausente, inválido o futuro, o símbolo distinto del solicitado."
             )
         elif eps_status == "unavailable":
             warnings.append("Histórico de BPA no disponible: pueden faltar cifras y sorpresas de resultados.")
