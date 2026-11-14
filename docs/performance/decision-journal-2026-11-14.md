@@ -47,7 +47,7 @@ contra el código de la base. Percentiles por rango más próximo.
 
 Muestras: `evidence/decision-journal-2026-11-14.json`.
 Reproducir desde `data-engine/` con Python 3.12 y dependencias instaladas:
-`PYTHONPATH=.:tests python ../docs/performance/decision-journal-ab.py`.
+`PYTHONPATH=.:tests python scripts/benchmark_decision_journal.py`.
 El script escribe `/tmp/journal-ab.json` y usa la base fija indicada.
 No se extrapola el porcentaje a latencia real de Nico. Redis local no estaba
 disponible; este endpoint no lo usa. Sin tráfico a producción ni proveedores.
