@@ -69,7 +69,9 @@ class OpenFIGIClient:
                 "source": self.name,
                 "source_url": self.base_url,
             }
-        matches = result.get("data") or []
+        matches = result.get("data")
+        if matches is None:
+            matches = []
         if not isinstance(matches, list) or any(not isinstance(row, dict) for row in matches):
             registry.record_failure(REGISTRY_KEY, "matches de mapeo invalidos")
             raise RuntimeError("OpenFIGI returned invalid mapping matches")
@@ -311,7 +313,9 @@ class OpenFIGIConnector:
             }
             self.cache.set(id_type, normalized, result, exchange)
             return result
-        matches = body.get("data") or []
+        matches = body.get("data")
+        if matches is None:
+            matches = []
         if not isinstance(matches, list) or any(not isinstance(row, dict) for row in matches):
             get_data_source_registry().record_failure(REGISTRY_KEY, "matches de mapeo invalidos")
             raise RuntimeError("OpenFIGI returned invalid mapping matches")
