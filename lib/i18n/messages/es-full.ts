@@ -23,6 +23,7 @@ import insider__es from './es/insider.json' with { type: 'json' };
 import investors__es from './es/investors.json' with { type: 'json' };
 import knowledge__es from './es/knowledge.json' with { type: 'json' };
 import knowledgeGraph__es from './es/knowledgeGraph.json' with { type: 'json' };
+import labels__es from './es/labels.json' with { type: 'json' };
 import landing__es from './es/landing.json' with { type: 'json' };
 import markets__es from './es/markets.json' with { type: 'json' };
 import movers__es from './es/movers.json' with { type: 'json' };
@@ -40,6 +41,7 @@ import search__es from './es/search.json' with { type: 'json' };
 import security__es from './es/security.json' with { type: 'json' };
 import settings__es from './es/settings.json' with { type: 'json' };
 import shell__es from './es/shell.json' with { type: 'json' };
+import shorts__es from './es/shorts.json' with { type: 'json' };
 import signals__es from './es/signals.json' with { type: 'json' };
 import stocks__es from './es/stocks.json' with { type: 'json' };
 import taxes__es from './es/taxes.json' with { type: 'json' };
@@ -68,6 +70,7 @@ export const bundledSpanish = {
     investors: investors__es,
     knowledge: knowledge__es,
     knowledgeGraph: knowledgeGraph__es,
+    labels: labels__es,
     landing: landing__es,
     markets: markets__es,
     movers: movers__es,
@@ -85,6 +88,7 @@ export const bundledSpanish = {
     security: security__es,
     settings: settings__es,
     shell: shell__es,
+    shorts: shorts__es,
     signals: signals__es,
     stocks: stocks__es,
     taxes: taxes__es,
