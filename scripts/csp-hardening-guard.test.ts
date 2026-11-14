@@ -62,8 +62,14 @@ test('el middleware genera el nonce por petición y fija la CSP en petición y r
     assert.match(source, /requestHeaders\.set\('x-nonce', nonce\)/);
 });
 
-test('la app no tiene scripts inline que noncear (SW registration es componente cliente)', () => {
-    assert.ok(!readFileSync('app/layout.tsx', 'utf8').includes('dangerouslySetInnerHTML'), 'app/layout.tsx');
+test('el único script inline del layout raíz es la captura pre-hidratación, con nonce CSP', () => {
+    // SW registration sigue siendo componente cliente. El único <script>
+    // inline sancionado es EARLY_OPEN_CAPTURE_JS (lib/early-open.ts: constante
+    // sin datos de usuario), servido con el nonce por petición del middleware;
+    // su posición la vigila scripts/early-open-script-placement-guard.test.ts.
+    const root = readFileSync('app/layout.tsx', 'utf8');
+    const inline = root.match(/<script[\s\S]*?\/>/g) ?? [];
+    assert.deepEqual(inline, ['<script nonce={nonce} dangerouslySetInnerHTML={{ __html: EARLY_OPEN_CAPTURE_JS }} />']);
 });
 
 async function headerFor(key: string): Promise<string | undefined> {
