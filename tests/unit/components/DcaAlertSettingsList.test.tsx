@@ -59,7 +59,7 @@ describe('avisos DCA sin repetir el veredicto', () => {
         render(<DcaAlertSettingsList items={items} />);
         const list = screen.getByRole('list', { name: 'Histórico DCA por empresa' });
         const rows = within(list).getAllByRole('listitem');
-        // Lista compacta (propuesta 2026-11-14, pendiente de OK de producto):
+        // Lista compacta (decisión de diseño, 2026-11-14):
         // cada fila es UNA línea flex con altura de toque, no tres bloques
         // apilados. Las «filas vacías» de empresas sin evaluar desaparecen:
         // su estado va dicho en la propia línea.

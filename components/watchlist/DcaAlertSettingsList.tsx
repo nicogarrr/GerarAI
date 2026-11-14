@@ -28,8 +28,8 @@ export default function DcaAlertSettingsList({ items }: { items: DcaSignalItem[]
         <div className="space-y-3">
             <ul aria-label={t('watchlist.dca.list.label')} className="divide-y divide-gray-700 rounded-lg border border-gray-700 bg-gray-800/50">
                 {visibleItems.map((item) => (
-                    // Lista compacta (decisión de diseño 2026-11-14, pendiente
-                    // de OK de producto): UNA línea por empresa. Antes cada
+                    // Lista compacta (decisión de diseño, 2026-11-14): UNA
+                    // línea por empresa. Antes cada
                     // empresa eran tres bloques apilados y las sin evaluar
                     // quedaban como «filas vacías» con el estado a media
                     // altura; ahora el estado va dicho en la propia línea y
