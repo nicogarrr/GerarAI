@@ -65,8 +65,13 @@ export function writeScrollMemory(storage: StorageLike | null | undefined, memor
     }
 }
 
-/** Tiempo máximo intentando restaurar mientras la página termina de llegar. */
+/** Tiempo sin que el documento CREZCA tras el que se deja de restaurar. No
+ *  hay señal de «fin de streaming»: el crecimiento es la prueba observable
+ *  de que la página sigue llegando; sin él se deja donde está para no pelear
+ *  con la página (y cualquier gesto del usuario cancela antes). */
 export const RESTORE_TIMEOUT_MS = 4000;
+/** Tope absoluto de una restauración, aunque el documento no pare de crecer. */
+export const RESTORE_HARD_LIMIT_MS = 15_000;
 /** Fotogramas seguidos en el objetivo para dar la restauración por buena. */
 export const RESTORE_STABLE_FRAMES = 5;
 
@@ -81,6 +86,8 @@ export type RestoreFrame = {
     stableFrames: number;
     /** ms desde que empezó la restauración. */
     elapsedMs: number;
+    /** ms desde que el documento creció por última vez (maxY subió). */
+    sinceGrowthMs: number;
 };
 
 export type RestoreStep =
@@ -93,16 +100,18 @@ export type RestoreStep =
  * (la ficha llega por streaming) se baja hasta donde se pueda y se sigue
  * intentando; se da por terminada cuando la posición aguanta en el objetivo
  * varios fotogramas seguidos (absorbe los saltos de maquetación de lo que
- * llega por encima). Pasado el tiempo máximo se deja donde esté.
+ * llega por encima). No hay forma de detectar el fin del streaming: se deja
+ * donde esté cuando el documento lleva RESTORE_TIMEOUT_MS sin crecer o al
+ * llegar al tope absoluto RESTORE_HARD_LIMIT_MS.
  */
 export function restoreStep(frame: RestoreFrame): RestoreStep {
-    const { target, y, maxY, stableFrames, elapsedMs } = frame;
+    const { target, y, maxY, stableFrames, elapsedMs, sinceGrowthMs } = frame;
     const reachable = maxY >= target - 1;
     const atTarget = reachable && Math.abs(y - target) <= 1;
     if (atTarget) {
         const stable = stableFrames + 1;
         return stable >= RESTORE_STABLE_FRAMES ? { kind: 'done' } : { kind: 'scroll', to: target, stableFrames: stable };
     }
-    if (elapsedMs >= RESTORE_TIMEOUT_MS) return { kind: 'give-up' };
+    if (sinceGrowthMs >= RESTORE_TIMEOUT_MS || elapsedMs >= RESTORE_HARD_LIMIT_MS) return { kind: 'give-up' };
     return { kind: 'scroll', to: Math.min(target, Math.max(0, maxY)), stableFrames: 0 };
 }

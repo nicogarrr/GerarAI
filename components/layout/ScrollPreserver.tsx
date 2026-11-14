@@ -149,6 +149,10 @@ export function ScrollPreserver() {
             trackingRef.current = false;
             const started = performance.now();
             let stableFrames = 0;
+            // El presupuesto se reinicia mientras la página siga llegando:
+            // una ficha lenta (> 4 s de streaming) no pierde la posición.
+            let lastMaxY = -1;
+            let lastGrowthAt = started;
             let frame = 0;
             let cancelled = false;
             const stop = () => {
@@ -163,12 +167,19 @@ export function ScrollPreserver() {
             };
             const tick = () => {
                 if (cancelled) return;
+                const now = performance.now();
+                const maxY = maxScrollY();
+                if (maxY > lastMaxY) {
+                    lastMaxY = maxY;
+                    lastGrowthAt = now;
+                }
                 const step = restoreStep({
                     target,
                     y: window.scrollY,
-                    maxY: maxScrollY(),
+                    maxY,
                     stableFrames,
-                    elapsedMs: performance.now() - started,
+                    elapsedMs: now - started,
+                    sinceGrowthMs: now - lastGrowthAt,
                 });
                 if (step.kind !== 'scroll') {
                     stop();
