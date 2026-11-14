@@ -3,7 +3,7 @@ import {
   researchIdentityHeaders,
 } from '@/lib/auth/research-identity';
 import { AppError, ExternalAPIError } from '@/lib/types/errors';
-import { researchErrorDetail } from '@/lib/research/error-detail';
+import { researchErrorDetail, researchErrorFields } from '@/lib/research/error-detail';
 import { researchRetryAfterSeconds } from '@/lib/research/rate-limit';
 
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
@@ -81,13 +81,19 @@ export function requestSignal(external: AbortSignal | null | undefined, timeoutM
 
 async function responseError(response: Response, path: string): Promise<never> {
   let detail = `${response.status} ${response.statusText}`.trim();
+  let validationFields: string[] = [];
   try {
-    detail = researchErrorDetail(await response.json(), detail);
+    const payload: unknown = await response.json();
+    detail = researchErrorDetail(payload, detail);
+    // Códigos pydantic crudos: el mensaje ya va traducido para la UI, así que
+    // quien clasifique (ledgerRejection) no puede depender de él.
+    validationFields = researchErrorFields(payload);
   } catch {
     // Preserve the HTTP status when the backend did not return JSON.
   }
   throw new AppError(detail, 'RESEARCH_API_ERROR', response.status, {
     path,
+    ...(validationFields.length ? { validationFields } : {}),
     ...(response.status === 429 ? { retryAfterSeconds: researchRetryAfterSeconds(response.headers.get('Retry-After')) } : {}),
   });
 }

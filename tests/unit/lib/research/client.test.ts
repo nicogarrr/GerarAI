@@ -78,7 +78,12 @@ describe('researchRequest', () => {
     it('error HTTP: AppError con el detalle del backend y el código de estado', async () => {
         fetchMock.mockResolvedValueOnce(res(422, { detail: [{ loc: ['body', 'quantity'] }] }));
         await expect(researchRequest('/api/x', { method: 'POST', body: '{}' })).rejects.toMatchObject({
-            name: 'AppError', code: 'RESEARCH_API_ERROR', statusCode: 422, message: expect.stringContaining('quantity'),
+            name: 'AppError',
+            code: 'RESEARCH_API_ERROR',
+            statusCode: 422,
+            // Presentación traducida; el código crudo viaja en cause.
+            message: expect.stringContaining('cantidad'),
+            cause: expect.objectContaining({ validationFields: ['quantity'] }),
         });
     });
     it('error HTTP con cuerpo no JSON: cae a "estado texto"', async () => {

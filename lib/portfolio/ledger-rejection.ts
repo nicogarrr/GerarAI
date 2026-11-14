@@ -26,13 +26,23 @@ export function ledgerRejection(error: unknown, operation: 'save' | 'delete' = '
     if (error.statusCode === 404 && /transaction not found/i.test(message)) {
         return t('portfolio.ledgerRejection.notFound');
     }
-    // trade_date llega como 422 con lista pydantic y researchErrorDetail
-    // conserva el CAMPO, no el motivo: con el mismo campo fallan la fecha
-    // futura (validador del modelo), una fecha imposible ('2026-02-30'),
-    // texto no parseable y null (validacion de tipo de Pydantic, antes de
-    // cualquier validador). Sin motivo distinguible no se puede afirmar
-    // 'futura': mensaje de fecha invalida que cubre todos los casos.
-    if (error.statusCode === 422 && /\btrade_date\b/.test(message)) {
+    // trade_date llega como 422 con lista pydantic. La clasificación usa el
+    // CÓDIGO de campo estructurado (cause.validationFields, que rellena
+    // responseError con researchErrorFields): el mensaje va traducido para
+    // la UI («Datos no válidos en: fecha de la operación…») y no se puede
+    // clasificar por presentación (#5453: el regex sobre el mensaje dejó de
+    // casar cuando el campo empezó a mostrarse traducido). Se conserva el
+    // regex sobre el mensaje como respaldo para errores construidos sin
+    // pasar por responseError. Con el mismo campo fallan la fecha futura
+    // (validador del modelo), una fecha imposible ('2026-02-30'), texto no
+    // parseable y null (validacion de tipo de Pydantic, antes de cualquier
+    // validador). Sin motivo distinguible no se puede afirmar 'futura':
+    // mensaje de fecha invalida que cubre todos los casos.
+    const cause = error.cause && typeof error.cause === 'object'
+        ? (error.cause as { validationFields?: unknown }).validationFields
+        : undefined;
+    const hasField = (code: string) => Array.isArray(cause) && cause.includes(code);
+    if (error.statusCode === 422 && (hasField('trade_date') || /\btrade_date\b/.test(message))) {
         return t('portfolio.ledgerRejection.invalidDate');
     }
     return null;

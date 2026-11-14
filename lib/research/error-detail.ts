@@ -71,13 +71,26 @@ function fieldLabel(field: string): string {
   return validationLabels[field] ?? field;
 }
 
+/**
+ * Códigos técnicos de campo (pydantic `loc`) de un 422 de validación, SIN
+ * traducir: los consumidores clasifican por código (lib/portfolio/
+ * ledger-rejection.ts los recibe en `cause.validationFields`) y solo la
+ * presentación pasa por fieldLabel. Lista vacía si no hay campos con nombre.
+ */
+export function researchErrorFields(payload: unknown): string[] {
+  if (!payload || typeof payload !== 'object') return [];
+  const { detail } = payload as { detail?: unknown };
+  if (!Array.isArray(detail)) return [];
+  return [...new Set(detail.map(fieldOf).filter((field): field is string => field !== null))];
+}
+
 export function researchErrorDetail(payload: unknown, fallback: string): string {
   if (!payload || typeof payload !== 'object') return fallback;
   const { detail, message } = payload as { detail?: unknown; message?: unknown };
   const text = nonEmptyText(detail);
   if (text) return text;
   if (Array.isArray(detail)) {
-    const fields = [...new Set(detail.map(fieldOf).filter((field): field is string => field !== null).map(fieldLabel))];
+    const fields = researchErrorFields(payload).map(fieldLabel);
     return fields.length
       ? `Datos no válidos en: ${fields.join(', ')}. Revisa esos campos y vuelve a intentarlo.`
       : 'El motor de análisis rechazó los datos enviados. Revisa el formulario y vuelve a intentarlo.';
