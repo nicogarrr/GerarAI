@@ -367,7 +367,10 @@ class CompanyEventsService:
             if payload is not None:
                 filing_index = payload.get("filings") if isinstance(payload, dict) else None
                 recent = filing_index.get("recent") if isinstance(filing_index, dict) else None
-                if not isinstance(recent, dict):
+                columns = ("accessionNumber", "form", "filingDate", "reportDate", "primaryDocument")
+                if not isinstance(recent, dict) or any(
+                    name in recent and not isinstance(recent[name], list) for name in columns
+                ):
                     payload = None
                     note = "Índice SEC no verificable: respuesta sin estructura de filings recientes. Se listan los documentos ya importados."
             if payload is not None:
