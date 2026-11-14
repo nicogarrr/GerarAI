@@ -323,8 +323,8 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             </TableHeader>
                             <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
                                 {signals.map((signal) => (
-                                    <TableRow key={signalKey(signal)} className="block break-words rounded-lg border border-gray-700/50 bg-gray-900/50 p-4 md:table-row md:rounded-none md:border-0 md:border-b md:bg-transparent md:p-0">
-                                        <TableCell className="block md:table-cell">
+                                    <TableRow key={signalKey(signal)} className="grid grid-cols-2 gap-x-3 gap-y-1 break-words rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 md:table-row md:gap-0 md:rounded-none md:border-0 md:border-b md:bg-transparent md:p-0">
+                                        <TableCell className="order-1 self-center p-0 md:table-cell">
                                             <span className="block text-xs text-gray-500 md:hidden">{ti('insider.signal')}</span>
                                             <Badge
                                                 variant={signalTone(signal.signal)}
@@ -333,7 +333,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                 {signalLabel(typeof signal.signal === 'string' ? signal.signal : null, f.locale)}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="block text-sm text-gray-200 md:table-cell">
+                                        <TableCell className="order-3 col-span-2 p-0 text-sm text-gray-200 md:table-cell">
                                             <span className="block text-xs text-gray-500 md:hidden">{ti('insider.insider')}</span>
                                             {formatRecordValue(signal.insider)}
                                             {signal.officer_title ?? signal.role ? (
@@ -346,15 +346,15 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                 </span>
                                             ) : null}
                                         </TableCell>
-                                        <TableCell className="block text-sm text-gray-300 md:table-cell">
+                                        <TableCell className="order-2 self-center p-0 text-right text-xs text-gray-500 md:table-cell md:text-left md:text-sm md:text-gray-300">
                                             <span className="block text-xs text-gray-500 md:hidden">{ti('insider.date')}</span>
                                             {filingDateText(f, signal.date ?? signal.window_start)}
                                         </TableCell>
-                                        <TableCell className="block text-sm font-semibold text-gray-100 md:table-cell md:text-right">
+                                        <TableCell className="order-4 p-0 text-sm font-semibold text-gray-100 md:table-cell md:text-right">
                                             <span className="block text-xs font-normal text-gray-500 md:hidden">{ti('insider.value')}</span>
                                             {moneyText(f, signal.value ?? signal.total_value)}
                                         </TableCell>
-                                        <TableCell className="block text-sm text-gray-400 md:table-cell md:max-w-md">
+                                        <TableCell className="order-5 col-span-2 p-0 text-sm text-gray-400 md:table-cell md:max-w-md">
                                             <span className="block text-xs text-gray-500 md:hidden">{ti('insider.detail')}</span>
                                             <span className="line-clamp-3">{formatRecordValue(signal.detail, ti)}</span>
                                             <span className="mt-1 flex flex-wrap items-center gap-2">
