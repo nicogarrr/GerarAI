@@ -114,31 +114,87 @@ async function expectBackAt(
       // sin la página no hay navigation.type; la serie y el cause mandan
     }
     // Memoria de scroll del producto (clave de lib/nav/scroll-memory): el
-    // target que el restore tenía para esta URL, o su ausencia.
+    // valor ACTUAL para esta URL al fallar, que puede haberse movido desde
+    // el target inicial (ver memAntes en la nota del test).
     let mem = "?";
     try {
-      mem = await page.evaluate((key) => {
-        try {
-          const raw = window.sessionStorage.getItem(key);
-          if (!raw) return "vacía";
-          const parsed = JSON.parse(raw) as Record<string, number>;
-          const here = window.location.pathname + window.location.search;
-          return `${here}=${parsed[here] ?? "ausente"} (${Object.keys(parsed).length} entradas)`;
-        } catch {
-          return "ilegible";
-        }
-      }, "gerarai:scroll-memory:v1");
+      mem = await readScrollMemoryFor(page, ""); // "" = URL actual
     } catch {
       // sin la página no hay memoria; la serie y el cause mandan
     }
+    // scrollTo programáticos grabados desde la vuelta. Interpretación con
+    // cuidado: restoreStep NO llama scrollTo cuando ya está a <=1px del
+    // objetivo, así que un log vacío no prueba que el restore no arrancara,
+    // y el cese de llamadas no prueba 'done' (puede ser give-up o cancel).
+    // El log sí fija: qué valores se aplicaron, desde qué posición y hasta
+    // cuándo hubo actividad de window.scrollTo.
+    let scrollLog = "?";
+    try {
+      const log = await page.evaluate(() =>
+        (window as unknown as { __r5ScrollLog?: Array<{ t: number; d: string }> }).__r5ScrollLog
+      );
+      scrollLog = !log
+        ? "(sin grabador: la vuelta fue carga de documento)"
+        : log.length === 0
+          ? "(sin scrollTo)"
+          : log.map((e) => `${e.t - t0}ms ${e.d}`).join(" | ");
+    } catch {
+      // sin la página no hay grabador
+    }
     throw new Error(
-      `scroll esperado ≈ ${before}px; navigation.type=${navType}; memoria: ${mem}${opts?.note ? `; ${opts.note()}` : ""}; serie: ${samples.join(" | ")}`,
+      `scroll esperado ≈ ${before}px; navigation.type=${navType}; memoria: ${mem}${opts?.note ? `; ${opts.note()}` : ""}; scrollTo: ${scrollLog}; serie: ${samples.join(" | ")}`,
       { cause },
     );
   } finally {
     sampling = false;
     await sampler;
   }
+}
+
+/** Descripción corta de la memoria de scroll del producto para `urlKey`
+ *  ("" = la URL actual de la página). Best-effort: nunca tapa el fallo. */
+async function readScrollMemoryFor(page: Page, urlKey: string): Promise<string> {
+  try {
+    return await page.evaluate(([key, url]) => {
+      try {
+        const raw = window.sessionStorage.getItem(key);
+        if (!raw) return "vacía";
+        const parsed = JSON.parse(raw) as Record<string, number>;
+        const here = url || window.location.pathname + window.location.search;
+        return `${here}=${parsed[here] ?? "ausente"} (${Object.keys(parsed).length} entradas)`;
+      } catch {
+        return "ilegible";
+      }
+    }, ["gerarai:scroll-memory:v1", urlKey] as const);
+  } catch {
+    return "?";
+  }
+}
+
+/** Graba las llamadas a window.scrollTo con su instante. Limitaciones
+ *  declaradas: solo ve window.scrollTo (no window.scroll/scrollBy,
+ *  scrollIntoView ni los ajustes nativos de anchoring); reemplaza la
+ *  identidad de window.scrollTo y no se restaura al terminar el test; cada
+ *  llamada grabada añade un Date.now y un push, y la lectura al fallar es
+ *  un roundtrip más: sonda de diagnóstico que PERTURBA el timing, no una
+ *  observación neutra. El parche vive en el documento: si la vuelta es
+ *  carga completa el log falta y navigation.type=back_forward lo delata. */
+async function recordScrollTo(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { __r5ScrollLog?: Array<{ t: number; d: string }> };
+    w.__r5ScrollLog = [];
+    const orig = window.scrollTo.bind(window) as (...args: unknown[]) => void;
+    const patched = (...args: unknown[]) => {
+      const first = args[0];
+      const d = typeof first === "object" && first !== null
+        ? `top=${Math.round((first as ScrollToOptions).top ?? -1)}`
+        : `y=${Math.round(Number(args[1]))}`;
+      w.__r5ScrollLog!.push({ t: Date.now(), d: `${d} desde=${Math.round(window.scrollY)}` });
+      if (w.__r5ScrollLog!.length > 300) w.__r5ScrollLog!.shift();
+      orig(...args);
+    };
+    window.scrollTo = patched as unknown as typeof window.scrollTo;
+  });
 }
 
 /** Marca el instante del popstate para datar la serie del restore. */
@@ -191,11 +247,17 @@ for (const [label, viewport] of [["móvil 390", { width: 390, height: 844 }], ["
       await link.click();
       await page.waitForURL(/\/research\/MSFT\/informe/);
       await expect(page.locator("h1").first()).toBeVisible();
+      // Lectura previa de la memoria antes de la vuelta: referencia del
+      // valor que el restore probablemente leerá (algo podría escribir
+      // entre medias; no es una observación dentro del restore). Y grabador
+      // de window.scrollTo (ver sus limitaciones en recordScrollTo).
+      const memAntes = await readScrollMemoryFor(page, "/research/MSFT?view=valoracion");
+      await recordScrollTo(page);
       await markPopstateClock(page);
       await page.goBack();
       await page.waitForURL(/\/research\/MSFT\?view=valoracion/);
       const t0 = await readPopstateClock(page);
-      await expectBackAt(page, before, { t0, note: () => `docNavIda=${informeDocNav.seen}` });
+      await expectBackAt(page, before, { t0, note: () => `docNavIda=${informeDocNav.seen}; memAntes: ${memAntes}` });
     });
 
     test("«← Volver a la ficha» del Informe vuelve a la pestaña y a donde estabas", async ({ page }) => {
@@ -207,11 +269,15 @@ for (const [label, viewport] of [["móvil 390", { width: 390, height: 844 }], ["
       await page.waitForURL(/\/research\/MSFT\/informe/);
       const back = page.getByRole("link", { name: "← Volver a la ficha" });
       await expect(back).toHaveAttribute("data-back-mode", "history");
+      // Igual que en el test hermano: lectura previa de referencia (no
+      // observación dentro del restore) y grabador de window.scrollTo.
+      const memAntes = await readScrollMemoryFor(page, "/research/MSFT?view=valoracion");
+      await recordScrollTo(page);
       await markPopstateClock(page);
       await back.click();
       await page.waitForURL(/\/research\/MSFT\?view=valoracion/);
       const t0 = await readPopstateClock(page);
-      await expectBackAt(page, before, { t0, note: () => `docNavIda=${informeDocNav.seen}` });
+      await expectBackAt(page, before, { t0, note: () => `docNavIda=${informeDocNav.seen}; memAntes: ${memAntes}` });
     });
   });
 }
