@@ -12,14 +12,16 @@ directos). Los títulos son los de cada PR o commit, tal cual; la lista completa
 está verificada contra `git log --first-parent fbfeeea2..ac20676d`. El corte de
 la 0.6.0 se congela en este SHA; lo que se mergee después irá a la 0.6.1.
 
-**Estado de despliegue (nada de lo mergeado se vende como desplegado):**
-producción corre `b19d5822` (12-nov-2026). Todo lo mergeado después está en
-`main` pero **no desplegado**; la 0.6.0 se anuncia solo tras el despliegue con
-gates (suite VM verde, backup restaurado, smoke post-deploy). Limitaciones
-conocidas al 14-nov: `worker-kpis` no corre en producción (el deploy efectivo lo
-omite; es gate de cierre, ver `docs/RELEASE_READINESS.md`); la cuota de OpenCode
-Go está agotada y las tesis LLM esperan a su reinicio (~25-nov); el workflow
-«User flows (smoke, no bloquea)» está en rojo no bloqueante.
+**Estado de despliegue (nada de lo mergeado se vende como desplegado):** todo
+lo listado está en `main`; la 0.6.0 se anuncia solo tras el despliegue con
+gates (suite VM verde, backup restaurado, smoke post-deploy). Último estado
+operativo **reportado**, no verificado por esta PR (14-nov-2026; re-verificar en
+el entorno en el despliegue): producción corría `b19d5822` (despliegue del
+12-nov); `worker-kpis` no corría (el deploy efectivo omitía el servicio; es gate
+de cierre, ver `docs/RELEASE_READINESS.md`); la cuota de OpenCode Go estaba
+agotada (reinicio estimado ~25-nov). Comprobado en la API de CI el 14-nov: el
+workflow «User flows (smoke, no bloquea)» falla de forma no bloqueante en
+`ac20676d`.
 
 ### Lo más destacado
 
@@ -41,8 +43,9 @@ Go está agotada y las tesis LLM esperan a su reinicio (~25-nov); el workflow
   profile2 para informes oficiales sin SEC (#5317, #5305).
 - **Watchlist**: pausa persistente del auto-análisis (#5332) y disponibilidad
   local de IA antes de chat/tesis/análisis (#5367).
-- **Almacenamiento Garage (S3)** en producción: el compose ya levanta Garage
-  y `OBJECT_STORAGE_*` apunta a él (`MINIO_*` queda como puente/alias).
+- **Almacenamiento Garage (S3)** en el compose: `docker-compose.prod.yml`
+  define Garage y `OBJECT_STORAGE_*`; el servicio MinIO ya no está en el compose
+  (`MINIO_*` queda como puente/alias).
 - **Backup Postgres estricto**: restore verificado por TCP y conteos, sin
   ignorar errores (#5436).
 - **Cola KPI robusta**: un 402 del proveedor difiere el documento sin gastar el
@@ -68,8 +71,9 @@ Go está agotada y las tesis LLM esperan a su reinicio (~25-nov); el workflow
   `OPENCODE_FREE_CHAT_FALLBACK_ENABLED`, `REDIS_PASSWORD`, `TELEGRAM_LINK_SECRET`.
 - **Cambios de defecto:** `DCA_ALERTS_ENABLED=false` y `DCA_ALERT_CHANNELS=in_app`;
   `BETTER_AUTH_URL` y `NEXT_PUBLIC_SITE_URL` pasan a `https://gerarai.duckdns.org`.
-- **MinIO retirado como servicio** del despliegue de producción: Garage lo
-  sustituye (`MINIO_ENDPOINT` sigue aceptándose como alias de `OBJECT_STORAGE_ENDPOINT`).
+- **MinIO fuera del compose de producción**: `docker-compose.prod.yml` ya no
+  define el servicio MinIO; en su lugar define Garage (S3) con `OBJECT_STORAGE_*`
+  (`MINIO_ENDPOINT` sigue aceptándose como alias).
 
 ### Novedades y mejoras (2245)
 
