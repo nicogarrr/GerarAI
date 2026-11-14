@@ -253,8 +253,13 @@ def test_la_ruta_usa_velas_diarias_desde_diciembre_y_publica_el_ranking(monkeypa
 
     monkeypatch.setattr(market, "_fetch_yahoo_candles", fake_fetch)
     monkeypatch.setattr(market, "_themes_cache", mt.ThemesCache())
+    market.market_themes_ranking()  # la descarga ahora ocurre fuera de la petición
+    deadline = time.monotonic() + 2
+    while market._themes_cache._refreshing and time.monotonic() < deadline:
+        time.sleep(.001)
     out = market.market_themes_ranking()
     assert out["themes"] and out["stale"] is False
+    assert out["refreshing"] is False
     assert {i for _, i, _ in seen} == {"1d"}
     assert len(seen) == len(mt.all_symbols())
     first_from = datetime.fromtimestamp(seen[0][2], tz=UTC)
