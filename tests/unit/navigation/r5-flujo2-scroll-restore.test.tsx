@@ -256,7 +256,11 @@ describe('ScrollPreserver: volver por historial', () => {
 describe('scroll-memory', () => {
     it('restoreStep espera a que el documento mida lo bastante y a que la posición aguante', () => {
         expect(restoreStep({ target: 900, y: 0, maxY: 300, stableFrames: 0, elapsedMs: 10, sinceGrowthMs: 10 })).toEqual({ kind: 'scroll', to: 300, stableFrames: 0 });
-        expect(restoreStep({ target: 900, y: 900, maxY: 2000, stableFrames: 4, elapsedMs: 50, sinceGrowthMs: 50 })).toEqual({ kind: 'done' });
+        // En el objetivo y 5 fotogramas estables, pero el documento creció
+        // hace 50 ms: aún NO se da por buena (el anclaje del navegador puede
+        // seguir moviendo y con cada inserción sobre el viewport).
+        expect(restoreStep({ target: 900, y: 900, maxY: 2000, stableFrames: 4, elapsedMs: 50, sinceGrowthMs: 50 })).toEqual({ kind: 'scroll', to: 900, stableFrames: 5 });
+        expect(restoreStep({ target: 900, y: 900, maxY: 2000, stableFrames: 4, elapsedMs: 50, sinceGrowthMs: RESTORE_TIMEOUT_MS })).toEqual({ kind: 'done' });
         expect(restoreStep({ target: 900, y: 300, maxY: 300, stableFrames: 0, elapsedMs: RESTORE_TIMEOUT_MS, sinceGrowthMs: RESTORE_TIMEOUT_MS })).toEqual({ kind: 'give-up' });
     });
 
@@ -267,6 +271,24 @@ describe('scroll-memory', () => {
         expect(restoreStep({ target: 900, y: 300, maxY: 300, stableFrames: 0, elapsedMs: 1_000, sinceGrowthMs: RESTORE_TIMEOUT_MS })).toEqual({ kind: 'give-up' });
         // Tope absoluto aunque no pare de crecer.
         expect(restoreStep({ target: 900, y: 0, maxY: 300, stableFrames: 0, elapsedMs: RESTORE_HARD_LIMIT_MS, sinceGrowthMs: 0 })).toEqual({ kind: 'give-up' });
+    });
+
+    it('restoreStep corrige la deriva por anclaje tras alcanzar el objetivo (flake CI 14-nov, run 43637099797)', () => {
+        // Firma medida con telemetría v4: scrollTo(1645) alcanzó el objetivo,
+        // 5 fotogramas después se declaró terminada y ~225 ms más tarde una
+        // inserción sobre el viewport hizo crecer max 5605 -> 5637 y el
+        // anclaje del navegador movió y 1645 -> 1677, ya sin nadie que
+        // corrigiera. Con la restauración aún activa, el fotograma siguiente
+        // a la deriva vuelve a mandar bajar al objetivo.
+        const quiet = { target: 1645, maxY: 5637, elapsedMs: 300 } as const;
+        // Aún en el objetivo pero con crecimiento reciente: no termina.
+        expect(restoreStep({ ...quiet, y: 1645, stableFrames: 4, sinceGrowthMs: 225 })).toEqual({ kind: 'scroll', to: 1645, stableFrames: 5 });
+        // Tras la deriva por anclaje (y = 1677), corrige de vuelta al objetivo.
+        expect(restoreStep({ ...quiet, y: 1677, stableFrames: 5, sinceGrowthMs: 20 })).toEqual({ kind: 'scroll', to: 1645, stableFrames: 0 });
+        // Y solo cuando el documento lleva la ventana sin crecer se da por buena.
+        expect(restoreStep({ ...quiet, y: 1645, stableFrames: 5, sinceGrowthMs: RESTORE_TIMEOUT_MS })).toEqual({ kind: 'done' });
+        // Tope absoluto estando en el objetivo: termina (la posición ya es la buena).
+        expect(restoreStep({ target: 1645, y: 1645, maxY: 5637, stableFrames: 2, elapsedMs: RESTORE_HARD_LIMIT_MS, sinceGrowthMs: 100 })).toEqual({ kind: 'done' });
     });
 
     it('rememberScroll guarda la más reciente y limita las entradas', () => {
