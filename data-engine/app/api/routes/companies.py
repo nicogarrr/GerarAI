@@ -735,8 +735,8 @@ def companies_basics_batch(
     resolviendo en ~0,9 s desde el front). La resolucion va por ticker
     con la MISMA funcion del endpoint individual (resolve_company), asi
     la politica de alias (SAN.MC -> SAN) no puede divergir entre ambos;
-    son lecturas por clave primaria, baratas, y van en una sola peticion
-    HTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el
+    los exactos se leen juntos y los alias conservan el resolver individual.
+    Todo va en una sola peticion HTTP. ``items`` va keyed por ticker PEDIDO (normalizado), no por el
     canonico, para que el caller no reimplemente la resolucion.
     """
     requested: list[str] = []
@@ -751,10 +751,18 @@ def companies_basics_batch(
             status_code=400,
             detail=f"Maximo {MAX_BASICS_BATCH_TICKERS} tickers por llamada",
         )
+    # Exact matches always win in resolve_company. Batch only this unambiguous
+    # phase; unresolved aliases keep that resolver's complete FIGI/listing policy.
+    exact = {
+        company.ticker: company
+        for company in db.scalars(select(Company).where(Company.ticker.in_(requested)))
+    } if requested else {}
     items: dict[str, CompanySearchItemOut] = {}
     missing: list[str] = []
     for ticker in requested:
-        company = resolve_company(db, ticker)
+        company = exact.get(ticker)
+        if company is None:
+            company = resolve_company(db, ticker)
         if company is None:
             missing.append(ticker)
         else:
