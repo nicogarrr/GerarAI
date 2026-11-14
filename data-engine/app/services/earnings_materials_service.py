@@ -267,6 +267,17 @@ async def resolve_materials(
     # Reconstruccion parcial (EFTS) sin items/formas completos: no se puede afirmar nada.
     if not isinstance(submissions, dict) or submissions.get("_fallback"):
         return _result("no_disponible")
+    # SEC recent is column-oriented. Malformed columns are a provider failure,
+    # not evidence that no matching results filing exists.
+    filings = submissions.get("filings", {})
+    if not isinstance(filings, dict):
+        return _result("no_disponible")
+    recent = filings.get("recent", {})
+    if not isinstance(recent, dict) or any(
+        not isinstance(recent.get(name, []), list)
+        for name in ("form", "items", "filingDate", "accessionNumber")
+    ):
+        return _result("no_disponible")
     foreign = is_foreign_private_issuer(submissions)
     filing = (
         pick_results_filing(submissions, event_date, forms=("6-K", "6-K/A"), require_results_item=False)
