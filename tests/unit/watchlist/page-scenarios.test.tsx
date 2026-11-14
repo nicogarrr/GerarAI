@@ -48,7 +48,7 @@ function order(node: unknown, out: string[] = []): string[] {
   if (Array.isArray(node)) node.forEach((n) => order(n, out));
   else if (node && typeof node === 'object') {
     const el = node as El;
-    if (el.props?.as === 'article' && typeof el.props.symbol === 'string') out.push(el.props.symbol);
+    if (el.props?.as === 'tr' && typeof el.props.symbol === 'string') out.push(el.props.symbol);
     if (el.props) Object.values(el.props).forEach((v) => order(v, out));
   }
   return out;
@@ -177,7 +177,7 @@ describe('/watchlist escenarios', () => {
     const items = Array.from({ length: 30 }, (_, i) => item(`S${i}`));
     m.state.mockResolvedValue({ items, unavailable: false });
     const p2 = await render({ page: '2' });
-    expect(find(p2, 'DatedRow').length).toBe(2 * 12);
+    expect(find(p2, 'DatedRow').length).toBe(12);
     const names = (a: number, b: number) => Array.from({ length: b - a + 1 }, (_, i) => `S${a + i}`).join(',');
     expect(order(p2).join(',')).toBe(names(12, 23));
     expect(order(await render({ page: 'abc' })).join(',')).toBe(names(0, 11));
@@ -205,10 +205,10 @@ describe('/watchlist escenarios', () => {
     // que resolver ambas capas para ver lo pintado; el árbol crudo solo
     // envuelve promesas.
     const streams = find(tree, 'EntryRowStream');
-    expect(streams).toHaveLength(6);
+    expect(streams).toHaveLength(3);
     const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
     const rows = find(streamed, 'DatedRow');
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(3);
     const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
     // Ninguna etiqueta visible de proveedor junto al PER, ni en tarjeta ni en tabla.
     const visible = painted.map(rawText).join('');

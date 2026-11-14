@@ -48,7 +48,7 @@ function order(node: unknown, out: string[] = []): string[] {
   if (Array.isArray(node)) node.forEach((n) => order(n, out));
   else if (node && typeof node === 'object') {
     const el = node as El;
-    if (el.props?.as === 'article' && typeof el.props.symbol === 'string') out.push(el.props.symbol);
+    if (el.props?.as === 'tr' && typeof el.props.symbol === 'string') out.push(el.props.symbol);
     if (el.props) Object.values(el.props).forEach((v) => order(v, out));
   }
   return out;
@@ -137,7 +137,7 @@ describe('motivo del PER N/D (helper)', () => {
 });
 
 describe('/watchlist: PER N/D con motivo', () => {
-  it('tarjeta móvil y tabla de escritorio enseñan el motivo del backend bajo el N/D', async () => {
+  it('la fila (tarjeta en móvil, tabla en escritorio: mismo árbol) enseña el motivo del backend bajo el N/D', async () => {
     m.state.mockResolvedValue({ items: [item('LOSS1'), item('MIX1'), item('OK1')], unavailable: false });
     m.entry.mockImplementation(async (symbol: string) => {
       if (symbol === 'LOSS1') return full(symbol, 3, { peRatio: null, peKind: null, peSource: LOSS });
@@ -149,20 +149,22 @@ describe('/watchlist: PER N/D con motivo', () => {
     // DatedRow: una por empresa y vista (tarjeta + fila de tabla). Hay que
     // resolver ambas capas para ver lo pintado.
     const streams = find(tree, 'EntryRowStream');
-    expect(streams).toHaveLength(6);
+    expect(streams).toHaveLength(3);
     const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
     const rows = find(streamed, 'DatedRow');
-    expect(rows).toHaveLength(6);
+    expect(rows).toHaveLength(3);
     const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
     const visible = painted.map(rawText);
     const count = (key: string) => visible.filter((v) => v.includes(key)).length;
-    // Antes: «N/D» pelado en ambas vistas (el motivo solo en un title, que en el iPhone no se ve).
-    expect(count('watchlist.page.peNd.loss')).toBe(2);
-    expect(count('watchlist.page.peNd.currency')).toBe(2);
+    // Antes: «N/D» pelado (el motivo solo en un title, que en el iPhone no se
+    // ve). Una fila por empresa (tabla responsiva única, 2026-11-14): un motivo
+    // visible por empresa.
+    expect(count('watchlist.page.peNd.loss')).toBe(1);
+    expect(count('watchlist.page.peNd.currency')).toBe(1);
     // Con PER no aparece ninguna nota.
-    expect(visible.filter((v) => v.includes('watchlist.page.peNd.')).length).toBe(4);
-    // La cadena completa del backend sigue en el title (trazabilidad), también en la tabla.
+    expect(visible.filter((v) => v.includes('watchlist.page.peNd.')).length).toBe(2);
+    // La cadena completa del backend sigue en el title (trazabilidad).
     const titles = painted.flatMap((r) => attrValues(r, 'title'));
-    expect(titles.filter((x) => x === LOSS).length).toBe(2);
+    expect(titles.filter((x) => x === LOSS).length).toBe(1);
   });
 });

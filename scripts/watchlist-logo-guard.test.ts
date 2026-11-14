@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 test('la watchlist pide el logo con el listado validado', () => {
   const src = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
   const calls = src.match(/<CompanyLogo ticker=\{[^}]+\}/g) ?? [];
-  assert.ok(calls.length >= 2, 'CompanyLogo en tarjeta y tabla');
+  assert.ok(calls.length >= 1, 'CompanyLogo en la fila (tabla responsiva única, 2026-11-14)');
   for (const call of calls) {
     assert.ok(call.includes('stock.quoteSymbol ?? stock.symbol'), `logo con listado validado: ${call}`);
   }

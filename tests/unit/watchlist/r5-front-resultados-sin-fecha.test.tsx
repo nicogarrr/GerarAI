@@ -109,16 +109,17 @@ beforeEach(() => {
 });
 
 describe('/watchlist: próximos resultados sin fecha', () => {
-  it('calendario leído y sin fecha para la empresa → «sin fecha anunciada» en tarjeta y tabla; con fecha, nada', async () => {
+  it('calendario leído y sin fecha para la empresa → «sin fecha anunciada» en la fila; con fecha, nada', async () => {
     m.state.mockResolvedValue({ items: [item('CONF'), item('NODATE')], unavailable: false });
     m.monitor.mockResolvedValue({ items: { CONF: { next_earnings_date: '2026-12-01', next_earnings_source: 'nasdaq' } }, earningsStatus: 'stored' });
     const tree = await render();
+    // Una fila por empresa (tabla responsiva única, 2026-11-14).
     const rows = find(tree, 'DatedRow');
-    expect(rows).toHaveLength(4);
+    expect(rows).toHaveLength(2);
     const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
     const withNote = painted.filter((r) => rawText(r).includes('watchlist.page.earningsNone'));
     // Antes: «N/D» pelado (la nota solo existía con el calendario caído o parcial).
-    expect(withNote).toHaveLength(2);
+    expect(withNote).toHaveLength(1);
     expect(withNote.every((r) => rawText(r).includes('NODATE'))).toBe(true);
   });
 

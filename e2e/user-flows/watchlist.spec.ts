@@ -13,13 +13,12 @@ async function resetWatchlist() {
 }
 
 function rowsFor(page: Page) {
-  const mobile = (page.viewportSize()?.width ?? 1280) < 768;
-  // En móvil la página tiene otros <article> legítimos (p. ej. «Valoración y
-  // salud financiera»): solo cuentan las filas de membresía, las que llevan
-  // el botón «Quitar … de la watchlist».
-  return mobile
-    ? page.locator("main article").filter({ has: page.locator("button[aria-label^='Quitar '][aria-label$=' de la watchlist']") })
-    : page.locator("main table tbody tr");
+  // Tabla responsiva única (2026-11-14): las filas de membresía son <tr> en
+  // TODOS los viewports (antes: <article> en móvil). Solo cuentan las que
+  // llevan el botón «Quitar … de la watchlist», como siempre.
+  return page
+    .locator("main table tbody tr")
+    .filter({ has: page.locator("button[aria-label^='Quitar '][aria-label$=' de la watchlist']") });
 }
 
 async function addBySymbol(page: Page, symbol: string, via: "button" | "enter" = "button") {

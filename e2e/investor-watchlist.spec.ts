@@ -77,7 +77,7 @@ test.describe("investor watchlist flow", () => {
     await expect(page.getByRole("heading", { name: "Watchlist", level: 1 })).toBeVisible();
 
     const mobile = (page.viewportSize()?.width ?? 1440) < 768;
-    const rows = page.locator(mobile ? "main article" : "table tbody tr");
+    const rows = page.locator("main table tbody tr");
     await expect(rows).not.toHaveCount(0);
 
     if (!mobile) await expect(page.getByRole("columnheader", { name: "Símbolo" })).toBeVisible();
@@ -100,7 +100,7 @@ test.describe("investor watchlist flow", () => {
     await page.goto("/watchlist");
 
     const mobile = (page.viewportSize()?.width ?? 1440) < 768;
-    const rows = page.locator(mobile ? "main article" : "table tbody tr");
+    const rows = page.locator("main table tbody tr");
     const initial = await rows.count();
     expect(initial).toBeGreaterThan(0);
 
