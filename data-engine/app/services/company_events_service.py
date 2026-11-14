@@ -365,6 +365,12 @@ class CompanyEventsService:
                     FILINGS_SEC_BUDGET_SECONDS,
                 )
             if payload is not None:
+                filing_index = payload.get("filings") if isinstance(payload, dict) else None
+                recent = filing_index.get("recent") if isinstance(filing_index, dict) else None
+                if not isinstance(recent, dict):
+                    payload = None
+                    note = "Índice SEC no verificable: respuesta sin estructura de filings recientes. Se listan los documentos ya importados."
+            if payload is not None:
                 fallback = payload.get("_fallback")
                 # Origen y estado honestos: una respuesta reconstruida desde
                 # EDGAR full-text search es PARCIAL, no "ok" de data.sec.gov.
@@ -386,7 +392,7 @@ class CompanyEventsService:
             elif timed_out:
                 note = "SEC EDGAR no respondió a tiempo; se listan los documentos ya importados."
             else:
-                note = "SEC EDGAR no accesible desde el servidor en este momento."
+                note = note or "SEC EDGAR no accesible desde el servidor en este momento."
         elif timed_out:
             note = "SEC EDGAR no respondió a tiempo; se listan los documentos ya importados."
         if timed_out and not sec_down:
