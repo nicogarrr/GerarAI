@@ -49,6 +49,7 @@ def _empty_side() -> dict[str, Any]:
         "_shares_priced": 0.0,
         "_shares_unpriced": 0.0,
         "_rows_without_value": 0,
+        "_rows_without_shares": 0,
     }
 
 
@@ -56,9 +57,13 @@ def _finish_side(side: dict[str, Any]) -> dict[str, Any]:
     shares_priced = side.pop("_shares_priced")
     shares_unpriced = side.pop("_shares_unpriced")
     rows_without_value = side.pop("_rows_without_value")
+    rows_without_shares = side.pop("_rows_without_shares")
     # Solo un medio completo: importe y acciones de las MISMAS filas. Con
     # filas sin importe el medio seria parcial -> None, y se declara.
-    avg = side["value"] / shares_priced if shares_priced and not rows_without_value else None
+    avg = (
+        side["value"] / shares_priced
+        if shares_priced and not rows_without_value and not rows_without_shares else None
+    )
     return {
         "trades": side["trades"],
         "shares": round(side["shares"], 4),
@@ -66,6 +71,7 @@ def _finish_side(side: dict[str, Any]) -> dict[str, Any]:
         "avg_price": round(avg, 4) if avg is not None else None,
         "shares_without_value": round(shares_unpriced, 4),
         "rows_without_value": rows_without_value,
+        "rows_without_shares": rows_without_shares,
     }
 
 
@@ -218,6 +224,8 @@ def insider_operations(db: Session, days: int = 365) -> dict[str, Any]:
                 bucket["officer_title"] = tx.officer_title
             for target in (bucket[side_key], totals[side_key]):
                 target["trades"] += 1
+                if tx.shares is None:
+                    target["_rows_without_shares"] += 1
                 # nosemgrep: gerarai-money-none-to-zero -- agregado informativo de filings/flujos (ranking/listado): una fila sin cifra no suma; no es un importe del usuario
                 target["shares"] += tx.shares or 0.0
                 if tx.value is not None:
