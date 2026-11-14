@@ -31,9 +31,10 @@ test('la traducción es bajo demanda (botón), no automática al pintar', () => 
     assert.ok(!component.includes('useEffect'), 'sin auto-fetch al montar: cuota frugal');
 });
 
-test('el flujo de noticias pinta el resumen en tarjeta móvil y tabla', () => {
+test('el flujo de noticias pinta el resumen en la fila única', () => {
     const uses = flow.split('NewsSummary event={event}').length - 1;
-    assert.ok(uses >= 2, `NewsSummary en móvil y desktop (encontrado ${uses - 1})`);
+    // Tabla responsiva única (2026-11-14): un solo NewsSummary por evento.
+    assert.equal(uses, 1, `NewsSummary una vez por evento (encontrado ${uses})`);
 });
 
 test('el tipo y el proxy conservan la forma del contrato del titular', () => {

@@ -301,57 +301,14 @@ export async function NewsEventsFlow({
         {/* F176: sin contain, Chrome propaga el overflow horizontal de la
             tabla al documento entero (zoom-out y recorte en movil) aunque la
             region ya scrolla por dentro; layout+paint lo contiene aqui. */}
-        {/* Movil: una tarjeta por noticia (titular completo, fecha, fuente). La
-            tabla de 5 columnas solo se usa desde md; en pantallas estrechas
-            cortaba titulares y partia el layout. */}
-        {events.length === 0 ? <div className="rounded-lg border border-gray-800 p-4 md:hidden">
-          <EmptyState title={lane === 'macro' ? t('research.flow.emptyMacroTitle') : t('research.flow.emptyTitle')} description={lane === 'macro' ? t('research.flow.emptyMacroDescription') : t('research.flow.emptyLaneDescription')} action={<EmptyLink href="/research/sources">{t('research.flow.emptyAction')}</EmptyLink>} />
-        </div> : null}
-        <ul aria-label={t('research.flow.listAria')} className="flex flex-col gap-3 md:hidden">
-          {events.map((event) => (
-            <li className="rounded-lg border border-gray-800 bg-black/20 p-3" key={`card-${event.id}`}>
-              <div className="flex flex-wrap items-center gap-2 text-xs text-gray-400">
-                {event.ticker ? (
-                  <Link className="inline-flex min-h-11 min-w-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/research/${event.ticker}`}>
-                    {event.ticker}
-                  </Link>
-                ) : null}
-                {event.ticker ? (
-                  <TickerContextBadges
-                    locale={locale}
-                    portfolioTickers={portfolioSet}
-                    ticker={event.ticker}
-                    watchlistTickers={watchlistSet}
-                  />
-                ) : null}
-                <MacroChip event={event} t={t} locale={locale} />
-                <GobiernoChip event={event} t={t} />
-
-                <CoverageChip event={event} t={t} />
-                <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} locale={locale} />
-                {event.requires_update ? (
-                  <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-amber-300">{t('research.flow.review')}</span>
-                ) : null}
-                <span className="ml-auto"><MaterialityIndicator score={event.materiality_score} t={t} /></span>
-              </div>
-              <div className="mt-2 text-sm text-gray-200"><NewsHeadline event={event} /></div>
-              <NewsSummary event={event} />
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
-                <span className="min-w-0 break-words">{event.source || naFor(locale)}</span>
-                <span aria-hidden="true">·</span>
-                <span>{formatTimeAgo(event.date, Date.now(), locale)}</span>
-                <DateNotes event={event} t={t} inline />
-              </div>
-              <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary={t('research.flow.viewContext')}>
-                <ContextAndCoverage event={event} t={t} locale={locale} />
-              </NewsSecondOrder>
-            </li>
-          ))}
-        </ul>
-        <div aria-label={t('research.flow.regionAria')} className="scroll-affordance-x overflow-x-auto [contain:layout_paint] hidden md:block" role="region" tabIndex={0}>
-          <table className="w-full min-w-[650px] text-left text-sm">
+        {/* Tabla responsiva UNICA (2026-11-14): un evento = una fila; en movil
+            la fila es tarjeta con etiquetas md:hidden por celda y el titular
+            sale completo (la tabla de 5 columnas lo cortaba en pantallas
+            estrechas). */}
+        <div aria-label={t('research.flow.regionAria')} className="scroll-affordance-x overflow-x-auto [contain:layout_paint]" role="region" tabIndex={0}>
+          <table className="block w-full text-left text-sm md:table md:min-w-[650px]">
             <caption className="sr-only">{t('research.flow.caption')}</caption>
-            <thead className="text-xs uppercase text-gray-500">
+            <thead className="hidden text-xs uppercase text-gray-500 md:table-header-group">
               <tr>
                 <th className="border-b border-gray-800 py-2" scope="col">{t('research.flow.colTicker')}</th>
                 <th className="border-b border-gray-800 px-3 py-2" scope="col">{t('research.flow.colDate')}</th>
@@ -360,10 +317,11 @@ export async function NewsEventsFlow({
                 <th className="border-b border-gray-800 px-3 py-2" scope="col">{t('research.flow.colStatus')}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="block space-y-3 md:table-row-group md:space-y-0">
               {events.map((event) => (
-                <tr key={event.id} className="border-b border-gray-900 align-top last:border-0">
-                  <th className="py-2.5 text-left text-sm font-semibold" scope="row">
+                <tr key={event.id} className="block break-words rounded-lg border border-gray-800 bg-black/20 p-3 align-top md:table-row md:rounded-none md:border-0 md:border-b md:border-gray-900 md:bg-transparent md:p-0 md:last:border-0">
+                  <th className="block text-left text-sm font-semibold md:table-cell md:py-2.5" scope="row">
+                    <span className="block text-xs font-normal normal-case text-gray-500 md:hidden">{t('research.flow.colTicker')}</span>
                     {event.ticker ? (
                       <Link
                         className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200"
@@ -376,40 +334,39 @@ export async function NewsEventsFlow({
                     )}
                     {event.ticker ? (
                       <TickerContextBadges
-                    locale={locale}
+                        locale={locale}
                         portfolioTickers={portfolioSet}
                         ticker={event.ticker}
                         watchlistTickers={watchlistSet}
                       />
                     ) : null}
-                    {event.news_lane === 'macro' || event.news_lane === 'gobierno' ? (
-                      <div className="mt-1">
-                        <MacroChip event={event} t={t} locale={locale} />
-                        <GobiernoChip event={event} t={t} />
-
-                      </div>
-                    ) : null}
-                    <div className="mt-1">
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <MacroChip event={event} t={t} locale={locale} />
+                      <GobiernoChip event={event} t={t} />
                       <CoverageChip event={event} t={t} />
                     </div>
                   </th>
-                  <td className="min-w-[120px] px-3 py-2.5 text-gray-400">
+                  <td className="block min-w-0 text-gray-400 md:table-cell md:min-w-[120px] md:px-3 md:py-2.5">
+                    <span className="block text-xs text-gray-500 md:hidden">{t('research.flow.colDate')}</span>
                     <div>{formatTimeAgo(event.date, Date.now(), locale)}</div>
                     <div className="mt-0.5 text-xs text-gray-500">{eventDateText(event.date, locale)}</div>
                     <DateNotes event={event} t={t} />
                   </td>
-                  <td className="max-w-[420px] px-3 py-2.5 text-gray-300">
+                  <td className="block text-gray-300 md:table-cell md:max-w-[420px] md:px-3 md:py-2.5">
+                    <span className="block text-xs text-gray-500 md:hidden">{t('research.flow.colHeadline')}</span>
                     <NewsHeadline event={event} />
                     <NewsSummary event={event} />
                     <div className="mt-1 text-xs text-gray-500">{event.source || naFor(locale)}</div>
                   </td>
-                  <td className="px-3 py-2.5 text-center">
+                  <td className="block md:table-cell md:px-3 md:py-2.5 md:text-center">
+                    <span className="block text-left text-xs text-gray-500 md:hidden">{t('research.flow.colMateriality')}</span>
                     <MaterialityIndicator score={event.materiality_score} t={t} />
                     <div className="mt-1">
                       <ImpactBadge direction={event.impact_direction} eventType={event.event_type} t={t} locale={locale} />
                     </div>
                   </td>
-                  <td className="py-2.5 text-gray-300">
+                  <td className="block text-gray-300 md:table-cell md:py-2.5">
+                    <span className="block text-xs text-gray-500 md:hidden">{t('research.flow.colStatus')}</span>
                     {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">{t('research.flow.review')}</span> : null}
                     <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary={t('research.flow.viewContext')}>
                       <ContextAndCoverage event={event} t={t} locale={locale} />
@@ -418,12 +375,12 @@ export async function NewsEventsFlow({
                 </tr>
               ))}
               {!events.length ? (
-                <tr>
-                  <td className="p-0" colSpan={5}>
+                <tr className="block md:table-row">
+                  <td className="block p-0 md:table-cell" colSpan={5}>
                     <EmptyState
                       action={<EmptyLink href="/research/sources">{t('research.flow.emptyAction')}</EmptyLink>}
-                      className="rounded-none border-0 p-6"
-                      description={lane === 'macro' ? t('research.flow.emptyMacroDescription') : undefined}
+                      className="rounded-lg border border-gray-800 p-4 md:rounded-none md:border-0 md:p-6"
+                      description={lane === 'macro' ? t('research.flow.emptyMacroDescription') : t('research.flow.emptyLaneDescription')}
                       title={
                         lane === 'para-ti' && !portfolioTickers.length && !watchlistTickers.length
                           ? t('research.flow.emptyForYouTitle')
