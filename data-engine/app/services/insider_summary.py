@@ -275,7 +275,11 @@ def insider_summary(
         )
     ).all()
     rows = [_row(tx, filing) for tx, filing in pairs]
-    rows = [r for r in rows if (_parse_date(r["tx_date"]) or _parse_date(r["filing_date"]) or today) <= today]
+    # The trade date controls its window, but the filing date controls when
+    # it becomes public. Historical summaries must not see later SEC filings.
+    rows = [r for r in rows
+            if (_parse_date(r["tx_date"]) or _parse_date(r["filing_date"]) or today) <= today
+            and (_parse_date(r["filing_date"]) or today) <= today]
     rows = _dedupe_amendments(rows)
     base = {
         "ticker": normalized,

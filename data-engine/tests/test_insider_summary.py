@@ -291,3 +291,38 @@ def test_summary_by_nature_counts_operations_without_price():
         assert slot["value_missing"] == 1
     finally:
         db.close()
+
+
+def test_as_of_excludes_trades_not_yet_publicly_filed():
+    """An old transaction is not knowable before its later SEC filing."""
+    db = _db()
+    try:
+        _store(db, '0000000099-26-000001', '2026-11-04', _xml(
+            owner_cik='1', name='ANA', code='P', ad='A', shares=100,
+            price=10, day='2026-11-02', after=1000))
+        _store(db, '0000000099-26-000002', '2026-11-10', _xml(
+            owner_cik='2', name='BEA', code='P', ad='A', shares=900,
+            price=10, day='2026-11-02', after=1000))
+        before = insider_summary.insider_summary(db, 'TSTX', as_of=date(2026, 11, 8))
+        assert before['transactions_total'] == 1
+        assert before['coverage']['last_filing'] == '2026-11-04'
+        assert before['windows'][0]['net_value'] == 1000
+        assert before['by_nature']['compra_mercado']['value'] == 1000
+        assert [r['insider'] for r in before['transactions']] == ['ANA']
+        after = insider_summary.insider_summary(db, 'TSTX', as_of=date(2026, 11, 10))
+        assert after['transactions_total'] == 2
+        assert after['windows'][0]['net_value'] == 10000
+        assert after['coverage']['last_filing'] == '2026-11-10'
+    finally:
+        db.close()
+
+
+def test_as_of_before_only_filing_has_no_data():
+    db = _db()
+    try:
+        _store(db, '0000000099-26-000003', '2026-11-10', _xml(
+            owner_cik='1', name='ANA', code='P', ad='A', shares=100,
+            price=10, day='2026-11-02', after=1000))
+        assert insider_summary.insider_summary(db, 'TSTX', as_of=date(2026, 11, 8))['status'] == 'sin_datos'
+    finally:
+        db.close()
