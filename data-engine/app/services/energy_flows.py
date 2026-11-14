@@ -29,6 +29,8 @@ def parse_retail_revenue(rows: list[dict]) -> tuple[str, list[dict], float]:
     missing sectors, negative/non-finite values and unrecognized units fail
     closed. The provider may revise historical observations.
     """
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("EIA invalid revenue rows")
     years = sorted({str(r.get("period", "")) for r in rows}, reverse=True)
     for year in years:
         if not (year.isdigit() and len(year) == 4 and int(year) < datetime.now(UTC).year):
