@@ -28,6 +28,7 @@ import { emptyWatchlistEntry } from '@/lib/watchlist/entry-fallback';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
 import { getPortfolioFxContext } from '@/lib/actions/portfolio.actions';
+import type { DcaSignalItem } from '@/lib/dca/types';
 import ExtendedHoursLine from '@/components/common/ExtendedHoursLine';
 import AnalystTargetLine from '@/components/common/AnalystTargetLine';
 import { Badge } from '@/components/ui/badge';
@@ -97,11 +98,13 @@ async function DcaPanelStream({ promise, ti, locale }: { promise: Promise<DcaSig
 }
 
 /** Badge DCA de la fila por streaming: sin señal el badge compacto no pinta
-    nada, así que la fila no lo necesita para el primer pintado. */
+    nada, así que la fila no lo necesita para el primer pintado. La selección
+    por símbolo es la MISMA de antes (Map: si viniera un duplicado, gana el
+    último) — solo cambia DÓNDE se espera la promesa, nunca qué dato se elige. */
 async function DcaBadgeStream({ promise, symbol }: { promise: Promise<DcaSignalsResult>; symbol: string }) {
     const dca = await promise;
-    const item = (dca.data?.items ?? []).find((it) => it.symbol.toUpperCase() === symbol);
-    return <DcaLevelBadge item={item} signalMonths={dca.data?.signal_months ?? null} compact />;
+    const dcaBySymbol = new Map<string, DcaSignalItem>((dca.data?.items ?? []).map((item) => [item.symbol.toUpperCase(), item]));
+    return <DcaLevelBadge item={dcaBySymbol.get(symbol)} signalMonths={dca.data?.signal_months ?? null} compact />;
 }
 
 async function DatedValuationGrid({ stocks, promise }: { stocks: WatchlistEntryData[]; promise: Promise<DatedMap> }) {
