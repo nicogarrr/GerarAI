@@ -218,29 +218,29 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                     {tx.form === 'PDMR' ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.pdmrBadge')}</span> : null}
                                                     {tx.form === 'CA-INSIDER' ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.canadaBadge')}</span> : null}
                                                 </TableCell>
-<TableCell className="self-center whitespace-nowrap p-0 text-right text-xs tabular-nums text-gray-500 md:table-cell md:px-3 md:py-2 md:text-left md:text-sm md:text-gray-400">
+                                                <TableCell className="self-center whitespace-nowrap p-0 text-right text-xs tabular-nums text-gray-500 md:table-cell md:px-3 md:py-2 md:text-left md:text-sm md:text-gray-400">
                                                     {tx.date ? f.formatDate(tx.date) : '—'}
                                                 </TableCell>
-<TableCell className={`self-center p-0 text-sm font-medium md:table-cell md:px-3 md:py-2 ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
+                                                <TableCell className={`self-center p-0 text-sm font-medium md:table-cell md:px-3 md:py-2 ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
                                                     {sideLabel(tx.side, t)}
                                                     {tx.rule_10b5_1 ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.plan10b51Badge')}</span> : null}
                                                 </TableCell>
-<TableCell className="col-span-2 p-0 text-sm font-medium text-gray-100 md:table-cell md:px-3 md:py-2 md:font-normal">
+                                                <TableCell className="col-span-2 p-0 text-sm font-medium text-gray-100 md:table-cell md:px-3 md:py-2 md:font-normal">
                                                     {insiderName(tx.insider)}
                                                 </TableCell>
-<TableCell className="col-span-2 p-0 text-xs text-gray-500 md:table-cell md:px-3 md:py-2 md:text-sm md:text-gray-400">
+                                                <TableCell className="col-span-2 p-0 text-xs text-gray-500 md:table-cell md:px-3 md:py-2 md:text-sm md:text-gray-400">
                                                     {insiderRole(tx.role, tx.officer_title, f.locale)}
                                                 </TableCell>
-<TableCell className="whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
+                                                <TableCell className="whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
                                                     <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colShares')}</span>
                                                     {f.formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })}
                                                     {note ? <span className="block text-xs font-normal text-gray-500">{note}</span> : null}
                                                 </TableCell>
-<TableCell className="whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
+                                                <TableCell className="whitespace-nowrap p-0 tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
                                                     <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colPrice')}</span>
                                                     {usd(f, tx.price, 2, txCurrency(tx))}
                                                 </TableCell>
-<TableCell className="col-span-2 p-0 tabular-nums md:table-cell md:py-2 md:pl-3 md:text-right">
+                                                <TableCell className="col-span-2 p-0 tabular-nums md:table-cell md:py-2 md:pl-3 md:text-right">
                                                     <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colAmount')}</span>
                                                     <span className="whitespace-nowrap">
                                                         {tx.source_url ? (
