@@ -2,7 +2,9 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 test.skip(process.env.E2E_UI_RUN !== '1', 'Local UI fixture required');
 const source = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
-const dateClass = source.match(/<dd className="([^"]+)"[^>]*>\{stock\.priceAsOf/)?.[1];
+// Tabla responsiva única (2026-11-14): la fecha de cierre vive en el <div> de la
+// celda de precio (antes era un <dd> de la tarjeta móvil).
+const dateClass = source.match(/<div className="([^"]+)">\{stock\.priceAsOf/)?.[1];
 
 // El fixture NO se inyecta en la página de la app: React hidrata esa página y, si hay
 // un mismatch, sustituye el documento (carrera vista en CI a 820px: el fixture era
@@ -27,7 +29,9 @@ async function realAppCss(page: Page, width: number): Promise<string> {
 async function isolatedFixture(browser: Browser, css: string, width: number) {
   const context = await browser.newContext({ viewport: { width, height: 844 }, javaScriptEnabled: false });
   const page = await context.newPage();
-  await page.setContent(`<style>${css}</style><main class="p-8 bg-gray-950 text-gray-200"><article class="p-4 border border-gray-800 rounded-lg"><dl class="mt-3 grid grid-cols-3 gap-2 rounded-lg bg-gray-800/50 px-2 py-3 text-center"><div class="min-w-0"><dt>Precio</dt><dd>29,47 US$</dd><dd data-testid="close-date" class="${dateClass}">Cierre 2026-10-06</dd></div><div>Market Cap<br>$6.92B</div><div>PER (TTM)<br>N/D</div></dl></article></main>`);
+  // El fixture reproduce la celda de precio de la fila única (<tr> bloque en
+  // móvil), no la tarjeta antigua.
+  await page.setContent(`<style>${css}</style><main class="p-8 bg-gray-950 text-gray-200"><table class="block w-full text-sm"><tbody class="block space-y-3"><tr class="block rounded-xl border border-gray-700/60 p-3"><td class="block font-mono font-medium text-gray-200"><span class="block font-sans text-[11px] font-normal text-gray-500">Precio</span>29,47 US$<div data-testid="close-date" class="${dateClass}">Cierre 2026-10-06</div></td><td class="block">Market Cap $6.92B</td><td class="block">PER (TTM) N/D</td></tr></tbody></table></main>`);
   return { context, page };
 }
 
