@@ -2,14 +2,16 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-// Los <summary> "Ver análisis original" de alertas activadas (AlertsManager)
-// y "Aviso original" de inicio (PersonalizedOverview) son controles táctiles:
+// Los <summary> "Ver análisis original" de alertas activadas (AlertsManager),
+// "Aviso original" de inicio (PersonalizedOverview) y "Fechas, caja por divisa
+// e historial" de cartera (PortfolioDataNotice) son controles táctiles:
 // en móvil deben reservar 44px reales (WCAG 2.5.5) y pueden volver a 40px en
 // escritorio. SIN display:flex/inline-flex: eso elimina el marcador nativo de
 // despliegue del <summary>.
 const FILES = [
   'components/alerts/AlertsManager.tsx',
   'components/PersonalizedOverview.tsx',
+  'components/portfolio/PortfolioDataNotice.tsx',
 ];
 
 for (const file of FILES) {
