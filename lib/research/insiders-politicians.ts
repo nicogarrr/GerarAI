@@ -113,6 +113,7 @@ export interface PoliticianCard {
   on_time_pct: number | null;
   volume_min: number;
   volume_max: number | null;
+  volume_unknown_trades?: number;
 }
 
 export interface PoliticiansList {

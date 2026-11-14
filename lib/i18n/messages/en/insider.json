@@ -257,6 +257,8 @@
     "noDates": "no dates",
     "topTickers": "Most traded",
     "volume": "Disclosed volume: {range}",
+    "volumePartial": "Partial volume (known amounts only): {range}. Trades without a verifiable amount: {count}.",
+    "volumeUnavailable": "Volume unavailable: Trades without a verifiable amount: {count}.",
     "scanned": "{count} scanned paper PTRs not read",
     "coverage": "{filings} PTRs from {years}; {scanned} scanned on paper (linked; their amounts cannot be read reliably).",
     "count": "{total} politicians",
