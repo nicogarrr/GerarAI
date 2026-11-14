@@ -39,3 +39,12 @@ keys in ES/EN and regenerated en.compact.json. No baseline increase. Relative
 check-i18n passes. Full guards: 3063 passed, 0 failed, 1 skipped.
 36 formatter/panel tests pass, 100% lines and 94.68% branches. Typecheck and
 ESLint pass. This changes text storage, not rendered text or amount semantics.
+
+## Semgrep count-default follow-up
+
+`value_missing` is a count, not money. Replaced its `or 0` default with an
+explicit `None` check and named it `missing_count`. No suppression or rule
+change. Added four regressions for None/0/1/3, preserving N/D monetary values.
+43 ownership pytest pass; reader coverage 95.95% combined. check-i18n and
+full guards pass (3063 passed, 0 failed, 1 skipped). Semgrep is not installed
+locally, so its exact CI rerun remains required; the matching pattern is gone.

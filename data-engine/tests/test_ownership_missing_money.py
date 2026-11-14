@@ -58,3 +58,21 @@ def test_missing_amount_does_not_erase_cluster_by_count():
     assert 'Compras en grupo' in result['reading']
     assert 'N/D (3 sin importe)' in ownership_fact_lines({'ticker':'UBER','insider':result})[0][0]
     db.close()
+
+
+@pytest.mark.parametrize('counter', [None, 0, 1, 3])
+def test_missing_counter_is_a_count_not_a_monetary_default(counter):
+    from app.services.ticker_ownership_signals import _insider_line
+
+    side = {'insiders': 1, 'trades': 1, 'value': None, 'value_missing': counter}
+    line = _insider_line('TEST', {
+        'buys': side, 'sells': side, 'window_days': 180,
+        'net_value': None, 'reading': 'test',
+    })
+    assert 'por N/D' in line
+    assert 'Saldo neto N/D' in line
+    if counter:
+        assert f'N/D ({counter} sin importe)' in line
+    else:
+        assert 'sin importe' not in line
+    assert '$0' not in line

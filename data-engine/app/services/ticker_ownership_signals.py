@@ -274,9 +274,11 @@ def ownership_signals(db: Session, ticker: str, *, as_of: date | None = None) ->
 def _insider_line(ticker: str, insider: dict[str, Any]) -> str:
     buys, sells = insider["buys"], insider["sells"]
     def amount(side: dict[str, Any]) -> str:
-        missing = side.get("value_missing") or 0
-        if missing or side.get("value") is None:
-            return f"N/D ({missing} sin importe)" if missing else "N/D"
+        missing_count = side.get("value_missing")
+        if missing_count is None:
+            missing_count = 0
+        if missing_count or side.get("value") is None:
+            return f"N/D ({missing_count} sin importe)" if missing_count else "N/D"
         return _money(side["value"])
 
     planned = sells.get("planned_10b5_1") or 0
