@@ -175,6 +175,8 @@ def filing_deadline_event(submissions: dict[str, Any], ticker: str) -> dict[str,
     forms, reports = recent.get("form", []), recent.get("reportDate", [])
     if not isinstance(forms, list) or not isinstance(reports, list):
         raise ValueError("SEC columnas de informes no verificables")
+    if len(forms) != len(reports):
+        raise ValueError("SEC columnas de informes desalineadas")
     periods_set: set[date] = set()
     for form, report in zip(forms, reports, strict=False):
         if form not in _PERIODIC:
