@@ -80,7 +80,17 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
   const t = createTranslator(locale);
   if (summary === null) return <p className="text-sm text-gray-400" role="status">{t('research.insidersV2.loadError')}</p>;
   if (summary.status !== 'ok') return <p className="text-sm text-gray-400" role="status">{t('research.insidersV2.empty', { ticker })}</p>;
-  const year = summary.windows.find((w) => w.days === 365);
+  // Cached pre-quarantine summaries can still carry PDMR money in aggregates.
+  // Never infer safe aggregate totals from a limited transaction sample.
+  const hasPdmr = summary.transactions.some((row) => row.form === 'PDMR');
+  const windows = hasPdmr ? summary.windows.map((window) => ({
+    ...window,
+    buys: {...window.buys, value: null},
+    sells: {...window.sells, value: null},
+    net_value: null,
+  })) : summary.windows;
+  const clusters = hasPdmr ? summary.clusters.map((cluster) => ({...cluster, value: null})) : summary.clusters;
+  const year = windows.find((w) => w.days === 365);
   const excluded = Object.entries(year?.excluded ?? {}).filter(([, n]) => (n ?? 0) > 0);
   // Primero lo que importa: compras y ventas en mercado. Si no hay, todo.
   const market = summary.transactions.filter((row) => row.nature === 'compra_mercado' || row.nature === 'venta_mercado');
@@ -100,7 +110,7 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
               </tr>
             </thead>
             <tbody>
-              {summary.windows.map((w) => (
+              {windows.map((w) => (
                 <tr className="border-t border-gray-800 align-top" key={w.days}>
                   <td className="py-1.5 pr-2 text-gray-300">
                     {t('research.insidersV2.months', { n: Math.round(w.days / 30) })}
@@ -124,11 +134,11 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
         ) : null}
         {summary.late.filings ? <p className="mt-1 text-xs text-gray-500">{t('research.insidersV2.lateLine', { late: summary.late.late, filings: summary.late.filings })}</p> : null}
       </section>
-      {summary.clusters.length ? (
+      {clusters.length ? (
         <section>
           <h3 className="mb-1 text-sm font-semibold text-gray-200">{t('research.insidersV2.clustersTitle')}</h3>
           <ul className="space-y-1 text-sm text-gray-300">
-            {summary.clusters.map((c) => (
+            {clusters.map((c) => (
               <li key={c.start}>
                 {t('research.insidersV2.cluster', { start: fmtDate(c.start, locale), end: fmtDate(c.end, locale), insiders: c.insiders, value: compactUsd(c.value, locale) })}
                 <span className="block text-xs text-gray-500">{c.names.join(', ')}</span>

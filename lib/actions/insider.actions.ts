@@ -287,7 +287,7 @@ export async function getInsiderSummary(ticker: string): Promise<InsiderSummary>
     const clean = ticker.trim().toUpperCase();
     const params = new URLSearchParams({ ticker: clean });
     return cachedFetch(
-        `insider:user:${userId}:summary:${clean}`,
+        `insider:user:${userId}:summary:pdmr-money-v2:${clean}`,
         () => researchRequest<InsiderSummary>(`/api/insider/summary?${params.toString()}`, { fast: true }),
         60,
     );
