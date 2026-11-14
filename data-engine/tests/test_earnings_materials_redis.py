@@ -63,7 +63,7 @@ def teardown_function():
 
 
 def test_redis_hit_skips_sec_and_refills_memory(monkeypatch):
-    redis = FakeRedis({svc._materials_redis_key("TSLA|2026-07-22"): json.dumps(OK_VALUE)})
+    redis = FakeRedis({svc._materials_redis_key(svc._materials_cache_key(_events()[0])): json.dumps(OK_VALUE)})
     monkeypatch.setattr(svc, "_materials_redis", lambda: redis)
 
     out = asyncio.run(svc.materials_for_events(_events(), date(2026, 7, 24), sec=BoomSEC()))
@@ -88,7 +88,7 @@ def test_resolved_value_is_written_to_redis_with_status_ttl(monkeypatch):
     # Sin CIK el resultado es no_disponible (MISS): TTL corto de 10 min.
     assert out["TSLA|2026-07-22"]["status"] == "no_disponible"
     assert redis.set_calls == [
-        (svc._materials_redis_key("TSLA|2026-07-22"), svc.MISS_TTL_S, json.dumps(out["TSLA|2026-07-22"]))
+        (svc._materials_redis_key(svc._materials_cache_key(_events()[0])), svc.MISS_TTL_S, json.dumps(out["TSLA|2026-07-22"]))
     ]
 
 
@@ -124,7 +124,7 @@ def test_redis_hit_rehydrates_memory_with_remaining_ttl(monkeypatch):
     import time
 
     redis = FakeRedis(
-        {svc._materials_redis_key("TSLA|2026-07-22"): json.dumps(MISS_VALUE)},
+        {svc._materials_redis_key(svc._materials_cache_key(_events()[0])): json.dumps(MISS_VALUE)},
         pttl_ms=100_000,  # quedan 100 s de los 600 s del MISS
     )
     monkeypatch.setattr(svc, "_materials_redis", lambda: redis)
@@ -132,7 +132,7 @@ def test_redis_hit_rehydrates_memory_with_remaining_ttl(monkeypatch):
     out = asyncio.run(svc.materials_for_events(_events(), date(2026, 7, 24), sec=BoomSEC()))
 
     assert out == {"TSLA|2026-07-22": MISS_VALUE}
-    stored_at = svc._cache["TSLA|2026-07-22"][0]
+    stored_at = svc._cache[svc._materials_cache_key(_events()[0])][0]
     age_s = time.monotonic() - stored_at
     # La L1 hereda la edad de la entrada de Redis: ~500 s consumidos, no 0.
     assert age_s >= 499.0, f"L1 rehidratada con TTL completo (edad {age_s:.1f} s)"

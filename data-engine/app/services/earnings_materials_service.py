@@ -68,7 +68,14 @@ _cache: dict[str, tuple[float, dict[str, Any]]] = {}
 # las llamadas a la SEC para los mismos eventos: /api/calendar/followed/materials
 # media 2.346 ms en el barrido del piloto (2026-10-31). Fail-open siempre:
 # Redis caido degrada a la L1 + SEC exactamente como antes.
-_MATERIALS_REDIS_PREFIX = "cavaai:earnings-materials:"
+_MATERIALS_REDIS_PREFIX = "cavaai:earnings-materials:v2:"
+
+
+def _materials_cache_key(event: dict[str, Any]) -> str:
+    # Public response identity remains ticker|date. Period verification belongs
+    # to the internal identity too; never reuse a result for another quarter.
+    label = (event.get("fiscal_label") or "").strip().casefold()
+    return json.dumps([event["ticker"], event["date"], label], separators=(",", ":"))
 
 
 def _materials_redis_key(key: str) -> str:
@@ -339,14 +346,15 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
         if event.get("confirmed") is False:
             out[key] = _result("sin_cobertura_sec")
             continue
-        hit = _cache.get(key)
+        cache_key = _materials_cache_key(event)
+        hit = _cache.get(cache_key)
         if hit and now - hit[0] < (OK_TTL_S if hit[1]["status"] == "ok" else MISS_TTL_S):
             out[key] = hit[1]
             continue
         redis_hit = None
         redis_age_s = 0.0
         if redis_client is not None:
-            rkey = _materials_redis_key(key)
+            rkey = _materials_redis_key(cache_key)
             try:
                 raw = redis_client.get(rkey)
                 redis_hit = json.loads(raw) if raw else None
@@ -366,7 +374,7 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
         if redis_hit is not None:
             out[key] = redis_hit
             # Rehidrata la L1 del worker conservando el TTL restante de L2.
-            _cache[key] = (now - redis_age_s, redis_hit)
+            _cache[cache_key] = (now - redis_age_s, redis_hit)
         else:
             pending.append(event)
 
@@ -374,15 +382,17 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
         key = f"{event['ticker']}|{event['date']}"
         value = await resolve_materials(
             sec=sec, ticker=event["ticker"], event_date=date.fromisoformat(event["date"]),
-            fiscal_label=event.get("fiscal_label"), confirmed=event.get("confirmed"),
+            fiscal_label=(event.get("fiscal_label") or "").strip().casefold() or None,
+            confirmed=event.get("confirmed"),
         )
         if value is None:
             return
         out[key] = value
-        _cache[key] = (time.monotonic(), value)
+        cache_key = _materials_cache_key(event)
+        _cache[cache_key] = (time.monotonic(), value)
         if redis_client is not None:
             try:
-                redis_client.set(_materials_redis_key(key), json.dumps(value), ex=_redis_ttl_for(value))
+                redis_client.set(_materials_redis_key(cache_key), json.dumps(value), ex=_redis_ttl_for(value))
             except Exception:  # noqa: BLE001 - no cachear nunca rompe la lectura
                 logger.warning("materials cache: escritura Redis fallo; se sirve sin cache", exc_info=True)
 
