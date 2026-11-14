@@ -36,6 +36,15 @@
   "submitSearch": "Buscar",
   "libraryLink": "Biblioteca",
   "command": {
-    "heading": "Comando"
+    "heading": "Comando",
+    "labels": {
+      "des": "Visión general",
+      "fa": "Financieros",
+      "hds": "Propietarios, 13F e insiders",
+      "n": "Noticias",
+      "gp": "Gráfico",
+      "tesis": "Tesis",
+      "alert": "Alertas"
+    }
   }
 }

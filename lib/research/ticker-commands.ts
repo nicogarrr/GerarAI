@@ -11,24 +11,32 @@
  * no se crea nada hasta el envio explicito del formulario por el usuario.
  *
  * Test funcional: scripts/ticker-commands-guard.test.ts.
+ *
+ * El nombre visible NO viaja en el comando: cada entrada lleva la clave
+ * i18n (`search.command.labels.*`) y quien pinta resuelve con t(), para que
+ * el buscador no muestre castellano con English activado. El literal de la
+ * clave queda aqui a proposito: el guard de i18n (scripts/check-i18n.mjs)
+ * cuenta cualquier literal con forma de clave como uso.
  */
+import type { TranslationKey } from '../i18n/t';
+
 export type TickerCommand = {
   /** Codigo corto tal como se teclea, en mayusculas (`FA`). */
   code: string;
-  /** Nombre visible del destino, en espanol. */
-  label: string;
+  /** Clave i18n del nombre visible del destino (search.command.labels.*). */
+  labelKey: TranslationKey;
   /** Destino dentro de la app para el ticker ya normalizado (mayusculas). */
   href: (ticker: string) => string;
 };
 
 export const TICKER_COMMANDS: readonly TickerCommand[] = [
-  { code: 'DES', label: 'Visión general', href: (t) => `/research/${encodeURIComponent(t)}` },
-  { code: 'FA', label: 'Financieros', href: (t) => `/research/${encodeURIComponent(t)}?view=financials` },
-  { code: 'HDS', label: 'Propietarios, 13F e insiders', href: (t) => `/research/${encodeURIComponent(t)}?view=holders` },
-  { code: 'N', label: 'Noticias', href: (t) => `/research/news?ticker=${encodeURIComponent(t)}` },
-  { code: 'GP', label: 'Gráfico', href: (t) => `/research/${encodeURIComponent(t)}#grafico` },
-  { code: 'TESIS', label: 'Tesis', href: (t) => `/research/${encodeURIComponent(t)}/tesis` },
-  { code: 'ALERT', label: 'Alertas', href: (t) => `/alerts?symbol=${encodeURIComponent(t)}` },
+  { code: 'DES', labelKey: 'search.command.labels.des', href: (t) => `/research/${encodeURIComponent(t)}` },
+  { code: 'FA', labelKey: 'search.command.labels.fa', href: (t) => `/research/${encodeURIComponent(t)}?view=financials` },
+  { code: 'HDS', labelKey: 'search.command.labels.hds', href: (t) => `/research/${encodeURIComponent(t)}?view=holders` },
+  { code: 'N', labelKey: 'search.command.labels.n', href: (t) => `/research/news?ticker=${encodeURIComponent(t)}` },
+  { code: 'GP', labelKey: 'search.command.labels.gp', href: (t) => `/research/${encodeURIComponent(t)}#grafico` },
+  { code: 'TESIS', labelKey: 'search.command.labels.tesis', href: (t) => `/research/${encodeURIComponent(t)}/tesis` },
+  { code: 'ALERT', labelKey: 'search.command.labels.alert', href: (t) => `/alerts?symbol=${encodeURIComponent(t)}` },
 ] as const;
 
 export type TickerCommandQuery = {

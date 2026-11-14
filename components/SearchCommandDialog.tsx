@@ -294,7 +294,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                         <Terminal aria-hidden="true" className="h-4 w-4 text-teal-400" />
                                         <div className="min-w-0 flex-1">
                                             <div className="search-item-name truncate font-mono">{exactCommand.ticker} {exactCommand.command.code}</div>
-                                            <div className="text-sm text-gray-500">{exactCommand.command.label}</div>
+                                            <div className="text-sm text-gray-500">{t(exactCommand.command.labelKey)}</div>
                                         </div>
                                         <CornerDownLeft aria-hidden="true" className="h-3.5 w-3.5 text-gray-600" />
                                     </CommandItem>
@@ -354,7 +354,7 @@ export default function SearchCommandDialog({ open, initialStocks, getFocusTarge
                                             <Terminal aria-hidden="true" className="h-4 w-4 text-gray-500" />
                                             <div className="min-w-0 flex-1">
                                                 <div className="search-item-name truncate font-mono">{commandQuery.ticker} {cmd.code}</div>
-                                                <div className="text-sm text-gray-500">{cmd.label}</div>
+                                                <div className="text-sm text-gray-500">{t(cmd.labelKey)}</div>
                                             </div>
                                         </CommandItem>
                                     ))}

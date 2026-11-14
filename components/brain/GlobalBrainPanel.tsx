@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Input } from '@/components/ui/input';
 import { X, Send, User, Bot, Loader2, Maximize2, Minimize2, Eye } from 'lucide-react';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
-import { useT } from '@/lib/i18n/client';
+import { useT, useLocale } from '@/lib/i18n/client';
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
 import { askResearchAssistantAction } from '@/lib/research/assistant-actions';
 import type { AssistantResponse } from '@/lib/research/assistant-contract';
@@ -81,8 +81,9 @@ type ContextEcho = {
  */
 export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setMessages, onClose, onClearKnowledge }: GlobalBrainPanelProps) {
     const t = useT();
+    const locale = useLocale();
     const pathname = usePathname();
-    const page = brainPageContext(pathname);
+    const page = brainPageContext(pathname, locale);
     // El panel solo se monta al abrirlo (chunk diferido desde GlobalBrain):
     // precarga el renderizador de markdown nada más montar, antes de que
     // llegue la primera respuesta, para que no se note la carga diferida.
