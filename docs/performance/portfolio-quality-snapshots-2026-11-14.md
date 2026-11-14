@@ -67,7 +67,7 @@ pero no crea ni retiene todas las entidades históricas o sus JSON completos.
 - `evidence/portfolio-quality-guard-diagnostic-2026-11-14.json`.
 - `evidence/portfolio-quality-snapshots-2026-11-14.json`.
 - Reproducir A/B desde data-engine con Python 3.12 y dependencias instaladas:
-  `PYTHONPATH=.:tests python ../docs/performance/portfolio-quality-snapshots-ab.py`.
+  `PYTHONPATH=.:tests python scripts/benchmark_portfolio_quality_snapshots.py`.
   Escribe `/tmp/quality-ab.json`.
 - 116 tests verdes: snapshot work-budget + portfolio_data_quality +
   ibkr_cost_canary + guard completo de consultas/tiempos. Después se añade
