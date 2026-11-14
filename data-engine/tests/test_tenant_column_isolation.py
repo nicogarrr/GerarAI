@@ -45,7 +45,12 @@ from app.models.entities import Base
 
 
 @pytest.fixture()
-def db():
+def db(monkeypatch):
+    # Independent in-memory databases reuse tenant IDs (starting at 1).
+    # Cache entries from a different test database are not this fixture's data.
+    from app.services import screener_service
+
+    monkeypatch.setattr(screener_service, "_METRIC_COVERAGE_CACHE", {})
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:

@@ -20,6 +20,15 @@ from app.services.screener_service import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolated_metric_coverage_cache(monkeypatch):
+    # Each test owns a fresh SQLite database but may reuse the same tenant ID.
+    # Keep real caching (including the TTL test), without leaking between DBs.
+    from app.services import screener_service
+
+    monkeypatch.setattr(screener_service, "_METRIC_COVERAGE_CACHE", {})
+
+
 def _company(ticker: str) -> Company:
     return Company(
         ticker=ticker,
