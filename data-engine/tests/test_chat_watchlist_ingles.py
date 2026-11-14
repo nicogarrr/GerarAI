@@ -7,7 +7,7 @@ recibe el modelo no cambia. Solo lectura y solo del tenant.
 """
 
 import asyncio
-from datetime import date
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 import pytest
@@ -78,7 +78,12 @@ def test_english_watchlist_fallback_in_english(english):
         assert spanish not in resp.answer
 
 
-def test_english_dca_level_in_english(english):
+@pytest.mark.parametrize("age_days", [0, 15])
+def test_english_dca_level_in_english(english, monkeypatch, age_days):
+    # Language assertions must not age with the wall clock. Exercise the stale
+    # notice explicitly as well, without changing or suppressing production copy.
+    monkeypatch.setattr("app.services.user_context.local_today", lambda: date(2026, 10, 30) + timedelta(days=age_days))
+    monkeypatch.setattr(get_settings(), "dca_max_data_age_days", 7)
     db = _english_db()
     reading = SimpleNamespace(level=-1, label="RECORTE LIGERO", status="forming", signal_date=date(2026, 10, 30))
     intent = detect_personal_intent("my watchlist")
@@ -91,8 +96,11 @@ def test_english_dca_level_in_english(english):
     finally:
         reset_language_scope(token)
     assert resp is not None
-    assert "- KO (Coca-Cola), no saved price, no fair value (neither a published thesis nor the engine), " \
-           "DCA level LIGHT TRIM (forming) (Oct 30, 2026)." in resp.answer
+    stale = f" [stale: last close {age_days} days ago]" if age_days > 7 else ""
+    assert ("- KO (Coca-Cola), no saved price, no fair value (neither a published thesis nor the engine), "
+            f"DCA level LIGHT TRIM (forming) (Oct 30, 2026){stale}.") in resp.answer
+    if age_days == 0:
+        assert "[stale:" not in resp.answer
     assert "- NVDA: no GerarAI page yet (no price or fair value); no DCA level evaluated." in resp.answer
 
 
