@@ -323,6 +323,11 @@ async def materials_for_events(events: list[dict[str, Any]], today: date, *, sec
     redis_client = _materials_redis()
     for event in due:
         key = f"{event['ticker']}|{event['date']}"
+        # Event confirmation can change while shared caches are still fresh.
+        # An estimated event never inherits links from a confirmed one.
+        if event.get("confirmed") is False:
+            out[key] = _result("sin_cobertura_sec")
+            continue
         hit = _cache.get(key)
         if hit and now - hit[0] < (OK_TTL_S if hit[1]["status"] == "ok" else MISS_TTL_S):
             out[key] = hit[1]
