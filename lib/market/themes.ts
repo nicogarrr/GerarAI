@@ -33,7 +33,7 @@ export type MarketThemes = {
   status: 'ok' | 'parcial' | 'sin_datos';
   as_of: string | null;
   intraday: boolean;
-  generated_at: string;
+  generated_at: string | null;
   source: string;
   method: string;
   symbols_total: number;
@@ -41,6 +41,8 @@ export type MarketThemes = {
   themes: MarketTheme[];
   /** true = dato anterior servido mientras el servidor lo refresca. */
   stale?: boolean;
+  /** true = caché fría; el servidor calcula el ranking en segundo plano. */
+  refreshing?: boolean;
 };
 
 export type ThemeOrder = 'ytd' | '1m';

@@ -23,6 +23,8 @@
     "inPortfolio": "In your portfolio",
     "inWatchlist": "In your watchlist",
     "noMarketData": "No market data right now",
+    "preparingTitle": "Preparing market data",
+    "preparingBody": "We are calculating the baskets in the background. The page will refresh itself in a few seconds.",
     "pagerAria": "Themes pagination",
     "prev": "Previous",
     "next": "Next",

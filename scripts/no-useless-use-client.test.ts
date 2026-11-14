@@ -100,6 +100,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/alerts/PushNotifications.tsx': 'useState/useEffect para permiso Notification, registro serviceWorker, PushManager y preferencias opt-in del navegador',
   'components/research/ChangesFeed.tsx': 'useState y useMemo para filtros y paginación interactiva de sucesos',
   'components/research/DcaPreparingRefresh.tsx': 'useEffect y useRouter: refresca la ficha cada 15 s mientras la señal DCA o las noticias recién pedidas se preparan',
+  'app/(root)/temas/_components/MarketThemesRefreshing.tsx': 'useEffect y useRouter: reconsulta /temas cada 15 s mientras el backend prepara la caché fría de temas',
   'components/research/AnalystTargetsView.tsx': 'useState para la paginación de firmas (5 por página) sin recargar la ficha',
   'components/research/AnalystHistoryView.tsx': 'useState para alternar el horizonte del backtest (6/12 meses) sin recargar la ficha',
   'components/research/WhatToBelieveView.tsx': 'useT/useFormat (contexto de idioma y formato del cliente), igual que las otras tarjetas de la ficha que se pintan dentro de Suspense',
