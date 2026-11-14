@@ -94,11 +94,12 @@ class WaccInputService:
                 item
                 for item in payload.get("observations", [])
                 if item.get("value") not in {None, "."}
+                and self._observation_date(item.get("date"), as_of) is not None
             ),
             None,
         )
         if observation:
-            risk_free_date = str(observation.get("date") or as_of)
+            risk_free_date = self._observation_date(observation.get("date"), as_of)
             risk_free = self._decimal(observation.get("value"))
             if risk_free is not None:
                 risk_free /= Decimal("100")
@@ -414,6 +415,17 @@ class WaccInputService:
             return result
 
         return await asyncio.to_thread(_fetch)
+
+    @staticmethod
+    def _observation_date(value, as_of: str) -> str | None:
+        """A source observation needs its own real, non-future calendar date."""
+        if not isinstance(value, str):
+            return None
+        try:
+            observed = date.fromisoformat(value)
+        except ValueError:
+            return None
+        return observed.isoformat() if observed <= date.fromisoformat(as_of) else None
 
     def _decimal(self, value) -> Decimal | None:
         try:
