@@ -97,7 +97,8 @@ describe('/watchlist con datos de entrada diferidos', () => {
     expect(text(resolved)).toContain('$100');
   });
 
-  // Contrato de orden declarado (2026-11-14, auditor #5633): sin orden por
+  // Contrato de orden declarado (decisión de diseño 2026-11-14, pendiente de
+  // OK de producto): sin orden por
   // metrica las filas mantienen el orden de la watchlist (recientes primero)
   // y se repintan en el sitio; una fila sin precio YA NO se hunde al final.
   // Antes la pagina esperaba todas las entradas y sortWatchlistRows la

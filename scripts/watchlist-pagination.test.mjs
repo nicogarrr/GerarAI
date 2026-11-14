@@ -7,7 +7,8 @@ const source = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
 test('watchlist quotes only its bounded visible page', () => {
     assert.match(source, /const PAGE_SIZE = 12/);
     assert.match(source, /orderedItems\.slice\(\(page - 1\) \* PAGE_SIZE, page \* PAGE_SIZE\)/);
-    // Contrato de streaming (2026-11-14, #5633): sin orden por metrica la
+    // Contrato de streaming (decision de diseno 2026-11-14, pendiente de OK
+    // de producto): sin orden por metrica la
     // pagina NO espera la cadena de cotizacion: pinta cada fila con los
     // basics del master (initialStock) y la cotizacion viva llega por
     // streaming en EntryRowStream. Con orden por metrica se sigue esperando
