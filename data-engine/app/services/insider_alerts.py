@@ -94,8 +94,12 @@ def _candidate_purchases(
             InsiderTransaction.is_derivative.is_(False),
         )
     ).all()
+    as_of = today or datetime.now(UTC).date()
+    # Una fecha futura no acredita una compra ya realizada, incluso en backfills
+    # que desactivan el limite de antiguedad.
+    rows = [r for r in rows if (d := _parse_date(r.tx_date)) is None or d <= as_of]
     if ALERT_MAX_AGE_DAYS is not None:
-        cutoff = (today or datetime.now(UTC).date()) - timedelta(days=ALERT_MAX_AGE_DAYS)
+        cutoff = as_of - timedelta(days=ALERT_MAX_AGE_DAYS)
         # Fecha ilegible = no se puede afirmar que sea reciente: no avisa.
         rows = [r for r in rows if (d := _parse_date(r.tx_date)) is not None and d >= cutoff]
     return list(rows)
