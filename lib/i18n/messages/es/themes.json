@@ -23,6 +23,8 @@
     "inPortfolio": "En tu cartera",
     "inWatchlist": "En tu lista de seguimiento",
     "noMarketData": "Sin datos de mercado ahora mismo",
+    "preparingTitle": "Preparando datos de mercado",
+    "preparingBody": "Estamos calculando las cestas en segundo plano. La página se actualizará sola en unos segundos.",
     "pagerAria": "Paginación de temas",
     "prev": "Anterior",
     "next": "Siguiente",
