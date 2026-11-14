@@ -54,6 +54,7 @@ _NEUTRAL_HINTS = (
     "dcsp",
     "notional",
     "tender offer",
+    "off-market transfer",
 )
 
 
