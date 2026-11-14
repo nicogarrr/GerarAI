@@ -1,11 +1,19 @@
-import tests.conftest
-import importlib.util,json,math,subprocess,time
+# Configure the hermetic test environment before importing application settings.
+import tests.conftest  # noqa: F401
+
+# isort: split
+import json
+import math
+import subprocess
+import time
 from collections import Counter
 from pathlib import Path
-from sqlalchemy import create_engine,event
+
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
+
+from app.api.routes.companies import decision_journal, resolve_company
 from app.core.database import Base
-from app.api.routes.companies import decision_journal,resolve_company
 from app.services.fundamental_review_service import DecisionJournalService
 from tests.test_journal_payload_work_budget import _fixture
 
