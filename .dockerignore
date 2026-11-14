@@ -53,6 +53,11 @@ e2e/*
 !e2e/user-flows/
 e2e/user-flows/*
 !e2e/user-flows/warmup-routes.ts
+# Mismo motivo: tests/unit/auth/sign-in-account-fixture.test.ts (que npm run
+# build typechequea) importa ../../../e2e/user-flows/sign-in-account. Sin la
+# re-inclusion el build de frontend-prod falla con TS2307 (#5466 detecto el
+# patron; scripts/docker-context-imports-guard.test.ts lo vigila).
+!e2e/user-flows/sign-in-account.ts
 # Mismo motivo que warmup-routes.ts: playwright.config.ts (que `npm run build`
 # typechequea) importa ./e2e/fixtures/e2e-env y tests/unit/e2e/e2e-env-config.test.ts
 # importa ../../../e2e/fixtures/e2e-env. Sin el fichero en el contexto, el build
