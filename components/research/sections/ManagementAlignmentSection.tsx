@@ -38,7 +38,7 @@ export function ManagementAlignmentSection({ data, locale = DEFAULT_LOCALE }: { 
       {annual?.status === 'ok' && annual.net_value !== null && <p>{t('research.managementAlignment.insiderSummary')}: <TradeSources trades={Object.values(annual.groups).flat()}>{alignmentNumber(annual.net_value, 'USD')}</TradeSources></p>}
     </div>
     <details className="min-w-0 rounded-lg border border-gray-700 p-4">
-      <summary className="cursor-pointer font-medium">{t('research.managementAlignment.capital')}</summary>
+      <summary className="min-h-11 cursor-pointer py-2 font-medium sm:min-h-10">{t('research.managementAlignment.capital')}</summary>
       {!data.years?.length ? <p className="mt-3 text-amber-300" role="status">{data.dilution_reason}</p> : <>
         {(partial || capitalWarnings.length > 0) && <p className="mt-3 text-amber-300" role="status">{[partial ? t('research.managementAlignment.partialCapital', { fields: missingFields.join(', ') }) : '', ...capitalWarnings].filter(Boolean).join(' ')}</p>}
         {data.years.map(row => <div className="mt-4 grid gap-2 border-t border-gray-800 pt-3 [overflow-wrap:anywhere]" key={row.year}>
@@ -53,7 +53,7 @@ export function ManagementAlignmentSection({ data, locale = DEFAULT_LOCALE }: { 
       </>}
     </details>
     <details className="min-w-0 rounded-lg border border-gray-700 p-4">
-      <summary className="cursor-pointer font-medium">{t('research.managementAlignment.insiders')}</summary>
+      <summary className="min-h-11 cursor-pointer py-2 font-medium sm:min-h-10">{t('research.managementAlignment.insiders')}</summary>
       <p className="mt-3 text-gray-400">{t('research.managementAlignment.planNote')}</p>
       {data.insiders?.map(window => {
         const all = Object.values(window.groups).flat();

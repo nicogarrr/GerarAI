@@ -120,7 +120,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
                 del motor (fusiones, umbrales): visibles bajo demanda, no como
                 badges primarios que parecen estado de la app. */}
             <details className="md:ml-auto">
-              <summary className="cursor-pointer text-xs font-medium text-gray-400 hover:text-gray-200">{t('search.techDetailsSearch')}</summary>
+              <summary className="min-h-11 cursor-pointer py-2 text-xs font-medium text-gray-400 hover:text-gray-200 sm:min-h-10">{t('search.techDetailsSearch')}</summary>
               <div className="mt-2 flex flex-wrap gap-2">
                 {Object.entries(response.retrieval).filter(([, value]) => typeof value === 'string').map(([key, value]) => <Badge key={key} variant="outline">{key}: {String(value)}</Badge>)}
               </div>
@@ -140,7 +140,7 @@ export default async function UniversalSearchPage({ searchParams }: PageProps) {
                   <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-sm leading-6 text-gray-300">{result.text}</p>
                   <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{result.collection ?? sourceDisplay(result.source_type, locale)}</span><span>{formatDate(result.as_of, undefined, t('research.notAvailable'), locale)}</span><span>{t('search.confidence', { value: formatPercent(result.source_trust, { digits: 0 }, undefined, locale) })}</span></div>
                   <details className="mt-2">
-                    <summary className="cursor-pointer text-xs text-gray-500 hover:text-gray-300">{t('search.techDetails')}</summary>
+                    <summary className="min-h-11 cursor-pointer py-2 text-xs text-gray-500 hover:text-gray-300 sm:min-h-10">{t('search.techDetails')}</summary>
                     <div className="mt-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-500"><span>{t('search.reference', { value: result.citation })}</span><span>{t('search.score', { value: formatNumber(result.scores.reranker, { minimumFractionDigits: 4, maximumFractionDigits: 4 }, undefined, locale) })}</span></div>
                   </details>
                 </div>

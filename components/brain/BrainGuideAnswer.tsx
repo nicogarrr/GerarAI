@@ -48,7 +48,7 @@ function GuideCitation({ citation, index, id }: { citation: AssistantResponse['c
             </div>
             <div className="mt-1 break-all">{t('brain.guide.referenceDate', { date: citation.as_of || t('signals.noDate') })}</div>
             {citation.excerpt
-                ? <details className="mt-1"><summary className="cursor-pointer text-slate-400 hover:text-slate-200">{t('brain.guide.originalExcerpt')}</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{citation.excerpt}</p></details>
+                ? <details className="mt-1"><summary className="min-h-11 cursor-pointer py-2 text-slate-400 hover:text-slate-200 sm:min-h-10">{t('brain.guide.originalExcerpt')}</summary><p className="mt-1 whitespace-pre-wrap break-words text-slate-300">{citation.excerpt}</p></details>
                 : null}
         </li>
     );
@@ -77,7 +77,7 @@ export function BrainGuideAnswer({ result }: { result: AssistantResponse }) {
                 <div className="space-y-2">
                     {result.sections.map((section, index) => (
                         <details key={`${section.key}-${index}`} className="rounded-lg border border-slate-700/60 bg-slate-900/60" open={section.key === 'conclusion' && result.status === 'answered'}>
-                            <summary className="min-h-11 cursor-pointer px-3 py-2 text-sm font-semibold text-slate-200">{t(SECTION_KEYS[section.key] ?? 'brain.guide.sections.unclassified')}</summary>
+                            <summary className="min-h-11 cursor-pointer px-3 py-2 text-sm font-semibold text-slate-200 sm:min-h-10">{t(SECTION_KEYS[section.key] ?? 'brain.guide.sections.unclassified')}</summary>
                             <div className="border-t border-slate-800 px-3 py-2">
                                 <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-300">{section.body?.trim() ? section.body : emptySectionCopy(t, result.status)}</p>
                                 {section.citation_ids.length ? (

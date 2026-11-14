@@ -15,7 +15,7 @@ const esT: TiFn = t;
 export default function ScenarioAssumptions({ ti = esT }: { ti?: TiFn }) {
   return (
     <details className="mt-3 rounded-lg border border-gray-800 bg-black/20 px-4 py-3 text-sm">
-      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-gray-400">
+      <summary className="min-h-11 cursor-pointer py-2 text-xs font-semibold uppercase tracking-wide text-gray-400 sm:min-h-10">
         {ti('research.scenarioHelp.title')}
       </summary>
       <div className="mt-3 space-y-2 text-xs leading-5 text-gray-400">
