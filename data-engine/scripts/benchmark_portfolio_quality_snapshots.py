@@ -1,13 +1,22 @@
-import tests.conftest
-import json,math,subprocess,time
-from datetime import date,timedelta
+# Configure the hermetic test environment before importing application settings.
+import tests.conftest  # noqa: F401
+
+# isort: split
+import json
+import math
+import subprocess
+import time
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
-from sqlalchemy import create_engine,event
+
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
+
 from app.core.database import Base
-from app.models import Portfolio,PortfolioDailySnapshot
+from app.models import Portfolio, PortfolioDailySnapshot
 from app.services.portfolio_quality_service import portfolio_quality
+
 old={'__name__':'quality_reference'}
 exec(compile(subprocess.check_output(['git','show','b1267e8f0:data-engine/app/services/portfolio_quality_service.py'],text=True),'reference.py','exec'),old)
 engine=create_engine('sqlite:///:memory:');Base.metadata.create_all(engine)
