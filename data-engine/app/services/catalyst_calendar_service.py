@@ -166,9 +166,17 @@ def filing_deadline_event(submissions: dict[str, Any], ticker: str) -> dict[str,
     festivos no se modelan. Sin historial suficiente o sin fiscalYearEnd, None:
     no se inventa nada.
     """
-    recent = (submissions.get("filings") or {}).get("recent") or {}
+    filings = submissions.get("filings", {})
+    if not isinstance(filings, dict):
+        raise ValueError("SEC filings no verificable")
+    recent = filings.get("recent", {})
+    if not isinstance(recent, dict):
+        raise ValueError("SEC filings.recent no verificable")
+    forms, reports = recent.get("form", []), recent.get("reportDate", [])
+    if not isinstance(forms, list) or not isinstance(reports, list):
+        raise ValueError("SEC columnas de informes no verificables")
     periods_set: set[date] = set()
-    for form, report in zip(recent.get("form") or [], recent.get("reportDate") or [], strict=False):
+    for form, report in zip(forms, reports, strict=False):
         if form not in _PERIODIC:
             continue
         period = _parse_us_date(report)
@@ -305,7 +313,12 @@ async def fetch_filing_deadlines(
             _FAILED_UNTIL[ticker] = now + DEADLINE_FAILURE_TTL_SECONDS
             errors.append(f"Plazos 10-Q/10-K: EDGAR no disponible para {ticker}")
             continue
-        event = filing_deadline_event(data, ticker)
+        try:
+            event = filing_deadline_event(data, ticker)
+        except ValueError:
+            _FAILED_UNTIL[ticker] = now + DEADLINE_FAILURE_TTL_SECONDS
+            errors.append(f"Plazos 10-Q/10-K: EDGAR no disponible para {ticker}")
+            continue
         if event is not None and desde <= date.fromisoformat(event["date"]) <= hasta:
             events.append(event)
     if errors and len(errors) == len(tickers):
