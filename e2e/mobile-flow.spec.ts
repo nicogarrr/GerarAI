@@ -70,8 +70,9 @@ test.describe("mobile flujo screener→watchlist→tesis→alerta solo con toque
     await expect(page.getByRole("heading", { name: "Watchlist", level: 1 })).toBeVisible();
     await expectNoPageOverflow(page, "watchlist");
 
-    // 4. Tocar el enlace a research de la primera card ("Ver análisis").
-    const watchCards = page.locator("article", { hasText: "Ver análisis" });
+    // 4. Tocar el enlace a research de la primera fila ("Ver análisis").
+    // Tabla responsiva única (2026-11-14): las filas son <tr> en móvil también.
+    const watchCards = page.locator("main table tbody tr", { hasText: "Ver análisis" });
     if ((await watchCards.count()) === 0) {
       await expect(page.getByText("Tu watchlist está vacía")).toBeVisible();
       await expectNoPageOverflow(page, "watchlist-vacia");
