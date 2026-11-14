@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
+import { waitForHydration } from "./fixtures/wait-for-hydration";
 
 /**
  * Recorrido real (auditoría r5-fa-flujo, 11-nov): ficha en una pestaña
@@ -77,12 +78,66 @@ for (const [label, viewport] of [["móvil 390", { width: 390, height: 844 }], ["
     test("watchlist → ficha → «Volver» vuelve a la watchlist en móvil", async ({ page }) => {
       test.skip(viewport.width >= 768, "El enlace de vuelta de la ficha solo se ve en móvil (en PC están las migas).");
       await page.goto("/watchlist");
+      // Alcance declarado: navegación SPA YA hidratada. Sin esta espera el
+      // clic podía caer antes de hidratar y ser una carga de documento
+      // completa, que nace sin pila de in-app-history y pinta el fallback
+      // «Research» en vez de «Volver» (rojo de main 2400440, móvil 390).
+      // Ese camino queda cubierto por el test negativo siguiente.
+      // waitForHydration es un waitForFunction dentro del timeout global del
+      // test; los presupuestos de las aserciones (10 s) no cambian.
+      await waitForHydration(page);
+      // Observación del tipo de navegación: SPA no emite request «document».
+      let documentNav = false;
+      page.on("request", (req) => {
+        if (req.resourceType() === "document" && /\/research\/MSFT/.test(req.url())) documentNav = true;
+      });
       await page.getByRole("link", { name: /Ver análisis/ }).first().click();
       await page.waitForURL(/\/research\/MSFT/);
+      expect(documentNav, "el test mide la navegación SPA; una carga de documento invalida la premisa").toBe(false);
       const back = page.getByRole("link", { name: "Volver" });
       await expect(back).toHaveAttribute("data-back-mode", "history");
       await back.click();
       await page.waitForURL(/\/watchlist/);
+    });
+
+    test("clic antes de hidratar: carga de documento y el enlace queda en su fallback «Research» (móvil)", async ({ page }) => {
+      test.skip(viewport.width >= 768, "Mismo alcance móvil que el caso positivo.");
+      // Prueba negativa del mecanismo del rojo de main 2400440: con los .js
+      // retenidos (técnica de prehydration-mobile-open.spec.ts) el clic en
+      // «Ver análisis» es una carga de documento completa; la pila de
+      // in-app-history nace vacía en la ficha (Navigation API: solo entradas
+      // observadas desde que arranca el JS) y el enlace de vuelta pinta su
+      // fallback con data-back-mode="link". Que «Volver» sobreviva cargas
+      // completas sería un cambio de producto aparte.
+      let release!: () => void;
+      const gate = new Promise<void>((resolve) => { release = resolve; });
+      await page.route("**/_next/**/*.js*", async (route) => { await gate; await route.continue(); });
+      let documentNav = false;
+      page.on("request", (req) => {
+        if (req.resourceType() === "document" && /\/research\/MSFT/.test(req.url())) documentNav = true;
+      });
+      try {
+        await page.goto("/watchlist", { waitUntil: "commit" });
+        const link = page.getByRole("link", { name: /Ver análisis/ }).first();
+        await expect(link).toBeVisible();
+        await Promise.all([
+          // 'commit': con los .js retenidos el load del documento nuevo no
+          // llega; commit basta para observar el request document.
+          page.waitForURL(/\/research\/MSFT/, { waitUntil: "commit" }),
+          link.click({ noWaitAfter: true }),
+        ]);
+        expect(documentNav, "clic pre-hidratación = carga de documento completa").toBe(true);
+        release();
+        // Acotado a main + data-back-mode: en main hay otro enlace
+        // «Research» (subnav de búsqueda) y BottomNav tiene otro fuera.
+        const back = page.getByRole("main").locator('a[data-back-mode="link"]');
+        await expect(back).toHaveAttribute("href", /\/research$/);
+        await expect(back).toHaveText(/^Research$/);
+        await expect(page.getByRole("link", { name: "Volver" })).toHaveCount(0);
+      } finally {
+        release();
+        await page.unrouteAll({ behavior: "ignoreErrors" });
+      }
     });
   });
 }
