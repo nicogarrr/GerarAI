@@ -111,8 +111,10 @@ describe('F322: el diagnóstico del motor no se presenta como badges primarios',
     const page = readFileSync('app/(root)/search/page.tsx', 'utf8');
 
     it('los pares crudos de retrieval van en un details «Detalles técnicos»', () => {
-        // i18n: el summary se mantiene con sus clases; el rotulo viene de la clave y el diccionario es conserva el copy verbatim.
-        assert.match(page, /<summary className="cursor-pointer text-xs font-medium text-gray-400 hover:text-gray-200">\{t\('search\.techDetailsSearch'\)\}<\/summary>/, 'el details «Detalles técnicos» se mantiene con sus clases');
+        // i18n: el rotulo viene de la clave y el diccionario conserva el copy verbatim. Las clases
+        // son las de la convencion tactil de <summary> (min-h-11 py-2 sm:min-h-10, #5641): las
+        // exige mobile-alerts-summary-target-guard; este pin solo fija el elemento concreto.
+        assert.match(page, /<summary className="min-h-11 cursor-pointer py-2 text-xs font-medium text-gray-400 hover:text-gray-200 sm:min-h-10">\{t\('search\.techDetailsSearch'\)\}<\/summary>/, 'el details «Detalles técnicos» se mantiene con sus clases');
         const pageDict = JSON.parse(readFileSync('lib/i18n/messages/es/search.json', 'utf8'));
         assert.equal(pageDict.techDetailsSearch, 'Detalles técnicos de la búsqueda', 'el rotulo se mantiene verbatim');
     });
