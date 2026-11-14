@@ -70,8 +70,8 @@ describe('/watchlist con DCA diferido', () => {
     expect(panels).toHaveLength(1);
     const resolved = await (panels[0].type as (p: Record<string, unknown>) => Promise<unknown>)(panels[0].props ?? {});
     expect(find(resolved, 'DcaSignalsPanel')).toHaveLength(1);
-    // Un badge por fila y por vista (tarjeta movil + fila de tabla).
-    expect(find(page, 'DcaBadgeStream').length).toBeGreaterThanOrEqual(2);
+    // Un badge por fila (tabla responsiva única, 2026-11-14).
+    expect(find(page, 'DcaBadgeStream').length).toBe(1);
   });
 
   it('preserva las props de antes: senal DCA real, meses, unavailable y seleccion Map (ultimo duplicado gana)', async () => {
@@ -91,7 +91,7 @@ describe('/watchlist con DCA diferido', () => {
     const page = await renderPage();
 
     const badges = find(page, 'DcaBadgeStream');
-    expect(badges.length).toBeGreaterThanOrEqual(2);
+    expect(badges.length).toBe(1);
     const badgeResolved = await (badges[0].type as (p: Record<string, unknown>) => Promise<unknown>)(badges[0].props ?? {});
     const levelBadge = find(badgeResolved, 'DcaLevelBadge');
     expect(levelBadge).toHaveLength(1);

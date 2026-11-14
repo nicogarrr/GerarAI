@@ -572,78 +572,18 @@ export default async function WatchlistPage({
                         A 820-1280px la tabla de 6 columnas (~805px de mínimo) no cabe
                         en el contenido con el menú lateral y salía cortada con un
                         scroll horizontal sin indicio (QA 2026-10-19, tablet 820px). */}
-                    <div className="space-y-3 xl:hidden">
-                        {displayStocks.map((baseStock, index) => streamEntry(baseStock, index, (stock) => (
-                            <WatchlistEntry as="article" symbol={stock.symbol} key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-3">
-                                <div className="flex min-w-0 items-center gap-3">
-                                    <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} loading="lazy" name={stock.name} className="size-11 shrink-0 rounded-lg" />
-                                    <div className="min-w-0 flex-1">
-                                        <Link
-                                            href={`/research/${stock.symbol}`}
-                                            className="flex min-h-11 items-center truncate text-base font-bold text-gray-200"
-                                        >
-                                            {stock.symbol}
-                                        </Link>
-                                        {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="truncate text-xs text-gray-500" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><Suspense fallback={null}><DcaBadgeStream promise={dcaPromise} symbol={stock.symbol.trim().toUpperCase()} /></Suspense>{valueRankNote(stock)}
-                                        {notFoundBadge(stock, 'mt-1 border-amber-800/60 text-amber-300/90', 'mt-1 border-gray-700 text-gray-400')}
-                                    </div>
-                                    <div className={`flex shrink-0 items-center gap-1 font-mono text-sm ${stock.changePercent === null ? 'text-gray-500' : stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
-                                        {stock.changePercent === null ? null : stock.changePercent >= 0 ? <TrendingUp className="h-4 w-4" aria-hidden="true" /> : <TrendingDown className="h-4 w-4" aria-hidden="true" />}
-                                        <span>
-                                            {formatChangePercent(stock.changePercent)}
-                                        </span>
-                                    </div>
-                                </div>
-                                <dl className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-gray-800/50 px-2 py-2 text-center">
-                                    <div className="col-span-2 min-w-0">
-                                        <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.price')}</dt>
-                                        <dd className="truncate font-mono text-sm font-medium text-gray-200">{formatPriceCell(stock.price, stock.currency)}</dd>
-                                        {stock.priceKind === 'close' ? (
-                                            <dd className="break-words text-[10px] leading-relaxed text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</dd>
-                                        ) : null}
-                                        <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} as="dd" />
-                                    </div>
-                                    <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.earnings')}</dt>
-                                        <dd className="font-mono text-sm text-gray-300">{stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="mt-1 block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}</dd>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">{t('watchlist.page.sort.marketCap')}</dt>
-                                        <dd className="break-words font-mono text-sm text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined}>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
-                                        </dd>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500">{stock.peKind === 'fy' ? t('watchlist.page.peFy') : t('watchlist.page.peTtm')}</dt>
-                                        <dd className="font-mono text-sm text-gray-300" title={stock.peSource ?? (stock.peRatio === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined)}>{formatPeRatio(stock.peRatio)}{peNdNoteEl(stock)}</dd>
-                                    </div>
-                                    <div className="min-w-0">
-                                        <dt className="text-[11px] text-gray-500" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</dt>
-                                        <dd className="text-sm"><AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} /></dd>
-                                    </div>
-                                </dl>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <Link
-                                        href={`/research/${stock.symbol}`}
-                                        aria-label={t('watchlist.page.viewAnalysisOf', { symbol: stock.symbol })}
-                                        className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-800 px-4 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-700 hover:text-white"
-                                    >
-                                        {t('watchlist.page.viewAnalysis')}
-                                        <ArrowRight className="h-4 w-4" aria-hidden="true" />
-                                    </Link>
-                                    <WatchlistBuyAction userId={userId} symbol={stock.symbol} companyName={stock.name} currency={stock.currency} variant="button" />
-                                    <WatchlistRemoveButton symbol={stock.symbol} />
-                                </div>
-                            </WatchlistEntry>
-                        )))}
-                        {marketCapLegendEl((legend) => legend)}
-                    </div>
-
-                    {/* Desktop (≥xl): tabla completa */}
-                    <div className="hidden overflow-hidden rounded-lg border border-gray-700 bg-gray-900/50 xl:block">
-                        <Table regionLabel={t('watchlist.page.tableRegion')}>
+                    {/* Una sola tabla responsiva (mismo patrón que PositionsTable y
+                        screener): debajo de xl cada fila es una tarjeta apilada con las
+                        métricas etiquetadas (span xl:hidden); desde xl, tabla completa
+                        con cabeceras ordenables. Antes se pintaban DOS árboles por fila
+                        (tarjetas xl:hidden + tabla hidden xl:block) y cada empresa iba
+                        dos veces en el payload RSC y en el HTML (661.831 B en 44 chunks
+                        medido en prod, 2026-11-14). El contenido visible en cada
+                        viewport es el de antes. */}
+                    <div className="overflow-hidden rounded-lg border-gray-700 bg-gray-900/50 max-xl:border-0 xl:border">
+                        <Table className="block xl:table" regionLabel={t('watchlist.page.tableRegion')}>
                             <TableCaption className="sr-only">{t('watchlist.page.tableCaption')}</TableCaption>
-                            <TableHeader className="bg-gray-800/80">
+                            <TableHeader className="hidden bg-gray-800/80 xl:table-header-group">
                                 <TableRow className="border-gray-700 hover:bg-gray-800/80">
                                     <TableHead className="text-gray-300" aria-sort={ariaSortFor('symbol')}>
                                         <Link href={sortHref('symbol')} className="inline-flex min-h-[44px] items-center gap-1 hover:text-gray-100">{t('watchlist.page.sort.symbol')}{sortIndicator('symbol')}</Link>
@@ -669,26 +609,44 @@ export default async function WatchlistPage({
 
                                 </TableRow>
                             </TableHeader>
-                            <TableBody>
+                            <TableBody className="block space-y-3 xl:table-row-group xl:space-y-0">
                                 {displayStocks.map((baseStock, index) => streamEntry(baseStock, index, (stock) => (
-                                    <WatchlistEntry as="tr" symbol={stock.symbol} key={stock.symbol} className="border-gray-800 transition-colors hover:bg-gray-800/30">
-                                        <TableCell>
-                                            <Link href={`/research/${stock.symbol}`} className="group flex items-center gap-3">
-                                                <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} loading="lazy" name={stock.name} className="size-10 shrink-0 rounded-lg" />
-                                                <div>
-                                                    <div className="flex items-center gap-2 font-bold text-gray-200 transition-colors group-hover:text-blue-400">
+                                    <WatchlistEntry as="tr" symbol={stock.symbol} key={stock.symbol} className="block rounded-xl border border-gray-700/60 bg-gray-900/60 p-3 xl:table-row xl:rounded-none xl:border-0 xl:border-b xl:bg-transparent xl:p-0 xl:transition-colors xl:hover:bg-gray-800/30">
+                                        <TableCell className="block min-w-0 xl:table-cell">
+                                            <div className="flex min-w-0 items-center gap-3">
+                                                <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} loading="lazy" name={stock.name} className="size-11 shrink-0 rounded-lg xl:size-10" />
+                                                <div className="min-w-0 flex-1">
+                                                    <Link
+                                                        href={`/research/${stock.symbol}`}
+                                                        className="flex min-h-11 items-center truncate text-base font-bold text-gray-200 transition-colors hover:text-blue-400 xl:min-h-0"
+                                                    >
                                                         {stock.symbol}
-                                                        {notFoundBadge(stock, 'border-amber-800/60 font-normal text-amber-300/90', 'border-gray-700 font-normal text-gray-400')}
-                                                        {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
-                                                            <Badge variant="outline" className="border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w), sessions: stock.monitor.low_52w_sessions })}>
-                                                                {t('watchlist.page.low52')}
-                                                            </Badge>
-                                                        ) : null}
-                                                    </div>
-                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <div className="max-w-[150px] truncate text-xs text-gray-500" title={stock.name}>{stock.name}</div> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><Suspense fallback={null}><DcaBadgeStream promise={dcaPromise} symbol={stock.symbol.trim().toUpperCase()} /></Suspense>{valueRankNote(stock)}
+                                                    </Link>
+                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="max-w-[220px] truncate text-xs text-gray-500 xl:max-w-[150px]" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><Suspense fallback={null}><DcaBadgeStream promise={dcaPromise} symbol={stock.symbol.trim().toUpperCase()} /></Suspense>{valueRankNote(stock)}
+                                                    {notFoundBadge(stock, 'mt-1 border-amber-800/60 text-amber-300/90', 'mt-1 border-gray-700 text-gray-400')}
+                                                    {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
+                                                        <Badge variant="outline" className="ml-1 border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w), sessions: stock.monitor.low_52w_sessions })}>
+                                                            {t('watchlist.page.low52')}
+                                                        </Badge>
+                                                    ) : null}
                                                 </div>
-                                            </Link>
-                                            <div className="ml-2 flex items-center gap-1">
+                                            </div>
+                                            {/* Acciones: «Ver análisis» visible como botón táctil debajo de xl
+                                                (el enlace que pulsa el flujo de vuelta en móvil); desde xl va en
+                                                «Opciones», como antes. Quitar siempre visible en ambos. */}
+                                            <div className="mt-2 flex items-center gap-2 xl:hidden">
+                                                <Link
+                                                    href={`/research/${stock.symbol}`}
+                                                    aria-label={t('watchlist.page.viewAnalysisOf', { symbol: stock.symbol })}
+                                                    className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-800 px-4 text-sm font-medium text-gray-200 transition-colors hover:bg-gray-700 hover:text-white"
+                                                >
+                                                    {t('watchlist.page.viewAnalysis')}
+                                                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                                                </Link>
+                                                <WatchlistBuyAction userId={userId} symbol={stock.symbol} companyName={stock.name} currency={stock.currency} variant="button" />
+                                                <WatchlistRemoveButton symbol={stock.symbol} />
+                                            </div>
+                                            <div className="ml-2 hidden items-center gap-1 xl:flex">
                                                 <details className="relative inline-block align-middle">
                                                     <summary className="min-h-9 cursor-pointer rounded px-2 py-2 text-xs text-gray-400 hover:text-gray-100" aria-label={t('watchlist.page.optionsOf', { symbol: stock.symbol })}>{t('watchlist.page.options')}</summary>
                                                     <div className="mt-1 min-w-40 rounded-md border border-gray-700 bg-gray-900 p-1 shadow-xl">
@@ -700,18 +658,20 @@ export default async function WatchlistPage({
                                                 <WatchlistRemoveButton symbol={stock.symbol} />
                                             </div>
                                         </TableCell>
-                                        <TableCell className="text-right font-mono font-medium text-gray-200">
+                                        <TableCell className="block font-mono font-medium text-gray-200 xl:table-cell xl:text-right">
+                                            <span className="block font-sans text-[11px] font-normal text-gray-500 xl:hidden">{t('watchlist.page.sort.price')}</span>
                                             {formatPriceCell(stock.price, stock.currency)}
                                             {stock.priceKind === 'close' ? (
                                                 <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</div>
                                             ) : null}
                                             <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="block xl:table-cell xl:text-right">
+                                            <span className="block text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.change')}</span>
                                             {stock.changePercent === null ? (
                                                 <span className="font-mono text-gray-500">{NA}</span>
                                             ) : (
-                                                <div className={`flex items-center justify-end gap-1 ${stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
+                                                <div className={`flex items-center gap-1 xl:justify-end ${stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
                                                     {stock.changePercent >= 0 ? <TrendingUp aria-hidden="true" className="h-3 w-3" /> : <TrendingDown aria-hidden="true" className="h-3 w-3" />}
                                                     <span className="font-mono">
                                                         {formatChangePercent(stock.changePercent)}
@@ -719,10 +679,12 @@ export default async function WatchlistPage({
                                                 </div>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-gray-400" title={stock.marketCap === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined}>
+                                        <TableCell className="block font-mono text-gray-400 xl:table-cell xl:text-right" title={stock.marketCap === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined}>
+                                            <span className="block font-sans text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.marketCap')}</span>
                                             {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </TableCell>
-                                        <TableCell className="text-right">
+                                        <TableCell className="block xl:table-cell xl:text-right">
+                                            <span className="block text-[11px] text-gray-500 xl:hidden">{stock.peKind === 'fy' ? t('watchlist.page.peFy') : t('watchlist.page.peTtm')}</span>
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (
                                                 // F144: sin semáforo. Los umbrales <15/<25 eran
                                                 // arbitrarios y ciegos al sector: pintaban de rojo
@@ -738,10 +700,12 @@ export default async function WatchlistPage({
                                                 <span className="text-gray-500" title={stock.peSource ?? undefined}>{NA}{peNdNoteEl(stock)}</span>
                                             )}
                                         </TableCell>
-                                        <TableCell className="text-right text-sm">
+                                        <TableCell className="block text-sm xl:table-cell xl:text-right">
+                                            <span className="block text-[11px] text-gray-500 xl:hidden" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</span>
                                             <AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} />
                                         </TableCell>
-                                        <TableCell className="text-right font-mono text-sm text-gray-300" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
+                                        <TableCell className="block font-mono text-sm text-gray-300 xl:table-cell xl:text-right" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
+                                            <span className="block font-sans text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.earnings')}</span>
                                             {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
                                         </TableCell>
 
@@ -749,7 +713,7 @@ export default async function WatchlistPage({
                                 )))}
                             </TableBody>
                         </Table>
-                        {marketCapLegendEl((legend) => legend ? <div className="border-t border-gray-700 px-4 py-2">{legend}</div> : null)}
+                        {marketCapLegendEl((legend) => legend ? <div className="border-t border-gray-700 px-4 py-2 max-xl:mt-3 max-xl:rounded-lg max-xl:border">{legend}</div> : null)}
                     </div>
                 </>
             )}
