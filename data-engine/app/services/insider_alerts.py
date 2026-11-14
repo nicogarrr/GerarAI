@@ -40,7 +40,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.i18n import generation_language
-from app.models.entities import InsiderTransaction, ResearchAlert
+from app.models.entities import InsiderFiling, InsiderTransaction, ResearchAlert
 from app.services.company_resolver import resolve_company
 from app.services.insider_service import (
     BIG_BUY_THRESHOLD_USD,
@@ -85,8 +85,10 @@ def _tx_as_signal_dict(tx: InsiderTransaction) -> dict:
 def _candidate_purchases(
     db: Session, tenant_id: int | None, today: date | None = None
 ) -> list[InsiderTransaction]:
-    rows = db.scalars(
-        select(InsiderTransaction).where(
+    records = db.execute(
+        select(InsiderTransaction, InsiderFiling.filing_date)
+        .outerjoin(InsiderFiling, InsiderTransaction.filing_id == InsiderFiling.id)
+        .where(
             InsiderTransaction.tenant_id.is_(tenant_id) if tenant_id is None
             else InsiderTransaction.tenant_id == tenant_id,
             InsiderTransaction.code == "P",
@@ -95,6 +97,9 @@ def _candidate_purchases(
         )
     ).all()
     as_of = today or datetime.now(UTC).date()
+    # La operación pasada no era observable antes de publicarse el formulario.
+    # Sin fecha legible se conserva la política existente, sin inventar una.
+    rows = [tx for tx, filed in records if (d := _parse_date(filed)) is None or d <= as_of]
     # Una fecha futura no acredita una compra ya realizada, incluso en backfills
     # que desactivan el limite de antiguedad.
     rows = [r for r in rows if (d := _parse_date(r.tx_date)) is None or d <= as_of]
