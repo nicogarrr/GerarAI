@@ -1145,7 +1145,10 @@ def extract_document_kpis(
     from app.models import Document
     from app.services.kpi_extraction_service import KPIExtractionService
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("extract_document_kpis", exc, tenant_id=tenant_id)
     try:
         document = db.get(Document, document_id)
         if document is None:
@@ -1578,7 +1581,10 @@ def evaluate_alert_rules(
 ) -> dict[str, Any]:
     from app.services.alert_rule_service import AlertRuleService
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("evaluate_alert_rules", exc, tenant_id=tenant_id)
     try:
         # Pasada periódica: las reglas de precio no se evalúan con la bolsa cerrada.
         results = AlertRuleService().evaluate_all(db, skip_closed_markets=True)
@@ -1629,7 +1635,10 @@ def refresh_bottlenecks(tenant_id: int | None = None, user_id: str | None = None
     """Reconcile all local evidence, including historical letters, without AI."""
     from app.services.bottleneck_service import refresh_signals
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("refresh_bottlenecks", exc, tenant_id=tenant_id)
     try:
         count = refresh_signals(db)
         db.commit()
@@ -1651,7 +1660,10 @@ def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | N
     """
     from app.services.sec_bottleneck_filings import ingest_all
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("ingest_sec_bottleneck_filings", exc, tenant_id=tenant_id)
     try:
         result = _run(ingest_all(db, db.info["tenant_id"]))
         return {"actor": "ingest_sec_bottleneck_filings", "status": "ok", **result}
@@ -1668,7 +1680,10 @@ def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = N
     """Movimientos PDMR del Reino Unido (tracefour, gratis, CC BY 4.0): 1 GET por corrida."""
     from app.services.uk_pdmr_ingestion import ingest_uk_pdmr
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("ingest_uk_pdmr_filings", exc, tenant_id=tenant_id)
     try:
         result = _run(ingest_uk_pdmr(db, db.info["tenant_id"]))
         return {"actor": "ingest_uk_pdmr_filings", "status": "ok", **result}
@@ -1686,7 +1701,10 @@ def ingest_ca_insider_yahoo(tenant_id: int | None = None, user_id: str | None = 
     """Insiders de Canada via Yahoo quoteSummary (FUENTE NO OFICIAL; SEDI es la verdad)."""
     from app.services.ca_insider_ingestion import ingest_ca_insiders
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("ingest_ca_insider_yahoo", exc, tenant_id=tenant_id)
     try:
         result = _run(ingest_ca_insiders(db, db.info["tenant_id"]))
         return {"actor": "ingest_ca_insider_yahoo", "status": "ok", **result}
@@ -1706,7 +1724,10 @@ def discover_bottlenecks(tenant_id: int | None = None, user_id: str | None = Non
     from app.services.bottleneck_discovery_service import discover
     from app.services.ticker_news_lane import Deadline
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("discover_bottlenecks", exc, tenant_id=tenant_id)
     try:
         deadline = Deadline(DISCOVERY_DEADLINE_SECONDS)
         # Derive contexts from current stored evidence, not a possibly empty
@@ -1899,7 +1920,10 @@ def refresh_portfolio_moves(tenant_id: int | None = None, user_id: str | None = 
     """Digest the last completed session's closes (skips weekends) for one tenant."""
     from app.services.portfolio_moves_service import build_digest
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("refresh_portfolio_moves", exc, tenant_id=tenant_id)
     try:
         from app.services.daily_digest_alerts import last_session_date
 
@@ -1956,7 +1980,10 @@ def backfill_finnhub_profiles(
     """
     from app.services.finnhub_profile_backfill import FinnhubProfileBackfill
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
     try:
         service = FinnhubProfileBackfill()
         try:
@@ -1987,7 +2014,10 @@ def backfill_sec_fundamentals(
     nunca inventados. Coste 0 EUR."""
     from app.services.sec_fundamentals_backfill import backfill_sec_fundamentals as _run
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("backfill_sec_fundamentals", exc, tenant_id=tenant_id)
     try:
         return {"actor": "backfill_sec_fundamentals", **_run(db, max_companies=max_companies)}
     except Exception as exc:
@@ -2016,7 +2046,10 @@ def seed_company_fundamentals(
     from app.models import Company
     from app.services.fundamentals_seed_service import seed_company_fundamentals as _seed
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("seed_company_fundamentals", exc, tenant_id=tenant_id)
     try:
         ticker = (ticker or "").strip().upper()
         company = db.scalar(_select(Company).where(Company.ticker == ticker))
@@ -2128,7 +2161,10 @@ def refresh_esef_fundamentals(
     from app.models import Company
     from app.services.async_bridge import run_from_any_context
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("refresh_esef_fundamentals", exc, tenant_id=tenant_id)
     try:
         if phase == "build":
             base = get_settings().esef_snapshot_dir
@@ -2294,7 +2330,10 @@ def ingest_corporate_splits(
     from app.services.async_bridge import run_from_any_context
     from app.services.split_ingestion_service import SplitIngestionService
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("ingest_corporate_splits", exc, tenant_id=tenant_id)
     try:
         tickers, next_cursor = split_sync_tickers(db, scope, cursor, chunk=SPLIT_SYNC_UNIVERSE_CHUNK)
         service = SplitIngestionService()
@@ -2341,7 +2380,10 @@ def sync_portfolio_dividends(tenant_id: int | None = None, user_id: str | None =
     from app.services.async_bridge import run_from_any_context
     from app.services.dividend_ingestion_service import DividendIngestionService
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("sync_portfolio_dividends", exc, tenant_id=tenant_id)
     try:
         result = run_from_any_context(DividendIngestionService().sync_portfolio(db))
         return {
@@ -2508,7 +2550,10 @@ def propicks_radar_scan(
     """
     from app.services.propicks_radar_job import run_radar_scan
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("propicks_radar_scan", exc, tenant_id=tenant_id)
     try:
         lease = acquire_job_lease(
             "propicks_radar_scan",
@@ -2591,7 +2636,10 @@ def refresh_valuation_metrics(
             delay=delay_ms,
         )
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("refresh_valuation_metrics", exc, tenant_id=tenant_id)
     try:
         lease = acquire_job_lease(
             f"refresh_valuation_metrics:{tenant_id}",
@@ -2695,7 +2743,10 @@ def run_propicks_funnel(
     """
     from app.services.propicks_funnel_service import execute_run
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("run_propicks_funnel", exc, tenant_id=tenant_id)
     try:
         run = execute_run(db, top_n=100)
         # Bootstrap del track record: el congelado mensual corre el dia 1, asi
@@ -2727,7 +2778,10 @@ def freeze_propicks_snapshot(
     """Snapshot mensual congelado (point-in-time) del embudo ProPicks."""
     from app.services.propicks_snapshot_service import freeze_monthly_snapshot
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("freeze_propicks_snapshot", exc, tenant_id=tenant_id)
     try:
         row = freeze_monthly_snapshot(db)
         return {
@@ -2750,7 +2804,10 @@ def ingest_spy_daily(
     """Ingesta diaria de la serie SPY (Yahoo, gratis) en benchmark_prices."""
     from app.services.propicks_track_record_service import ingest_spy_prices
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("ingest_spy_daily", exc, tenant_id=tenant_id)
     try:
         result = ingest_spy_prices(db)
         return {"actor": "ingest_spy_daily", **result}
@@ -2878,7 +2935,10 @@ def _run_dca_evaluation(
 
     if not get_settings().dca_evaluation_enabled:
         return {"status": "skipped", "actor": actor, "reason": "disabled"}
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error(actor, exc, tenant_id=tenant_id)
     try:
         lease = acquire_job_lease(
             f"evaluate_dca_signals:{tenant_id}",
@@ -2956,7 +3016,10 @@ def refresh_earnings_calendar(
     """Fechas de resultados de cartera + watchlist (Yahoo calendarEvents + NASDAQ)."""
     from app.services.earnings_dates_service import refresh_earnings_dates
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("refresh_earnings_calendar", exc, tenant_id=tenant_id)
     try:
         return {"actor": "refresh_earnings_calendar", **refresh_earnings_dates(db)}
     except Exception as exc:
@@ -2983,7 +3046,10 @@ def backfill_company_price_history(
     from app.models.entities import Company
     from app.services.market_close_sync import backfill_company_history
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("backfill_company_price_history", exc, tenant_id=tenant_id)
     try:
         company = db.get(Company, company_id)
         if company is None:
@@ -3440,7 +3506,10 @@ def dispatch_tracked_news_alerts(tenant_id: int | None = None, user_id: str | No
     from app.services.asts_spacex_signal import evaluate as evaluate_asts_signal
     from app.services.tracked_news_alerts import evaluate
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("dispatch_tracked_news_alerts", exc, tenant_id=tenant_id)
     try:
         lease = acquire_job_lease(
             f"dispatch_tracked_news_alerts:{tenant_id}",
@@ -4161,7 +4230,10 @@ def reconcile_alert_analyses(tenant_id: int | None = None, user_id: str | None =
     actor_name = "reconcile_alert_analyses"
     from app.services.alert_analysis_service import reconcile_missing_analyses
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("reconcile_alert_analyses", exc, tenant_id=tenant_id)
     try:
         lease = acquire_job_lease(
             f"reconcile_alert_analyses:{tenant_id}",
@@ -5350,7 +5422,10 @@ def generate_sotp_agents_job(run_id: int) -> None:
 def refresh_paper_trades(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     from app.services.paper_trading_service import refresh_trades
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("refresh_paper_trades", exc, tenant_id=tenant_id)
     try:
         # status ok explicito: sin el la marca de coalescencia nunca quedaba
         # fresca (el decorador solo conserva el claim con status "ok").
@@ -5373,7 +5448,10 @@ def propose_paper_trades(tenant_id: int | None = None, user_id: str | None = Non
     """
     from app.services.paper_feed_service import run_feed
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("propose_paper_trades", exc, tenant_id=tenant_id)
     try:
         return {"actor": "propose_paper_trades", **_run(run_feed(db))}
     except Exception as exc:
@@ -5397,7 +5475,10 @@ def sync_paper_dividends(tenant_id: int | None = None, user_id: str | None = Non
     from app.services.async_bridge import run_from_any_context
     from app.services.dividend_ingestion_service import DividendIngestionService
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("sync_paper_dividends", exc, tenant_id=tenant_id)
     try:
         tickers = [
             t
@@ -5582,7 +5663,10 @@ def evaluate_manual_dca(run_id: int, token: str, tenant_id: int, user_id: str) -
     """Execute an accepted, bounded manual batch outside the HTTP request."""
     from app.services.dca_manual_job import run_manual_job
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("evaluate_manual_dca", exc, tenant_id=tenant_id)
     try:
         return run_manual_job(db, run_id, token)
     finally:
@@ -5801,7 +5885,10 @@ def recompute_management_alignment(tenant_id: int | None = None, user_id: str | 
     from app.models.entities import Company, ManagementAlignmentSnapshot
     from app.services.earnings_dates_service import followed_companies
     from app.services.management_alignment import recompute_alignment
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("recompute_management_alignment", exc, tenant_id=tenant_id)
     try:
         if company_id is not None:
             companies = list(db.scalars(select(Company).where(Company.id == company_id)))
