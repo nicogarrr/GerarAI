@@ -239,3 +239,20 @@ def test_routes_need_user_context_and_reject_bad_models(db):
     with pytest.raises(HTTPException) as no_user:
         get_user_sotp("ASTS", db)
     assert no_user.value.status_code == 403
+
+
+@pytest.mark.parametrize('stated', [0.0, None, -5.0, 20.0])
+def test_stated_gap_treats_zero_as_a_value_not_missing(stated):
+    raw = {
+        'base_year': 2026, 'valuation_year': 2026, 'discount_rate': 0.1,
+        'shares_current': 10,
+        'parts': [{'name': 'Business', 'ebitda': 10, 'multiple': 10}],
+        'stated_value_per_share': stated,
+        'scenarios': [{'key': 'same', 'label': 'Same arithmetic', 'revenue_factor': 1,
+                       'stated_value_per_share': stated}],
+    }
+    out = run_user_sotp(_model(raw))
+    assert out['value_per_share'] == 10.0
+    expected = None if stated is None else stated / 10.0 - 1.0
+    assert out['stated_gap'] == expected
+    assert out['stated_gap'] == out['scenarios'][0]['stated_gap']
