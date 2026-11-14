@@ -55,6 +55,7 @@ _NEUTRAL_HINTS = (
     "notional",
     "tender offer",
     "off-market transfer",
+    "bonus deferral",
 )
 
 
