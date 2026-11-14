@@ -1,0 +1,93 @@
+name: Backend latency benchmark (manual, advisory)
+
+# Dedicated runner and serial suite, not a claim of physical hardware isolation.
+# No PR/push trigger: this is advisory and creates no automatic runner workload.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-perf-benchmark-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  benchmark:
+    name: Backend wall time (advisory)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: data-engine
+    env:
+      APP_ENV: test
+      WORKERS_ENABLED: "false"
+      PERF_GUARD_ENFORCE_WALL_TIME: "1"
+      CAVAAI_ENABLE_VECTOR_INGEST: "0"
+      CAVAAI_ENABLE_VECTOR_CHAT: "0"
+      CAVAAI_ENABLE_VECTOR_SEARCH: "0"
+      HF_HUB_OFFLINE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+      - name: Runner environment
+        id: environment
+        run: |
+          mkdir -p perf-benchmark
+          {
+            printf 'sha=%s\nrun=%s\n' "$GITHUB_SHA" "$GITHUB_RUN_ID"
+            date -u
+            uname -a
+            lscpu
+            free -m
+            uptime
+            df -h .
+          } > perf-benchmark/environment.txt
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.12.5"
+          enable-cache: true
+          cache-dependency-glob: "data-engine/uv.lock"
+      - name: Frozen test dependencies
+        run: uv sync --frozen --extra test --extra dev --no-install-project
+      - name: Serial latency measurement (no coverage or xdist)
+        id: measure
+        run: |
+          set -o pipefail
+          uv run --frozen python -m pytest tests/test_perf_guard_query_budgets.py \
+            -o addopts='' -o junit_family=legacy \
+            --junitxml=perf-benchmark/junit.xml --durations=0 -v --tb=short \
+            2>&1 | tee perf-benchmark/pytest.log
+      - name: Runner environment after measurement
+        if: always()
+        run: |
+          mkdir -p perf-benchmark
+          { date -u; uptime; free -m; } > perf-benchmark/environment-after.txt
+      - name: Upload benchmark evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-perf-${{ github.sha }}-${{ github.run_attempt }}
+          path: data-engine/perf-benchmark/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Benchmark summary
+        if: always()
+        env:
+          MEASUREMENT_OUTCOME: ${{ steps.measure.outcome }}
+        run: |
+          {
+            echo '## Backend latency benchmark (advisory)'
+            printf 'Measurement outcome: %s\n\n' "$MEASUREMENT_OUTCOME"
+            echo 'Serial suite, existing 2 s warm / 10 s cold limits, no coverage.'
+            echo 'JUnit contains per-case perf.warm_s and perf.cold_s properties.'
+            echo 'Artifact includes pytest.log, junit.xml and runner environment.'
+            echo 'A failed measurement remains recorded; this job does not block merging.'
+            echo 'Shared hosted hardware can still be noisy. Compare the same fixture and SHA.'
+          } >> "$GITHUB_STEP_SUMMARY"
