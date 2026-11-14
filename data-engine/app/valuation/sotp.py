@@ -375,7 +375,7 @@ def run_user_sotp(model: dict, *, price: float | None = None) -> dict:
         "price": price,
         "vs_price": _vs_price(base["value_per_share"], price),
         "stated_value_per_share": stated,
-        "stated_gap": (stated / base["value_per_share"] - 1.0) if (stated and base["value_per_share"]) else None,
+        "stated_gap": (stated / base["value_per_share"] - 1.0) if (stated is not None and base["value_per_share"]) else None,
         # Parte del precio actual que ya cubren las partes, de mayor a menor.
         "price_covered_by": _price_covered_by(base["rows"], price),
         "scenarios": scenarios,
