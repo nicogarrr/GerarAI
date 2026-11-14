@@ -274,12 +274,12 @@ def test_marca_intradia_solo_con_la_sesion_en_curso():
     assert mt.compute_themes(c, [_basket("T", ["X"])], generated_at=cerrado)["intraday"] is False
 
 
-def test_intradia_se_recalcula_al_servir_y_no_se_queda_del_momento_de_generar():
+def test_cached_intraday_snapshot_is_not_promoted_to_close_by_clock():
     from datetime import UTC, datetime
 
     cached = {"as_of": "2026-10-12", "intraday": True, "status": "ok"}
-    # 16:30 ET (20:30 UTC, octubre = EDT): ya es cierre aunque se generase a las 15:30 ET.
-    assert mt.with_live_intraday(cached, datetime(2026, 10, 12, 20, 30, tzinfo=UTC))["intraday"] is False
+    # Cambia el contrato: el reloj posterior al cierre no acredita otra descarga.
+    assert mt.with_live_intraday(cached, datetime(2026, 10, 12, 20, 30, tzinfo=UTC))["intraday"] is True
     assert mt.with_live_intraday(cached, datetime(2026, 10, 12, 19, 30, tzinfo=UTC))["intraday"] is True
     assert mt.with_live_intraday({"as_of": None, "status": "sin_datos"}) == {
         "as_of": None,
@@ -367,3 +367,13 @@ def test_yahoo_caido_no_relanza_la_descarga_en_cada_visita_ni_encola_peticiones(
     clock["now"] = mt.FAILED_TTL_SECONDS + 1
     cache.get(lambda: {"symbols_with_data": 3, "themes": [1]})
     assert cache.get(outage)["themes"] == [1]  # el dato bueno manda en cuanto vuelve Yahoo
+
+
+def test_cached_intraday_keeps_date_and_quality_days_later():
+    payload = {"as_of": "2026-10-12", "intraday": True, "generated_at": "2026-10-12T19:30:00+00:00", "stale": True, "status": "ok"}
+    assert mt.with_live_intraday(payload, datetime(2026, 10, 15, 22, 30, tzinfo=UTC)) == payload
+
+
+def test_actual_close_snapshot_stays_close():
+    payload = {"as_of": "2026-10-12", "intraday": False, "generated_at": "2026-10-12T21:30:00+00:00", "status": "ok"}
+    assert mt.with_live_intraday(payload, datetime(2026, 10, 13, 14, 30, tzinfo=UTC)) == payload
