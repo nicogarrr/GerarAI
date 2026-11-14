@@ -141,7 +141,9 @@ def comparison(db: Session, company_id: int, form: str, page: int) -> dict[str, 
             Document.tenant_id == tenant, Document.company_id == company_id,
             Document.metadata_["form"].as_string() == form,
         ).limit(MAX_DOCUMENTS)).all()
-        if official_document(doc) and reported_period(doc.metadata_ or {}) is not None
+        if official_document(doc)
+        and (period := reported_period(doc.metadata_ or {})) is not None
+        and period <= date.today()
     ]
     documents.sort(key=lambda d: (reported_period(d.metadata_ or {}), d.id), reverse=True)
     base: dict[str, Any] = {"form": form, "page": page, "total": len(documents)}
