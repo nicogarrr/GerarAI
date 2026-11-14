@@ -1,8 +1,8 @@
 /**
  * Orden final de las filas de la watchlist una vez cotizadas.
  *
- * - «added» (por defecto): con streaming (decisión de diseño 2026-11-14,
- *   pendiente de OK de producto) la página pinta
+ * - «added» (por defecto): con streaming (decisión de diseño, 2026-11-14)
+ *   la página pinta
  *   en el orden del backend (recientes primero) desde el primer byte y cada
  *   fila se repinta EN EL SITIO cuando llega su cotización: una fila sin
  *   precio YA NO se hunde al final. Reordenar tras el pintado movería filas

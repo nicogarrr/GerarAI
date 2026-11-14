@@ -315,8 +315,8 @@ export default async function WatchlistPage({
             default: return null;
         }
     };
-    // Contrato de orden (decisión de diseño 2026-11-14, pendiente de OK de
-    // producto): sin orden por métrica la
+    // Contrato de orden (decisión de diseño, 2026-11-14): sin orden por
+    // métrica la
     // página pinta en el orden de la watchlist desde el primer byte y cada
     // fila se repinta en el sitio al llegar su cotización. Una fila sin
     // precio YA NO se hunde al final (antes sortWatchlistRows lo hacía porque
