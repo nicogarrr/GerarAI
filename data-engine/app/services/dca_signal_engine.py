@@ -309,6 +309,11 @@ def evaluate_series(
     veredicto formado con el lleva ``close_kind="live"``. Un valor no finito
     o no positivo se ignora (la formula sigue con cierres).
     """
+    # Truncate daily observations before grouping: a later candle in the same
+    # period must not replace the close/low available on the requested day.
+    # This also prevents a future period from suppressing today's live quote.
+    if today is not None:
+        bars = (bar for bar in bars if bar.day <= today)
     months = period_closes(bars, period)
     periods_per_year = PERIODS_PER_YEAR[period]
     live_period: str | None = None
