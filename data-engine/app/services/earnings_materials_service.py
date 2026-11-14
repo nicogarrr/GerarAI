@@ -286,6 +286,9 @@ async def resolve_materials(
     ):
         return _result("no_disponible")
     foreign = is_foreign_private_issuer(submissions)
+    required_columns = ("filingDate", "accessionNumber") + (() if foreign else ("items",))
+    if any(len(recent.get(name, [])) != len(recent.get("form", [])) for name in required_columns):
+        return _result("no_disponible")
     filing = (
         pick_results_filing(submissions, event_date, forms=("6-K", "6-K/A"), require_results_item=False)
         if foreign
