@@ -37,7 +37,7 @@ from app.services.own_consensus import (
     period_end,
 )
 
-ACCURACY_VERSION = "acierto_estimaciones v1"
+ACCURACY_VERSION = "acierto_estimaciones v2"
 # Solo se aparta un caso cuando la cifra real y la estimada no pueden estar en la misma unidad:
 # una está ~1.000 o ~1.000.000 de veces la otra (miles frente a unidades, millones frente a
 # unidades). Todo lo demás es un fallo (o un acierto) de previsión y cuenta, aunque sea grande o
@@ -45,11 +45,9 @@ ACCURACY_VERSION = "acierto_estimaciones v1"
 # inverosímil). Lo apartado se ve en el caso, con su motivo, y se cuenta en el resumen.
 SCALE_FACTORS = (1e3, 1e6)
 SCALE_TOLERANCE_DECADES = 0.5  # ±0,5 órdenes de magnitud alrededor de ×1.000 o ×1.000.000
-# Error extremo: se marca (visible), pero cuenta. En los ingresos (no cambian de signo ni se
-# multiplican por tres en un año frente a la guía) un real a más de 3 veces, o menos de un tercio,
-# de la estimación es una lectura errónea: se aparta con su motivo (y se cuenta en el resumen).
+# Un error grande no demuestra una lectura errónea ni una escala distinta.
+# Cuenta en la precisión y confianza, con aviso visible, incluso para ingresos.
 EXTREME_RATIO = 3.0
-STABLE_METRICS = frozenset({"revenue"})
 
 
 def scale_mismatch(actual: float, estimate: float) -> str | None:
@@ -100,8 +98,6 @@ def cases(estimates: Sequence[Estimate], actuals: Mapping[str, Mapping[str, Actu
         end = period_end(period, fy_month.get(metric, 12), offset.get(metric, 0))
         ratio = real.value / e.mid
         excluded = scale_mismatch(real.value, e.mid)
-        if not excluded and metric in STABLE_METRICS and not (1 / EXTREME_RATIO <= ratio <= EXTREME_RATIO):
-            excluded = f"lectura_inverosímil: el dato real es {ratio:.2f} veces la estimación"
         flags = []
         if not excluded and ratio < 0:
             flags.append("signo_contrario: el dato real tiene el signo opuesto a la estimación")
