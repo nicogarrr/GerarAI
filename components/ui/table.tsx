@@ -47,8 +47,12 @@ const Table = React.forwardRef<HTMLTableElement, TableProps>(
         ? { role: "region", "aria-label": regionLabel, tabIndex: 0 }
         : null)}
     >
+      {/* Las tablas responsivas cambian display (block md:table); medido 2024
+          (matriz navegador × lector de pantalla): VoiceOver + Safari anuncia
+          la tabla sin filas ni columnas. Los roles explícitos las restauran. */}
       <table
         ref={ref}
+        role="table"
         className={cn("w-full caption-bottom text-sm", className)}
         {...props}
       />
@@ -61,7 +65,7 @@ const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn("[&_tr]:border-b", className)} {...props} />
+  <thead ref={ref} role="rowgroup" className={cn("[&_tr]:border-b", className)} {...props} />
 ))
 TableHeader.displayName = "TableHeader"
 
@@ -71,6 +75,7 @@ const TableBody = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tbody
     ref={ref}
+    role="rowgroup"
     className={cn("[&_tr:last-child]:border-0", className)}
     {...props}
   />
@@ -98,6 +103,7 @@ const TableRow = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tr
     ref={ref}
+    role="row"
     className={cn(
       "border-b border-gray-700/50 transition-all duration-150 hover:bg-gray-700/30 data-[state=selected]:bg-gray-700/50",
       "group-data-[dense]/table:[&>th]:px-3 group-data-[dense]/table:[&>th]:py-2 group-data-[dense]/table:[&>th]:h-auto group-data-[dense]/table:[&>td]:p-2",
@@ -118,6 +124,7 @@ const TableHead = React.forwardRef<
 >(({ className, scope = "col", ...props }, ref) => (
   <th
     ref={ref}
+    role="columnheader"
     scope={scope}
     className={cn(
       "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
@@ -136,6 +143,7 @@ const TableCell = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <td
     ref={ref}
+    role="cell"
     className={cn(
       "p-4 align-middle [&:has([role=checkbox])]:pr-0",
       "group-data-[dense]/table:p-2",
