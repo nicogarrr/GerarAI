@@ -26,7 +26,14 @@ describe('textos de error del motor en español', () => {
     expect(spanishBackendMessage('Sin velas disponibles')).toBe('Sin velas disponibles');
     expect(spanishBackendMessage('rango maximo: 366 dias')).toBe('rango maximo: 366 dias');
     expect(spanishBackendMessage('La importación Flex no está habilitada para esta cuenta.')).toMatch(/^La importación Flex/);
-    expect(spanishBackendMessage('Thesis generation failed (ref ab12)')).toMatch(/\(ref ab12\)$/);
+    expect(spanishBackendMessage('Thesis generation failed (ref ab12)')).toBe('No se pudo generar la tesis (ref ab12). Inténtalo de nuevo.');
+  });
+
+  it('cubre los huecos de tesis: equipo de expertos, su ejecución y la generación fallida', () => {
+    expect(spanishBackendMessage('Expert team is off')).toBe('El equipo de expertos no está activado.');
+    expect(spanishBackendMessage('Expert thesis run not found')).toBe('No se encontró la ejecución del equipo de expertos.');
+    expect(spanishBackendMessage('Thesis generation failed (ref ab12)')).toBe('No se pudo generar la tesis (ref ab12). Inténtalo de nuevo.');
+    expect(spanishBackendMessage('Value error, Thesis generation failed (ref Zz-9)')).toBe('No se pudo generar la tesis (ref Zz-9). Inténtalo de nuevo.');
   });
 
   it('los toasts ya no mezclan idiomas («Holding no encontrado»)', () => {

@@ -39,6 +39,14 @@ export const BACKEND_ERROR_VALIDATION_KEY_LITERALS = [
   'errors.backendValidation.min10Decimals',
 ] as const;
 
+// Huecos de tesis (2026-11-14): textos también en el diccionario para no
+// subir el techo de literales de este archivo.
+export const BACKEND_ERROR_THESIS_KEY_LITERALS = [
+  'errors.backendThesis.expertTeamOff',
+  'errors.backendThesis.expertThesisRunNotFound',
+  'errors.backendThesis.generationFailedRef',
+] as const;
+
 /** Mensaje exacto del motor (en minúsculas) → clave de diccionario. */
 const VALIDATION_MESSAGES: [string, ValidationKey][] = [
   ['currency must be a currency code such as eur, usd or gbp', 'currencyCode'],
@@ -56,6 +64,7 @@ const VALIDATION_MESSAGES: [string, ValidationKey][] = [
 // abajo de un `<` crea un falso nodo JSX para el guard de i18n y le infla
 // el recuento de literales.
 const validationTexts: { [key: string]: string } = esErrors.backendValidation;
+const thesisTexts: { [key: string]: string } = esErrors.backendThesis;
 
 const GENERIC = 'No se pudo completar la operación. Inténtalo de nuevo.';
 const ENGINE_DOWN = 'El motor de análisis no responde ahora mismo. Reintenta en unos segundos.';
@@ -94,6 +103,9 @@ const EXACT: Record<string, string> = {
 // Las validaciones pydantic se cruzan desde el diccionario (ver arriba).
 for (const [message, key] of VALIDATION_MESSAGES) EXACT[message] = validationTexts[key];
 
+// Huecos de tesis (2026-11-14), también desde el diccionario.
+EXACT['expert team is off'] = thesisTexts.expertTeamOff;
+
 /** Sujeto de «X not found» → español. */
 const NOT_FOUND_SUBJECT: Record<string, string> = {
   company: 'No se encontró la empresa.',
@@ -123,6 +135,9 @@ const NOT_FOUND_SUBJECT: Record<string, string> = {
   review: 'No se encontró la revisión.',
   source: 'No se encontró la fuente.',
 };
+
+// Hueco de tesis (2026-11-14), desde el diccionario.
+NOT_FOUND_SUBJECT['expert thesis run'] = thesisTexts.expertThesisRunNotFound;
 
 const SPANISH_MARKS = /[áéíóúñü¿¡«»]/i;
 const ENGLISH_WORDS =
@@ -169,7 +184,12 @@ export function spanishBackendMessage(message: string | null | undefined, fallba
     return NOT_FOUND_SUBJECT[subject] ?? NOT_FOUND_GENERIC;
   }
 
-  // «Thesis generation failed (ref abc123)»: se conserva la referencia.
+  // «Thesis generation failed (ref abc123)»: aviso propio conservando la
+  // referencia (pydantic puede anteponer «Value error, »).
+  const thesisFailed = /^(?:value error,\s*)?thesis generation failed \(ref ([\w-]+)\)\s*$/i.exec(text);
+  if (thesisFailed) return thesisTexts.generationFailedRef.replace('{ref}', thesisFailed[1]);
+
+  // Cualquier otro texto inglés con «(ref X)»: se conserva la referencia.
   const ref = /\(ref ([\w-]+)\)\s*$/i.exec(text);
   if (looksEnglish(text)) {
     return ref ? `${fallback} (ref ${ref[1]})` : fallback;
