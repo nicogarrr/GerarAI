@@ -14,9 +14,11 @@ contexto del chat:
 2. Presupuesto absoluto: el número de sentencias no puede pasar de lo medido
    en main (``BUDGETS``) más un margen pequeño. Si una mejora lo baja,
    el test sigue verde; si se quiere fijar la mejora, se baja el número.
-3. Tiempo: presupuesto grueso (``TIME_BUDGET_S``), muy por encima de lo
-   medido, para que no dé falsos rojos con la máquina cargada: solo salta si
-   algo se vuelve un orden de magnitud más lento.
+3. Consultas tambien en caliente: mismo presupuesto absoluto que en frio.
+   Tiempo de reloj: telemetria en JUnit, NO un guard determinista en un runner
+   compartido. Para exigir los limites historicos de 2/10 s en una ejecucion
+   controlada: PERF_GUARD_ENFORCE_WALL_TIME=1 pytest ... --junitxml=perf.xml
+   Este guard SQL no detecta por si solo regresiones de CPU, I/O o memoria.
 
 Herméticos: la DB sqlite de la suite (conftest), tenants y tickers propios
 de este fichero, sin red ni LLM (el chat usa un proveedor stub).
@@ -30,6 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import re
 import time
 from contextlib import contextmanager
@@ -361,6 +364,26 @@ WARM_TIME_BUDGET_S = 2.0
 COLD_TIME_BUDGET_S = 10.0
 
 
+def _check_wall_time(label: str, run: dict, record_property, *, enforce: bool) -> None:
+    """Always retain measured wall time; gate only on a controlled benchmark."""
+    record_property("perf.warm_s", run["warm_s"])
+    record_property("perf.cold_s", run["cold_s"])
+    if enforce:
+        assert run["warm_s"] < WARM_TIME_BUDGET_S, (
+            f"{label}: {run['warm_s']:.5f} s en caliente (> {WARM_TIME_BUDGET_S} s)"
+        )
+        assert run["cold_s"] < COLD_TIME_BUDGET_S, (
+            f"{label}: {run['cold_s']:.5f} s en frío (> {COLD_TIME_BUDGET_S} s)"
+        )
+
+
+def _check_warm_queries(label: str, statements: list[str], *, budget: int) -> None:
+    assert len(statements) <= _allowed(budget), (
+        f"{label}: {len(statements)} consultas en caliente "
+        f"(presupuesto {budget}, máximo {_allowed(budget)})"
+    )
+
+
 def _allowed(budget: int) -> int:
     """Presupuesto + margen pequeño (20 %, mínimo 2) para no frenar un cambio legítimo."""
     return budget + max(2, budget // 5)
@@ -392,13 +415,14 @@ def endpoint_runs(perf_world):
     for path in BUDGETS:
         res_l, stmts_l, cold_l = _get(perf_world, "large", path)
         res_s, stmts_s, cold_s = _get(perf_world, "small", path)
-        res_w, _, warm = _get(perf_world, "large", path)
+        res_w, stmts_w, warm = _get(perf_world, "large", path)
         runs[path] = {
             "large": res_l,
             "small": res_s,
             "warm": res_w,
             "stmts_large": stmts_l,
             "stmts_small": stmts_s,
+            "stmts_warm": stmts_w,
             "cold_s": max(cold_l, cold_s),
             "warm_s": warm,
         }
@@ -423,14 +447,11 @@ def test_consultas_por_endpoint_no_crecen_con_la_cartera(endpoint_runs, path):
 
 
 @pytest.mark.parametrize("path", list(BUDGETS))
-def test_tiempo_por_endpoint(endpoint_runs, path):
+def test_presupuesto_caliente_y_telemetria(endpoint_runs, path, record_property):
     run = endpoint_runs[path]
-    assert run["warm_s"] < WARM_TIME_BUDGET_S, (
-        f"{path}: {run['warm_s']:.2f} s en caliente (> {WARM_TIME_BUDGET_S} s)"
-    )
-    assert run["cold_s"] < COLD_TIME_BUDGET_S, (
-        f"{path}: {run['cold_s']:.2f} s en frío (> {COLD_TIME_BUDGET_S} s)"
-    )
+    _check_warm_queries(path, run["stmts_warm"], budget=BUDGETS[path])
+    _check_wall_time(path, run, record_property,
+                     enforce=os.environ.get("PERF_GUARD_ENFORCE_WALL_TIME") == "1")
 
 
 def test_la_semilla_llega_a_las_respuestas(endpoint_runs):
@@ -495,12 +516,14 @@ def chat_runs(perf_world):
     for question in CHAT_BUDGETS:
         resp_l, stmts_l, t_l = _chat(perf_world, "large", question)
         resp_s, stmts_s, t_s = _chat(perf_world, "small", question)
-        _, _, warm = _chat(perf_world, "large", question)
+        resp_w, stmts_w, warm = _chat(perf_world, "large", question)
         runs[question] = {
             "large": resp_l,
             "small": resp_s,
+            "warm": resp_w,
             "stmts_large": stmts_l,
             "stmts_small": stmts_s,
+            "stmts_warm": stmts_w,
             "cold_s": max(t_l, t_s),
             "warm_s": warm,
         }
@@ -508,9 +531,9 @@ def chat_runs(perf_world):
 
 
 @pytest.mark.parametrize("question", list(CHAT_BUDGETS))
-def test_contexto_del_chat_no_crece_con_la_cartera(chat_runs, question):
+def test_contexto_del_chat_no_crece_con_la_cartera(chat_runs, question, record_property):
     run = chat_runs[question]
-    assert run["large"].answer and run["small"].answer
+    assert run["large"].answer and run["small"].answer and run["warm"].answer
     small, large = run["stmts_small"], run["stmts_large"]
     assert len(large) == len(small), (
         f"N+1 en el chat «{question}»: {len(small)} consultas con {SMALL} posiciones y {len(large)} con {LARGE}. "
@@ -520,8 +543,9 @@ def test_contexto_del_chat_no_crece_con_la_cartera(chat_runs, question):
     assert len(large) <= _allowed(budget), (
         f"chat «{question}» hace {len(large)} consultas (presupuesto {budget}, máximo {_allowed(budget)})"
     )
-    assert run["warm_s"] < WARM_TIME_BUDGET_S
-    assert run["cold_s"] < COLD_TIME_BUDGET_S
+    _check_warm_queries(question, run["stmts_warm"], budget=budget)
+    _check_wall_time(question, run, record_property,
+                     enforce=os.environ.get("PERF_GUARD_ENFORCE_WALL_TIME") == "1")
 
 
 # ------------------------------------------------------- el guardia funciona

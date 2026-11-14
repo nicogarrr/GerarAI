@@ -1,0 +1,366 @@
+{
+  "default": [
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/positions?page=1&page_size=200]",
+      "perf.warm_s": 0.01458629200010364,
+      "perf.cold_s": 1.0829348409999966
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/summary]",
+      "perf.warm_s": 0.01283096200018008,
+      "perf.cold_s": 0.020155687999931615
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist]",
+      "perf.warm_s": 0.012631742000166923,
+      "perf.cold_s": 0.5199025719998644
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/transactions?offset=0&limit=50]",
+      "perf.warm_s": 0.013052956000137783,
+      "perf.cold_s": 0.017916397999897526
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/transactions/page?limit=50&offset=0]",
+      "perf.warm_s": 0.01321508899991386,
+      "perf.cold_s": 0.013610193999966214
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/snapshots?page=1&page_size=200]",
+      "perf.warm_s": 0.01225299299994731,
+      "perf.cold_s": 0.014909818999967683
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/tearsheet]",
+      "perf.warm_s": 0.011806217999946966,
+      "perf.cold_s": 0.012849750999976095
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/forecast]",
+      "perf.warm_s": 0.012666337999917232,
+      "perf.cold_s": 0.018111561000068832
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/dividends]",
+      "perf.warm_s": 0.012216002000059234,
+      "perf.cold_s": 0.015435498999977426
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/dividends/projection]",
+      "perf.warm_s": 0.01321257500012507,
+      "perf.cold_s": 0.016804314999944836
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/data-quality]",
+      "perf.warm_s": 0.012236416999940047,
+      "perf.cold_s": 0.014532949000113149
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/risk/dashboard]",
+      "perf.warm_s": 0.012764758000002985,
+      "perf.cold_s": 0.06582380300005752
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/intelligence]",
+      "perf.warm_s": 0.032647156999928484,
+      "perf.cold_s": 0.2149378669998896
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/risk-matrix]",
+      "perf.warm_s": 0.017886266999994405,
+      "perf.cold_s": 0.02452201200003401
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist/dca-signals]",
+      "perf.warm_s": 0.01354434199993193,
+      "perf.cold_s": 0.022150292000105765
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist/attention-thesis]",
+      "perf.warm_s": 0.0121658349999052,
+      "perf.cold_s": 0.016128180999885444
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist/monitor?tickers={watch}]",
+      "perf.warm_s": 0.016751612999996723,
+      "perf.cold_s": 0.02609934800011615
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/snapshot]",
+      "perf.warm_s": 0.014743699000064225,
+      "perf.cold_s": 0.024523897999870314
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/facts?limit=250]",
+      "perf.warm_s": 0.012380597999936072,
+      "perf.cold_s": 0.013657674000114639
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/metrics/calculated]",
+      "perf.warm_s": 0.011383091999960016,
+      "perf.cold_s": 0.014014455000051385
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/ttm]",
+      "perf.warm_s": 0.012334499999951731,
+      "perf.cold_s": 0.01324482299992269
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/valuation/{lead}]",
+      "perf.warm_s": 0.02108903399994233,
+      "perf.cold_s": 0.04083887299998423
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/peers/comparison]",
+      "perf.warm_s": 0.021320119999927556,
+      "perf.cold_s": 0.029265538000117886
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/decision-journal]",
+      "perf.warm_s": 0.011375937999900998,
+      "perf.cold_s": 0.015447763999873132
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/memory/thesis/{lead}/changes?limit=100]",
+      "perf.warm_s": 0.013049875999968208,
+      "perf.cold_s": 0.5642173829999138
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/alerts?ticker={lead}&include_snoozed=true]",
+      "perf.warm_s": 0.011538061999999627,
+      "perf.cold_s": 0.01458414100011396
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/reviews?ticker={lead}]",
+      "perf.warm_s": 0.011990616000048249,
+      "perf.cold_s": 0.013415023999868936
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfC\\xf3mo va mi cartera?]",
+      "perf.warm_s": 0.0026691630000641453,
+      "perf.cold_s": 0.08592043299995566
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfCu\\xe1nto tengo invertido?]",
+      "perf.warm_s": 0.0016563639999276347,
+      "perf.cold_s": 0.0019611710001754545
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfCu\\xe1l es mi mayor posici\\xf3n?]",
+      "perf.warm_s": 0.0022529309999299585,
+      "perf.cold_s": 0.002287612999907651
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfQu\\xe9 tal va mi {lead}?]",
+      "perf.warm_s": 0.0016331520000676392,
+      "perf.cold_s": 0.001738463000037882
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfQu\\xe9 opinas de {lead}?]",
+      "perf.warm_s": 0.010584771999901932,
+      "perf.cold_s": 0.0527769889999945
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[Analiza mi cartera]",
+      "perf.warm_s": 0.002709006000031877,
+      "perf.cold_s": 0.0027851040001678484
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfQu\\xe9 riesgos ves en mi cartera?]",
+      "perf.warm_s": 0.00439298899982532,
+      "perf.cold_s": 0.005912453999826539
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfDeber\\xeda diversificar m\\xe1s?]",
+      "perf.warm_s": 0.0046282529999643884,
+      "perf.cold_s": 0.012366012000029514
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[Resume la tesis de {lead}]",
+      "perf.warm_s": 0.010707551999985299,
+      "perf.cold_s": 0.012836184999969191
+    }
+  ],
+  "controlled_wall_enforced": [
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/positions?page=1&page_size=200]",
+      "perf.warm_s": 0.03221284000005653,
+      "perf.cold_s": 3.5186721520001356
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/summary]",
+      "perf.warm_s": 0.029744134999873495,
+      "perf.cold_s": 0.04122227799985012
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist]",
+      "perf.warm_s": 0.029934144999970158,
+      "perf.cold_s": 1.9250231349999467
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/transactions?offset=0&limit=50]",
+      "perf.warm_s": 0.030860430000075212,
+      "perf.cold_s": 0.03853416900005868
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/transactions/page?limit=50&offset=0]",
+      "perf.warm_s": 0.03040171299994654,
+      "perf.cold_s": 0.030488796000099683
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/snapshots?page=1&page_size=200]",
+      "perf.warm_s": 0.028400460000057137,
+      "perf.cold_s": 0.033088279999901715
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/tearsheet]",
+      "perf.warm_s": 0.028142321999894193,
+      "perf.cold_s": 0.029694005000010293
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/forecast]",
+      "perf.warm_s": 0.029943018000039956,
+      "perf.cold_s": 0.039904375000105574
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/dividends]",
+      "perf.warm_s": 0.029271432999848912,
+      "perf.cold_s": 0.033981456999981674
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/dividends/projection]",
+      "perf.warm_s": 0.031514446000073804,
+      "perf.cold_s": 0.03975804500009872
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/data-quality]",
+      "perf.warm_s": 0.0290473469999597,
+      "perf.cold_s": 0.03160295899988341
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/risk/dashboard]",
+      "perf.warm_s": 0.030065897999975277,
+      "perf.cold_s": 0.2215171289999489
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/intelligence]",
+      "perf.warm_s": 0.05799243500018747,
+      "perf.cold_s": 0.24295795699981682
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/portfolio/risk-matrix]",
+      "perf.warm_s": 0.03632186799995907,
+      "perf.cold_s": 0.03975973399997201
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist/dca-signals]",
+      "perf.warm_s": 0.03734679700005472,
+      "perf.cold_s": 0.04492986100012786
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist/attention-thesis]",
+      "perf.warm_s": 0.028925833999892347,
+      "perf.cold_s": 0.03647389100001419
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/watchlist/monitor?tickers={watch}]",
+      "perf.warm_s": 0.034639736000144694,
+      "perf.cold_s": 0.053641806999848995
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/snapshot]",
+      "perf.warm_s": 0.032035812000003716,
+      "perf.cold_s": 0.05014178400006131
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/facts?limit=250]",
+      "perf.warm_s": 0.028340537000076438,
+      "perf.cold_s": 0.03251551100015604
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/metrics/calculated]",
+      "perf.warm_s": 0.02728946399997767,
+      "perf.cold_s": 0.030170970999961355
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/ttm]",
+      "perf.warm_s": 0.028633930000069086,
+      "perf.cold_s": 0.03102429899990966
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/valuation/{lead}]",
+      "perf.warm_s": 0.04427261599994381,
+      "perf.cold_s": 0.06639416100006201
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/peers/comparison]",
+      "perf.warm_s": 0.044683116999976846,
+      "perf.cold_s": 0.05925877699996818
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/companies/{lead}/decision-journal]",
+      "perf.warm_s": 0.02743767999982083,
+      "perf.cold_s": 0.030306948999850647
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/memory/thesis/{lead}/changes?limit=100]",
+      "perf.warm_s": 0.02885062499990454,
+      "perf.cold_s": 1.4125341540000136
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/alerts?ticker={lead}&include_snoozed=true]",
+      "perf.warm_s": 0.02850182300016968,
+      "perf.cold_s": 0.032646383999917816
+    },
+    {
+      "test": "test_presupuesto_caliente_y_telemetria[/api/reviews?ticker={lead}]",
+      "perf.warm_s": 0.028302557000188244,
+      "perf.cold_s": 0.03108739999993304
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfC\\xf3mo va mi cartera?]",
+      "perf.warm_s": 0.004440419000047768,
+      "perf.cold_s": 0.5269878659998994
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfCu\\xe1nto tengo invertido?]",
+      "perf.warm_s": 0.0029519909999180527,
+      "perf.cold_s": 0.007972163999966142
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfCu\\xe1l es mi mayor posici\\xf3n?]",
+      "perf.warm_s": 0.003706998999859934,
+      "perf.cold_s": 0.003899207000131355
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfQu\\xe9 tal va mi {lead}?]",
+      "perf.warm_s": 0.002743439000141734,
+      "perf.cold_s": 0.004569078000031368
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfQu\\xe9 opinas de {lead}?]",
+      "perf.warm_s": 0.02009065299989743,
+      "perf.cold_s": 0.07721857499996077
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[Analiza mi cartera]",
+      "perf.warm_s": 0.0045069739999235026,
+      "perf.cold_s": 0.004871825000009267
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfQu\\xe9 riesgos ves en mi cartera?]",
+      "perf.warm_s": 0.007343246000118597,
+      "perf.cold_s": 0.01048346900006436
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[\\xbfDeber\\xeda diversificar m\\xe1s?]",
+      "perf.warm_s": 0.008246310999993511,
+      "perf.cold_s": 0.06088849599996138
+    },
+    {
+      "test": "test_contexto_del_chat_no_crece_con_la_cartera[Resume la tesis de {lead}]",
+      "perf.warm_s": 0.018986916000130805,
+      "perf.cold_s": 0.02536851599984402
+    }
+  ]
+}
