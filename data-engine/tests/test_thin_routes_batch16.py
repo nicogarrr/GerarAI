@@ -585,7 +585,7 @@ def test_compute_themes_payload_delega(monkeypatch):
 
 def test_market_themes_ranking(monkeypatch):
     monkeypatch.setattr(m, "_compute_themes_payload", lambda: {"themes": [1]})
-    monkeypatch.setattr(m, "_themes_cache", SimpleNamespace(get=lambda fn: fn()))
+    monkeypatch.setattr(m, "_themes_cache", SimpleNamespace(get_background=lambda fn: fn()))
     monkeypatch.setattr(
         m.market_themes, "with_live_intraday", lambda payload: {"live": payload}
     )
