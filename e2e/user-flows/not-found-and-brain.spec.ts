@@ -1,5 +1,7 @@
 import { expect, expectHealthyPage, runUiE2E, test, VIEWPORTS, visit } from "./support";
 
+import { isDisabledChatAvailabilityResponse } from "./brain-request-classifier";
+
 for (const vp of VIEWPORTS) {
   test.describe(`404 y Cerebro (${vp.name})`, () => {
     test.skip(!runUiE2E, "Set E2E_UI_RUN=1 E2E_USER_FLOWS=1 to run the user-flow suite.");
@@ -45,7 +47,8 @@ for (const vp of VIEWPORTS) {
     test("el Cerebro se abre y pinta su panel (LLM simulado, sin enviar nada)", async ({ page }) => {
       // Nada del Cerebro puede llegar a un modelo real: el asistente de
       // research se responde con un stub, y abrir el panel no puede disparar
-      // ninguna server action (el chat va por chatWithPortfolio).
+      // una acción de generación (el chat va por chatWithPortfolio).
+      // Consultar disponibilidad desactivada no llama al modelo.
       const llmCalls: string[] = [];
       await page.route(/\/api\/research\/assistant/, async (route) => {
         llmCalls.push(route.request().url());
@@ -54,8 +57,16 @@ for (const vp of VIEWPORTS) {
       await visit(page, "/inicio");
       const open = page.getByRole("button", { name: "Abrir el cerebro" }).first();
       await expect(open).toBeVisible();
+      const actionChecks: Promise<void>[] = [];
       page.on("request", (req) => {
-        if (req.method() === "POST" && req.headers()["next-action"]) llmCalls.push(`server-action ${req.url()}`);
+        if (req.method() !== "POST" || !req.headers()["next-action"]) return;
+        actionChecks.push((async () => {
+          try {
+            const response = await req.response();
+            if (response?.ok() && isDisabledChatAvailabilityResponse(await response.text())) return;
+          } catch { /* Unreadable/failed actions are not safe to exclude. */ }
+          llmCalls.push(`server-action ${req.url()}`);
+        })());
       });
       await open.click();
       const panel = page.getByRole("dialog").or(page.getByRole("complementary")).filter({ hasText: /Cerebro|cerebro/ }).first();
@@ -65,6 +76,7 @@ for (const vp of VIEWPORTS) {
       await page.keyboard.press("Escape");
       await expect(panel).toBeHidden({ timeout: 10_000 });
       // Abrir no envía nada al modelo.
+      await Promise.all(actionChecks);
       expect(llmCalls).toEqual([]);
     });
   });
