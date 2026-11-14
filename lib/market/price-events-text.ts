@@ -23,7 +23,9 @@ function resultsText(event: PriceEvent, t: TranslateFn): PriceEvent {
   const title = event.title === 'Resultados'
     ? t('research.chart.storedEvent.resultsTitle')
     : label ? t('research.chart.storedEvent.resultsTitleLabel', { label: label[1] }) : event.title;
-  const detail = event.detail === 'Fecha confirmada por la fuente' ? t('research.chart.storedEvent.resultsConfirmed') : event.detail;
+  const detail = event.detail === 'Fecha confirmada por la fuente' ? t('research.chart.storedEvent.resultsConfirmed')
+    : event.detail === 'Fecha estimada por la fuente; puede cambiar' ? t('research.chart.storedEvent.resultsEstimated')
+    : event.detail === 'La fuente no indica si la fecha está confirmada' ? t('research.chart.storedEvent.resultsUnknown') : event.detail;
   return { ...event, title, detail };
 }
 

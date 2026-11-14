@@ -582,7 +582,11 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             "date": row.event_date.isoformat(),
             "kind": "results",
             "title": f"Resultados {row.fiscal_label}" if row.fiscal_label else "Resultados",
-            "detail": "Fecha confirmada por la fuente" if row.confirmed else None,
+            "detail": (
+                "Fecha confirmada por la fuente" if row.confirmed is True
+                else "Fecha estimada por la fuente; puede cambiar" if row.confirmed is False
+                else "La fuente no indica si la fecha está confirmada"
+            ),
             "source": source,
             "source_url": row.source_url,
         })
