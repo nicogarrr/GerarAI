@@ -48,4 +48,19 @@ describe('InsiderSignalsView responsiva (una fila por señal)', () => {
         // http:// no se enlaza.
         expect(within(rows[2]).queryByRole('link')).not.toBeInTheDocument();
     });
+
+    it('el orden DOM de la fila coincide con el orden visual en 390 (WCAG 1.3.2)', () => {
+        render(<InsiderSignalsView initialTicker="ASTS" initialResult={result()} initialFilings={filings()} />);
+        const rows = within(screen.getByRole('table')).getAllByRole('row');
+        const cells = within(rows[2]).getAllByRole('cell');
+        const texts = cells.map((c) => c.textContent ?? '');
+        // Orden visual medido en capturas 390: Senal, Fecha, Insider, Valor,
+        // Detalle. El lector de pantalla recorre el DOM: misma secuencia.
+        expect(texts[1]).toMatch(/oct 2026|01\/10\/2026/);
+        expect(texts[2]).toContain('Jane');
+        expect(texts[3]).toContain('US$');
+        expect(texts[4]).toContain('Compra grande');
+        // Sin clases order-N: la secuencia visual no puede divergir del DOM.
+        for (const cell of cells) expect(cell.className).not.toMatch(/\border-\d/);
+    });
 });
