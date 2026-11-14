@@ -590,14 +590,18 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             "source": source,
             "source_url": row.source_url,
         })
-    for row in db.scalars(
+    dividend_rows = db.scalars(
         select(DividendRecord).where(
             DividendRecord.company_id == company.id,
             DividendRecord.ex_date >= desde,
             DividendRecord.ex_date <= hasta,
             *tenant_filters(db, DividendRecord),
         )
-    ).all():
+    ).all()
+    from app.services.dividend_records import resolve_yahoo_events
+
+    usable, uncertain = resolve_yahoo_events(dividend_rows)
+    for row in usable:
         if not row.source:
             continue
         amount = _timeline_float(row.amount)
@@ -608,6 +612,16 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             "title": "Ex-dividendo",
             "detail": f"{amount:g} {row.currency} por acción" if amount else None,
             "source": row.source,
+            "source_url": None,
+        })
+    for group in uncertain:
+        events.append({
+            "id": f"dividend-uncertain-{group.company_id}-{group.ex_date}-{group.currency}",
+            "date": group.ex_date.isoformat(),
+            "kind": "ex_dividend",
+            "title": "Ex-dividendo",
+            "detail": "Importe incierto: la fuente guarda varios importes para esta fecha",
+            "source": "yahoo_finance",
             "source_url": None,
         })
     start_dt = datetime.combine(desde, datetime.min.time(), tzinfo=UTC)

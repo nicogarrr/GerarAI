@@ -34,7 +34,8 @@ function resultsText(event: PriceEvent, t: TranslateFn): PriceEvent {
 function dividendText(event: PriceEvent, t: TranslateFn): PriceEvent {
   const title = event.title === 'Ex-dividendo' ? t('research.chart.storedEvent.exDividendTitle') : event.title;
   const amount = event.detail ? DIVIDEND_DETAIL.exec(event.detail) : null;
-  const detail = amount ? t('research.chart.storedEvent.exDividendDetail', { amount: amount[1], currency: amount[2] }) : event.detail;
+  const detail = event.detail === sourceText('research.chart.storedEvent.exDividendUncertain')
+    ? t('research.chart.storedEvent.exDividendUncertain') : amount ? t('research.chart.storedEvent.exDividendDetail', { amount: amount[1], currency: amount[2] }) : event.detail;
   return { ...event, title, detail };
 }
 
