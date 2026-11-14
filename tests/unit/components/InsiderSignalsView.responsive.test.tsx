@@ -63,4 +63,16 @@ describe('InsiderSignalsView responsiva (una fila por señal)', () => {
         // Sin clases order-N: la secuencia visual no puede divergir del DOM.
         for (const cell of cells) expect(cell.className).not.toMatch(/\border-\d/);
     });
+
+    it('padding de celda: p-0 en movil, md:px-3 md:py-2 restaurado en escritorio', () => {
+        render(<InsiderSignalsView initialTicker="ASTS" initialResult={result()} initialFilings={filings()} />);
+        const rows = within(screen.getByRole('table')).getAllByRole('row');
+        // Regresion medida en captura 1440 (auditoria 2026-11-15): p-0 sin
+        // padding md dejaba Valor pegado a Detalle y Senal a Fecha.
+        for (const cell of within(rows[1]).getAllByRole('cell')) {
+            expect(cell.className).toContain('p-0');
+            expect(cell.className).toContain('md:px-3');
+            expect(cell.className).toContain('md:py-2');
+        }
+    });
 });
