@@ -326,3 +326,29 @@ def test_combined_touched_is_max_of_families() -> None:
     verdict = evaluate_series(bars, month_complete=True)[-1]
     assert verdict.touched_level == 4
     assert probe.touched_level is None or probe.touched_level < 4
+
+
+@pytest.mark.parametrize('period', ['month', 'week', 'quarter', 'year'])
+def test_future_daily_bars_cannot_change_as_of_verdicts(period):
+    params = replace(NICO_V0_PARAMS, min_months=3, signal='drawdown')
+    known = _month_end_bars([100.0] * 36)
+    today = known[-1].day
+    # A corrupt/prefetched future candle, including later in this same month,
+    # cannot be a price observation available at the requested date.
+    future = [DailyBar(today + timedelta(days=1), 1.0),
+              DailyBar(date(today.year + 1, 1, 15), 0.5)]
+    expected = evaluate_series(known, params=params, today=today, period=period)
+    actual = evaluate_series(iter(known + future), params=params, today=today, period=period)
+    assert actual == expected
+
+
+def test_future_prices_do_not_replace_the_current_live_quote():
+    params = replace(NICO_V0_PARAMS, min_months=3, signal='drawdown')
+    known = _month_end_bars([100.0] * 36)
+    today = known[-1].day
+    future = DailyBar(date(today.year + 1, 1, 15), 1.0)
+    expected = current_verdict(known, params=params, today=today, current_price=90.0)
+    actual = current_verdict(known + [future], params=params, today=today, current_price=90.0)
+    assert actual == expected
+    assert actual.close == 90.0
+    assert actual.close_kind == 'live'
