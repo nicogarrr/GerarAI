@@ -45,9 +45,16 @@ describe('InsiderFeed responsivo (una fila por operación)', () => {
     it('la fila única conserva etiquetas móviles, badges y enlaces de fuente', () => {
         render(<InsiderFeed feed={feed()} side="all" days={90} />);
         const rows = within(screen.getByRole('table')).getAllByRole('row');
-        for (const label of ['Fecha', 'Ticker', 'Insider', 'Cargo', 'Operación', 'Acciones', 'Precio', 'Importe']) {
+        // Móvil compacto (rejilla 2 col como la tarjeta antigua, medida a
+        // 390px): etiqueta solo en los campos numéricos; identidad y fecha se
+        // leen solas en la cabecera de la fila.
+        for (const label of ['Acciones', 'Precio', 'Importe']) {
             expect(within(rows[1]).getByText(label)).toBeInTheDocument();
         }
+        expect(rows[1].className).toContain('grid grid-cols-2');
+        expect(within(rows[1]).getByText(/oct 2026/)).toBeInTheDocument();
+        expect(within(rows[1]).getByText('Doe John')).toBeInTheDocument();
+        expect(within(rows[1]).getByText('CFO')).toBeInTheDocument();
         expect(within(rows[1]).getByText('3 tramos · precio medio')).toBeInTheDocument();
         expect(within(rows[1]).getByText('Plan 10b5-1')).toBeInTheDocument();
         expect(within(rows[1]).getByRole('link', { name: /12\.500/ })).toHaveAttribute('href', 'https://sec.gov/x');
