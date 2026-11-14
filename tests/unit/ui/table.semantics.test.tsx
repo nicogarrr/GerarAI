@@ -1,7 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // Las tablas responsivas del repo cambian display (block md:table, filas de
 // tarjeta en móvil). Medido 2024 (zellwk.com, matriz navegador × lector):
@@ -33,5 +33,46 @@ describe('semántica de tabla explícita (display responsivo)', () => {
         expect(container.querySelector('th')).toHaveAttribute('role', 'columnheader');
         expect(container.querySelector('th')).toHaveAttribute('scope', 'col');
         expect(container.querySelector('td')).toHaveAttribute('role', 'cell');
+    });
+
+    it('TableHead deriva role de scope: fila -> rowheader, columna -> columnheader', () => {
+        // <th scope="row|rowgroup"> es cabecera de FILA (rowheader); fijar
+        // role="columnheader" lo anunciaría mal aunque el scope diga lo
+        // contrario (auditor1, 2026-11-14).
+        const { container } = render(
+            <Table>
+                <TableBody>
+                    <TableRow>
+                        <TableHead scope="row">Total cartera</TableHead>
+                        <TableCell>100.000</TableCell>
+                    </TableRow>
+                    <TableRow>
+                        <TableHead scope="rowgroup">Renta variable</TableHead>
+                        <TableCell>60.000</TableCell>
+                    </TableRow>
+                    <TableRow>
+                        <TableHead scope="colgroup">Renta fija</TableHead>
+                        <TableCell>40.000</TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>,
+        );
+        const heads = container.querySelectorAll('th');
+        expect(heads[0]).toHaveAttribute('role', 'rowheader');
+        expect(heads[1]).toHaveAttribute('role', 'rowheader');
+        expect(heads[2]).toHaveAttribute('role', 'columnheader');
+    });
+
+    it('TableFooter también lleva role=rowgroup (mismo riesgo de display CSS)', () => {
+        const { container } = render(
+            <Table>
+                <TableFooter className="block">
+                    <TableRow>
+                        <TableCell>Total</TableCell>
+                    </TableRow>
+                </TableFooter>
+            </Table>,
+        );
+        expect(container.querySelector('tfoot')).toHaveAttribute('role', 'rowgroup');
     });
 });
