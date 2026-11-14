@@ -22,9 +22,10 @@ describe('Insider: etiqueta de lado internacionalizada', () => {
     assert.equal(en.feed.sideBuyLabel, 'Buy');
     assert.equal(en.feed.sideSellLabel, 'Sell');
   });
-  it('InsiderFeed pasa el traductor en ambas apariciones (movil y tabla)', () => {
+  it('InsiderFeed pasa el traductor en la fila única (tabla responsiva)', () => {
     const usos = feed.match(/\{sideLabel\(tx\.side, t\)\}/g) ?? [];
-    assert.equal(usos.length, 2);
+    // Tabla responsiva única (2026-11-14): una sola llamada por operación.
+    assert.equal(usos.length, 1);
     assert.doesNotMatch(feed, /\{sideLabel\(tx\.side\)\}/);
   });
   it('InsiderSignalsView pasa el traductor a insiderCodeLabel (codigos P/S)', () => {

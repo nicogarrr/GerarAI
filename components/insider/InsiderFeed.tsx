@@ -8,6 +8,7 @@ import type { TranslateFn as TFunction } from '@/lib/i18n/translate';
 import type { Formatters } from '@/lib/format';
 import type { InsiderFeedResult, InsiderFeedSignal, InsiderFeedTransaction } from '@/lib/actions/insider.actions';
 import { insiderName, insiderRole, isInstitutionalInsiderName, sideLabel } from '@/lib/insider/format';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 // La divisa es por operacion y siempre declarada (SEC = USD, PDMR UK = GBP);
 // nunca se asume una ni se mezclan en un solo formato.
@@ -98,70 +99,6 @@ function SignalLine({ signal, children }: { signal: InsiderFeedSignal; children?
 
 function trancheNote(t: TFunction, f: Formatters, tranches: number | undefined): string | null {
     return tranches && tranches > 1 ? t('insider.feed.trancheNote', { n: f.formatNumber(tranches, { maximumFractionDigits: 0 }) }) : null;
-}
-
-function OperationCard({ tx }: { tx: InsiderFeedTransaction }) {
-    const t = useT();
-    const f = useFormat();
-    const note = trancheNote(t, f, tx.tranches);
-    return (
-        <article className="min-w-0 rounded-lg border border-gray-800 bg-gray-900/50 p-4">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <Link className="inline-flex min-h-11 min-w-11 items-center font-semibold text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
-                    {tx.ticker}
-                </Link>
-                <span className={`font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>{sideLabel(tx.side, t)}</span>
-                {tx.rule_10b5_1 ? <span className="text-xs text-gray-500">{t('insider.feed.plan10b51Badge')}</span> : null}
-                {tx.form === 'PDMR' ? <span className="text-xs text-gray-500">{t('insider.feed.pdmrBadge')}</span> : null}
-                {tx.form === 'CA-INSIDER' ? <span className="text-xs text-gray-500">{t('insider.feed.canadaBadge')}</span> : null}
-                <span className="ml-auto tabular-nums text-xs text-gray-500">{tx.date ? f.formatDate(tx.date) : '—'}</span>
-            </div>
-            <div className="mt-1.5 text-sm font-medium text-gray-100">{insiderName(tx.insider)}</div>
-            <div className="text-xs text-gray-500">{insiderRole(tx.role, tx.officer_title, f.locale)}</div>
-            <dl className="mt-2 grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
-                <div>
-                    <dt className="text-xs text-gray-500">{t('insider.feed.colShares')}</dt>
-                    <dd className="tabular-nums text-gray-200">{f.formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })}</dd>
-                </div>
-                <div>
-                    <dt className="text-xs text-gray-500">{t('insider.feed.colPrice')}</dt>
-                    <dd className="tabular-nums text-gray-200">{usd(f, tx.price, 2, txCurrency(tx))}</dd>
-                </div>
-                <div>
-                    <dt className="text-xs text-gray-500">{t('insider.feed.colAmount')}</dt>
-                    <dd className="tabular-nums font-semibold text-gray-100">
-                        {tx.source_url ? (
-                            <a
-                                className="inline-flex min-h-11 min-w-11 items-center gap-1 hover:text-teal-300"
-                                href={tx.source_url}
-                                rel="noopener noreferrer"
-                                target="_blank"
-                            >
-                                {usd(f, tx.value, 0, txCurrency(tx))}
-                                <ExternalLink aria-hidden="true" className="h-3 w-3" />
-                            </a>
-                        ) : (
-                            usd(f, tx.value, 0, txCurrency(tx))
-                        )}
-                    </dd>
-                </div>
-            </dl>
-            {note ? <p className="mt-1.5 text-xs text-gray-500">{note}</p> : null}
-            {tx.currency == null && (tx.price != null || tx.value != null) ? (
-                <p className="mt-1.5 text-xs text-gray-500">{t('insider.feed.currencyMissing')}</p>
-            ) : null}
-            {tx.form === 'PDMR' ? (
-                <p className="mt-1.5 text-xs text-gray-500">{t('insider.feed.pdmrSource')}</p>
-            ) : null}
-            {tx.form === 'CA-INSIDER' ? (
-                <p className="mt-1.5 text-xs text-gray-500">
-                    {t('insider.feed.canadaSourcePre')}
-                    <a className="underline hover:text-teal-300" href="https://www.sedi.ca" rel="noopener noreferrer" target="_blank">SEDI</a>
-                    {t('insider.feed.canadaSourcePost')}
-                </p>
-            ) : null}
-        </article>
-    );
 }
 
 export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedResult | null; side: string; days: number }) {
@@ -255,72 +192,95 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                     <p className="mt-3 text-sm text-gray-500">{t('insider.feed.emptyPeriod')}</p>
                 ) : (
                     <>
-                        <div className="mt-3 hidden overflow-x-auto md:block">
-                            <table className="w-full min-w-[720px] text-left text-sm">
-                                <thead className="text-xs uppercase text-gray-500">
-                                    <tr>
-                                        <th className="py-1 pr-3 font-medium" scope="col">{t('insider.feed.colDate')}</th>
-                                        <th className="px-3 py-1 font-medium" scope="col">{t('insider.feed.colTicker')}</th>
-                                        <th className="px-3 py-1 font-medium" scope="col">{t('insider.feed.colInsider')}</th>
-                                        <th className="px-3 py-1 font-medium" scope="col">{t('insider.feed.colRole')}</th>
-                                        <th className="px-3 py-1 font-medium" scope="col">{t('insider.feed.colOperation')}</th>
-                                        <th className="px-3 py-1 text-right font-medium" scope="col">{t('insider.feed.colShares')}</th>
-                                        <th className="px-3 py-1 text-right font-medium" scope="col">{t('insider.feed.colPrice')}</th>
-                                        <th className="py-1 pl-3 text-right font-medium" scope="col">{t('insider.feed.colAmount')}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                        <div className="mt-3 overflow-x-auto">
+                            <Table className="block md:table md:min-w-[720px]">
+                                <TableHeader className="hidden md:table-header-group">
+                                    <TableRow className="border-gray-900 hover:bg-transparent">
+                                        <TableHead className="py-1 pr-3 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colDate')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colTicker')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colInsider')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colRole')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-xs font-medium uppercase text-gray-500">{t('insider.feed.colOperation')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-right text-xs font-medium uppercase text-gray-500">{t('insider.feed.colShares')}</TableHead>
+                                        <TableHead className="px-3 py-1 text-right text-xs font-medium uppercase text-gray-500">{t('insider.feed.colPrice')}</TableHead>
+                                        <TableHead className="py-1 pl-3 text-right text-xs font-medium uppercase text-gray-500">{t('insider.feed.colAmount')}</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
                                     {feed.transactions.map((tx, index) => {
                                         const note = trancheNote(t, f, tx.tranches);
                                         return (
-                                            <tr className="border-t border-gray-900" key={`${tx.accession_number}-${index}`}>
-                                                <td className="whitespace-nowrap py-2 pr-3 tabular-nums text-gray-400">{tx.date ? f.formatDate(tx.date) : '—'}</td>
-                                                <td className="px-3 py-2 font-semibold">
+                                            <TableRow className="block break-words rounded-lg border border-gray-800 bg-gray-900/50 p-4 md:table-row md:rounded-none md:border-0 md:border-t md:border-gray-900 md:bg-transparent md:p-0" key={`${tx.accession_number}-${index}`}>
+                                                <TableCell className="block whitespace-nowrap tabular-nums text-gray-400 md:table-cell md:py-2 md:pr-3">
+                                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.feed.colDate')}</span>
+                                                    {tx.date ? f.formatDate(tx.date) : '—'}
+                                                </TableCell>
+                                                <TableCell className="block font-semibold md:table-cell md:px-3 md:py-2">
+                                                    <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colTicker')}</span>
                                                     <Link className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={`/insider?ticker=${tx.ticker}`}>
                                                         {tx.ticker}
                                                     </Link>
                                                     {tx.form === 'PDMR' ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.pdmrBadge')}</span> : null}
                                                     {tx.form === 'CA-INSIDER' ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.canadaBadge')}</span> : null}
-                                                </td>
-                                                <td className="px-3 py-2 text-gray-100">{insiderName(tx.insider)}</td>
-                                                <td className="px-3 py-2 text-gray-400">{insiderRole(tx.role, tx.officer_title, f.locale)}</td>
-                                                <td className={`px-3 py-2 font-medium ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
+                                                </TableCell>
+                                                <TableCell className="block text-gray-100 md:table-cell md:px-3 md:py-2">
+                                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.feed.colInsider')}</span>
+                                                    {insiderName(tx.insider)}
+                                                </TableCell>
+                                                <TableCell className="block text-gray-400 md:table-cell md:px-3 md:py-2">
+                                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.feed.colRole')}</span>
+                                                    {insiderRole(tx.role, tx.officer_title, f.locale)}
+                                                </TableCell>
+                                                <TableCell className={`block font-medium md:table-cell md:px-3 md:py-2 ${tx.side === 'compra' ? 'text-teal-300' : 'text-red-400'}`}>
+                                                    <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colOperation')}</span>
                                                     {sideLabel(tx.side, t)}
                                                     {tx.rule_10b5_1 ? <span className="block text-xs font-normal text-gray-500">{t('insider.feed.plan10b51Badge')}</span> : null}
-                                                </td>
-                                                <td className="px-3 py-2 text-right tabular-nums">
+                                                </TableCell>
+                                                <TableCell className="block whitespace-nowrap tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
+                                                    <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colShares')}</span>
                                                     {f.formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 })}
                                                     {note ? <span className="block text-xs font-normal text-gray-500">{note}</span> : null}
-                                                </td>
-                                                <td className="px-3 py-2 text-right tabular-nums">{usd(f, tx.price, 2, txCurrency(tx))}</td>
-                                                <td className="py-2 pl-3 text-right tabular-nums">
-                                                    {tx.source_url ? (
-                                                        <a
-                                                            className="inline-flex min-h-11 min-w-11 items-center gap-1 text-gray-100 hover:text-teal-300"
-                                                            href={tx.source_url}
-                                                            rel="noopener noreferrer"
-                                                            target="_blank"
-                                                        >
-                                                            {usd(f, tx.value, 0, txCurrency(tx))}
-                                                            <ExternalLink aria-hidden="true" className="h-3 w-3" />
-                                                        </a>
-                                                    ) : (
-                                                        usd(f, tx.value, 0, txCurrency(tx))
-                                                    )}
+                                                </TableCell>
+                                                <TableCell className="block whitespace-nowrap tabular-nums md:table-cell md:px-3 md:py-2 md:text-right">
+                                                    <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colPrice')}</span>
+                                                    {usd(f, tx.price, 2, txCurrency(tx))}
+                                                </TableCell>
+                                                <TableCell className="block tabular-nums md:table-cell md:py-2 md:pl-3 md:text-right">
+                                                    <span className="block text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.colAmount')}</span>
+                                                    <span className="whitespace-nowrap">
+                                                        {tx.source_url ? (
+                                                            <a
+                                                                className="inline-flex min-h-11 min-w-11 items-center gap-1 text-gray-100 hover:text-teal-300"
+                                                                href={tx.source_url}
+                                                                rel="noopener noreferrer"
+                                                                target="_blank"
+                                                            >
+                                                                {usd(f, tx.value, 0, txCurrency(tx))}
+                                                                <ExternalLink aria-hidden="true" className="h-3 w-3" />
+                                                            </a>
+                                                        ) : (
+                                                            usd(f, tx.value, 0, txCurrency(tx))
+                                                        )}
+                                                    </span>
                                                     {tx.currency == null && (tx.price != null || tx.value != null) ? (
                                                         <span className="block text-xs font-normal text-gray-500">{t('insider.feed.currencyMissing')}</span>
                                                     ) : null}
-                                                </td>
-                                            </tr>
+                                                    {tx.form === 'PDMR' ? (
+                                                        <span className="mt-1 block whitespace-normal text-xs font-normal text-gray-500 md:hidden">{t('insider.feed.pdmrSource')}</span>
+                                                    ) : null}
+                                                    {tx.form === 'CA-INSIDER' ? (
+                                                        <span className="mt-1 block whitespace-normal text-xs font-normal text-gray-500 md:hidden">
+                                                            {t('insider.feed.canadaSourcePre')}
+                                                            <a className="underline hover:text-teal-300" href="https://www.sedi.ca" rel="noopener noreferrer" target="_blank">SEDI</a>
+                                                            {t('insider.feed.canadaSourcePost')}
+                                                        </span>
+                                                    ) : null}
+                                                </TableCell>
+                                            </TableRow>
                                         );
                                     })}
-                                </tbody>
-                            </table>
-                        </div>
-                        <div className="mt-3 grid grid-cols-1 gap-3 md:hidden">
-                            {feed.transactions.map((tx, index) => (
-                                <OperationCard key={`${tx.accession_number}-${index}`} tx={tx} />
-                            ))}
+                                </TableBody>
+                            </Table>
                         </div>
                     </>
                 )}
