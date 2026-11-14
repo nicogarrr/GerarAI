@@ -76,3 +76,30 @@ def test_missing_counter_is_a_count_not_a_monetary_default(counter):
     else:
         assert 'sin importe' not in line
     assert '$0' not in line
+
+
+@pytest.mark.parametrize('publication', ['2026-11-13', '2026-11-15'])
+def test_publication_cutoff_composes_with_incomplete_amounts(publication):
+    """Unpublished unknown money cannot taint today's known balance."""
+    db = _db()
+    as_of = date(2026, 11, 14)
+    try:
+        known = _filing(db, 'UBER', '2026-11-14')
+        _tx(db, known, insider='Known Seller', code='S', shares=100, price=10, tx_date='2026-11-13')
+        unknown = _filing(db, 'UBER', publication)
+        _tx(db, unknown, insider='Unknown Buyer', code='P', shares=1000, price=None, tx_date='2026-11-13')
+        db.commit()
+        result = insider_signal(db, 'UBER', as_of=as_of)
+        assert result['sells']['value'] == 1000
+        text = ownership_fact_lines({'ticker': 'UBER', 'insider': result})[0][0]
+        if publication > as_of.isoformat():
+            assert result['buys']['trades'] == 0
+            assert result['net_value'] == -1000
+            assert 'value_missing' not in result['buys']
+        else:
+            assert result['buys']['trades'] == 1
+            assert result['buys']['value'] is None
+            assert result['net_value'] is None
+            assert 'N/D (1 sin importe)' in text
+    finally:
+        db.close()

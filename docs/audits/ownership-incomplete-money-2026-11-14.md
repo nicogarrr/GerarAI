@@ -48,3 +48,21 @@ change. Added four regressions for None/0/1/3, preserving N/D monetary values.
 43 ownership pytest pass; reader coverage 95.95% combined. check-i18n and
 full guards pass (3063 passed, 0 failed, 1 skipped). Semgrep is not installed
 locally, so its exact CI rerun remains required; the matching pattern is gone.
+
+## Reconciliación con main afceca89, 2026-11-15
+
+Se conserva el corte de publicación de #5673 y el guard de importes ausentes.
+El único conflicto del rebase fue en en.compact.json, resuelto regenerándolo
+desde los diccionarios. No se cambia el contenido de insider_feed,
+insider_summary, InsiderFeed ni los avisos/PDMR existentes en main; #5666
+sigue fuera de esta rama y no se atribuyen sus futuros cambios a este parche.
+
+Prueba de composición rojo/verde: la misma pareja de casos falla por importe
+cero falso en main sin #5674, y por aceptar publicación futura en #5674 viejo
+sin #5673. Tras componer, publicación pasada + importe ausente da N/D; el
+mismo importe ausente en filing futuro no contamina el saldo conocido actual.
+
+54 pytest verdes incluidos los nueve casos de corte de publicación de #5673;
+reader 96.04% combinado. 36 vitest, 100% líneas/94.68% ramas; typecheck,
+ESLint, Ruff, check-i18n y guards completos (3066 pasan/0 fallos/1 omitido).
+No suite completa, Browser E2E ni Semgrep local. Sin push/merge/despliegue.
