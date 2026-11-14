@@ -10,6 +10,8 @@ import type { PriceEvent } from '@/lib/market/price-events';
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator, type TranslateFn } from '@/lib/i18n/translate';
 
+const sourceText = createTranslator('es');
+
 const RESULTS_LABEL = /^Resultados (.+)$/;
 const DIVIDEND_DETAIL = /^(\S+) (\S+) por acción$/;
 const INSIDER_TITLE = /^(.+) (compra|vende) acciones$/;
@@ -23,7 +25,9 @@ function resultsText(event: PriceEvent, t: TranslateFn): PriceEvent {
   const title = event.title === 'Resultados'
     ? t('research.chart.storedEvent.resultsTitle')
     : label ? t('research.chart.storedEvent.resultsTitleLabel', { label: label[1] }) : event.title;
-  const detail = event.detail === 'Fecha confirmada por la fuente' ? t('research.chart.storedEvent.resultsConfirmed') : event.detail;
+  const detail = event.detail === sourceText('research.chart.storedEvent.resultsConfirmed') ? t('research.chart.storedEvent.resultsConfirmed')
+    : event.detail === sourceText('research.chart.storedEvent.resultsEstimated') ? t('research.chart.storedEvent.resultsEstimated')
+    : event.detail === sourceText('research.chart.storedEvent.resultsUnknown') ? t('research.chart.storedEvent.resultsUnknown') : event.detail;
   return { ...event, title, detail };
 }
 

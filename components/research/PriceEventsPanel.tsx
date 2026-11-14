@@ -44,9 +44,9 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
                                     línea, ilegible. Desde sm vuelve al comportamiento en línea. */}
                                 <span className="min-w-0 flex-1 basis-full text-gray-200 sm:basis-auto">{event.title}</span>
                                 {event.source_url ? <a href={event.source_url} target="_blank" rel="noreferrer" className="text-[10px] text-gray-500 underline">{event.source}</a> : <span className="text-[10px] text-gray-500">{event.source}</span>}
-                                {event.detail ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="text-[10px] text-gray-500 hover:text-gray-200">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
+                                {event.detail && event.kind !== 'results' ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="text-[10px] text-gray-500 hover:text-gray-200">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
                             </div>
-                            {event.detail && open === event.id ? <p className="mt-1 whitespace-pre-line text-gray-400">{event.detail}</p> : null}
+                            {event.detail && (event.kind === 'results' || open === event.id) ? <p className="mt-1 whitespace-pre-line text-gray-400">{event.detail}</p> : null}
                         </li>
                     ))}
                 </ol>

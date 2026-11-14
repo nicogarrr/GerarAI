@@ -41,7 +41,7 @@ const snapshot: CompanyMarketSnapshot = {
 describe('gráfico «Precio y eventos»: eventos guardados en inglés', () => {
     it('el backend sigue escribiendo estas frases', () => {
         expect(SERVICE).toContain('"title": f"Resultados {row.fiscal_label}" if row.fiscal_label else "Resultados",');
-        expect(SERVICE).toContain('"detail": "Fecha confirmada por la fuente" if row.confirmed else None,');
+        expect(SERVICE).toContain('"Fecha confirmada por la fuente" if row.confirmed is True');
         expect(SERVICE).toContain('"title": "Ex-dividendo",');
         expect(SERVICE).toContain('"detail": f"{amount:g} {row.currency} por acción" if amount else None,');
         expect(SERVICE).toContain(`"title": f"{row.insider or 'Un directivo'} {'compra' if row.code == 'P' else 'vende'} acciones",`);
@@ -78,4 +78,16 @@ it('traduce moneda declarada y avisa cuando el importe no es comparable', () => 
     expect(storedEventText(unknown, 'en').detail).toBe('Amount not comparable: currency or amount not reported (form PDMR)');
     expect(storedEventText(known, 'es')).toEqual(known);
     expect(storedEventText(unknown, 'es')).toEqual(unknown);
+});
+
+
+it('keeps estimated and unknown dates explicit in both languages', () => {
+    const base: PriceEvent = { id: 'estimated', date: '2026-11-20', kind: 'results', title: 'Resultados', source: 'Yahoo Finance' };
+    for (const [es, en] of [
+        ['Fecha estimada por la fuente; puede cambiar', 'Date estimated by the source; it may change'],
+        ['La fuente no indica si la fecha está confirmada', 'The source does not say whether the date is confirmed'],
+    ]) {
+        expect(storedEventText({ ...base, detail: es }, 'en').detail).toBe(en);
+        expect(storedEventText({ ...base, detail: es }, 'es').detail).toBe(es);
+    }
 });
