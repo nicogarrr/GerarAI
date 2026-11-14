@@ -88,6 +88,7 @@ const TableFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <tfoot
     ref={ref}
+    role="rowgroup"
     className={cn(
       "border-t bg-muted/50 font-medium [&>tr]:last:border-b-0",
       className
@@ -124,7 +125,9 @@ const TableHead = React.forwardRef<
 >(({ className, scope = "col", ...props }, ref) => (
   <th
     ref={ref}
-    role="columnheader"
+    // El role se deriva del scope: th scope="row|rowgroup" es cabecera de
+    // fila (rowheader); fijarlo a columnheader lo anunciaría mal (auditor1).
+    role={scope === 'row' || scope === 'rowgroup' ? 'rowheader' : 'columnheader'}
     scope={scope}
     className={cn(
       "h-12 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
