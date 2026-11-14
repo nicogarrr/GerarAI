@@ -226,6 +226,16 @@ def _reported_amount(value: Any) -> float | None:
     return amount if math.isfinite(amount) else None
 
 
+def _usaspending_rows(data: Any) -> list[dict]:
+    """A malformed upstream payload is unavailable, never an empty breakdown."""
+    if not isinstance(data, dict):
+        raise ValueError("USAspending no devolvió una respuesta verificable")
+    rows = data.get("results")
+    if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+        raise ValueError("USAspending no devolvió un desglose verificable")
+    return rows
+
+
 def fetch_agency_obligations(agency_name: str, start: str, end: str) -> float:
     """Obligaciones (contratos + ayudas) de la agencia en la ventana.
 
@@ -239,7 +249,7 @@ def fetch_agency_obligations(agency_name: str, start: str, end: str) -> float:
         "spending_type": "obligations",
     }
     data = _usaspending_post("/search/spending_over_time/", payload)
-    results = data.get("results") or []
+    results = _usaspending_rows(data)
     if not results:
         raise RuntimeError("USAspending no devolvió obligaciones para la ventana")
     amount = _reported_amount(results[0].get("aggregated_amount"))
@@ -251,17 +261,13 @@ def fetch_agency_obligations(agency_name: str, start: str, end: str) -> float:
 def fetch_top_categories(agency_name: str, start: str, end: str, limit: int = 8) -> list[dict]:
     payload = {"filters": _agency_filter(agency_name, start, end), "limit": limit}
     data = _usaspending_post("/search/spending_by_category/psc/", payload)
-    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
-        raise ValueError("USAspending no devolvió un desglose verificable")
-    return data["results"]
+    return _usaspending_rows(data)
 
 
 def fetch_top_recipients(agency_name: str, start: str, end: str, limit: int = 30) -> list[dict]:
     payload = {"filters": _agency_filter(agency_name, start, end), "limit": limit}
     data = _usaspending_post("/search/spending_by_category/recipient/", payload)
-    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
-        raise ValueError("USAspending no devolvió un desglose verificable")
-    return data["results"]
+    return _usaspending_rows(data)
 
 
 _NORMALIZE_RE = re.compile(r"[^A-Z0-9 ]+")
