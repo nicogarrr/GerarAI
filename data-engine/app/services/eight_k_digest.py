@@ -9,7 +9,6 @@ URL oficial de SEC (``official_document``). Lectura pura: no descarga nada.
 from __future__ import annotations
 
 import re
-from datetime import date
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -127,31 +126,12 @@ _OFFICIAL_TITLE_START = (
 )
 
 
-# QA 10: published_at puede faltar aunque el propio nombre del filing la
-# lleve (jpm-20261013.htm). Se deriva del nombre del documento o de su
-# URL; una fecha invalida o ausente sigue siendo None, nunca se inventa.
-# Los limites de digitos evitan falsos positivos en CIK y accession.
-_FILENAME_DATE_RE = re.compile(
-    r"(?<!\d)((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)"
-)
-
-
-def _filing_date_from_name(*texts: str | None) -> str | None:
-    for text in texts:
-        for match in _FILENAME_DATE_RE.finditer(text or ""):
-            try:
-                return date(
-                    int(match.group(1)), int(match.group(2)), int(match.group(3))
-                ).isoformat()
-            except ValueError:  # p.ej. 2026-02-30: se prueba la siguiente pista
-                continue
-    return None
-
-
 def _filed_at(document: Document) -> str | None:
     if document.published_at:
         return document.published_at.date().isoformat()
-    return _filing_date_from_name(document.source_url, document.title)
+    # A filing name can encode the event/report date, not the SEC filing date.
+    # No verified publication date means unknown, never a date guessed from text.
+    return None
 
 
 def _looks_like_official_title(text: str) -> bool:
