@@ -17,6 +17,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from app.models import MemoryItem
 from app.workers import dramatiq_app as worker
 
 
@@ -102,7 +103,7 @@ def test_structured_error_clasificado_y_sesion_cerrada(env, monkeypatch):
 
 
 def _item(i, content, importance=1, company=5):
-    return SimpleNamespace(
+    return MemoryItem(
         id=i, company_id=company, scope="company", memory_type="fact",
         content=content, importance=importance, metadata_={}, status="active",
     )
