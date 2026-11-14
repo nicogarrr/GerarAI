@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import math
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -17,6 +18,8 @@ from app.valuation.adr_ratios import table_adr_ratio
 from app.valuation.financial_snapshot import FinancialSnapshot, FinancialSnapshotBuilder
 from app.valuation.moat_framework import empty_moat_framework
 from app.valuation.scenario_definitions import ScenarioDefinition
+
+logger = logging.getLogger(__name__)
 
 # v2: net_debt is a required DCF input (no longer coerced to zero debt), the
 # FCF-margin clamp no longer flips the sign of a known-negative margin, the
@@ -668,7 +671,11 @@ def _declared_rate(db, company_id: int, input_key: str, *, as_of: date | None = 
         if as_of is not None and row.as_of is not None and row.as_of > as_of:
             return None
         value = float(row.base)
-    except Exception:  # noqa: BLE001 - un input opcional nunca rompe las tasas
+    except Exception as exc:  # noqa: BLE001 - un input opcional nunca rompe las tasas
+        logger.warning(
+            "input declarado %s ilegible para company_id=%s (%s); se usa el supuesto por defecto",
+            input_key, company_id, type(exc).__name__,
+        )
         return None
     unit = str(getattr(row, "unit", "") or "").lower()
     if unit in {"percent", "%", "pct"} or "percent" in unit or abs(value) > 1.5:
