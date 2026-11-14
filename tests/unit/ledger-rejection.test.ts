@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ledgerRejection } from '@/lib/portfolio/ledger-rejection';
-import { researchErrorDetail } from '@/lib/research/error-detail';
+import { researchErrorDetail, researchErrorFields } from '@/lib/research/error-detail';
 import { AppError } from '@/lib/types/errors';
 
 const api = (msg: string, status: number) => new AppError(msg, 'RESEARCH_API_ERROR', status);
@@ -12,7 +12,7 @@ describe('ledgerRejection', () => {
         expect(ledgerRejection(api('Transaction not found', 404))).toMatch(/ya no existe/);
         expect(ledgerRejection(api('Insufficient shares for sale', 409), 'delete')).toMatch(/^No se puede borrar: una venta posterior/);
     });
-    it('422 de trade_date: cableado real desde el cuerpo pydantic hasta el mensaje', () => {
+    it('422 de trade_date: cableado real desde el cuerpo pydantic hasta el rechazo', () => {
         // Cuerpos 422 medidos del backend (PortfolioTransactionInput): fecha
         // futura (validador del modelo), fecha imposible, texto y null
         // (validación de tipo de Pydantic). Los cuatro llegan con el MISMO
@@ -25,15 +25,26 @@ describe('ledgerRejection', () => {
             [{ type: 'date_type', loc: ['body', 'trade_date'], msg: 'Input should be a valid date' }],
         ];
         for (const detail of bodies) {
-            // Cableado real: researchErrorDetail (lo que hace responseError)
-            // -> AppError -> ledgerRejection, sin mensaje preconstruido.
-            const message = researchErrorDetail({ detail }, 'fallback');
-            expect(message).toContain('trade_date');
+            // Cableado real: lo que hace responseError (researchErrorDetail
+            // para el mensaje + researchErrorFields para cause), sin mensaje
+            // preconstruido. La clasificación va por el CÓDIGO estructurado:
+            // el mensaje muestra el campo traducido (#5453).
+            const payload = { detail };
+            const message = researchErrorDetail(payload, 'fallback');
+            expect(message).toContain('fecha de la operación');
             expect(message).not.toContain('future');
-            const mapped = ledgerRejection(new AppError(message, 'RESEARCH_API_ERROR', 422));
+            const mapped = ledgerRejection(new AppError(message, 'RESEARCH_API_ERROR', 422, { path: '/x', validationFields: researchErrorFields(payload) }));
             expect(mapped).toMatch(/^La fecha de la operación no es válida/);
             expect(mapped).not.toMatch(/futura\./);
         }
+    });
+    it('respaldo: el código crudo en el mensaje (error sin cause estructurado) sigue clasificando', () => {
+        expect(ledgerRejection(api('Datos no válidos en: trade_date. Revisa esos campos y vuelve a intentarlo.', 422)))
+            .toMatch(/^La fecha de la operación no es válida/);
+    });
+    it('un 422 de otro campo con códigos estructurados no es rechazo de fecha', () => {
+        const err = new AppError('Datos no válidos en: cantidad. Revisa esos campos y vuelve a intentarlo.', 'RESEARCH_API_ERROR', 422, { path: '/x', validationFields: ['quantity'] });
+        expect(ledgerRejection(err)).toBeNull();
     });
     it('lo demás no es un rechazo conocido (se relanza)', () => {
         expect(ledgerRejection(api('boom', 500))).toBeNull();
