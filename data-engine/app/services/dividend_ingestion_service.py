@@ -284,7 +284,7 @@ class DividendIngestionService(ProviderIngestionService):
         results = await self.sync_each(db, self._portfolio_tickers(db))
         ok = sum(1 for r in results if r["status"] == "ok")
         failed = sum(1 for r in results if r["status"] == "failed")
-        unavailable = sum(1 for r in results if r["status"] == "unavailable") + failed
+        unavailable = sum(1 for r in results if r["status"] in {"unavailable", "no_safe_symbol"}) + failed
         unknown = sum(1 for r in results if r["status"] == "currency_unknown" or r.get("currency_unknown_rows"))
         unavailable += unknown  # desconocido/no actualizado: cobertura parcial, nunca OK
         summary: dict[str, Any] = {
