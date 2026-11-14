@@ -1610,7 +1610,11 @@ def refresh_subtel_decrees() -> dict[str, Any]:
     fetched_at = datetime.now(UTC)
     created, errors = 0, []
     for tenant_id, user_id in contexts:
-        db = _session(tenant_id, user_id)
+        try:
+            db = _session(tenant_id, user_id)
+        except Exception as exc:  # noqa: BLE001 - un tenant no frena al resto
+            errors.append({"tenant_id": tenant_id, "type": type(exc).__name__})
+            continue
         try:
             created += persist_decrees(db, decrees, fetched_at)
         except Exception as exc:
@@ -1792,7 +1796,10 @@ def sync_ibkr_flex() -> dict[str, Any]:
         xml_text = _run(client.fetch_latest_xml())
     except Exception as exc:  # noqa: BLE001 - IBKRFlexError ya viene sin token
         return _handle_actor_error("sync_ibkr_flex", exc)
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("sync_ibkr_flex", exc)
     try:
         result = IBKRImportService().import_flex_xml(
             db,
@@ -3414,7 +3421,10 @@ def analyze_tracked_news_alert(
     """Idempotent attributed-headline baseline, never a verified claim."""
     from app.services.alert_analysis_service import analyze_alert
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("analyze_tracked_news_alert", exc, tenant_id=tenant_id, alert_id=alert_id)
     lease_key = f"analyze_tracked_news_alert:{tenant_id}:{alert_id}"
     try:
         lease = acquire_job_lease(lease_key, ttl_seconds=300, redis_url=_lease_redis_url())
