@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // /watchlist no debe esperar a la cadena de cotizacion por fila
 // (getWatchlistEntryData: Finnhub -> respaldo Yahoo, presupuesto de 3 s por
@@ -12,6 +12,7 @@ import { describe, expect, it, vi } from 'vitest';
 const m = vi.hoisted(() => ({
   dated: vi.fn(),
   entry: vi.fn(),
+  state: vi.fn(),
 }));
 vi.mock('@/lib/market/dated-change', () => ({ fetchDatedChanges: m.dated }));
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser: async () => ({ id: 'u1' }) }));
@@ -24,12 +25,13 @@ vi.mock('@/lib/i18n/server', () => ({
   }),
 }));
 vi.mock('@/lib/actions/watchlist.actions', () => ({
-  getWatchlistState: async () => ({ items: [{ symbol: 'AAPL', addedAt: new Date(0), analysis: null }], unavailable: false }),
+  getWatchlistState: m.state,
   getWatchlistEntryData: m.entry,
   getWatchlistMonitor: async () => ({ items: {}, earningsStatus: 'ok' }),
 }));
 vi.mock('@/lib/actions/market-workspace.actions', () => ({
-  getResearchCompaniesBasics: async () => ({ AAPL: { name: 'Apple', exchange: 'NASDAQ', currency: 'USD' } }),
+  getResearchCompaniesBasics: async (symbols: string[]) =>
+    Object.fromEntries(symbols.map((s) => [s, { name: s === 'AAPL' ? 'Apple' : s, exchange: 'NASDAQ', currency: 'USD' }])),
   getResearchCompanyBasics: async () => null,
 }));
 vi.mock('@/lib/actions/finnhub.actions', () => ({ getProfile: async () => null }));
@@ -63,6 +65,10 @@ async function renderPage() {
 }
 
 describe('/watchlist con datos de entrada diferidos', () => {
+  beforeEach(() => {
+    m.state.mockResolvedValue({ items: [{ symbol: 'AAPL', addedAt: new Date(0), analysis: null }], unavailable: false });
+  });
+
   it('devuelve la pagina con la cotizacion viva pendiente y la fila con basics del master', async () => {
     m.dated.mockResolvedValue({});
     m.entry.mockReturnValue(new Promise(() => {}));
@@ -89,5 +95,38 @@ describe('/watchlist con datos de entrada diferidos', () => {
     expect(streams.length).toBeGreaterThanOrEqual(2); // tarjeta movil + fila de tabla
     const resolved = await (streams[0].type as (p: Record<string, unknown>) => Promise<unknown>)(streams[0].props ?? {});
     expect(text(resolved)).toContain('$100');
+  });
+
+  // Contrato de orden declarado (2026-11-14, auditor #5633): sin orden por
+  // metrica las filas mantienen el orden de la watchlist (recientes primero)
+  // y se repintan en el sitio; una fila sin precio YA NO se hunde al final.
+  // Antes la pagina esperaba todas las entradas y sortWatchlistRows la
+  // hundia; reordenar tras el pintado moveria filas bajo el dedo en movil.
+  it('mantiene el orden de la watchlist aunque la primera fila no tenga precio', async () => {
+    m.state.mockResolvedValue({
+      items: [
+        { symbol: 'NOPRICE', addedAt: new Date(0), analysis: null },
+        { symbol: 'WITHPRICE', addedAt: new Date(1), analysis: null },
+      ],
+      unavailable: false,
+    });
+    m.dated.mockResolvedValue({});
+    m.entry.mockImplementation(async (symbol: string) =>
+      symbol === 'NOPRICE'
+        ? { symbol, name: symbol, exchange: 'NASDAQ', currency: 'USD', price: null, change: null, changePercent: null, marketCap: null, peRatio: null, priceKind: null, priceAsOf: null, quoteSymbol: null }
+        : { symbol, name: symbol, exchange: 'NASDAQ', currency: 'USD', price: 100, change: 1, changePercent: 1, marketCap: 1, peRatio: 10, priceKind: 'live', priceAsOf: null, quoteSymbol: null });
+    const page = await renderPage();
+    // 2 vistas (tarjeta + tabla) x 2 filas, siempre en orden de la watchlist:
+    // NOPRICE primero en ambas, con su «sin datos» explicito, y WITHPRICE
+    // detras con su cotizacion. El hundido de N/D no vuelve a ocurrir.
+    const streams = find(page, 'EntryRowStream');
+    expect(streams).toHaveLength(4);
+    const painted = await Promise.all(streams.map((s) => (s.type as (p: Record<string, unknown>) => Promise<unknown>)(s.props ?? {})));
+    expect(text(painted[0])).toContain('NOPRICE');
+    expect(text(painted[0])).toContain('watchlist.page.noData');
+    expect(text(painted[1])).toContain('WITHPRICE');
+    expect(text(painted[1])).toContain('$100');
+    expect(text(painted[2])).toContain('NOPRICE');
+    expect(text(painted[3])).toContain('WITHPRICE');
   });
 });

@@ -315,6 +315,13 @@ export default async function WatchlistPage({
             default: return null;
         }
     };
+    // Contrato de orden (2026-11-14, auditor #5633): sin orden por métrica la
+    // página pinta en el orden de la watchlist desde el primer byte y cada
+    // fila se repinta en el sitio al llegar su cotización. Una fila sin
+    // precio YA NO se hunde al final (antes sortWatchlistRows lo hacía porque
+    // la página esperaba todas las entradas): reordenar tras el pintado
+    // movería filas bajo el dedo en móvil. Con orden por métrica no hay
+    // cambio: se espera todo, se ordena y los N/D quedan al final.
     const sortedStocks = sortWatchlistRows(watchlistStocks, sort, dir, metricValue);
     const displayStocks = metricSort ? sortedStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedStocks;
 
