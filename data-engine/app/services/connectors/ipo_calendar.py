@@ -208,7 +208,7 @@ async def _fetch_ipo_month(first: date, client: httpx.AsyncClient | None) -> dic
         payload = None
     data = payload.get("data") if isinstance(payload, dict) else None
     has_calendar = isinstance(data, dict) and any(section in data for section in ("priced", "upcoming"))
-    if has_calendar:
+    if has_calendar and isinstance(data, dict):
         for section in ("priced", "upcoming"):
             if section not in data:
                 continue

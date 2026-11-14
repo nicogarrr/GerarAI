@@ -48,7 +48,9 @@ def summarize(latest: dict[str, nport.FundReport], cusip: str) -> dict[str, Any]
     holders = [r for r in latest.values() if r.shares.get(cusip, Decimal(0)) > 0]
     total_shares = sum((r.shares[cusip] for r in holders), Decimal(0))
     values = [r.value.get(cusip) for r in holders]
-    total_value = sum(values, Decimal(0)) if all(value is not None for value in values) else None
+    known_values = [value for value in values if value is not None]
+    # Valor incompleto: se rechaza (None), nunca se fabrica un subtotal.
+    total_value = sum(known_values, Decimal(0)) if len(known_values) == len(values) else None
     key = lambda r: (r.series_id, r.accession)  # noqa: E731
     top = sorted(holders, key=lambda r: (-r.shares[cusip], key(r)))[:TOP_N]
     by_weight = sorted((r for r in holders if r.weight.get(cusip) is not None), key=lambda r: (-r.weight[cusip], key(r)))[:TOP_N]
