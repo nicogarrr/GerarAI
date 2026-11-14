@@ -691,6 +691,26 @@ class ThemesCache:
             self._store(fresh)
             return {**fresh, "stale": False}
 
+    @staticmethod
+    def _pending_payload() -> dict:
+        # Aún no ha terminado ninguna descarga: no fabricar fecha ni precios.
+        return {
+            "status": "sin_datos", "as_of": None, "intraday": False,
+            "generated_at": None, "source": "Yahoo Finance", "method": "media simple",
+            "symbols_total": len(all_symbols()), "symbols_with_data": 0, "themes": [],
+        }
+
+    def get_background(self, compute: Callable[[], dict]) -> dict:
+        """Lectura no bloqueante, también sin caché previa; un refresco por proceso."""
+        self._refresh_async(compute, only_if_due=True)
+        with self._lock:
+            now = self._clock()
+            if self._value is not None:
+                return {**self._value, "stale": now - self._at >= self._effective_ttl,
+                        "refreshing": self._refreshing}
+            value = self._failed if self._failed is not None else self._pending_payload()
+            return {**value, "stale": False, "refreshing": self._refreshing}
+
     def _recent_failure(self, now: float) -> dict | None:
         with self._lock:
             if self._failed is not None and now - self._failed_at < self._failed_ttl:
@@ -705,22 +725,29 @@ class ThemesCache:
             return
         with self._lock:
             self._value = fresh
+            self._failed = None
             self._at = self._clock()
             self._effective_ttl = (
                 self._ttl if fresh.get("status") == "ok" else min(self._ttl, PARTIAL_TTL_SECONDS)
             )
 
-    def _refresh_async(self, compute: Callable[[], dict]) -> None:
+    def _refresh_async(self, compute: Callable[[], dict], *, only_if_due: bool = False) -> None:
         with self._lock:
             if self._refreshing:
                 return
+            if only_if_due:
+                now = self._clock()
+                if self._value is not None and now - self._at < self._effective_ttl:
+                    return
+                if self._failed is not None and now - self._failed_at < self._failed_ttl:
+                    return
             self._refreshing = True
 
         def run() -> None:
             try:
                 self._store(compute())
-            except Exception:  # noqa: BLE001 - seguimos sirviendo el dato anterior
-                pass
+            except Exception:  # noqa: BLE001 - conservamos dato previo y evitamos reintentos en bucle
+                self._store(self._pending_payload())
             finally:
                 with self._lock:
                     self._refreshing = False

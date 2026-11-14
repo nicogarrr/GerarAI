@@ -108,6 +108,11 @@ async def lifespan(_: FastAPI):
 
     if settings.app_env.lower() == "production":
         _start_embedder_warmup(settings)
+        # Cestas de mercado en el mismo single-flight que las peticiones:
+        # el primer usuario no paga las descargas tras reiniciar un proceso.
+        from app.api.routes.market import start_themes_warmup
+
+        start_themes_warmup()
 
     if settings.app_env.lower() != "test":
         # Lo vivo tras el arranque (modulos, ORM, esquemas) ya no lo recorre el
