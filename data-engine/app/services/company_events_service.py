@@ -519,8 +519,11 @@ def stored_holding(db: Session, company: Company) -> dict[str, Any] | None:
         return None
     start = first_buy.isoformat() if first_buy else None
     notice = "Coste medio no comparable: faltan cantidades/costes válidos o las divisas no coinciden. No se ha inferido un tipo de cambio."
-    if any(qty is None for qty in quantities):
+    known_quantities = [q for q in quantities if q is not None]
+    if len(known_quantities) != len(quantities):
+        # Cantidad incompleta: se rechaza, nunca se suma lo que si hay.
         return {"average_cost": None, "first_buy_date": start, "notice": notice}
+    quantities = known_quantities
     qty = sum(quantities)
     if qty <= 0:
         return None
