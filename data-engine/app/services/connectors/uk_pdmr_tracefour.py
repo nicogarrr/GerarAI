@@ -139,6 +139,8 @@ def map_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         # solo en data_quality y el importe queda N/D.
         value_raw = float(value)
         value = None
+    if entry.get("valueUnknown") is True:
+        value = None
     return {
         "filing_id": filing_id,
         "accession_number": filing_id,
