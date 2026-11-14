@@ -9,7 +9,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { ScrollPreserver } from '@/components/layout/ScrollPreserver';
-import { RESTORE_TIMEOUT_MS, SCROLL_MEMORY_KEY, readScrollMemory, rememberScroll, restoreStep } from '@/lib/nav/scroll-memory';
+import { RESTORE_HARD_LIMIT_MS, RESTORE_TIMEOUT_MS, SCROLL_MEMORY_KEY, readScrollMemory, rememberScroll, restoreStep } from '@/lib/nav/scroll-memory';
 
 /**
  * Auditoría de flujo r5 (11-nov): tras bajar por la ficha, volver por
@@ -22,6 +22,10 @@ let scrollY = 0;
 let docHeight = 4000;
 const viewport = 844;
 let rafQueue: FrameRequestCallback[] = [];
+// Reloj controlado: los fotogramas se avanzan a mano con advanceMs, como
+// hace el navegador (~un frame por paso), para acreditar el comportamiento
+// ENTRE crecimientos y no solo en los saltos.
+let now = 1_000;
 
 function flushFrames(n = 1) {
     for (let i = 0; i < n; i++) {
@@ -30,6 +34,14 @@ function flushFrames(n = 1) {
         act(() => {
             for (const cb of queue) cb(performance.now());
         });
+    }
+}
+
+/** Avanza el reloj y dispara un fotograma por paso (100 ms), como el rAF real. */
+function advanceMs(totalMs: number, stepMs = 100) {
+    for (let elapsed = 0; elapsed < totalMs; elapsed += stepMs) {
+        now += stepMs;
+        flushFrames(1);
     }
 }
 
@@ -67,6 +79,8 @@ beforeEach(() => {
         return rafQueue.length;
     });
     vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    now = 1_000;
+    vi.spyOn(performance, 'now').mockImplementation(() => now);
 });
 
 afterEach(() => {
@@ -156,6 +170,66 @@ describe('ScrollPreserver: volver por historial', () => {
         expect(scrollY).toBe(10);
     });
 
+    it('la ficha que llega a tramos durante más de 4 s recupera la posición', () => {
+        const view = render(<ScrollPreserver />);
+        userScrollsTo(1613);
+        clickLink('/research/NVDA/informe');
+        go('/research/NVDA/informe', view);
+        flushFrames(2);
+        act(() => {
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        });
+        go('/research/NVDA?view=valoracion', view);
+        docHeight = 1200; // primer tramo: tope 356
+        flushFrames(2);
+        expect(scrollY).toBe(356);
+        advanceMs(3_000); // 3 s de frames sin crecer: dentro del presupuesto
+        expect(scrollY).toBe(356);
+        docHeight = 2000; // segundo tramo a los ~3 s (< 4 s desde el anterior)
+        advanceMs(200);
+        expect(scrollY).toBe(1156);
+        advanceMs(3_000); // otros 3 s sin crecer: 6,2 s acumulados (> 4 s total)
+        expect(scrollY).toBe(1156);
+        docHeight = 2600; // tercer tramo: tope 1756, posición ya alcanzable
+        advanceMs(700); // llega al objetivo y aguanta los 5 fotogramas
+        expect(scrollY).toBe(1613);
+    });
+
+    it('un hueco de más de 4 s sin crecer rinde la restauración aunque la página llegue después', () => {
+        const view = render(<ScrollPreserver />);
+        userScrollsTo(1613);
+        clickLink('/research/NVDA/informe');
+        go('/research/NVDA/informe', view);
+        flushFrames(2);
+        act(() => {
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        });
+        go('/research/NVDA?view=valoracion', view);
+        docHeight = 1200; // tope 356
+        flushFrames(2);
+        expect(scrollY).toBe(356);
+        advanceMs(4_200); // 4,2 s de frames seguidos sin un solo tramo: se rinde
+        expect(scrollY).toBe(356);
+        docHeight = 3000; // llega tarde: ya no mueve al usuario
+        advanceMs(500);
+        expect(scrollY).toBe(356);
+    });
+
+    it('volver a una URL sin memoria guardada no restaura nada', () => {
+        const view = render(<ScrollPreserver />);
+        userScrollsTo(400);
+        clickLink('/research/NVDA/informe');
+        go('/research/NVDA/informe', view);
+        flushFrames(2);
+        sessionStorage.clear(); // la ficha no tiene posición guardada
+        act(() => {
+            window.dispatchEvent(new PopStateEvent('popstate'));
+        });
+        go('/research/NVDA?view=valoracion', view);
+        flushFrames(4);
+        expect(window.scrollTo).not.toHaveBeenCalled();
+    });
+
     it('navegar hacia delante a otra ruta no restaura nada', () => {
         sessionStorage.setItem(SCROLL_MEMORY_KEY, JSON.stringify({ '/watchlist': 700 }));
         const view = render(<ScrollPreserver />);
@@ -181,9 +255,18 @@ describe('ScrollPreserver: volver por historial', () => {
 
 describe('scroll-memory', () => {
     it('restoreStep espera a que el documento mida lo bastante y a que la posición aguante', () => {
-        expect(restoreStep({ target: 900, y: 0, maxY: 300, stableFrames: 0, elapsedMs: 10 })).toEqual({ kind: 'scroll', to: 300, stableFrames: 0 });
-        expect(restoreStep({ target: 900, y: 900, maxY: 2000, stableFrames: 4, elapsedMs: 50 })).toEqual({ kind: 'done' });
-        expect(restoreStep({ target: 900, y: 300, maxY: 300, stableFrames: 0, elapsedMs: RESTORE_TIMEOUT_MS })).toEqual({ kind: 'give-up' });
+        expect(restoreStep({ target: 900, y: 0, maxY: 300, stableFrames: 0, elapsedMs: 10, sinceGrowthMs: 10 })).toEqual({ kind: 'scroll', to: 300, stableFrames: 0 });
+        expect(restoreStep({ target: 900, y: 900, maxY: 2000, stableFrames: 4, elapsedMs: 50, sinceGrowthMs: 50 })).toEqual({ kind: 'done' });
+        expect(restoreStep({ target: 900, y: 300, maxY: 300, stableFrames: 0, elapsedMs: RESTORE_TIMEOUT_MS, sinceGrowthMs: RESTORE_TIMEOUT_MS })).toEqual({ kind: 'give-up' });
+    });
+
+    it('restoreStep aguanta mientras el documento sigue creciendo y se rinde cuando deja de crecer', () => {
+        // 9 s de streaming, pero el documento creció hace nada: sigue.
+        expect(restoreStep({ target: 900, y: 0, maxY: 300, stableFrames: 0, elapsedMs: RESTORE_TIMEOUT_MS + 5_000, sinceGrowthMs: 100 })).toEqual({ kind: 'scroll', to: 300, stableFrames: 0 });
+        // Página terminada y corta: 4 s sin crecer, se deja donde está.
+        expect(restoreStep({ target: 900, y: 300, maxY: 300, stableFrames: 0, elapsedMs: 1_000, sinceGrowthMs: RESTORE_TIMEOUT_MS })).toEqual({ kind: 'give-up' });
+        // Tope absoluto aunque no pare de crecer.
+        expect(restoreStep({ target: 900, y: 0, maxY: 300, stableFrames: 0, elapsedMs: RESTORE_HARD_LIMIT_MS, sinceGrowthMs: 0 })).toEqual({ kind: 'give-up' });
     });
 
     it('rememberScroll guarda la más reciente y limita las entradas', () => {
