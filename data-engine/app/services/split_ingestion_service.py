@@ -257,15 +257,16 @@ class SplitIngestionService(ProviderIngestionService):
         try:
             numerator = Decimal(str(row.get("numerator")))
             denominator = Decimal(str(row.get("denominator")))
+            if not numerator.is_finite() or not denominator.is_finite() or denominator <= 0 or numerator <= 0:
+                return None
+            ratio = (numerator / denominator).quantize(Decimal("1e-10"))
         except (InvalidOperation, ValueError, TypeError):
-            return None
-        if denominator <= 0 or numerator <= 0:
             return None
         # La columna es Numeric(24, 10): se guarda ya a esa precision. Con el
         # cociente completo (28 digitos, p. ej. 5:3) la comparacion de dedupe
         # contra lo guardado en Postgres nunca coincide y cada sync semanal
         # reinserta el mismo split.
-        return (numerator / denominator).quantize(Decimal("1e-10"))
+        return ratio if ratio.is_finite() and ratio > 0 else None
 
     @staticmethod
     def _description(source: str, ratio: float | Decimal, fetched_at: datetime) -> str:
