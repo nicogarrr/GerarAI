@@ -200,10 +200,14 @@ describe('/watchlist escenarios', () => {
       });
     });
     const tree = await render();
-    // Las filas son async server components (DatedRow, una por empresa y
-    // vista: tarjeta movil + fila de tabla): hay que resolverlas para ver lo
-    // pintado; el arbol crudo solo envuelve promesas.
-    const rows = find(tree, 'DatedRow');
+    // Las filas llegan por streaming (EntryRowStream, una por empresa y
+    // vista: tarjeta móvil + fila de tabla) y dentro van en DatedRow: hay
+    // que resolver ambas capas para ver lo pintado; el árbol crudo solo
+    // envuelve promesas.
+    const streams = find(tree, 'EntryRowStream');
+    expect(streams).toHaveLength(6);
+    const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const rows = find(streamed, 'DatedRow');
     expect(rows).toHaveLength(6);
     const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
     // Ninguna etiqueta visible de proveedor junto al PER, ni en tarjeta ni en tabla.
@@ -221,15 +225,19 @@ describe('/watchlist escenarios', () => {
     m.state.mockResolvedValue({ items: [item('AAPL')], unavailable: false });
     m.dated.mockReturnValue(Promise.reject(new Error('caído')));
     const page = await render();
-    const rows = find(page, 'DatedRow');
+    const streams = find(page, 'EntryRowStream');
+    const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const rows = find(streamed, 'DatedRow');
     const fn = rows[0].type as (p: unknown) => Promise<unknown>;
     expect(text(await fn(rows[0].props))).not.toContain('watchlist.page.closeOn');
-    const grid = find(page, 'DatedValuationGrid')[0];
+    const gridHost = await Promise.all(find(page, 'StocksStream').map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const grid = find(gridHost, 'DatedValuationGrid')[0];
     expect(await (grid.type as (p: unknown) => Promise<unknown>)(grid.props)).toBeTruthy();
     // live manda sobre el cierre datado
     m.dated.mockResolvedValue({ AAPL: { price: 1, currency: 'USD', change: 0, changePercent: 0, previousClose: 1, date: '2026-11-06' } });
     const page2 = await render();
-    const r2 = find(page2, 'DatedRow')[0];
+    const streamed2 = await Promise.all(find(page2, 'EntryRowStream').map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
+    const r2 = find(streamed2, 'DatedRow')[0];
     expect(text(await (r2.type as (p: unknown) => Promise<unknown>)(r2.props))).not.toContain('closeOn:2026-11-06');
   });
 });

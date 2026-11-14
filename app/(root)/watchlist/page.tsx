@@ -107,6 +107,25 @@ async function DcaBadgeStream({ promise, symbol }: { promise: Promise<DcaSignals
     return <DcaLevelBadge item={dcaBySymbol.get(symbol)} signalMonths={dca.data?.signal_months ?? null} compact />;
 }
 
+type SettledEntry = { ok: true; value: WatchlistEntryData | null } | { ok: false };
+
+/** Fila con sus datos de entrada (cotización viva, cap, PER) por streaming:
+    el documento pinta la fila con los basics del master y estos datos llegan
+    cuando resuelve la cadena (3 s de presupuesto por símbolo en frío; primera
+    empresa a 7,5 s y LCP 10 s medidos en prod, 2026-11-14). El estado final
+    no cambia: mismo render, mismo «sin datos» explícito mientras no hay dato. */
+async function EntryRowStream({ promise, render }: { promise: Promise<SettledEntry>; render: (settled: SettledEntry) => ReactNode }) {
+    const settled = await promise;
+    return <>{render(settled)}</>;
+}
+
+/** Piezas de página que necesitan las entradas resueltas (grid de
+    valoraciones, leyenda de cap N/D): llegan por streaming, como las filas. */
+async function StocksStream({ promise, render }: { promise: Promise<WatchlistStock[]>; render: (stocks: WatchlistStock[]) => ReactNode }) {
+    const stocks = await promise;
+    return <>{render(stocks)}</>;
+}
+
 async function DatedValuationGrid({ stocks, promise }: { stocks: WatchlistEntryData[]; promise: Promise<DatedMap> }) {
     const dated = await promise.catch((): DatedMap => ({}));
     return <ValuationSummaryGrid quotes={stocks.map((s) => applyDated(s, dated)).map((s) => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />;
@@ -238,40 +257,53 @@ export default async function WatchlistPage({
         pageItems.map((item, index) => [item.symbol.trim().toUpperCase(), notFoundPromises[index]]),
     );
     const [datedChanges, monitorData, basicsList] = await Promise.all([metricSort ? datedChangesPromise : Promise.resolve({} as DatedMap), monitorPromise, Promise.all(basicsPromises)]);
-    const watchlistStocks: WatchlistStock[] = await Promise.all(
-        pageItems.map(async (item, index) => {
-            try {
-                // Precio y divisa del LISTADO REAL (master), nunca del ticker
-                // desnudo: Finnhub free lo resuelve en la línea US (ADR en USD
-                // u otro emisor) y contradecía la ficha research (F253/F254).
-                const settled = await entryPromises[index];
-                if (!settled.ok) throw new Error('watchlist entry failed');
-                // null = presupuesto agotado: entrada vacía con priceKind null
-                // para que el cierre datado (etiquetado) ocupe la celda, pero
-                // CON nombre y divisa del master (un cierre en € no sale en $).
-                const timedOut = settled.value === null;
-                const basics: ResearchCompanyBasics | null = basicsList[index] ?? null;
-                const entry: WatchlistEntryData = settled.value ?? emptyWatchlistEntry(item.symbol.trim().toUpperCase(), basics, null);
-                const data = applyDated(entry, datedChanges);
-                return {
-                    ...data,
-                    analysis: item.analysis,
-                    monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
-                    timedOut,
-                    addedAt: item.addedAt
-                };
-            } catch {
-                // Fallo de red/proveedor: todo a null para pintar NA ('N/D') + badge «sin datos».
-                return {
-                    ...emptyWatchlistEntry(item.symbol, null, null),
-                    analysis: item.analysis,
-                    monitor: null,
-                    timedOut: false,
-                    addedAt: item.addedAt
-                };
-            }
-        })
+
+    // Construye la fila con la entrada ya resuelta. Precio y divisa del
+    // LISTADO REAL (master), nunca del ticker desnudo: Finnhub free lo
+    // resuelve en la línea US (ADR en USD u otro emisor) y contradecía la
+    // ficha research (F253/F254). value null = presupuesto agotado: entrada
+    // vacía con priceKind null para que el cierre datado (etiquetado) ocupe
+    // la celda, pero CON nombre y divisa del master (un cierre en € no sale
+    // en $). !ok = fallo de red/proveedor: todo a null para NA + «sin datos».
+    const buildStock = (item: (typeof pageItems)[number], basics: ResearchCompanyBasics | null, settled: SettledEntry, dated: DatedMap): WatchlistStock => {
+        if (!settled.ok) {
+            return {
+                ...emptyWatchlistEntry(item.symbol, null, null),
+                analysis: item.analysis,
+                monitor: null,
+                timedOut: false,
+                addedAt: item.addedAt
+            };
+        }
+        const timedOut = settled.value === null;
+        const entry: WatchlistEntryData = settled.value ?? emptyWatchlistEntry(item.symbol.trim().toUpperCase(), basics, null);
+        const data = applyDated(entry, dated);
+        return {
+            ...data,
+            analysis: item.analysis,
+            monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
+            timedOut,
+            addedAt: item.addedAt
+        };
+    };
+    // Pintado inicial: la fila sale con los basics del master (nombre, bolsa,
+    // divisa) y el monitor; la cotización viva llega por streaming.
+    const initialStock = (item: (typeof pageItems)[number], basics: ResearchCompanyBasics | null): WatchlistStock => ({
+        ...emptyWatchlistEntry(item.symbol.trim().toUpperCase(), basics, null),
+        analysis: item.analysis,
+        monitor: monitorData.items[item.symbol.trim().toUpperCase()] ?? null,
+        timedOut: false,
+        addedAt: item.addedAt,
+    });
+    // Las entradas resueltas las usan el grid de valoraciones y la leyenda de
+    // cap por streaming (sin orden por métrica). Con orden por métrica se
+    // espera por completo antes de ordenar, como antes.
+    const entriesStocksPromise: Promise<WatchlistStock[]> = Promise.all(
+        entryPromises.map((promise, index) => promise.then((settled) => buildStock(pageItems[index], basicsList[index] ?? null, settled, {}))),
     );
+    const watchlistStocks: WatchlistStock[] = metricSort
+        ? await Promise.all(entryPromises.map((promise, index) => promise.then((settled) => buildStock(pageItems[index], basicsList[index] ?? null, settled, datedChanges))))
+        : pageItems.map((item, index) => initialStock(item, basicsList[index] ?? null));
 
     const metricValue = (stock: WatchlistStock): number | string | null => {
         switch (sort) {
@@ -287,25 +319,27 @@ export default async function WatchlistPage({
     const displayStocks = metricSort ? sortedStocks.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE) : sortedStocks;
 
     // Capitalización N/D: una sola leyenda por página en vez de repetir el motivo en cada tarjeta/fila.
-    const marketCapGaps = MARKET_CAP_GAP_REASONS
-        .map((reason) => ({
-            reason,
-            symbols: displayStocks.filter((st) => marketCapGapReason(st) === reason).map((st) => st.symbol),
-        }))
-        .filter((group) => group.symbols.length > 0);
     const MARKET_CAP_GAP_TEXT: Record<MarketCapGapReason, string> = {
         timedOut: t('watchlist.page.capGap.timedOut'),
         readFailed: t('watchlist.page.capGap.readFailed'),
         notApplicable: t('watchlist.page.capGap.notApplicable'),
         unverifiable: t('watchlist.page.capGap.unverifiable'),
     };
-    const marketCapLegend = marketCapGaps.length > 0 ? (
-        <div className="space-y-0.5 text-[11px] leading-relaxed text-gray-500" data-testid="watchlist-marketcap-legend">
-            {marketCapGaps.map((group) => (
-                <p key={group.reason}>{t('watchlist.page.capLegend', { who: group.symbols.length === displayStocks.length ? t('watchlist.page.capLegendAll') : group.symbols.join(', '), reason: MARKET_CAP_GAP_TEXT[group.reason] })}</p>
-            ))}
-        </div>
-    ) : null;
+    const marketCapLegendFor = (stocks: WatchlistStock[]): ReactNode => {
+        const marketCapGaps = MARKET_CAP_GAP_REASONS
+            .map((reason) => ({
+                reason,
+                symbols: stocks.filter((st) => marketCapGapReason(st) === reason).map((st) => st.symbol),
+            }))
+            .filter((group) => group.symbols.length > 0);
+        return marketCapGaps.length > 0 ? (
+            <div className="space-y-0.5 text-[11px] leading-relaxed text-gray-500" data-testid="watchlist-marketcap-legend">
+                {marketCapGaps.map((group) => (
+                    <p key={group.reason}>{t('watchlist.page.capLegend', { who: group.symbols.length === stocks.length ? t('watchlist.page.capLegendAll') : group.symbols.join(', '), reason: MARKET_CAP_GAP_TEXT[group.reason] })}</p>
+                ))}
+            </div>
+        ) : null;
+    };
 
     const sortHref = (key: SortKey) => {
         if (key === 'added') return '/watchlist';
@@ -405,6 +439,22 @@ export default async function WatchlistPage({
             </Suspense>
         );
 
+    // Sin orden por métrica la cotización viva de cada fila llega por streaming:
+    // el documento pinta la fila con los basics del master (nombre, bolsa,
+    // divisa, monitor) y la fila se repinta cuando la cadena resuelve
+    // (presupuesto 3 s; LCP 10 s medido en prod, 2026-11-14). Fallback = fila
+    // con basics; el estado final es idéntico al de antes. Con orden por
+    // métrica ya se esperó todo antes de ordenar: render directo.
+    const streamEntry = (baseStock: WatchlistStock, index: number, render: (stock: WatchlistStock) => ReactNode): ReactNode =>
+        metricSort ? dated(baseStock, render) : (
+            <Suspense key={baseStock.symbol} fallback={dated(baseStock, render)}>
+                <EntryRowStream
+                    promise={entryPromises[index]}
+                    render={(settled) => dated(buildStock(pageItems[index], basicsList[index] ?? null, settled, {}), render)}
+                />
+            </Suspense>
+        );
+
     // Badge «No encontrado»/«sin datos» por streaming: el documento no espera
     // al perfil del proveedor (cadena de 3 s en frío tras los basics); el
     // fallback pinta «sin datos» cuando toca y el badge lo repinta al llegar.
@@ -425,6 +475,16 @@ export default async function WatchlistPage({
             </Suspense>
         );
     };
+
+    // Leyenda de cap N/D: sin orden por métrica llega por streaming cuando
+    // las entradas resuelven (sin frenar el documento); con orden por métrica
+    // ya está todo resuelto. wrap deja a cada sitio su envoltorio (o ninguno).
+    const marketCapLegendEl = (wrap: (legend: ReactNode) => ReactNode): ReactNode =>
+        metricSort ? wrap(marketCapLegendFor(displayStocks)) : (
+            <Suspense fallback={null}>
+                <StocksStream promise={entriesStocksPromise} render={(stocks) => wrap(marketCapLegendFor(stocks))} />
+            </Suspense>
+        );
 
     return (
         <WatchlistMembership key={watchlistItems.map((item) => item.symbol).sort().join('|')}>
@@ -505,7 +565,7 @@ export default async function WatchlistPage({
                         en el contenido con el menú lateral y salía cortada con un
                         scroll horizontal sin indicio (QA 2026-10-19, tablet 820px). */}
                     <div className="space-y-3 xl:hidden">
-                        {displayStocks.map((baseStock) => dated(baseStock, (stock) => (
+                        {displayStocks.map((baseStock, index) => streamEntry(baseStock, index, (stock) => (
                             <WatchlistEntry as="article" symbol={stock.symbol} key={stock.symbol} className="min-w-0 rounded-xl border border-gray-700/60 bg-gray-900/60 p-3">
                                 <div className="flex min-w-0 items-center gap-3">
                                     <CompanyLogo ticker={stock.quoteSymbol ?? stock.symbol} loading="lazy" name={stock.name} className="size-11 shrink-0 rounded-lg" />
@@ -568,7 +628,7 @@ export default async function WatchlistPage({
                                 </div>
                             </WatchlistEntry>
                         )))}
-                        {marketCapLegend}
+                        {marketCapLegendEl((legend) => legend)}
                     </div>
 
                     {/* Desktop (≥xl): tabla completa */}
@@ -602,7 +662,7 @@ export default async function WatchlistPage({
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {displayStocks.map((baseStock) => dated(baseStock, (stock) => (
+                                {displayStocks.map((baseStock, index) => streamEntry(baseStock, index, (stock) => (
                                     <WatchlistEntry as="tr" symbol={stock.symbol} key={stock.symbol} className="border-gray-800 transition-colors hover:bg-gray-800/30">
                                         <TableCell>
                                             <Link href={`/research/${stock.symbol}`} className="group flex items-center gap-3">
@@ -681,7 +741,7 @@ export default async function WatchlistPage({
                                 )))}
                             </TableBody>
                         </Table>
-                        {marketCapLegend ? <div className="border-t border-gray-700 px-4 py-2">{marketCapLegend}</div> : null}
+                        {marketCapLegendEl((legend) => legend ? <div className="border-t border-gray-700 px-4 py-2">{legend}</div> : null)}
                     </div>
                 </>
             )}
@@ -695,7 +755,7 @@ export default async function WatchlistPage({
             <ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />
         ) : (
             <Suspense fallback={<ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />}>
-                <DatedValuationGrid stocks={watchlistStocks} promise={datedChangesPromise} />
+                <StocksStream promise={entriesStocksPromise} render={(stocks) => <DatedValuationGrid stocks={stocks} promise={datedChangesPromise} />} />
             </Suspense>
         )}
         </main>
