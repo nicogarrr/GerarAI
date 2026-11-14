@@ -61,7 +61,7 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
                                         {/* Detalle expandible nativo (details/summary: funciona con teclado
                                             y en móvil sin JS): el límite queda accesible sin ruido visual. */}
                                         <details className="mt-1 text-xs text-gray-400">
-                                            <summary className="cursor-pointer select-none text-amber-300/80 underline decoration-dotted underline-offset-2">{ti('paperTrading.positions.whatMeans')}</summary>
+                                            <summary className="min-h-11 cursor-pointer select-none py-2 text-amber-300/80 underline decoration-dotted underline-offset-2 sm:min-h-10">{ti('paperTrading.positions.whatMeans')}</summary>
                                             <p className="mt-1 max-w-prose">
                                                 {ti('paperTrading.positions.expiredDetail')}
                                             </p>
@@ -103,7 +103,7 @@ function ValuationCells({ row, currency, ti, f }: { row: ValuedPosition | null; 
                     {/* El motivo no va solo en title/truncate (auditor 21-oct-2026):
                         expandible nativo, accesible con teclado y táctil. */}
                     <details className="mt-0.5 text-xs text-gray-500">
-                        <summary className="ml-auto w-fit cursor-pointer select-none text-gray-400 underline decoration-dotted underline-offset-2">{ti('paperTrading.positions.reasonSummary')}</summary>
+                        <summary className="ml-auto min-h-11 w-fit cursor-pointer select-none py-2 text-gray-400 underline decoration-dotted underline-offset-2 sm:min-h-10">{ti('paperTrading.positions.reasonSummary')}</summary>
                         <p className="mt-1 max-w-56 whitespace-normal">{row?.note ?? ti('paperTrading.positions.noValuation')}</p>
                     </details>
                     {row?.quoteLabel ? <span className="block text-xs text-gray-500">{row.quoteLabel}</span> : null}

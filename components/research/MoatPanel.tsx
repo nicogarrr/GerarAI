@@ -190,7 +190,7 @@ export function MoatClassificationPanel({ moat, ti = esT, locale = DEFAULT_LOCAL
         <p className="mt-1 text-xs text-gray-400">{(() => { const count = moat.moats.filter(item => item.nico_classification?.type === key).length; return count === 1 ? ti('research.moat.types.countOne', { count }) : ti('research.moat.types.countOther', { count }); })()}</p>
       </li>)}
     </ul>
-    <details className="text-xs text-gray-400"><summary className="cursor-pointer">{ti('research.moat.types.mapping')}</summary>
+    <details className="text-xs text-gray-400"><summary className="min-h-11 cursor-pointer py-2 sm:min-h-10">{ti('research.moat.types.mapping')}</summary>
       <ul className="mt-2 space-y-1">{Object.entries(moat.nico_mapping.mapping).map(([source, target]) => <li key={source}>{moatLabel(source, locale)}: {moat.nico_mapping?.types[target]}</li>)}{moat.nico_mapping.unclassified.map(source => <li key={source}>{moatLabel(source, locale)}: {ti('research.moat.types.unclassified')}</li>)}</ul>
       <p className="mt-2">{ti('research.moat.types.note')}</p>
     </details>

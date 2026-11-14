@@ -71,6 +71,6 @@ export function ExternalNewsHeadline({headline, url, className = ''}: {headline:
   return <div ref={ref}>
     <div className={className}>{url ? <a href={url} target="_blank" rel="noopener noreferrer" className="hover:text-teal-200">{text ?? headline}</a> : (text ?? headline)}</div>
     {showOriginalLabel && <p className="mt-1 text-xs text-amber-300">{t('researchShared.translate.originalHeadline')}</p>}
-    {text && <details className="mt-1 text-xs text-gray-400"><summary className="relative z-10 cursor-pointer py-1">{t('researchShared.translate.autoViewOriginal')}</summary><p className="relative z-10 mt-1 break-words">{url ? <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">{headline}</a> : headline}</p></details>}
+    {text && <details className="mt-1 text-xs text-gray-400"><summary className="relative z-10 min-h-11 cursor-pointer py-2 sm:min-h-10">{t('researchShared.translate.autoViewOriginal')}</summary><p className="relative z-10 mt-1 break-words">{url ? <a href={url} target="_blank" rel="noopener noreferrer" className="hover:underline">{headline}</a> : headline}</p></details>}
   </div>;
 }

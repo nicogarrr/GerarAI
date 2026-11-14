@@ -12,7 +12,26 @@ const FILES = [
   'components/alerts/AlertsManager.tsx',
   'components/PersonalizedOverview.tsx',
   'components/portfolio/PortfolioDataNotice.tsx',
+  'app/(root)/search/page.tsx',
+  'components/ErrorBoundary.tsx',
+  'components/brain/BrainGuideAnswer.tsx',
+  'components/paper-trading/PositionsTable.tsx',
+  'components/portfolio/ImportImageButton.tsx',
+  'components/portfolio/PortfolioDividends.tsx',
+  'components/proPicks/PaperTradingView.tsx',
+  'components/research/ExternalNewsHeadline.tsx',
+  'components/research/MoatPanel.tsx',
+  'components/research/ScenarioAssumptions.tsx',
+  'components/research/sections/ManagementAlignmentSection.tsx',
 ];
+
+// <summary> interactivos EXCLUIDOS a proposito de la convencion tactil:
+// son zona protegida (cerebro/tesis/valor) y solo se tocan con OK explicito.
+//   components/research/SotpBreakdownSection.tsx
+//   components/research/ThesisHumanInputForm.tsx
+//   components/research/ThesisInvalidationRulesForm.tsx
+// El <summary> de filtros avanzados de app/(root)/search/page.tsx lleva
+// list-none + icono propio: su flex es intencional y no entra en el guard.
 
 for (const file of FILES) {
   test(`guard móvil: summary táctil 44px con marcador nativo (${file})`, () => {
