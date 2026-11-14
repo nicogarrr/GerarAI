@@ -98,19 +98,27 @@ export type RestoreStep =
 /**
  * Un fotograma de la restauración. Mientras el documento no mide lo bastante
  * (la ficha llega por streaming) se baja hasta donde se pueda y se sigue
- * intentando; se da por terminada cuando la posición aguanta en el objetivo
- * varios fotogramas seguidos (absorbe los saltos de maquetación de lo que
- * llega por encima). No hay forma de detectar el fin del streaming: se deja
- * donde esté cuando el documento lleva RESTORE_TIMEOUT_MS sin crecer o al
- * llegar al tope absoluto RESTORE_HARD_LIMIT_MS.
+ * intentando. No basta con que la posición aguante unos fotogramas en el
+ * objetivo: el anclaje de scroll del navegador mueve `scrollY` con cada
+ * inserción por encima del viewport (medido en CI, 14-nov: max +32 px
+ * ~225 ms tras declararla terminada, y quedó desplazada). Por eso solo se
+ * da por terminada cuando además el documento lleva RESTORE_TIMEOUT_MS sin
+ * crecer; hasta entonces cada deriva se corrige de vuelta al objetivo. No
+ * hay forma de detectar el fin del streaming: se deja donde esté cuando el
+ * documento lleva RESTORE_TIMEOUT_MS sin crecer o al llegar al tope absoluto
+ * RESTORE_HARD_LIMIT_MS.
  */
 export function restoreStep(frame: RestoreFrame): RestoreStep {
     const { target, y, maxY, stableFrames, elapsedMs, sinceGrowthMs } = frame;
     const reachable = maxY >= target - 1;
     const atTarget = reachable && Math.abs(y - target) <= 1;
     if (atTarget) {
+        // Ya está donde debe: también el tope absoluto la da por buena.
+        if (elapsedMs >= RESTORE_HARD_LIMIT_MS) return { kind: 'done' };
         const stable = stableFrames + 1;
-        return stable >= RESTORE_STABLE_FRAMES ? { kind: 'done' } : { kind: 'scroll', to: target, stableFrames: stable };
+        return stable >= RESTORE_STABLE_FRAMES && sinceGrowthMs >= RESTORE_TIMEOUT_MS
+            ? { kind: 'done' }
+            : { kind: 'scroll', to: target, stableFrames: stable };
     }
     if (sinceGrowthMs >= RESTORE_TIMEOUT_MS || elapsedMs >= RESTORE_HARD_LIMIT_MS) return { kind: 'give-up' };
     return { kind: 'scroll', to: Math.min(target, Math.max(0, maxY)), stableFrames: 0 };
