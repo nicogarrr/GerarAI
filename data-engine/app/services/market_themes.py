@@ -727,12 +727,9 @@ class ThemesCache:
 
 
 def with_live_intraday(payload: dict, now: datetime | None = None) -> dict:
-    """Recalcula `intraday` al SERVIR: el payload cacheado puede ser de antes del cierre."""
-    as_of = payload.get("as_of")
-    if not as_of:
-        return payload
-    try:
-        session = date.fromisoformat(as_of)
-    except ValueError:
-        return payload
-    return {**payload, "intraday": last_point_is_intraday(session, now or datetime.now(UTC))}
+    """Preserva la clasificacion de la descarga; el reloj no acredita un cierre.
+
+    ``now`` se conserva por compatibilidad. Una foto intradia antigua sigue
+    siendo intradia de SU fecha, con la frescura que declara la cache.
+    """
+    return payload
