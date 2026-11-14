@@ -21,31 +21,34 @@ const usdPrice = (f: Formatters, value: number | null) =>
 const sharesText = (f: Formatters, side: InsiderOperationsSide) =>
     // Misma convención que el importe (86,74 M US$ · 300.000 acc. · 289,14 US$ en es-ES).
     side.trades === 0 ? '—' : f.formatNumber(side.shares, { maximumFractionDigits: 0 });
-/** Con filas sin importe el medio no se calcula: se declara N/D (convención N/D del repo), nunca «—» a secas. */
-const avgText = (t: TFunction, f: Formatters, side: InsiderOperationsSide) =>
-    side.rows_without_value > 0 ? t('insider.operations.avgNa') : usdPrice(f, side.avg_price);
 /** El total con filas sin importe es un mínimo: se marca en la cifra, no solo en el pie. */
 const minMark = (side: InsiderOperationsSide) => (side.rows_without_value > 0 ? '≥ ' : '');
 
-function periodText(t: TFunction, f: Formatters, period: InsiderOperationsCompany['period']): string {
-    if (!period.from || !period.to) return t('insider.operations.periodNoDates');
-    return `${f.formatDate(period.from)} – ${f.formatDate(period.to)}`;
-}
-
-function SideCells({ side, empty }: { side: InsiderOperationsSide; empty?: string }) {
+function SideCells({ side, empty, label }: { side: InsiderOperationsSide; empty?: string; label: string }) {
     const t = useT();
     const f = useFormat();
     if (side.trades === 0) {
-        return <TableCell className="text-right text-sm text-gray-500">{empty ?? '—'}</TableCell>;
+        return (
+            <TableCell className="block text-sm text-gray-500 md:table-cell md:text-right">
+                <span className="block text-xs text-gray-500 md:hidden">{label}</span>
+                {empty ?? '—'}
+            </TableCell>
+        );
     }
     return (
-        <TableCell className="text-right text-sm font-semibold tabular-nums text-gray-100">
-            {usdCompact(f, side.value)}
+        <TableCell className="block text-sm md:table-cell md:text-right">
+            <span className="block text-xs font-normal text-gray-500 md:hidden">{label}</span>
+            <span className="font-semibold tabular-nums text-gray-100">{usdCompact(f, side.value)}</span>
             <span className="block text-xs font-normal text-gray-500">
                 {t('insider.operations.sharesAcc', { n: sharesText(f, side) })} · {side.rows_without_value > 0 ? t('insider.operations.avgNaReason') : usdPrice(f, side.avg_price)}
             </span>
         </TableCell>
     );
+}
+
+function periodText(t: TFunction, f: Formatters, period: InsiderOperationsCompany['period']): string {
+    if (!period.from || !period.to) return t('insider.operations.periodNoDates');
+    return `${f.formatDate(period.from)} – ${f.formatDate(period.to)}`;
 }
 
 export function CompanyCard({ company }: { company: InsiderOperationsCompany }) {
@@ -78,10 +81,13 @@ export function CompanyCard({ company }: { company: InsiderOperationsCompany }) 
                 })}
             </p>
 
-            <div className="mt-3 hidden md:block">
-                <Table regionLabel={t('insider.operations.tableRegion', { ticker: company.ticker })}>
+            {/* Una sola tabla responsiva (decisión de diseño, 2026-11-14): fila
+                tarjeta debajo de md, fila de tabla desde md; un insider = una fila
+                con el mismo contenido en cada viewport. */}
+            <div className="mt-3">
+                <Table className="block md:table" regionLabel={t('insider.operations.tableRegion', { ticker: company.ticker })}>
                     <TableCaption className="sr-only">{t('insider.operations.tableCaption', { ticker: company.ticker })}</TableCaption>
-                    <TableHeader>
+                    <TableHeader className="hidden md:table-header-group">
                         <TableRow className="border-gray-700 hover:bg-transparent">
                             <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('insider.operations.colInsider')}</TableHead>
                             <TableHead className="text-xs font-semibold uppercase text-gray-500">{t('insider.operations.colRole')}</TableHead>
@@ -91,53 +97,31 @@ export function CompanyCard({ company }: { company: InsiderOperationsCompany }) 
                             <TableHead className="text-right text-xs font-semibold uppercase text-gray-500">{t('insider.operations.colLast')}</TableHead>
                         </TableRow>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody className="block space-y-2 md:table-row-group md:space-y-0">
                         {company.insiders.map((row) => (
-                            <TableRow key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`} className="border-gray-700/50">
-                                <TableCell className="text-sm text-gray-200">{insiderName(row.insider)}</TableCell>
-                                <TableCell className="text-sm text-gray-400">{insiderRole(row.role, row.officer_title, f.locale)}</TableCell>
-                                <SideCells side={row.sell} />
-                                <SideCells side={row.buy} />
-                                <TableCell className="text-right text-sm tabular-nums text-gray-300">
+                            <TableRow aria-label={insiderName(row.insider)} key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`} className="block rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 md:table-row md:rounded-none md:border-0 md:border-b md:bg-transparent md:p-0">
+                                <TableCell className="block text-sm text-gray-200 md:table-cell">
+                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colInsider')}</span>
+                                    <span className="font-medium md:font-normal">{insiderName(row.insider)}</span>
+                                </TableCell>
+                                <TableCell className="block text-sm text-gray-400 md:table-cell">
+                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colRole')}</span>
+                                    {insiderRole(row.role, row.officer_title, f.locale)}
+                                </TableCell>
+                                <SideCells side={row.sell} label={t('insider.operations.colSales')} />
+                                <SideCells side={row.buy} label={t('insider.operations.colBuys')} />
+                                <TableCell className="block text-sm tabular-nums text-gray-300 md:table-cell md:text-right">
+                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colOps')}</span>
                                     {f.formatNumber(row.sell.trades + row.buy.trades, { maximumFractionDigits: 0 })}
                                 </TableCell>
-                                <TableCell className="text-right text-sm text-gray-400">
+                                <TableCell className="block text-sm text-gray-400 md:table-cell md:text-right">
+                                    <span className="block text-xs text-gray-500 md:hidden">{t('insider.operations.colLast')}</span>
                                     {row.last_tx ? f.formatDate(row.last_tx) : '—'}
                                 </TableCell>
                             </TableRow>
                         ))}
                     </TableBody>
                 </Table>
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-2 md:hidden">
-                {company.insiders.map((row) => (
-                    <article
-                        key={`${row.insider ?? 'sin-nombre'}|${row.role ?? ''}|${row.officer_title ?? ''}`}
-                        className="rounded-lg border border-gray-700/50 bg-gray-900/50 p-3 text-sm"
-                    >
-                        <p className="font-medium text-gray-200">{insiderName(row.insider)}</p>
-                        <p className="text-xs text-gray-500">{insiderRole(row.role, row.officer_title, f.locale)}</p>
-                        <dl className="mt-2 grid grid-cols-2 gap-2">
-                            <div>
-                                <dt className="text-xs text-gray-500">{t('insider.operations.colSales')}</dt>
-                                <dd className="tabular-nums text-gray-100">
-                                    {row.sell.trades === 0 ? '—' : `${usdCompact(f, row.sell.value)} · ${t('insider.operations.sharesAcc', { n: sharesText(f, row.sell) })} · ${avgText(t, f, row.sell)}`}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="text-xs text-gray-500">{t('insider.operations.colBuys')}</dt>
-                                <dd className="tabular-nums text-gray-100">
-                                    {row.buy.trades === 0 ? '—' : `${usdCompact(f, row.buy.value)} · ${t('insider.operations.sharesAcc', { n: sharesText(f, row.buy) })} · ${avgText(t, f, row.buy)}`}
-                                </dd>
-                            </div>
-                        </dl>
-                        <p className="mt-1 text-xs text-gray-500">
-                            {t('insider.operations.opsLine', { n: f.formatNumber(row.sell.trades + row.buy.trades, { maximumFractionDigits: 0 }) })}
-                            {row.last_tx ? ` · ${t('insider.operations.lastSuffix', { date: f.formatDate(row.last_tx) })}` : ''}
-                        </p>
-                    </article>
-                ))}
             </div>
 
             {company.excluded_codes > 0 ||
