@@ -95,6 +95,9 @@ def insider_signal(
     }
     last: date | None = None
     for tx, filing_date in rows:
+        filed = _parse_date(filing_date)
+        if filed is not None and filed > today:
+            continue
         effective = _parse_date(tx.tx_date) or _parse_date(filing_date)
         if effective is None or effective < cutoff or effective > today:
             continue
