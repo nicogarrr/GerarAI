@@ -61,14 +61,91 @@ async function scrollToContentReportLink(page: Page) {
 }
 
 /** La posición vuelve a la del usuario (o al tope si la página es más corta). */
-async function expectBackAt(page: Page, before: number) {
-  await expect.poll(async () => {
-    const { y, max } = await page.evaluate(() => ({
-      y: Math.round(window.scrollY),
-      max: Math.round(document.documentElement.scrollHeight - window.innerHeight),
-    }));
-    return Math.abs(y - Math.min(before, max)) <= 2 && y > 0;
-  }, { timeout: 15_000, message: `scroll esperado ≈ ${before}px` }).toBe(true);
+async function expectBackAt(
+  page: Page,
+  before: number,
+  opts?: { t0?: number; note?: () => string },
+) {
+  // Telemetría para los rojos intermitentes de CI. El sampler de 200 ms es
+  // INDEPENDIENTE del poll del gate: este conserva los intervalos por
+  // defecto de Playwright, así que lo que el test exige no cambia; la serie
+  // solo se enseña si el gate falla (Error en texto, no artefacto).
+  // t = 0 es el popstate de la vuelta cuando se pudo marcar (el restore
+  // arranca en el commit siguiente); si no, la entrada aquí, justo tras
+  // waitForURL. Con eso la serie data mesetas >= 4 s sin crecimiento y
+  // crecimientos tardíos, la firma del give-up por sinceGrowthMs.
+  const t0 = opts?.t0 ?? Date.now();
+  const samples: string[] = [];
+  let sampling = true;
+  const sampler = (async () => {
+    while (sampling) {
+      try {
+        const { y, max } = await page.evaluate(() => ({
+          y: Math.round(window.scrollY),
+          max: Math.round(document.documentElement.scrollHeight - window.innerHeight),
+        }));
+        samples.push(`${Date.now() - t0}ms y=${y} max=${max}`);
+      } catch {
+        break; // página destruida: telemetría best-effort, no es el fallo
+      }
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  })();
+  try {
+    await expect.poll(async () => {
+      const { y, max } = await page.evaluate(() => ({
+        y: Math.round(window.scrollY),
+        max: Math.round(document.documentElement.scrollHeight - window.innerHeight),
+      }));
+      return Math.abs(y - Math.min(before, max)) <= 2 && y > 0;
+    }, { timeout: 15_000, message: `scroll esperado ≈ ${before}px` }).toBe(true);
+  } catch (cause) {
+    // Best-effort: una página cerrada no puede tapar el fallo original.
+    let navType = "?";
+    try {
+      navType = (await page.evaluate(() =>
+        (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type
+      )) ?? "?";
+    } catch {
+      // sin la página no hay navigation.type; la serie y el cause mandan
+    }
+    throw new Error(
+      `scroll esperado ≈ ${before}px; navigation.type=${navType}${opts?.note ? `; ${opts.note()}` : ""}; serie: ${samples.join(" | ")}`,
+      { cause },
+    );
+  } finally {
+    sampling = false;
+    await sampler;
+  }
+}
+
+/** Marca el instante del popstate para datar la serie del restore. */
+async function markPopstateClock(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { __r5PopAt?: number };
+    w.__r5PopAt = 0;
+    window.addEventListener("popstate", () => { w.__r5PopAt = Date.now(); });
+  });
+}
+
+/** Lee la marca del popstate (no sobrevive a una carga de documento). */
+async function readPopstateClock(page: Page): Promise<number | undefined> {
+  try {
+    const t = await page.evaluate(() => (window as unknown as { __r5PopAt?: number }).__r5PopAt);
+    return t && t > 0 ? t : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Observa si la navegación hacia `urlRe` fue carga de documento (clic
+ *  pre-hidratación) en vez de SPA; se reporta en la telemetría del fallo. */
+function watchDocumentNav(page: Page, urlRe: RegExp) {
+  const state = { seen: false };
+  page.on("request", (req) => {
+    if (req.resourceType() === "document" && urlRe.test(req.url())) state.seen = true;
+  });
+  return state;
 }
 
 for (const [label, viewport] of [["móvil 390", { width: 390, height: 844 }], ["PC 1440", { width: 1440, height: 900 }]] as const) {
@@ -85,25 +162,34 @@ for (const [label, viewport] of [["móvil 390", { width: 390, height: 844 }], ["
       await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
       const { link, before } = await scrollToContentReportLink(page);
       expect(before).toBeGreaterThan(0);
+      // Tipo de la navegación de ida: un request «document» al informe
+      // delataría un clic pre-hidratación (carga completa en vez de SPA).
+      // Solo telemetría: no cambia los criterios del test.
+      const informeDocNav = watchDocumentNav(page, /\/informe/);
       await link.click();
       await page.waitForURL(/\/research\/MSFT\/informe/);
       await expect(page.locator("h1").first()).toBeVisible();
+      await markPopstateClock(page);
       await page.goBack();
       await page.waitForURL(/\/research\/MSFT\?view=valoracion/);
-      await expectBackAt(page, before);
+      const t0 = await readPopstateClock(page);
+      await expectBackAt(page, before, { t0, note: () => `docNavIda=${informeDocNav.seen}` });
     });
 
     test("«← Volver a la ficha» del Informe vuelve a la pestaña y a donde estabas", async ({ page }) => {
       await page.goto("/research/MSFT?view=valoracion");
       await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
       const { link, before } = await scrollToContentReportLink(page);
+      const informeDocNav = watchDocumentNav(page, /\/informe/);
       await link.click();
       await page.waitForURL(/\/research\/MSFT\/informe/);
       const back = page.getByRole("link", { name: "← Volver a la ficha" });
       await expect(back).toHaveAttribute("data-back-mode", "history");
+      await markPopstateClock(page);
       await back.click();
       await page.waitForURL(/\/research\/MSFT\?view=valoracion/);
-      await expectBackAt(page, before);
+      const t0 = await readPopstateClock(page);
+      await expectBackAt(page, before, { t0, note: () => `docNavIda=${informeDocNav.seen}` });
     });
   });
 }
