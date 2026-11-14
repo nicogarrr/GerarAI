@@ -257,6 +257,8 @@
     "noDates": "sin fechas",
     "topTickers": "Más operados",
     "volume": "Volumen declarado: {range}",
+    "volumePartial": "Volumen parcial (solo importes conocidos): {range}. Operaciones sin importe verificable: {count}.",
+    "volumeUnavailable": "Volumen no disponible: Operaciones sin importe verificable: {count}.",
     "scanned": "{count} PTR en papel escaneado sin leer",
     "coverage": "{filings} PTR de {years}; {scanned} en papel escaneado (se enlazan, sus importes no se leen de forma fiable).",
     "count": "{total} políticos",

@@ -17,6 +17,15 @@ export function PoliticianCardView({ card, locale = DEFAULT_LOCALE }: { card: Po
   const t = createTranslator(locale);
   const intl = intlLocale(locale);
   const pct = card.on_time_pct;
+  const unknownAmounts = card.volume_unknown_trades ?? 0;
+  const volumeRange = card.volume_max === null
+    ? `> ${compactUsd(card.volume_min, intl)}`
+    : `${compactUsd(card.volume_min, intl)} – ${compactUsd(card.volume_max, intl)}`;
+  const volume = unknownAmounts > 0
+    ? (unknownAmounts >= card.trades
+      ? t('insider.politicians.volumeUnavailable', { count: unknownAmounts })
+      : t('insider.politicians.volumePartial', { range: volumeRange, count: unknownAmounts }))
+    : t('insider.politicians.volume', { range: card.trades ? volumeRange : '—' });
   return (
     <li className="rounded-xl border border-gray-800 bg-surface-1 p-4" data-testid="politician-card">
       <div className="flex flex-wrap items-center gap-2">
@@ -47,7 +56,7 @@ export function PoliticianCardView({ card, locale = DEFAULT_LOCALE }: { card: Po
           </div>
         </div>
       ) : null}
-      <p className="mt-3 text-xs text-gray-500">{t('insider.politicians.volume', { range: card.trades ? (card.volume_max === null ? `> ${compactUsd(card.volume_min, intl)}` : `${compactUsd(card.volume_min, intl)} – ${compactUsd(card.volume_max, intl)}`) : '—' })}</p>
+      <p className="mt-3 text-xs text-gray-500">{volume}</p>
       {card.scanned_filings ? <p className="text-xs text-gray-500">{t('insider.politicians.scanned', { count: card.scanned_filings })}</p> : null}
     </li>
   );
