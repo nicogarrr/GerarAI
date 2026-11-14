@@ -140,7 +140,8 @@ def test_ingest_saves_known_isin_once_with_currency(db):
     assert filing.filing_date == "2026-10-19"
     assert filing.source_url == "https://data.fca.org.uk/artefacts/NSM/RNS/cgeo-1.html"
     tx = db.scalar(select(InsiderTransaction).where(InsiderTransaction.accession_number == "pence-1|1"))
-    assert tx.code == "S" and tx.price == 8.9
+    assert tx.code == "S" and tx.price is None
+    assert tx.data_quality["provider_reported_price"] == 890
     assert tx.data_quality["currency"] == "GBP" and tx.data_quality["price_from_pence"] is True
     assert tx.data_quality["source"] == "tracefour" and tx.data_quality["licence"] == "CC BY 4.0"
     # Idempotente: la segunda pasada no duplica.
@@ -219,7 +220,8 @@ def test_gbx_value_never_divided_unverified():
         "valueUnknown": False,
     }
     mapped = map_entry(entry)
-    assert mapped["price"] == 8.9 and mapped["price_from_pence"] is True
+    assert mapped["price"] is None and mapped["price_from_pence"] is True
+    assert mapped["monetary_quality"]["provider_reported_price"] == 890
     assert mapped["value"] is None and mapped["value_raw"] == 4954630
     assert mapped["value_unknown"] is True
 

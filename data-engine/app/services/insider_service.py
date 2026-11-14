@@ -24,6 +24,7 @@ from typing import Any
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
 from app.services.connectors import form4 as form4_connector
+from app.services.pdmr_monetary_quality import transaction_money
 from app.services.provenance import Coverage, SourceKind, provenance
 
 CLUSTER_MIN_INSIDERS = 3
@@ -344,8 +345,7 @@ def _persisted_filing_transactions(
                     "type": row.code,
                     "acquired_disposed": row.acquired_disposed,
                     "shares": row.shares,
-                    "price": row.price,
-                    "value": row.value,
+                    **transaction_money(row, row.form or record.form),
                     "date": row.tx_date or record.filing_date,
                     "is_derivative": bool(row.is_derivative),
                     "accession_number": accession,

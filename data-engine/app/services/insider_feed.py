@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models.entities import InsiderFiling, InsiderTransaction
 from app.services import insider_service
+from app.services.pdmr_monetary_quality import monetary_fields, transaction_money
 
 SIDES = {"buy": "P", "sell": "S"}
 
@@ -62,14 +63,13 @@ def _tx_dict(row: InsiderTransaction, filing: InsiderFiling, line: int) -> dict[
         "type": row.code,
         "acquired_disposed": row.acquired_disposed,
         "shares": row.shares,
-        "price": row.price,
+        **transaction_money(row, row.form or filing.form),
         # Divisa declarada por transaccion. SEC Form 4: siempre USD (se
         # declara y liquida en USD). PDMR UK: la que traiga la fuente; si
         # falta (93/307 en el feed real), None -> UI: "divisa no informada".
         "currency": ((row.data_quality or {}).get("currency")
         if isinstance(row.data_quality, dict) else None)
         or ("USD" if row.form in ("4", "4/A", "5", "5/A") else None),
-        "value": row.value,
         "date": row.tx_date or filing.filing_date,
         "is_derivative": bool(row.is_derivative),
         "rule_10b5_1": bool(row.rule_10b5_1),
@@ -101,14 +101,13 @@ def _tx_dict_from_row(row: Any, line: int) -> dict[str, Any]:
         "type": row["code"],
         "acquired_disposed": row["acquired_disposed"],
         "shares": row["shares"],
-        "price": row["price"],
+        **monetary_fields(tx_form or row["filing_form"], row["accession_number"], row["price"], row["value"]),
         # Divisa declarada por transaccion. SEC Form 4: siempre USD (se
         # declara y liquida en USD). PDMR UK: la que traiga la fuente; si
         # falta (93/307 en el feed real), None -> UI: "divisa no informada".
         "currency": ((data_quality or {}).get("currency")
         if isinstance(data_quality, dict) else None)
         or ("USD" if tx_form in ("4", "4/A", "5", "5/A") else None),
-        "value": row["value"],
         "date": row["tx_date"] or row["filing_date"],
         "is_derivative": bool(row["is_derivative"]),
         "rule_10b5_1": bool(row["rule_10b5_1"]),
@@ -336,6 +335,7 @@ def build_feed(
                 "source_url": t["source_url"],
                 "form": t["form"],
                 "currency": t["currency"],
+                **({"monetary_verification": t["monetary_verification"]} if "monetary_verification" in t else {}),
             }
             for t in shown[:limit]
         ],

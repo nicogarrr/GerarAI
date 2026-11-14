@@ -22,6 +22,7 @@ from typing import Any
 import httpx
 
 from app.services.data_source_health import get_data_source_registry
+from app.services.pdmr_monetary_quality import monetary_fields
 
 TRACEFOUR_URL = "https://tracefour.com/v1/eu/uk"
 _REGISTRY_KEY = "tracefour"
@@ -143,7 +144,16 @@ def map_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         value = None
     if entry.get("valueUnknown") is True:
         value = None
+    money = monetary_fields(FORM, filing_id, price, value)
     return {
+        "monetary_quality": {
+            "monetary_verification": money["monetary_verification"],
+            "provider_monetary_inconsistent": money["provider_monetary_inconsistent"],
+            "provider_reported_price": entry.get("pricePerShare"),
+            "provider_reported_value": entry.get("totalValue"),
+            "provider_reported_currency": entry.get("currency"),
+            "monetary_source_url": entry.get("rawArtefactUrl"),
+        },
         "filing_id": filing_id,
         "accession_number": filing_id,
         "form": FORM,
@@ -155,9 +165,9 @@ def map_entry(entry: dict[str, Any]) -> dict[str, Any] | None:
         "code": map_transaction_code(entry.get("transactionNature")),
         "transaction_nature": entry.get("transactionNature"),
         "shares": entry.get("volume") if isinstance(entry.get("volume"), (int, float)) else None,
-        "price": price,
+        "price": money["price"],
         "currency": currency,
-        "value": float(value) if isinstance(value, (int, float)) else None,
+        "value": money["value"],
         "value_raw": value_raw,
         "value_unknown": bool(entry.get("valueUnknown")) or value_raw is not None,
         "tx_date": entry.get("transactionDate"),

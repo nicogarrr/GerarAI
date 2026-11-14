@@ -85,6 +85,7 @@ def insider_signal(
         .join(InsiderFiling, InsiderFiling.id == InsiderTransaction.filing_id)
         .where(
             InsiderTransaction.issuer_ticker == normalized,
+            InsiderTransaction.form.in_(("4", "4/A", "5", "5/A")),
             InsiderTransaction.code.in_(("P", "S")),
             InsiderTransaction.is_derivative.is_(False),
         )

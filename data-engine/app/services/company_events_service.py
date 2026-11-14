@@ -42,6 +42,7 @@ from app.services.connectors.finnhub import FinnhubClient
 from app.services.connectors.sec import SECClient
 from app.services.document_visibility import without_archive_duplicates
 from app.services.holding_period import current_holding_starts
+from app.services.pdmr_monetary_quality import transaction_value
 
 logger = logging.getLogger(__name__)
 
@@ -665,7 +666,7 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             func.upper(InsiderTransaction.issuer_ticker) == ticker, *tenant_filters(db, InsiderTransaction)
         )
     ).all():
-        value = _timeline_float(row.value)
+        value = _timeline_float(transaction_value(row))
         day = _timeline_day(row.tx_date)
         if day is None or not (desde <= day <= hasta):
             continue
@@ -681,7 +682,9 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             detail = f"Operación de {value:,.0f} $ (formulario {row.form})".replace(",", ".")
         else:
             source = {"PDMR": "tracefour", "CA-INSIDER": "Yahoo Finance (no oficial)"}.get(row.form, "Registro insider")
-            if isinstance(currency, str) and currency.strip() and value is not None and value >= 0:
+            if row.form == "PDMR":
+                detail = "Precio e importe sin verificar; no se usan para calcular flujos (formulario PDMR)"
+            elif isinstance(currency, str) and currency.strip() and value is not None and value >= 0:
                 detail = f"Operación de {value:,.0f} {currency.strip()} (formulario {row.form})".replace(",", ".")
             else:
                 detail = f"Importe no comparable: divisa o importe no informado (formulario {row.form})"

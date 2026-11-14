@@ -200,7 +200,9 @@
       "cluster_buy": "3 or more different insiders buy within 30 days",
       "c_suite_buy": "The CEO or CFO buys shares",
       "big_buy": "A single purchase above $1M"
-    }
+    },
+    "monetaryUnverified": "Price and amount are unverified. They are not used to calculate flows.",
+    "monetaryInconsistent": "Price and amount disagree with the original filing. They are not used to calculate flows."
   },
   "statusCopy": {
     "reason": {

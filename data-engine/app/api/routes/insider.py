@@ -13,6 +13,7 @@ from app.core.database import get_db
 from app.core.tenancy import tenant_filters
 from app.models.entities import Company, Document, InsiderFiling, InsiderTransaction
 from app.services import insider_feed, insider_operations, insider_service, insider_summary
+from app.services.pdmr_monetary_quality import transaction_money
 from app.services.ticker_ownership_signals import ownership_signals
 
 logger = logging.getLogger(__name__)
@@ -244,13 +245,12 @@ def insider_filings(
                             else None,
                             "rule_10b5_1": bool(tx.rule_10b5_1),
                             "shares": tx.shares,
-                            "price": tx.price,
+                            **transaction_money(tx, tx.form or filing.form),
                             # Como insider_feed: USD solo en Form 4; PDMR sin
                             # divisa queda None (nunca se asume).
                             "currency": ((tx.data_quality or {}).get("currency")
                             if isinstance(tx.data_quality, dict) else None)
                             or ("USD" if tx.form in ("4", "4/A", "5", "5/A") else None),
-                            "value": tx.value,
                             "tx_date": tx.tx_date,
                             "source_url": tx.source_url,
                         }

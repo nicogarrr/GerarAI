@@ -65,6 +65,7 @@ export interface InsiderFilingTransaction {
     rule_10b5_1?: boolean | null;
     shares?: number | null;
     price?: number | null;
+    monetary_verification?: 'unverified' | 'inconsistent';
     /** Divisa declarada de la operacion (USD en SEC, GBP en PDMR UK). */
     currency?: string | null;
     value?: number | null;
@@ -141,6 +142,7 @@ export interface InsiderFeedTransaction {
     side?: 'compra' | 'venta' | null;
     shares?: number | null;
     price?: number | null;
+    monetary_verification?: 'unverified' | 'inconsistent';
     /** Divisa declarada (USD en SEC, GBP en PDMR UK); nunca se asume. */
     currency?: string | null;
     /** Formulario origen: "4"/"4/A" (SEC), "PDMR" (UK) o "CA-INSIDER" (Canada, Yahoo no oficial). */

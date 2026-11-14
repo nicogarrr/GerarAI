@@ -111,6 +111,8 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
             </section>
         );
     }
+    // Cached responses from before quarantine must not flash unverified money.
+    const transactions = feed.transactions.map((tx) => tx.form === "PDMR" ? {...tx, price: null, value: null} : tx);
     const totals = feed.totals;
     const bigBuys = feed.big_buys ?? [];
     const SIDES = [
@@ -188,7 +190,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
 
             <section className="rounded-xl border border-gray-800 bg-surface-1 p-4">
                 <h2 className="text-sm font-semibold text-gray-100">{t('insider.feed.operationsTitle')}</h2>
-                {feed.transactions.length === 0 ? (
+                {transactions.length === 0 ? (
                     <p className="mt-3 text-sm text-gray-500">{t('insider.feed.emptyPeriod')}</p>
                 ) : (
                     <>
@@ -207,7 +209,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody className="block space-y-3 md:table-row-group md:space-y-0">
-                                    {feed.transactions.map((tx, index) => {
+                                    {transactions.map((tx, index) => {
                                         const note = trancheNote(t, f, tx.tranches);
                                         return (
                                             <TableRow className="grid grid-cols-2 gap-x-3 gap-y-1 break-words rounded-lg border border-gray-800 bg-gray-900/50 p-3 md:table-row md:gap-0 md:rounded-none md:border-0 md:border-t md:border-gray-900 md:bg-transparent md:p-0" key={`${tx.accession_number}-${index}`}>
@@ -257,6 +259,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                             usd(f, tx.value, 0, txCurrency(tx))
                                                         )}
                                                     </span>
+                                                    {tx.form === 'PDMR' ? <span className="mt-1 block whitespace-normal text-xs font-normal text-amber-300">{t(tx.monetary_verification === 'inconsistent' ? 'insider.feed.monetaryInconsistent' : 'insider.feed.monetaryUnverified')}</span> : null}
                                                     {tx.currency == null && (tx.price != null || tx.value != null) ? (
                                                         <span className="block text-xs font-normal text-gray-500">{t('insider.feed.currencyMissing')}</span>
                                                     ) : null}

@@ -92,6 +92,7 @@ def _candidate_purchases(
             InsiderTransaction.tenant_id.is_(tenant_id) if tenant_id is None
             else InsiderTransaction.tenant_id == tenant_id,
             InsiderTransaction.code == "P",
+            InsiderTransaction.form.in_(("4", "4/A", "5", "5/A")),
             InsiderTransaction.acquired_disposed == "A",
             InsiderTransaction.is_derivative.is_(False),
         )

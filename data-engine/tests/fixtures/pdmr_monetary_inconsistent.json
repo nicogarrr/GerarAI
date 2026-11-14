@@ -1,0 +1,112 @@
+[
+  {
+    "provider_row": {
+      "filingId": "a25fe9c8-34b0-4c21-8b83-4b8cf9ea717a|1",
+      "publicationAt": "2026-10-30T07:00:04Z",
+      "issuerName": "THE SCHIEHALLION FUND LIMITED",
+      "pdmrName": "Wendy Colquhoun",
+      "capacity": "Director of The Schiehallion Fund Limited",
+      "transactionNature": "Purchase of Shares",
+      "isin": "GG00BJ0CDD21",
+      "transactionDate": "2026-10-28",
+      "volume": 18137,
+      "pricePerShare": 0.0001,
+      "currency": "USD",
+      "totalValue": 2.19,
+      "rawArtefactUrl": "https://data.fca.org.uk/artefacts/NSM/RNS/a25fe9c8-34b0-4c21-8b83-4b8cf9ea717a.html",
+      "valueUnknown": false
+    },
+    "fca_url": "https://data.fca.org.uk/artefacts/NSM/RNS/a25fe9c8-34b0-4c21-8b83-4b8cf9ea717a.html",
+    "fca_excerpt": "Nature of the transaction Purchase of Shares c) Price(s) and volume(s) Price(s) Volume(s) $2.19 18,137 d) Aggregated information - Aggregated volume - Price 18,137 $2.19 e) Date of the transaction 28 October 2026 f) Place of the transaction London Stock Exchange ",
+    "verified_at": "2026-11-14",
+    "finding": "provider_total_is_original_unit_price_not_transaction_value"
+  },
+  {
+    "provider_row": {
+      "filingId": "bdf8e93e-f1da-49ae-8685-6c62c83cd3ef|1",
+      "publicationAt": "2026-10-07T11:00:00Z",
+      "issuerName": "THE SCHIEHALLION FUND LIMITED",
+      "pdmrName": "John Mackie",
+      "capacity": "Director of The Schiehallion Fund Limited",
+      "transactionNature": "Sale of Shares",
+      "isin": "GG00BJ0CDD21",
+      "transactionDate": "2026-10-06",
+      "volume": 14709,
+      "pricePerShare": 0.0001,
+      "currency": "USD",
+      "totalValue": 2.18,
+      "rawArtefactUrl": "https://data.fca.org.uk/artefacts/NSM/RNS/bdf8e93e-f1da-49ae-8685-6c62c83cd3ef.html",
+      "valueUnknown": false
+    },
+    "fca_url": "https://data.fca.org.uk/artefacts/NSM/RNS/bdf8e93e-f1da-49ae-8685-6c62c83cd3ef.html",
+    "fca_excerpt": "Nature of the transaction Sale of Shares c) Price(s) and volume(s) Price(s) Volume(s) $2.18 14,709 d) Aggregated information - Aggregated volume - Price 14,709 $2.18 e) Date of the transaction 6 October 2026 f) Place of the transaction London Stock Exchange ",
+    "verified_at": "2026-11-14",
+    "finding": "provider_total_is_original_unit_price_not_transaction_value"
+  },
+  {
+    "provider_row": {
+      "filingId": "a6e19f1b-9753-4139-995c-f01f100b8a28|1",
+      "publicationAt": "2026-09-30T14:00:00Z",
+      "issuerName": "THE SCHIEHALLION FUND LIMITED",
+      "pdmrName": "Graeme Proudfoot",
+      "capacity": "Director of The Schiehallion Fund Limited",
+      "transactionNature": "Purchase of Shares",
+      "isin": "GG00BJ0CDD21",
+      "transactionDate": "2026-09-29",
+      "volume": 30000,
+      "pricePerShare": 0.0001,
+      "currency": "USD",
+      "totalValue": 2.1625,
+      "rawArtefactUrl": "https://data.fca.org.uk/artefacts/NSM/RNS/a6e19f1b-9753-4139-995c-f01f100b8a28.html",
+      "valueUnknown": false
+    },
+    "fca_url": "https://data.fca.org.uk/artefacts/NSM/RNS/a6e19f1b-9753-4139-995c-f01f100b8a28.html",
+    "fca_excerpt": "Nature of the transaction Purchase of Shares c) Price(s) and volume(s) Price(s) Volume(s) $2.1625 30,000 d) Aggregated information - Aggregated volume - Price 30,000 $2.1625 e) Date of the transaction 29 September 2026 f) Place of the transaction London Stock Exchange ",
+    "verified_at": "2026-11-14",
+    "finding": "provider_total_is_original_unit_price_not_transaction_value"
+  },
+  {
+    "provider_row": {
+      "filingId": "0dcc6ca0-c013-445e-8cd7-387cdd1259fa|1",
+      "publicationAt": "2026-09-18T06:00:02Z",
+      "issuerName": "TMT INVESTMENTS PLC",
+      "pdmrName": "Alexander Selegenev",
+      "capacity": "Executive Director",
+      "transactionNature": "An acquisition of 13,000 ordinary shares in the Issuer",
+      "isin": "JE00B3RQZ289",
+      "transactionDate": "2026-09-16",
+      "volume": 13000,
+      "pricePerShare": 0.0003,
+      "currency": "USD",
+      "totalValue": 3.29,
+      "rawArtefactUrl": "https://data.fca.org.uk/artefacts/NSM/RNS/0dcc6ca0-c013-445e-8cd7-387cdd1259fa.html",
+      "valueUnknown": false
+    },
+    "fca_url": "https://data.fca.org.uk/artefacts/NSM/RNS/0dcc6ca0-c013-445e-8cd7-387cdd1259fa.html",
+    "fca_excerpt": "Nature of the transaction An acquisition of 13,000 ordinary shares in the Issuer. c) Price(s) and volume(s) Acquisition Price(s) Volume(s) USD 3.23 10,000 USD 3.46 3,000 d) Aggregated information - Aggregated volume Acquisition of, in aggregate, 13,000 ordinary shares - Price Average price of acquisitions of US$3.29 e) Date of the transaction 16 September 2026 17 September 2026 f) Place of the transaction London Stock Exchange, AIM (XLON) ",
+    "verified_at": "2026-11-14",
+    "finding": "provider_total_is_original_unit_price_not_transaction_value"
+  },
+  {
+    "provider_row": {
+      "filingId": "8714cd09-c85d-48bb-b4c3-f70ea843728d|1",
+      "publicationAt": "2026-09-10T06:00:04Z",
+      "issuerName": "TMT INVESTMENTS PLC",
+      "pdmrName": "Alexander Selegenev",
+      "capacity": "Executive Director",
+      "transactionNature": "A disposal of 20,000 ordinary shares in the Issuer",
+      "isin": "JE00B3RQZ289",
+      "transactionDate": "2026-09-09",
+      "volume": 20000,
+      "pricePerShare": 0.0002,
+      "currency": "USD",
+      "totalValue": 3.49,
+      "rawArtefactUrl": "https://data.fca.org.uk/artefacts/NSM/RNS/8714cd09-c85d-48bb-b4c3-f70ea843728d.html",
+      "valueUnknown": false
+    },
+    "fca_url": "https://data.fca.org.uk/artefacts/NSM/RNS/8714cd09-c85d-48bb-b4c3-f70ea843728d.html",
+    "fca_excerpt": "Nature of the transaction A disposal of 20,000 ordinary shares in the Issuer. c) Price(s) and volume(s) Disposal Price(s) Volume(s) USD 3.55 6,000 USD 3.55 6,100 USD 3.40 7,900 d) Aggregated information - Aggregated volume Disposal of, in aggregate, 20,000 ordinary shares - Price Average price of disposals of US$3.49 e) Date of the transaction 9 September 2026 f) Place of the transaction London Stock Exchange, AIM (XLON) ",
+    "verified_at": "2026-11-14",
+    "finding": "provider_total_is_original_unit_price_not_transaction_value"
+  }
+]

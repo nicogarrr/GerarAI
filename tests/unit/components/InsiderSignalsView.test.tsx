@@ -224,3 +224,10 @@ describe('InsiderSignalsView', () => {
         expect(loadMore).toHaveBeenCalledTimes(1);
     });
 });
+
+it('PDMR filings preserve shares and explain why unverified money is missing', () => {
+    render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals()} initialFilings={filings([filing(1,{form:'PDMR',transactions:[{insider:'UK Director',code:'P',shares:18137,price:987.65,value:987654,monetary_verification:'inconsistent'}]})])} />);
+    expect(screen.getByText(/Precio e importe inconsistentes con el documento original/)).toBeInTheDocument();
+    expect(screen.queryByText(/987/)).toBeNull();
+    expect(screen.getByText(/18.137/)).toBeInTheDocument();
+});

@@ -111,3 +111,12 @@ it('insiders: la lista muestra primero compras y ventas en mercado', () => {
   expect(screen.getByText('Últimas compras y ventas en mercado')).toBeInTheDocument();
   expect(screen.queryByText('OTRO')).toBeNull();
 });
+
+it('insiders: unverified UK money never appears as a zero-dollar flow', () => {
+  const missing = {...summary, windows: [{...summary.windows[0], buys:{...side(1,0), value:null, value_missing:1}, net_value:null}], transactions:[{...summary.transactions[0],form:'PDMR',price:null,value:null,monetary_verification:'unverified' as const}]};
+  render(<InsidersSection summary={missing} ticker="ABC" />);
+  const cells = within(screen.getByRole('table')).getAllByRole('cell');
+  expect(cells[1]).toHaveTextContent('1 · —');
+  expect(cells[3]).toHaveTextContent('—');
+  expect(screen.getByText(/Precio e importe sin verificar/)).toBeInTheDocument();
+});

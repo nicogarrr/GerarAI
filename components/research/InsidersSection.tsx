@@ -40,6 +40,8 @@ const NATURE_TONE: Record<string, string> = {
 
 function RowCard({ row, locale }: { row: InsiderRow; locale: Locale }) {
   const t = createTranslator(locale);
+  const price = row.form === "PDMR" ? null : row.price;
+  const value = row.form === "PDMR" ? null : row.value;
   return (
     <li className="rounded-lg border border-gray-800 p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -51,11 +53,12 @@ function RowCard({ row, locale }: { row: InsiderRow; locale: Locale }) {
       </div>
       {row.role ? <p className="mt-1 text-xs text-gray-500">{row.role}</p> : null}
       <p className="mt-1 text-sm text-gray-300">
-        {fmtDate(row.tx_date, locale)} · {row.shares !== null && row.price
-          ? t('research.insidersV2.row', { shares: fmtNumber(row.shares, locale), price: `${fmtNumber(row.price, locale, 2)} $` })
+        {fmtDate(row.tx_date, locale)} · {row.shares !== null && price
+          ? t('research.insidersV2.row', { shares: fmtNumber(row.shares, locale), price: `${fmtNumber(price, locale, 2)} $` })
           : row.shares !== null ? fmtNumber(row.shares, locale) : '—'}
-        {row.value ? ` = ${compactUsd(row.value, locale)}` : ''}
+        {value ? ` = ${compactUsd(value, locale)}` : ''}
       </p>
+      {row.form === 'PDMR' ? <p className="mt-1 text-xs text-amber-300">{t(row.monetary_verification === 'inconsistent' ? 'insider.feed.monetaryInconsistent' : 'insider.feed.monetaryUnverified')}</p> : null}
       {row.pct_of_holdings !== null ? <p className="text-xs text-teal-300">{t('research.insidersV2.pctHoldings', { pct: fmtNumber(row.pct_of_holdings, locale, 1) })}</p> : null}
       <p className={`mt-1 text-xs ${row.late ? 'text-amber-300' : 'text-gray-500'}`}>
         {row.late
@@ -108,7 +111,7 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
                     {sideCell(w.sells, locale, t)}
                     {w.sells.planned_10b5_1 ? <span className="block text-xs text-gray-500">{t('research.insidersV2.planned', { count: w.sells.planned_10b5_1 })}</span> : null}
                   </td>
-                  <td className={`py-1.5 font-medium ${w.net_value > 0 ? 'text-teal-300' : w.net_value < 0 ? 'text-red-300' : 'text-gray-300'}`}>{compactUsd(w.net_value, locale)}</td>
+                  <td className={`py-1.5 font-medium ${w.net_value !== null && w.net_value > 0 ? 'text-teal-300' : w.net_value !== null && w.net_value < 0 ? 'text-red-300' : 'text-gray-300'}`}>{compactUsd(w.net_value, locale)}</td>
                 </tr>
               ))}
             </tbody>
