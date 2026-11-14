@@ -28,7 +28,10 @@ export default function DcaWatchCardToggle({ symbol }: { symbol: string }) {
         });
     };
     return (
-        <div className="w-full space-y-2">
+        // Cerrado el wrapper no fuerza ancho completo: el botón queda en la
+        // línea de la empresa (lista compacta). Abierto, la tarjeta ocupa todo
+        // el ancho debajo. (Decisión de diseño, 2026-11-14.)
+        <div className={open ? 'w-full space-y-2' : undefined}>
             <button type="button" aria-expanded={open} onClick={toggle} className="min-h-11 rounded border border-gray-700 px-2 py-1 text-[11px] text-gray-300 hover:border-gray-500">
                 {t('watchlist.dcaCard.trigger')}
             </button>
