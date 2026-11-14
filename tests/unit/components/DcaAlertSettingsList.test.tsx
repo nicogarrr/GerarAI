@@ -55,6 +55,29 @@ describe('avisos DCA sin repetir el veredicto', () => {
         expect(screen.getByRole('status')).toHaveTextContent('1-2 de 2 · Página 1 de 1');
         expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
     });
+    it('una empresa por línea: símbolo, nombre, chips y estado en la misma fila, sin filas vacías', () => {
+        render(<DcaAlertSettingsList items={items} />);
+        const list = screen.getByRole('list', { name: 'Histórico DCA por empresa' });
+        const rows = within(list).getAllByRole('listitem');
+        // Lista compacta (propuesta 2026-11-14, pendiente de OK de producto):
+        // cada fila es UNA línea flex con altura de toque, no tres bloques
+        // apilados. Las «filas vacías» de empresas sin evaluar desaparecen:
+        // su estado va dicho en la propia línea.
+        for (const li of rows) {
+            expect(li.className).toContain('flex');
+            expect(li.className).toContain('items-center');
+            expect(li.className).not.toContain('space-y-2');
+        }
+        // Empresa evaluada (TEST0): símbolo, nombre, histórico y tarjeta en su línea.
+        expect(within(rows[0]).getByText('TEST0')).toBeInTheDocument();
+        expect(within(rows[0]).getByText('Empresa 0')).toBeInTheDocument();
+        expect(within(rows[0]).getByRole('button', { name: 'Histórico de señales DCA de TEST0' })).toBeInTheDocument();
+        expect(within(rows[0]).getByRole('button', { name: 'Tarjeta DCA de TEST0' })).toBeInTheDocument();
+        // Empresa sin evaluar (TEST1): estado explícito en la línea, sin bloques extra ni tarjeta.
+        expect(within(rows[1]).getByText('Sin histórico evaluado')).toBeInTheDocument();
+        expect(within(rows[1]).getByText('en cartera')).toBeInTheDocument();
+        expect(within(rows[1]).queryByRole('button')).toBeNull();
+    });
     it('muestra vacío y no inventa ajustes cuando no hay datos', () => {
         const { rerender } = render(<DcaSignalsPanel data={{ ...data, items: [] }} unavailable={false} />);
         expect(screen.getByText(/Añade empresas/)).toBeInTheDocument();

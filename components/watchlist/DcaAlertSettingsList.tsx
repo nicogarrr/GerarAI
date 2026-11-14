@@ -28,21 +28,23 @@ export default function DcaAlertSettingsList({ items }: { items: DcaSignalItem[]
         <div className="space-y-3">
             <ul aria-label={t('watchlist.dca.list.label')} className="divide-y divide-gray-700 rounded-lg border border-gray-700 bg-gray-800/50">
                 {visibleItems.map((item) => (
-                    <li key={item.symbol} className="space-y-2 px-3 py-3">
-                        <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-                            <div className="min-w-0">
-                                <p className="break-all font-semibold text-gray-100">{item.symbol}</p>
-                                {item.company_name ? <p className="max-w-[220px] truncate text-xs text-gray-400" title={item.company_name}>{item.company_name}</p> : null}
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                                {item.in_watchlist ? <span className="rounded border border-gray-600 px-1.5 text-[10px] text-gray-300">watchlist</span> : null}
-                                {item.in_portfolio ? <span className="rounded border border-teal-800 px-1.5 text-[10px] text-teal-300">{t('watchlist.dca.list.inPortfolio')}</span> : null}
-                            </div>
+                    // Lista compacta (decisión de diseño 2026-11-14, pendiente
+                    // de OK de producto): UNA línea por empresa. Antes cada
+                    // empresa eran tres bloques apilados y las sin evaluar
+                    // quedaban como «filas vacías» con el estado a media
+                    // altura; ahora el estado va dicho en la propia línea y
+                    // los controles (histórico, tarjeta) no cambian.
+                    <li key={item.symbol} className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-3 py-2">
+                        <div className="flex min-w-0 items-baseline gap-2">
+                            <span className="break-all font-semibold text-gray-100">{item.symbol}</span>
+                            {item.company_name ? <span className="max-w-[160px] truncate text-xs text-gray-400" title={item.company_name}>{item.company_name}</span> : null}
                         </div>
-                        <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            {item.in_watchlist ? <span className="rounded border border-gray-600 px-1.5 text-[10px] text-gray-300">watchlist</span> : null}
+                            {item.in_portfolio ? <span className="rounded border border-teal-800 px-1.5 text-[10px] text-teal-300">{t('watchlist.dca.list.inPortfolio')}</span> : null}
                             {item.state ? <DcaHitRatesPopover symbol={item.symbol} /> : <span className="text-xs text-gray-400">{t('watchlist.dca.list.notEvaluated')}</span>}
+                            {item.state ? <DcaWatchCardToggle symbol={item.symbol} /> : null}
                         </div>
-                        {item.state ? <DcaWatchCardToggle symbol={item.symbol} /> : null}
                     </li>
                 ))}
             </ul>
