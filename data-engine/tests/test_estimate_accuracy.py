@@ -41,14 +41,16 @@ def test_summary_by_source_and_horizon_and_feeds_confidence() -> None:
     assert conf8["level"] == "alto" and conf8["n"] == 8
 
 
-def test_implausible_reading_is_set_aside_with_its_reason() -> None:
-    est = [Estimate("guia", "revenue", "fy2025", None, 110.0, None, date(2025, 2, 1))]  # escala mal leída
+def test_large_revenue_miss_counts_with_its_warning() -> None:
+    est = [Estimate("guia", "revenue", "fy2025", None, 110.0, None, date(2025, 2, 1))]
     got = cases(est, ACTS)
-    assert got and got[0]["excluded"].startswith("lectura_inverosímil")
-    # apartada, pero contada en el resumen (nada se aparta en silencio)
+    # v2: un error grande no prueba una escala mal leída. Se avisa y cuenta;
+    # antes el umbral x3 retiraba este error del acierto y de la confianza.
+    assert got and got[0]["excluded"] is None
+    assert got[0]["flags"][0].startswith("error_extremo:")
     [row] = summarize(got)
-    assert row["n"] == 0 and row["n_excluded"] == 1 and row["excluded_reasons"] == ["lectura_inverosímil"]
-    assert measured_errors(got) == {}
+    assert row["n"] == 1 and row["n_excluded"] == 0 and row["n_extreme"] == 1
+    assert measured_errors(got) == {("guia", "≤1A"): [9.0]}
 
 
 SUB = {"filings": {"recent": {
