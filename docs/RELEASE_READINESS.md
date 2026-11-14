@@ -1,12 +1,20 @@
 # Checklist de revisión y despliegue
 
-La versión vigente es **0.5.0**, fijada sobre el commit de producción
-`fbfeeea2df394af5f536992b27966e8c0ead3e54`. No hay un hito de lanzamiento futuro fijado.
+La versión en preparación es **0.6.0** (corte congelado en `ac20676d`; lo
+posterior va a la 0.6.1). La última etiqueta es **v0.5.0**
+(`fbfeeea2df394af5f536992b27966e8c0ead3e54`, 30-oct-2026). Último estado
+reportado (14-nov-2026, sin verificar en el entorno por este documento):
+producción corría `b19d5822` (desplegado el 12-nov-2026).
 
 El inventario de abajo conserva su fecha histórica y no demuestra el estado actual.
 Cada nuevo despliegue requiere revisar CI, auditoría, backups y el entorno real.
 
 Estado al escribirlo: 27-oct-2026, cabeza Alembic `0082`.
+Actualizado 14-nov-2026: cabeza Alembic `0135` (32 migraciones nuevas desde la
+etiqueta v0.5.0, que iba por `0103`). Último estado reportado (13-nov-2026,
+pendiente de verificar tras el deploy): el `deploy-effective.json` de producción
+omitía `worker-kpis` (15 servicios sin él) aunque `docker-compose.prod.yml` lo
+define; la 0.6.0 debe desplegarlo (gate en sección 3).
 
 **Recuento a 27-oct-2026 18:50 (CET), `main` = `239e68de`** (incluye #2476):
 
@@ -98,6 +106,16 @@ Tras desplegar (a mano, 10 minutos, con tu usuario):
       «La respuesta tardó demasiado…» si el proveedor no responde, nunca un error.
 - [ ] Alertas: crear una de precio y ver que se evalúa; Telegram/correo si están configurados.
 - [ ] Biblioteca: subir un PDF pequeño y verlo indexado.
+- [ ] **`worker-kpis` desplegado y healthy**: el deploy efectivo incluye el servicio
+      (1 hilo, prefetch 1, 1 GiB, 0.40 CPU, healthcheck `kpi_consumer_health`) y la cola
+      drena: `LLEN kpis` bajando tras el arranque. Si falta en el `deploy-effective.json`,
+      el despliegue no cierra la 0.6.0.
+      **Orden de arranque**: antes de activar `worker-kpis` debe estar mergeada #5570
+      («402 como diferimiento»; mergeada el 13-nov): con la cuota de Go agotada, el backlog
+      de ~500 KPIs quemaría sus 5 intentos si el worker arranca sin ella. Relacionadas
+      (ambas mergeadas el 13-nov): #5568 (el barrido `recompute_fundamental_metrics` no se
+      corta con la cola KPI llena) y #5569 (watchdog: kpis sin consumidor se alerta
+      explícitamente).
 
 ## 4. Variables de entorno por despliegue
 
@@ -137,7 +155,11 @@ Producción usa `docker-compose.prod.yml` con `.env.production` en la VM
 | `RESEARCH_AUTH_SECRET` | sí | igual que en el frontend |
 | `DATABASE_URL` | sí | Postgres con usuario y contraseña propios (SQLite y credenciales por defecto se rechazan al arrancar) |
 | `REDIS_URL`, `QDRANT_URL` | sí | |
-| `MINIO_ENDPOINT`, `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY`, `MINIO_BUCKET` | sí | en producción los originales van a MinIO; claves por defecto rechazadas |
+| `OBJECT_STORAGE_ENDPOINT`, `OBJECT_STORAGE_ACCESS_KEY`, `OBJECT_STORAGE_SECRET_KEY` (acepta alias `MINIO_*`) | sí | en producción van a Garage (S3); claves por defecto rechazadas |
+| `GARAGE_RPC_SECRET`, `GARAGE_ACCESS_KEY`, `GARAGE_SECRET_KEY` | sí | almacenamiento Garage (genera con `openssl rand -hex`) |
+| `REDIS_PASSWORD` | recomendada | si Redis tiene contraseña |
+| `TELEGRAM_LINK_SECRET` | opcional | vinculación de cuentas de Telegram |
+| `COMPANIES_HOUSE_API_KEY`, `EIA_API_KEY` | opcionales | fuentes de datos adicionales |
 | `CORS_ORIGINS` | según uso | por defecto solo `localhost`; pon el dominio del frontend si el navegador llama directo al data-engine (Next lo llama desde el servidor con firma). `*` se rechaza |
 | `SEC_USER_AGENT` | sí | nombre + correo real (la SEC bloquea sin contacto; `example.com` se rechaza) |
 | `FINNHUB_API_KEY`, `FMP_API_KEY` | sí | claves **rotadas** |
@@ -145,7 +167,9 @@ Producción usa `docker-compose.prod.yml` con `.env.production` en la VM
 | `GEMINI_API_KEY`, `GROQ_API_KEY`, `GEMINI_CHAT_FALLBACK_ENABLED`, `GROQ_CHAT_FALLBACK_ENABLED` | opcionales | respaldos del chat; Gemini con la clave **rotada** |
 | `LLM_SETTINGS_ENCRYPTION_KEY` | recomendada | cifra las claves LLM que guarda cada usuario en Ajustes |
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` | opcionales | avisos por Telegram |
-| `SMTP_*`, `ALERT_EMAIL_TO`, `DCA_ALERTS_*` | si se mergea #2310 | avisos DCA por correo |
+| `SMTP_*`, `ALERT_EMAIL_TO` | si hay avisos por correo | |
+| `DCA_ALERTS_ENABLED`, `DCA_ALERT_CHANNELS` | recomendadas | por defecto `false` y `in_app` |
+| `OPENCODE_FREE_BASE_URL`, `OPENCODE_FREE_MODEL`, `OPENCODE_FREE_CHAT_FALLBACK_ENABLED` | opcionales | respaldo LLM gratuito |
 | `WORKERS_ENABLED` | sí | el compose la fuerza a `"false"` en el servicio backend: workers y scheduler corren en servicios separados |
 | `RETENTION_JOB_ENABLED`, `RETENTION_DRY_RUN`, `ACCESS_REQUEST_RETENTION_DAYS` | recomendadas | retención de datos (privacidad) |
 

@@ -13,7 +13,7 @@
 [![Next.js 16](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](package.json)
 [![Python 3.12](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](data-engine/pyproject.toml)
 
-> **Status:** v0.5.0 (pre-release), the production baseline of 30 October 2026. Hardening and review remain in progress.
+> **Status:** v0.6.0 (pre-release). The previous production baseline was v0.5.0 (30 October 2026). Hardening and review remain in progress.
 > Live at [gerarai.duckdns.org](https://gerarai.duckdns.org) (access by request).
 > The user interface is in Spanish (es-ES); code, APIs and this document are in English.
 > **Not financial advice.** See the [disclaimer](#disclaimer).
