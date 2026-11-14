@@ -77,6 +77,7 @@ async function expectBackAt(
   const t0 = opts?.t0 ?? Date.now();
   const samples: string[] = [];
   let sampling = true;
+  const samplerStart = Date.now();
   const sampler = (async () => {
     while (sampling) {
       try {
@@ -88,7 +89,10 @@ async function expectBackAt(
       } catch {
         break; // página destruida: telemetría best-effort, no es el fallo
       }
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      // Denso (50 ms) el primer medio segundo: ahí se ve si y llegó a
+      // asentarse en el objetivo antes del primer estirón (restore 'done'
+      // precoz) o si nunca pasó por él (restore que no arrancó).
+      await new Promise((resolve) => setTimeout(resolve, Date.now() - samplerStart < 600 ? 50 : 200));
     }
   })();
   try {
@@ -109,8 +113,26 @@ async function expectBackAt(
     } catch {
       // sin la página no hay navigation.type; la serie y el cause mandan
     }
+    // Memoria de scroll del producto (clave de lib/nav/scroll-memory): el
+    // target que el restore tenía para esta URL, o su ausencia.
+    let mem = "?";
+    try {
+      mem = await page.evaluate((key) => {
+        try {
+          const raw = window.sessionStorage.getItem(key);
+          if (!raw) return "vacía";
+          const parsed = JSON.parse(raw) as Record<string, number>;
+          const here = window.location.pathname + window.location.search;
+          return `${here}=${parsed[here] ?? "ausente"} (${Object.keys(parsed).length} entradas)`;
+        } catch {
+          return "ilegible";
+        }
+      }, "gerarai:scroll-memory:v1");
+    } catch {
+      // sin la página no hay memoria; la serie y el cause mandan
+    }
     throw new Error(
-      `scroll esperado ≈ ${before}px; navigation.type=${navType}${opts?.note ? `; ${opts.note()}` : ""}; serie: ${samples.join(" | ")}`,
+      `scroll esperado ≈ ${before}px; navigation.type=${navType}; memoria: ${mem}${opts?.note ? `; ${opts.note()}` : ""}; serie: ${samples.join(" | ")}`,
       { cause },
     );
   } finally {
