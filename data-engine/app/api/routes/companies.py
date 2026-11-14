@@ -1142,9 +1142,9 @@ def decision_journal(ticker: str, db: Session = Depends(get_db)) -> list[dict]:
     company = resolve_company(db, ticker)
     if not company:
         raise HTTPException(status_code=404, detail="Company not found")
-    from app.services.journal_trade_link import journal_entry_payload
+    from app.services.journal_trade_link import journal_entries_payload
 
-    return [journal_entry_payload(db, entry) for entry in DecisionJournalService().list(db, company)]
+    return journal_entries_payload(db, company, DecisionJournalService().list(db, company))
 
 
 @router.get("/{ticker}/decision-journal/trades")
