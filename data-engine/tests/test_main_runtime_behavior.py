@@ -51,6 +51,8 @@ def test_lifespan_runs_only_environment_appropriate_steps(monkeypatch, pools, en
     jobs = SimpleNamespace(start=Mock(), shutdown=Mock())
     build = Mock(return_value=jobs)
     monkeypatch.setattr(scheduler, "build_scheduler", build)
+    themes_warmup = Mock()
+    monkeypatch.setattr(market, "start_themes_warmup", themes_warmup)
     close = Mock()
     monkeypatch.setattr(market, "close_shared_yahoo_client", close)
 
@@ -61,6 +63,7 @@ def test_lifespan_runs_only_environment_appropriate_steps(monkeypatch, pools, en
     asyncio.run(run())
     assert all(pool._shutdown for pool in pools)
     close.assert_called_once()
+    assert themes_warmup.call_count == (env == "production")
     assert observed["init_db"].call_count == (env == "test")
     assert observed["ensure_company_master"].call_count == (env != "production")
     assert observed["apply_master_taxonomy_to_stubs"].call_count == (env == "production")
