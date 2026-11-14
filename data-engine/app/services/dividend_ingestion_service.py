@@ -51,7 +51,7 @@ class DividendIngestionService(ProviderIngestionService):
                 amount = Decimal(str(raw))
             except (InvalidOperation, ValueError):
                 continue
-            if amount > 0:
+            if amount.is_finite() and amount > 0:
                 return amount
         return None
 
