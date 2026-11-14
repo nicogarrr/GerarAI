@@ -305,7 +305,7 @@ function SotpWhyDetails({ why, sources, assumption, t }: { why?: SotpWhy; source
   if (!entries.length && !sources?.length && !assumption) return null;
   return (
     <details className="mt-1 text-xs text-gray-400">
-      <summary className="cursor-pointer text-teal-300">{t('research.sotp.whyTitle')}</summary>
+      <summary className="min-h-11 cursor-pointer py-2 text-teal-300 sm:min-h-10">{t('research.sotp.whyTitle')}</summary>
       <ul className="mt-1 space-y-1">
         {entries.map(([key, text]) => <li key={key}><span className="text-gray-300">{t(WHY_KEYS[key])}:</span> {text}</li>)}
         {assumption ? <li className="text-amber-200/90">{assumption}</li> : null}
@@ -356,7 +356,7 @@ function SotpEditor({ model, t, locale, ticker, saved, versions, fromAgents = fa
   const counts = { parts: parts.length, dilution: dilution.length, scenarios: scenarios.length };
   return (
     <details className={BOX}>
-      <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-teal-300">{model ? t('research.sotp.edit') : t('research.sotp.create')}{saved ? ` · ${t('research.sotp.versions', { count: versions })}` : ''}</summary>
+      <summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-teal-300 sm:min-h-10">{model ? t('research.sotp.edit') : t('research.sotp.create')}{saved ? ` · ${t('research.sotp.versions', { count: versions })}` : ''}</summary>
       <MutationForm action={saveSotpResult.bind(null, ticker, counts)} className="mt-3 grid gap-4" successMessage={t('research.sotp.saved')}>
         <p className="text-xs text-gray-500">{t('research.sotp.unitsHint')}</p>
         {fromAgents ? <p className="text-xs text-amber-200/90">{t('research.sotp.editAgentsHint')}</p> : null}
