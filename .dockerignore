@@ -65,6 +65,8 @@ e2e/user-flows/*
 !e2e/fixtures/
 e2e/fixtures/*
 !e2e/fixtures/e2e-env.ts
+# Unit-tested pointerdown oracle is also typechecked by frontend-prod.
+!e2e/fixtures/departure-scroll.ts
 
 # Debug
 npm-debug.log*
