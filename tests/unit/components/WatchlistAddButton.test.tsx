@@ -67,3 +67,18 @@ describe('WatchlistAddButton: ticker ya seguido', () => {
         expect(within(dialog).queryByText(/Ya sigues/)).not.toBeInTheDocument();
     });
 });
+
+it('opens from the one-shot query after prefetch events without creating membership', async () => {
+    window.history.replaceState({}, '', '/watchlist?anadir=1');
+    render(<WatchlistAddButton followedSymbols={[]} />);
+    expect(window.location.search).not.toContain('anadir=1');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+});
+
+it('prefetches on focus and pointerdown without opening the add dialog', () => {
+    window.history.replaceState({}, '', '/watchlist');
+    render(<WatchlistAddButton followedSymbols={[]} />);
+    const trigger = screen.getByRole('button', { name: /Añadir empresa/ });
+    fireEvent.focus(trigger); fireEvent.pointerDown(trigger);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});

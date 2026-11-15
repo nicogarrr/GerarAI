@@ -98,3 +98,11 @@ describe('WatchlistBuyAction', () => {
         expect(within(dialog).getByText('Precio (GBP)')).toBeInTheDocument();
     });
 });
+
+it('prefetch on focus/pointerdown does not register or open a purchase until explicit click', async () => {
+    render(<WatchlistBuyAction userId="user-1" symbol="MSFT" companyName="Microsoft" currency="USD" variant="button" />);
+    const trigger = screen.getByRole('button', { name: 'Registrar compra' });
+    fireEvent.focus(trigger); fireEvent.pointerDown(trigger);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); expect(addTransaction).not.toHaveBeenCalled();
+    fireEvent.click(trigger); expect(await screen.findByRole('dialog')).toBeInTheDocument(); expect(addTransaction).not.toHaveBeenCalled();
+});
