@@ -124,7 +124,9 @@ describe('alerts manager load and mutation contracts', () => {
         api.createAlertResult.mockRejectedValueOnce(new AppError('synthetic outage', 'RESEARCH_API_ERROR', 503));
         await create();
         const failure = await screen.findByRole('alert');
-        expect(failure).toHaveFocus();
+        // Finding the committed alert does not mean its passive focus effect
+        // has run yet (the modal may still have its initial symbol focus).
+        await waitFor(() => expect(failure).toHaveFocus());
         expect(screen.getByRole('dialog')).toContainElement(failure);
         fireEvent.click(within(failure).getByRole('button', { name: 'Reintentar' }));
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
