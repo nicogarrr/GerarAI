@@ -93,3 +93,50 @@ def test_batch_empty_nested_and_tenant_cache_are_request_scoped():
     finally:
         db.close()
         engine.dispose()
+
+
+def test_prefetch_chunks_every_company_and_releases_cache(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.services.metric_calculation_service import _FACTS_CACHE_KEY, MetricCalculationService
+
+    service = MetricCalculationService()
+    db = SimpleNamespace(info={})
+    batches = []
+    monkeypatch.setattr(service, '_prefetch_company_ids', lambda db, ids, cache: batches.append(ids))
+    companies = [SimpleNamespace(id=i) for i in range(205)]
+    with service.prefetched_companies(db, companies):
+        assert _FACTS_CACHE_KEY in db.info
+    assert batches == [list(range(100)), list(range(100, 200)), list(range(200, 205))]
+    assert _FACTS_CACHE_KEY not in db.info
+
+
+def test_peer_reference_missing_table_is_an_inert_axis():
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+
+    from app.services.peer_comparison_service import _reference_taxonomy
+
+    engine = create_engine('sqlite:///:memory:')
+    try:
+        with Session(engine) as db:
+            assert _reference_taxonomy(db, []) == {}
+            assert _reference_taxonomy(db, ['AAPL']) == {}
+    finally:
+        engine.dispose()
+
+
+def test_capital_units_and_unknown_years_do_not_imply_comparability():
+    from decimal import Decimal
+
+    from app.models import FinancialFact
+    from app.services.metric_calculation_service import _capital_scale_conflict, _fact_year, _fiscal_year_gap
+
+    equity = FinancialFact(value=Decimal('100'), unit='USD', period='2026-Q3', source_type='test')
+    debt = FinancialFact(value=Decimal('20'), unit='EUR', period='unknown', source_type='test')
+    assert _capital_scale_conflict(equity, debt) is True
+    assert _fact_year(equity) == 2026
+    assert _fact_year(debt) is None
+    assert _fiscal_year_gap(equity, debt) is None
+    debt.value = Decimal('0')
+    assert _capital_scale_conflict(equity, debt) is False
