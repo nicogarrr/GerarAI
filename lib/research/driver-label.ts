@@ -19,5 +19,5 @@ export function driverLabel(key: string, locale: Locale = DEFAULT_LOCALE): strin
         buyback: t('research.driverLabels.buyback'),
         dilution: t('research.driverLabels.dilution'),
     };
-    return labels[key] ?? key.replaceAll('_', ' ');
+    return Object.hasOwn(labels, key) ? labels[key] : key.replaceAll('_', ' ');
 }

@@ -74,3 +74,8 @@ it('keeps unknown management states and qualitative missing fields visible', () 
     expect(html).toContain('Explanation');
     expect(html).toContain('custom_grade');
 });
+
+it.each(['constructor', '__proto__', 'toString'])('treats inherited driver name %s as an unknown label', (key) => {
+    expect(driverLabel(key, 'es')).toBe(key.replaceAll('_', ' '));
+    expect(driverLabel(key, 'en')).toBe(key.replaceAll('_', ' '));
+});
