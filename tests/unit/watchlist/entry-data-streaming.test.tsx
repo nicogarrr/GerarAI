@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // /watchlist no debe esperar a la cadena de cotizacion por fila
 // (getWatchlistEntryData: Finnhub -> respaldo Yahoo, presupuesto de 3 s por
@@ -59,8 +59,14 @@ function text(node: unknown): string {
   return '';
 }
 
+// Import/transform time is not page data latency. Load the module before
+// the streaming assertion's clock starts (cold VM imports can exceed 1s).
+let WatchlistPage: typeof import('@/app/(root)/watchlist/page')['default'];
+beforeAll(async () => {
+  ({ default: WatchlistPage } = await import('@/app/(root)/watchlist/page'));
+});
+
 async function renderPage() {
-  const { default: WatchlistPage } = await import('@/app/(root)/watchlist/page');
   return WatchlistPage({ searchParams: Promise.resolve({}) });
 }
 
