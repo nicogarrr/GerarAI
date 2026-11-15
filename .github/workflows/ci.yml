@@ -875,6 +875,10 @@ jobs:
         if: steps.pw-cache.outputs.cache-hit != 'true'
         timeout-minutes: 8
         run: npx playwright install chromium
+      # Real component/CSS geometry regression; uses Chromium installed above.
+      # Kept in the browser lane, never the API-only lane.
+      - name: Quote loading layout regression (390px and 1440px)
+        run: npm run test:quote-layout
       - run: npm run test:e2e
         env:
           # El webServer de playwright.config.ts usa `python` salvo que

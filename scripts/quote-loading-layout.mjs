@@ -1,4 +1,4 @@
-// Run: node tests/browser/quote-loading-layout.mjs
+// Run: npm run test:quote-layout (requires the Browser E2E Chromium install)
 // Real component + real app CSS, deterministic delayed quote, no app server.
 import { build } from 'vite';
 import tailwindcss from '@tailwindcss/postcss';
