@@ -145,10 +145,6 @@ def _insider_key(tx: InsiderTransaction) -> str:
     return (tx.insider_cik or tx.insider or "?").strip().upper()
 
 
-def _value(tx: InsiderTransaction) -> float | None:
-    return transaction_value(tx)
-
-
 def _row(tx: InsiderTransaction, filing: InsiderFiling) -> dict[str, Any]:
     tx_day = _parse_date(tx.tx_date)
     filed = _parse_date(filing.filing_date)
