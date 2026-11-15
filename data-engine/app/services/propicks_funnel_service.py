@@ -173,73 +173,56 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
     }
 
 
-def _earnings_consistency(db: Session) -> dict[int, tuple[int, int]]:
-    """Positive-net-income years out of the last CONSISTENCY_YEARS fiscal years.
+def _annual_fact_rows(db: Session, metric: str, *, recent: int | None = None):
+    """Latest revision per fiscal year, then only years consumed by the funnel.
 
-    Returns company_id -> (positive_years, years_with_data).
+    Preserve created_at precedence and FY/empty-quarter policy. No arbitrary
+    fiscal cutoff: revenue still spans the oldest and newest available FY.
     """
-    fy_rows = db.execute(
-        select(
-            FinancialFact.company_id,
-            FinancialFact.fiscal_year,
-            FinancialFact.value,
-        )
-        .where(FinancialFact.metric == "net_income")
-        .where(FinancialFact.fiscal_quarter.in_(["FY", ""]))
-        .where(FinancialFact.fiscal_year.isnot(None))
-        .where(*tenant_filters(db, FinancialFact))
-        .order_by(
-            FinancialFact.company_id,
-            FinancialFact.fiscal_year.desc(),
-            FinancialFact.created_at.desc(),
-        )
-    ).all()
-    by_company: dict[int, list[tuple[int, float]]] = {}
-    seen: set[tuple[int, int]] = set()
-    for cid, fy, value in fy_rows:
-        if (cid, fy) in seen:  # keep newest-created row per fiscal year
-            continue
-        seen.add((cid, fy))
-        by_company.setdefault(cid, []).append((fy, float(value)))
-    out: dict[int, tuple[int, int]] = {}
-    for cid, years in by_company.items():
-        window = years[:CONSISTENCY_YEARS]
-        positive = sum(1 for _, v in window if v > 0)
-        out[cid] = (positive, len(window))
-    return out
+    revisions = select(
+        FinancialFact.company_id.label("cid"), FinancialFact.fiscal_year.label("fy"),
+        FinancialFact.value.label("value"),
+        func.row_number().over(
+            partition_by=(FinancialFact.company_id, FinancialFact.fiscal_year),
+            order_by=FinancialFact.created_at.desc(),
+        ).label("revision"),
+    ).where(
+        FinancialFact.metric == metric,
+        FinancialFact.fiscal_quarter.in_(["FY", ""]),
+        FinancialFact.fiscal_year.isnot(None),
+        *tenant_filters(db, FinancialFact),
+    ).subquery()
+    years = select(
+        revisions.c.cid, revisions.c.fy, revisions.c.value,
+        func.row_number().over(partition_by=revisions.c.cid, order_by=revisions.c.fy.desc()).label("newest"),
+        func.row_number().over(partition_by=revisions.c.cid, order_by=revisions.c.fy.asc()).label("oldest"),
+        func.count().over(partition_by=revisions.c.cid).label("n_years"),
+    ).where(revisions.c.revision == 1).subquery()
+    query = select(years.c.cid, years.c.fy, years.c.value, years.c.n_years)
+    if recent is not None:
+        query = query.where(years.c.newest <= recent)
+    else:
+        query = query.where((years.c.newest == 1) | (years.c.oldest == 1))
+    return db.execute(query.order_by(years.c.cid, years.c.fy)).all()
+
+
+def _earnings_consistency(db: Session) -> dict[int, tuple[int, int]]:
+    by_company: dict[int, list[float]] = {}
+    for cid, _fy, value, _count in _annual_fact_rows(db, "net_income", recent=CONSISTENCY_YEARS):
+        by_company.setdefault(cid, []).append(float(value))
+    return {cid: (sum(v > 0 for v in values), len(values)) for cid, values in by_company.items()}
 
 
 def _revenue_cagr(db: Session) -> dict[int, float]:
-    """Revenue CAGR over the available FY span (needs >= MIN_GROWTH_YEARS)."""
-    rows = db.execute(
-        select(
-            FinancialFact.company_id,
-            FinancialFact.fiscal_year,
-            FinancialFact.value,
-        )
-        .where(FinancialFact.metric == "revenue")
-        .where(FinancialFact.fiscal_quarter.in_(["FY", ""]))
-        .where(FinancialFact.fiscal_year.isnot(None))
-        .where(*tenant_filters(db, FinancialFact))
-        .order_by(
-            FinancialFact.company_id,
-            FinancialFact.fiscal_year.asc(),
-            FinancialFact.created_at.desc(),
-        )
-    ).all()
-    by_company: dict[int, list[tuple[int, float]]] = {}
-    seen: set[tuple[int, int]] = set()
-    for cid, fy, value in rows:
-        if (cid, fy) in seen:
-            continue
-        seen.add((cid, fy))
-        by_company.setdefault(cid, []).append((fy, float(value)))
+    by_company: dict[int, list[tuple[int, float, int]]] = {}
+    for cid, fy, value, count in _annual_fact_rows(db, "revenue"):
+        by_company.setdefault(cid, []).append((fy, float(value), count))
     out: dict[int, float] = {}
     for cid, years in by_company.items():
-        if len(years) < MIN_GROWTH_YEARS:
+        if years[0][2] < MIN_GROWTH_YEARS:
             continue
-        first_fy, first_val = years[0]
-        last_fy, last_val = years[-1]
+        first_fy, first_val, _ = years[0]
+        last_fy, last_val, _ = years[-1]
         span = int(last_fy) - int(first_fy)
         if span < 1 or first_val <= 0 or last_val <= 0:
             continue
