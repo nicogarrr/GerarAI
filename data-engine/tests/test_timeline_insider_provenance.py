@@ -10,10 +10,10 @@ from tests.test_company_timeline_events import _company, _memory_db
 
 
 @pytest.mark.parametrize("form,currency,value,source,detail", [
-    ("PDMR", "GBP", 250000, "tracefour", "250.000 GBP"),
-    ("PDMR", "EUR", 50, "tracefour", "50 EUR"),
+    ("PDMR", "GBP", 250000, "tracefour", "Precio e importe sin verificar"),
+    ("PDMR", "EUR", 50, "tracefour", "Precio e importe sin verificar"),
     ("CA-INSIDER", None, 250000, "Yahoo Finance (no oficial)", "Importe no comparable"),
-    ("PDMR", None, None, "tracefour", "Importe no comparable"),
+    ("PDMR", None, None, "tracefour", "Precio e importe sin verificar"),
     ("4", None, 250000, "SEC", "250.000 $"),
 ])
 def test_timeline_respeta_fuente_moneda_y_umbral(form, currency, value, source, detail):

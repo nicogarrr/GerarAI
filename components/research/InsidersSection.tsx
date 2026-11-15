@@ -40,6 +40,8 @@ const NATURE_TONE: Record<string, string> = {
 
 function RowCard({ row, locale }: { row: InsiderRow; locale: Locale }) {
   const t = createTranslator(locale);
+  const price = row.form === "PDMR" ? null : row.price;
+  const value = row.form === "PDMR" ? null : row.value;
   return (
     <li className="rounded-lg border border-gray-800 p-3">
       <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -51,11 +53,12 @@ function RowCard({ row, locale }: { row: InsiderRow; locale: Locale }) {
       </div>
       {row.role ? <p className="mt-1 text-xs text-gray-500">{row.role}</p> : null}
       <p className="mt-1 text-sm text-gray-300">
-        {fmtDate(row.tx_date, locale)} · {row.shares !== null && row.price
-          ? t('research.insidersV2.row', { shares: fmtNumber(row.shares, locale), price: `${fmtNumber(row.price, locale, 2)} $` })
+        {fmtDate(row.tx_date, locale)} · {row.shares !== null && price
+          ? t('research.insidersV2.row', { shares: fmtNumber(row.shares, locale), price: `${fmtNumber(price, locale, 2)} $` })
           : row.shares !== null ? fmtNumber(row.shares, locale) : '—'}
-        {row.value ? ` = ${compactUsd(row.value, locale)}` : ''}
+        {value ? ` = ${compactUsd(value, locale)}` : ''}
       </p>
+      {row.form === 'PDMR' ? <p className="mt-1 text-xs text-amber-300">{t(row.monetary_verification === 'inconsistent' ? 'insider.feed.monetaryInconsistent' : 'insider.feed.monetaryUnverified')}</p> : null}
       {row.pct_of_holdings !== null ? <p className="text-xs text-teal-300">{t('research.insidersV2.pctHoldings', { pct: fmtNumber(row.pct_of_holdings, locale, 1) })}</p> : null}
       <p className={`mt-1 text-xs ${row.late ? 'text-amber-300' : 'text-gray-500'}`}>
         {row.late
@@ -77,7 +80,17 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
   const t = createTranslator(locale);
   if (summary === null) return <p className="text-sm text-gray-400" role="status">{t('research.insidersV2.loadError')}</p>;
   if (summary.status !== 'ok') return <p className="text-sm text-gray-400" role="status">{t('research.insidersV2.empty', { ticker })}</p>;
-  const year = summary.windows.find((w) => w.days === 365);
+  // Cached pre-quarantine summaries can still carry PDMR money in aggregates.
+  // Never infer safe aggregate totals from a limited transaction sample.
+  const hasPdmr = summary.transactions.some((row) => row.form === 'PDMR');
+  const windows = hasPdmr ? summary.windows.map((window) => ({
+    ...window,
+    buys: {...window.buys, value: null},
+    sells: {...window.sells, value: null},
+    net_value: null,
+  })) : summary.windows;
+  const clusters = hasPdmr ? summary.clusters.map((cluster) => ({...cluster, value: null})) : summary.clusters;
+  const year = windows.find((w) => w.days === 365);
   const excluded = Object.entries(year?.excluded ?? {}).filter(([, n]) => (n ?? 0) > 0);
   // Primero lo que importa: compras y ventas en mercado. Si no hay, todo.
   const market = summary.transactions.filter((row) => row.nature === 'compra_mercado' || row.nature === 'venta_mercado');
@@ -97,7 +110,7 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
               </tr>
             </thead>
             <tbody>
-              {summary.windows.map((w) => (
+              {windows.map((w) => (
                 <tr className="border-t border-gray-800 align-top" key={w.days}>
                   <td className="py-1.5 pr-2 text-gray-300">
                     {t('research.insidersV2.months', { n: Math.round(w.days / 30) })}
@@ -108,7 +121,7 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
                     {sideCell(w.sells, locale, t)}
                     {w.sells.planned_10b5_1 ? <span className="block text-xs text-gray-500">{t('research.insidersV2.planned', { count: w.sells.planned_10b5_1 })}</span> : null}
                   </td>
-                  <td className={`py-1.5 font-medium ${w.net_value > 0 ? 'text-teal-300' : w.net_value < 0 ? 'text-red-300' : 'text-gray-300'}`}>{compactUsd(w.net_value, locale)}</td>
+                  <td className={`py-1.5 font-medium ${w.net_value !== null && w.net_value > 0 ? 'text-teal-300' : w.net_value !== null && w.net_value < 0 ? 'text-red-300' : 'text-gray-300'}`}>{compactUsd(w.net_value, locale)}</td>
                 </tr>
               ))}
             </tbody>
@@ -121,11 +134,11 @@ export function InsidersSection({ ticker, summary, locale = DEFAULT_LOCALE }: { 
         ) : null}
         {summary.late.filings ? <p className="mt-1 text-xs text-gray-500">{t('research.insidersV2.lateLine', { late: summary.late.late, filings: summary.late.filings })}</p> : null}
       </section>
-      {summary.clusters.length ? (
+      {clusters.length ? (
         <section>
           <h3 className="mb-1 text-sm font-semibold text-gray-200">{t('research.insidersV2.clustersTitle')}</h3>
           <ul className="space-y-1 text-sm text-gray-300">
-            {summary.clusters.map((c) => (
+            {clusters.map((c) => (
               <li key={c.start}>
                 {t('research.insidersV2.cluster', { start: fmtDate(c.start, locale), end: fmtDate(c.end, locale), insiders: c.insiders, value: compactUsd(c.value, locale) })}
                 <span className="block text-xs text-gray-500">{c.names.join(', ')}</span>

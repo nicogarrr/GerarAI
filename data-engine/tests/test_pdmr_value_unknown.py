@@ -13,10 +13,12 @@ from tests.test_uk_pdmr_ingestion import RECORDED, _client_with, db  # noqa: F40
 
 
 @pytest.mark.parametrize('flag', [False, None, 'true', 1])
-def test_only_boolean_true_changes_the_amount(flag):
+def test_unverified_money_is_missing_regardless_of_unknown_flag(flag):
     entry = {**RECORDED['data'][0], 'valueUnknown': flag}
     result = map_entry(entry)
-    assert result['value'] == entry['totalValue']
+    assert result['value'] is None
+    assert result['value_unknown'] is bool(flag)
+    assert result['monetary_quality']['provider_reported_value'] == entry['totalValue']
 
 
 def test_explicit_unknown_preserves_other_fields_without_inferring_total():
@@ -24,7 +26,7 @@ def test_explicit_unknown_preserves_other_fields_without_inferring_total():
     known = map_entry({**entry, 'valueUnknown': False})
     result = map_entry(entry)
     assert result == {**known, 'value': None, 'value_unknown': True}
-    assert result['shares'] and result['price']  # never multiply them to fill the total
+    assert result['shares'] and result['price'] is None  # never infer a total
 
 
 def test_unknown_amount_stays_missing_in_persistence_and_feed(db):

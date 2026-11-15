@@ -502,6 +502,7 @@ def _recent_insider_txs(db: Session, tenant: int, ticker: str, limit: int) -> li
         InsiderTransaction.tenant_id == tenant,
         InsiderTransaction.issuer_ticker == ticker,
         InsiderTransaction.code.in_(["P", "S"]),
+            InsiderTransaction.form.in_(("4", "4/A", "5", "5/A")),
     ).order_by(InsiderTransaction.tx_date.desc(), InsiderTransaction.id.desc()).limit(limit)).all())
 
 

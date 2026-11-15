@@ -30,6 +30,7 @@ Que calcula, y con que reglas (visibles en ``rules`` del resultado):
 
 from __future__ import annotations
 
+from bisect import bisect_right
 from datetime import date, timedelta
 from functools import lru_cache
 from typing import Any
@@ -39,6 +40,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models.entities import InsiderFiling, InsiderTransaction
+from app.services.pdmr_monetary_quality import transaction_money, transaction_value
 
 SOURCE = "SEC EDGAR · Form 4/5"
 WINDOWS_DAYS = (90, 180, 365)
@@ -144,11 +146,7 @@ def _insider_key(tx: InsiderTransaction) -> str:
 
 
 def _value(tx: InsiderTransaction) -> float | None:
-    if tx.value is not None:
-        return float(tx.value)
-    if tx.shares is not None and tx.price is not None:
-        return float(tx.shares) * float(tx.price)
-    return None
+    return transaction_value(tx)
 
 
 def _row(tx: InsiderTransaction, filing: InsiderFiling) -> dict[str, Any]:
@@ -181,8 +179,8 @@ def _row(tx: InsiderTransaction, filing: InsiderFiling) -> dict[str, Any]:
         "is_derivative": bool(tx.is_derivative),
         "rule_10b5_1": bool(tx.rule_10b5_1),
         "shares": tx.shares,
-        "price": tx.price,
-        "value": _value(tx),
+        **transaction_money(tx, form),
+        "value": transaction_value(tx, form),
         "holdings_after": holdings_after,
         "ownership": quality.get("ownership"),
         "pct_of_holdings": pct_of_holdings,
@@ -218,7 +216,7 @@ def _side(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "insiders": len({r["_key"] for r in rows}),
         "shares": sum(float(r["shares"]) for r in rows if r["shares"] is not None),
         "shares_missing": sum(1 for r in rows if r["shares"] is None),
-        "value": sum(float(r["value"]) for r in rows if r["value"] is not None),
+        "value": (None if any(r["value"] is None for r in rows) else sum(float(r["value"]) for r in rows)),
         "value_missing": sum(1 for r in rows if r["value"] is None),
         "planned_10b5_1": sum(1 for r in rows if r["rule_10b5_1"]),
     }
@@ -226,15 +224,19 @@ def _side(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 def _clusters(buys: list[dict[str, Any]]) -> list[dict[str, Any]]:
     dated = sorted((r for r in buys if r["tx_date"]), key=lambda r: r["tx_date"])
+    # Las filas están ordenadas: el resto del historial no puede pertenecer
+    # a una ventana que ya terminó. Parsear una vez y buscar su extremo
+    # evita recorrer (y volver a parsear) toda la cola por cada compra.
+    days = [date.fromisoformat(row["tx_date"]) for row in dated]
     clusters: list[dict[str, Any]] = []
-    for i, start in enumerate(dated):
-        start_day = date.fromisoformat(start["tx_date"])
+    for i, start_day in enumerate(days):
         end_limit = start_day + timedelta(days=CLUSTER_WINDOW_DAYS - 1)
-        members = [r for r in dated[i:] if date.fromisoformat(r["tx_date"]) <= end_limit]
+        stop = bisect_right(days, end_limit, lo=i)
+        members = dated[i:stop]
         insiders = {r["_key"] for r in members}
         if len(insiders) < CLUSTER_MIN_INSIDERS:
             continue
-        end_day = max(date.fromisoformat(r["tx_date"]) for r in members)
+        end_day = days[stop - 1]
         if clusters and start_day <= date.fromisoformat(clusters[-1]["end"]):
             last = clusters[-1]
             merged = {id(r): r for r in last["_rows"] + members}
@@ -251,7 +253,7 @@ def _clusters(buys: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "insiders": len({r["_key"] for r in rows}),
             "names": names,
             "trades": len(rows),
-            "value": sum(float(r["value"]) for r in rows if r["value"] is not None),
+            "value": (None if any(r["value"] is None for r in rows) else sum(float(r["value"]) for r in rows)),
             "value_missing": sum(1 for r in rows if r["value"] is None),
         })
     return out
@@ -325,7 +327,7 @@ def insider_summary(
             "days": days,
             "buys": b,
             "sells": s,
-            "net_value": b["value"] - s["value"],
+            "net_value": None if b["value"] is None or s["value"] is None else b["value"] - s["value"],
             "excluded": excluded,
             "covered": bool(coverage["first_filing"]) and date.fromisoformat(coverage["first_filing"]) <= cutoff,
         })
@@ -371,6 +373,10 @@ def insider_summary(
             slot["value_missing"] += 1
         else:
             slot["value"] += float(r["value"])
+
+    for slot in by_nature.values():
+        if slot["value_missing"]:
+            slot["value"] = None
 
     form4_filings: dict[str, bool] = {}
     for r in rows:

@@ -111,3 +111,39 @@ it('insiders: la lista muestra primero compras y ventas en mercado', () => {
   expect(screen.getByText('Últimas compras y ventas en mercado')).toBeInTheDocument();
   expect(screen.queryByText('OTRO')).toBeNull();
 });
+
+it('insiders: unverified UK money never appears as a zero-dollar flow', () => {
+  const missing = {...summary, windows: [{...summary.windows[0], buys:{...side(1,0), value:null, value_missing:1}, net_value:null}], transactions:[{...summary.transactions[0],form:'PDMR',price:null,value:null,monetary_verification:'unverified' as const}]};
+  render(<InsidersSection summary={missing} ticker="ABC" />);
+  const cells = within(screen.getByRole('table')).getAllByRole('cell');
+  expect(cells[1]).toHaveTextContent('1 · —');
+  expect(cells[3]).toHaveTextContent('—');
+  expect(screen.getByText(/Precio e importe sin verificar/)).toBeInTheDocument();
+});
+
+it('legacy PDMR windows and clusters never leak cached money while rows are guarded',()=>{
+ const legacy:InsiderSummary={...summary,ticker:'MNTN.L',windows:[{...summary.windows[2],buys:side(3,987654),sells:side(1,123456),net_value:864198}],clusters:[{...summary.clusters[0],value:987654}],transactions:[{...summary.transactions[0],form:'PDMR',price:999,value:987654}]};
+ const {container}=render(<InsidersSection summary={legacy} ticker="MNTN.L"/>);
+ expect(container.textContent).not.toMatch(/987|123,5|864|999/);
+ expect(screen.getByRole('table')).toHaveTextContent('—');
+ expect(screen.getByText(/4 insiders/)).toHaveTextContent('—');
+});
+
+it('insiders handles unavailable summaries',()=>{
+ render(<InsidersSection summary={null} ticker="X"/>);
+ expect(screen.getByRole('status')).toBeInTheDocument();
+});
+it('insiders preserves SEC negative nets, first buys and non-market transaction details',()=>{
+ const example:InsiderSummary={...summary,coverage:null,windows:[{...summary.windows[0],net_value:-500,excluded:{otra:2}}],clusters:[],late:{filings:0,late:0},first_buys:[{kind:'desde_compra_previa',insider:'New Buyer',years:3,tx_date:'2026-05-07',role:null,value:10,source_url:null,previous_buy:null},{kind:'sin_compra_previa_en_datos',insider:null,years:null,tx_date:null,role:null,value:null,source_url:null,previous_buy:null}],transactions_total:undefined,transactions:[{...summary.transactions[0],insider:null,role:null,nature:'otra',price:null,value:0,shares:null,rule_10b5_1:true,is_derivative:true,ownership:'I',pct_of_holdings:null,tx_date:null,filing_date:null,late:true,days_late:null,source_url:null}]};
+ const {container}=render(<InsidersSection summary={example} ticker="POOL" locale="en"/>);
+ expect(container.textContent).toContain('New Buyer');
+ expect(screen.getByRole('table').textContent).toContain('500');
+ expect(screen.queryByText('Form 4 →')).toBeNull();
+});
+it('insiders shows inconsistent PDMR warnings with missing coverage and preserves caller data',()=>{
+ const example:InsiderSummary={...summary,coverage:{...summary.coverage!,first_filing:null},windows:[{...summary.windows[2],excluded:{otra:1}}],transactions:[{...summary.transactions[0],form:'PDMR',monetary_verification:'inconsistent',nature:'otra',shares:5,price:99,value:495,late:true,days_late:4,role:null}],transactions_total:1};
+ const {container}=render(<InsidersSection summary={example} ticker="POOL"/>);
+ expect(container.textContent).toContain('5');
+ expect(container.textContent).not.toContain('495');
+ expect(example.windows[0].buys.value).toBe(7673698);
+});

@@ -255,6 +255,7 @@ def find_gems(
         .where(InsiderTransaction.tx_date >= since)
         .where(InsiderTransaction.is_derivative.is_(False))
         .where(InsiderTransaction.code.in_(["P", "S"]))
+        .where(InsiderTransaction.form.in_(("4", "4/A", "5", "5/A")))
         .where(*tenant_filters(db, InsiderTransaction))
     ).all():
         if t.value is None or t.issuer_ticker is None:

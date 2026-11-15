@@ -20,6 +20,7 @@ from app.models.entities import (
     InsiderTransaction,
     ManagementAlignmentSnapshot,
 )
+from app.services.pdmr_monetary_quality import transaction_value
 
 VERSION = 1
 METRICS = {
@@ -224,7 +225,9 @@ def insider_windows(rows: list[tuple[InsiderTransaction, str | None]], today: da
             # Legacy False means unknown until explicit XML evidence is persisted.
             plan = (tx.data_quality or {}).get("alignment_10b5_1")
             plan = plan if type(plan) is bool else None
-            value = tx.value if tx.value is not None else (tx.shares * tx.price if tx.shares is not None and tx.price is not None else None)
+            value = transaction_value(tx)
+            if tx.form == "PDMR":
+                warnings.append("Precio e importe PDMR sin verificar; no se suman al flujo.")
             reported_value = None
             if value is not None and (not Decimal(str(value)).is_finite() or value < 0):
                 warnings.append("Importe P/S inválido; se conserva la operación sin sumarlo al flujo.")

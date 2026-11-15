@@ -17,7 +17,7 @@ export interface InsiderSide {
   trades: number;
   insiders: number;
   shares: number;
-  value: number;
+  value: number | null;
   value_missing: number;
   planned_10b5_1: number;
 }
@@ -26,7 +26,7 @@ export interface InsiderWindow {
   days: number;
   buys: InsiderSide;
   sells: InsiderSide;
-  net_value: number;
+  net_value: number | null;
   excluded: Partial<Record<InsiderNature, number>>;
   covered: boolean;
 }
@@ -35,6 +35,7 @@ export interface InsiderRow {
   insider: string | null;
   role: string | null;
   form: string;
+  monetary_verification?: 'unverified' | 'inconsistent';
   code: string | null;
   nature: InsiderNature;
   is_derivative: boolean;
@@ -59,7 +60,7 @@ export interface InsiderCluster {
   insiders: number;
   names: string[];
   trades: number;
-  value: number;
+  value: number | null;
 }
 
 export interface InsiderFirstBuy {
@@ -168,7 +169,8 @@ export function amountRange(min: number | null, max: number | null, locale: stri
   return `${fmt(min)}–${fmt(max)} $`;
 }
 
-export function compactUsd(value: number, locale: string): string {
+export function compactUsd(value: number | null, locale: string): string {
+  if (value === null || !Number.isFinite(value)) return "—";
   return new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD', notation: 'compact', maximumFractionDigits: 1 }).format(value);
 }
 

@@ -144,3 +144,16 @@ describe('InsiderFeed', () => {
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
 });
+
+it.each(['unverified', 'inconsistent'] as const)('PDMR %s: single responsive row explains missing money without claiming zero', (quality) => {
+    render(<InsiderFeed feed={feed({transactions:[tx({form:'PDMR', price:null, value:null, currency:'USD', monetary_verification:quality, shares:18137})]})} side="all" days={90} />);
+    const expected = quality === 'inconsistent' ? /Precio e importe inconsistentes con el documento original/ : /Precio e importe sin verificar/;
+    expect(screen.getAllByText(expected)).toHaveLength(1);
+    expect(screen.getAllByText(expected)[0]).toHaveTextContent('No se usan para calcular flujos.');
+    expect(screen.getAllByText('18.137')).toHaveLength(1);
+});
+
+it('PDMR cached raw money is not displayed even before the response cache refreshes', () => {
+    render(<InsiderFeed feed={feed({transactions:[tx({form:'PDMR', price:987.65, value:987654, currency:'USD'})]})} side="all" days={90} />);
+    expect(screen.queryByText(/987/)).toBeNull();
+});

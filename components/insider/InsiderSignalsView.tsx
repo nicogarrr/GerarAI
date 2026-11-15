@@ -426,11 +426,12 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                         {tx.security_title ? ` · ${tx.security_title}` : ''}
                                                         {tx.rule_10b5_1 ? ` · ${ti('insider.plan10b51')}` : ''}
                                                     </span>
+                                                    {filing.form === 'PDMR' ? <span className="text-amber-300">{ti(tx.monetary_verification === 'inconsistent' ? 'insider.feed.monetaryInconsistent' : 'insider.feed.monetaryUnverified')}</span> : null}
                                                     <span className="tabular-nums text-gray-300">{ti('insider.shares', { n: f.formatNumber(tx.shares ?? null, { maximumFractionDigits: 0 }) })}</span>
-                                                    {tx.price !== null && tx.price !== undefined ? (
+                                                    {filing.form !== 'PDMR' && tx.price !== null && tx.price !== undefined ? (
                                                         <span className="tabular-nums text-gray-300">{moneyText(f, tx.price)}</span>
                                                     ) : null}
-                                                    {tx.value !== null && tx.value !== undefined && !(tx.value === 0 && tx.code !== 'P' && tx.code !== 'S') ? (
+                                                    {filing.form !== 'PDMR' && tx.value !== null && tx.value !== undefined && !(tx.value === 0 && tx.code !== 'P' && tx.code !== 'S') ? (
                                                         <span className="tabular-nums text-gray-100">{moneyText(f, tx.value)}</span>
                                                     ) : null}
                                                 </li>
