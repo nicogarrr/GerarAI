@@ -133,7 +133,9 @@ describe('formato y antigüedad', () => {
     });
     it('yahooChartRequest codifica el símbolo y manda UA de navegador', () => {
         const r = yahooChartRequest('^GSPC');
-        expect(r.url).toBe('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=2d&interval=1d');
+        // range=5d: con 2d los futuros CME/NYM solo tenían 1 barra diaria en
+        // finde y el cambio quedaba N/D hasta el lunes (medido 15-nov-2026).
+        expect(r.url).toBe('https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=5d&interval=1d');
         expect((r.init.headers as Record<string, string>)['User-Agent']).toContain('Mozilla/5.0');
     });
 });

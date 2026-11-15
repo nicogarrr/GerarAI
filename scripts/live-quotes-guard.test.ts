@@ -65,7 +65,7 @@ test('parse: precio ausente o roto devuelve null (N/D honesto)', () => {
 
 test('request: URL con el simbolo codificado y UA de navegador', () => {
     const { url, init } = yahooChartRequest('EURUSD=X');
-    assert.match(url, /finance\/chart\/EURUSD%3DX\?range=2d&interval=1d$/);
+    assert.match(url, /finance\/chart\/EURUSD%3DX\?range=5d&interval=1d$/);
     const headers = init.headers as Record<string, string>;
     assert.match(headers['User-Agent'], /Mozilla/);
 });
