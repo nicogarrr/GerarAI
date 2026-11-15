@@ -70,3 +70,19 @@ describe('signals panel honest status', () => {
         expect(screen.getByTestId('dca-evaluation-disabled')).toHaveTextContent(/turned off.*levels don.t update/i);
     });
 });
+
+describe('partial historical results and enabled settings', () => {
+    it('keeps uncolored rows and missing periods neutral, omits unavailable visits and missing return averages', () => {
+        const data = { ...rates, first_period: null, last_period: null, rows: [{ ...rates.rows[0], color: null, cells: [{ horizon_months: 3, months: 5, pct_higher: 0, avg_return: null }] }], zone_visits: { available: false, reason: 'partial' } as DcaHitRates['zone_visits'] };
+        const ui = render(<DcaHitRatesCard data={data} ti={ti} locale="en" />);
+        expect(screen.queryByText(/2024-01/)).not.toBeInTheDocument(); expect(screen.queryByTestId('dca-zone-visits')).not.toBeInTheDocument(); expect(screen.getByText('n=5')).not.toHaveTextContent(/average/i); expect(screen.getByRole('rowheader').querySelector('span')).toHaveStyle({ backgroundColor: '#374151' });
+        ui.rerender(<DcaHitRatesCard data={{ ...data, available: false, reason: null }} ti={ti} locale="en" />); expect(screen.queryByRole('table')).not.toBeInTheDocument();
+        ui.rerender(<DcaHitRatesCard data={{ ...data, zone_visits: { available: true, completed_visits: 2, avg_months: null, open_visit_months: 0 } as DcaHitRates['zone_visits'] }} ti={ti} locale="en" />); expect(screen.getByTestId('dca-zone-visits')).not.toHaveTextContent(/open visit/i);
+    });
+    it('shows enabled delivery, disabled directions, and actual last run without inventing a missing run', () => {
+        const data: DcaSignalsResponse = { alerts_enabled: true, email_configured: true, evaluation_enabled: true, directional_policy: true, up_min_level: null, down_max_level: null, global_min_level: 2, trims_enabled: true, channels: [], signal_months: null, zones: [], items: [] };
+        const ui = mount(<DcaSignalsPanel data={data} unavailable={false} ti={ti} locale="en" />); expect(screen.queryByTestId('dca-last-run')).not.toBeInTheDocument(); expect(screen.queryByTestId('dca-evaluation-disabled')).not.toBeInTheDocument(); expect(screen.getByTestId('dca-signals')).toHaveTextContent(/off/i);
+        ui.rerender(<LocaleProvider locale="en"><DcaSignalsPanel data={{ ...data, last_run: { status: 'ok', trigger: 'manual', started_at: '2026-11-15T10:00:00Z', finished_at: '2026-11-15T10:01:00Z', tracked: 2, evaluated: 2, skipped: 0, errors: 0, alerted: 0, error: null }, channels: ['email'], items: [item(1), item(2)] }} unavailable={false} ti={ti} locale="en" /></LocaleProvider>); expect(screen.getByTestId('dca-last-run')).not.toBeEmptyDOMElement(); expect(screen.getByTestId('dca-signals')).toHaveTextContent(/email/i);
+        ui.rerender(<LocaleProvider locale="en"><DcaSignalsPanel data={null} unavailable={false} ti={ti} locale="en" /></LocaleProvider>); expect(screen.getByTestId('dca-signals-unavailable')).toBeInTheDocument();
+    });
+});
