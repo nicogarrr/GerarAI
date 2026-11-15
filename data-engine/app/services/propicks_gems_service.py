@@ -13,7 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -136,21 +136,23 @@ def score_gem(g: GemInputs) -> Gem | None:
 
 
 def _latest_fcf_and_shares(db: Session, min_fiscal_year: int) -> dict[int, tuple[float, float, str]]:
-    rows = db.execute(
-        select(
-            FinancialFact.company_id, FinancialFact.metric, FinancialFact.fiscal_year,
-            FinancialFact.value, FinancialFact.period,
-        )
-        .where(FinancialFact.metric.in_(["free_cash_flow", "shares_diluted"]))
-        .where(FinancialFact.fiscal_quarter.in_(["FY", ""]))
-        .where(FinancialFact.fiscal_year.isnot(None))
-        # Un FY de hace más de 2 años no es un dato actual: VOYA entraba en
-        # joyas con FCF de FY2016 contra precio de hoy. Sin FY reciente la
-        # empresa se queda sin fcf_yield y no entra (fail-closed, N/D).
-        .where(FinancialFact.fiscal_year >= min_fiscal_year)
-        .where(*tenant_filters(db, FinancialFact))
-        .order_by(FinancialFact.fiscal_year.desc(), FinancialFact.created_at.desc())
-    ).all()
+    ranked = select(
+        FinancialFact.company_id.label("cid"), FinancialFact.metric.label("metric"),
+        FinancialFact.fiscal_year.label("fy"), FinancialFact.value.label("value"),
+        FinancialFact.period.label("period"),
+        func.row_number().over(
+            partition_by=(FinancialFact.company_id, FinancialFact.metric),
+            order_by=(FinancialFact.fiscal_year.desc(), FinancialFact.created_at.desc()),
+        ).label("rn"),
+    ).where(
+        FinancialFact.metric.in_(["free_cash_flow", "shares_diluted"]),
+        FinancialFact.fiscal_quarter.in_(["FY", ""]),
+        FinancialFact.fiscal_year.isnot(None), FinancialFact.fiscal_year >= min_fiscal_year,
+        *tenant_filters(db, FinancialFact),
+    ).subquery()
+    rows = db.execute(select(
+        ranked.c.cid, ranked.c.metric, ranked.c.fy, ranked.c.value, ranked.c.period,
+    ).where(ranked.c.rn == 1)).all()
     fcf: dict[int, tuple[int, float, str]] = {}
     sh: dict[int, tuple[int, float]] = {}
     for cid, metric, fy, value, period in rows:
