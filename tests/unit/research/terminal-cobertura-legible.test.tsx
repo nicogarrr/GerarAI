@@ -43,3 +43,18 @@ it('keeps unknown statuses, missing values and partial history honest', () => {
     expect(document.body.textContent).toContain('no aplica a ratios');
     expect(document.body.textContent).toContain('no se calcula');
 });
+
+it('renders unknown statuses, unavailable values and ratio or negative annual summaries', () => {
+    const point = {id:1,period:'FY2024',value:1,unit:'USD',status:'',segment:'consolidated',confidence:1,source:{title:null,type:'sec'}};
+    const metric = {metric:'custom_metric',status:'custom_state',definition:'',canonical_formula:'a + b',periods:2,segments:[],missing_reason:null,series:[point]};
+    const fixtures = [
+        {...metric,series:[{...point,value:null},{...point,id:2,value:'bad'},{...point,id:3,value:1,unit:''}]},
+        {...metric,series:[{...point,value:-1},{...point,id:2,period:'FY2025',value:2}]},
+        {...metric,series:[{...point,unit:'ratio'},{...point,id:2,period:'FY2025',unit:'ratio',value:2}]},
+        {...metric,missing_reason:'Missing input',series:[{...point,period:'unknown',value:null}]},
+    ];
+    render(<FinancialTerminalSection terminal={{...terminal,periodicity:'custom_period',metrics:fixtures.map((item,index)=>({...item,metric:'custom_'+index}))} as unknown as FinancialTerminalData} years={10} periodicity="annual"/>);
+    expect(screen.getAllByText('custom state')).toHaveLength(4);
+    expect(screen.getByText('Missing input')).toBeInTheDocument();
+    expect(screen.getAllByTestId('terminal-annual-summary')).toHaveLength(2);
+});
