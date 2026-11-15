@@ -155,3 +155,32 @@ def test_projection_parity_revisions_old_gaps_and_tenants():
         assert funnel._earnings_consistency(db) == reference_earnings_consistency(db) == {}
         assert funnel._revenue_cagr(db) == reference_revenue_cagr(db) == {}
         assert gems._latest_fcf_and_shares(db, 2024) == {}
+
+
+def test_smart_money_counts_only_increases_with_verified_cusip_and_tenant():
+    from datetime import date
+
+    from app.models.entities import FundManager, InstrumentReference, ManagerHolding
+
+    with _db() as db:
+        manager = FundManager(cik='TEST13F', name='Manager')
+        db.add(manager)
+        db.flush()
+        prior, latest = date(2026, 3, 31), date(2026, 6, 30)
+        for i, (day, shares, put_call) in enumerate([
+            (prior, 10, ''), (latest, 20, ''), (latest, 1000, 'CALL'),
+        ]):
+            db.add(ManagerHolding(manager_id=manager.id, accession_number=f'Q{i}',
+                report_date=day, cusip='123456789', shares=Decimal(shares), put_call=put_call))
+        db.commit()
+        assert gems._smart_money(db, {'X'}) == ({}, latest)
+        db.add(InstrumentReference(ticker_normalized='X', cusip='123456789'))
+        db.commit()
+        assert gems._smart_money(db, {'X'}) == ({'X': 1}, latest)
+        # No increase is not a buy signal.
+        row = db.query(ManagerHolding).filter(ManagerHolding.accession_number == 'Q1').one()
+        row.shares = Decimal('5')
+        db.commit()
+        assert gems._smart_money(db, {'X'}) == ({'X': 0}, latest)
+        db.info['tenant_id'] += 1
+        assert gems._smart_money(db, {'X'}) == ({}, None)
