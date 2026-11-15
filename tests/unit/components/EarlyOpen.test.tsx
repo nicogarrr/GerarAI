@@ -45,7 +45,8 @@ describe('initial HTML clicks before React hydration', () => {
         render(<MobileNav />);
         expect(await screen.findByRole('dialog', { name: 'Menú de navegación' })).toBeVisible();
         expect(sessionStorage.getItem(EARLY_OPEN_NAV_KEY)).toBeNull();
-        fireEvent.keyDown(document, { key: 'Escape' });
+        // jsdom has no Escape default action. Browser spec covers the real key.
+        act(() => { (screen.getByRole('dialog', { name: 'Menú de navegación' }) as HTMLDialogElement).close(); });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(consumeEarlyNavOpen()).toBe(false);
     });

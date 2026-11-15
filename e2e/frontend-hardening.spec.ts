@@ -32,14 +32,13 @@ test.describe("hardening frontend estático", () => {
     // Entre 640px y 767px no puede existir una ventana sin navegación.
     expect(sidebar).toContain("md:flex");
     expect(mobileNav).toContain("md:hidden");
-    // La trampa de foco del drawer vive en un solo sitio.
-    expect(mobileNav).toContain("useNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef })");
-    const drawerHook = source("hooks", "useNavDrawer.ts");
-    expect(drawerHook).toContain("querySelectorAll<HTMLElement>");
-    expect(drawerHook).toContain("el.tabIndex >= 0 && el.getClientRects().length > 0");
-    expect(drawerHook).toContain("e.key === 'Escape'");
-    expect(drawerHook).toContain("e.key !== 'Tab'");
-    expect(mobileNav).not.toContain("onDrawerKeyDown");
+    // Native top layer owns focus containment and Escape, not a JS trap.
+    expect(mobileNav).toContain("useNativeNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef })");
+    const drawerHook = source("hooks", "useNativeNavDrawer.ts");
+    expect(drawerHook).toContain("dialog.showModal()");
+    expect(drawerHook).not.toContain("document.addEventListener('keydown'");
+    expect(drawerHook).not.toContain("document.body.style.overflow =");
+    expect(mobileNav).toContain("md:hidden");
   });
 
   test("la pantalla de error no muestra el mensaje interno", () => {
@@ -78,17 +77,11 @@ test.describe("hardening frontend estático", () => {
 
     expect(mobileNav).toContain("closeButtonRef");
     expect(mobileNav).toContain("aria-labelledby=\"mobile-nav-title\"");
-    // Los aria-label del drawer viven en i18n desde E1-E3: la fuente referencia
-    // la clave y el texto real se verifica en los mensajes «es».
-    expect(mobileNav).toContain("aria-label={t('shell.nav.closeBackdrop')}");
-    const shellMessages = JSON.parse(source("lib", "i18n", "messages", "es", "shell.json")) as { nav: { closeBackdrop: string } };
-    expect(shellMessages.nav.closeBackdrop).toBe("Cerrar menú por fondo");
-    expect(mobileNav).toContain("useNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef })");
-    const drawerHook = source("hooks", "useNavDrawer.ts");
-    expect(drawerHook).toContain("querySelectorAll<HTMLElement>");
-    expect(drawerHook).toContain("el.tabIndex >= 0 && el.getClientRects().length > 0");
-    expect(drawerHook).toContain("e.key === 'Escape'");
-    expect(drawerHook).toContain("e.key !== 'Tab'");
+    expect(mobileNav).toContain("aria-label={t('shell.nav.closeMenu')}");
+    expect(mobileNav).toContain("<dialog");
+    expect(mobileNav).toContain("DialogPortalContainerProvider");
+    const drawerHook = source("hooks", "useNativeNavDrawer.ts");
+    expect(drawerHook).toContain("dialog.showModal()");
     expect(searchCommand).toContain("searchError");
     expect(searchCommand).toContain("t('ui.command.error')");
     const uiMessages = JSON.parse(source("lib", "i18n", "messages", "es", "ui.json")) as { command: { error: string } };

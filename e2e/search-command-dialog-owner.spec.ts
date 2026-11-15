@@ -96,19 +96,21 @@ test.describe('owner huérfano (objeción auditor)', () => {
         await page.waitForTimeout(500);
         await warmUpPalette(page);
 
+        // Count semantic dialogs: native <dialog> has an implicit role, no role attribute.
         // Drawer móvil: su SearchCommand es una instancia más.
         await page.click('button[aria-label="Abrir menú de navegación"]');
-        await expect(page.locator('[role="dialog"]')).toHaveCount(1); // el drawer
-        await page.locator('[role="dialog"] [data-testid="search-command-trigger"]').click();
-        await expect(page.locator('[role="dialog"]')).toHaveCount(2); // drawer + paleta (dueña: drawer)
+        await expect(page.getByRole('dialog')).toHaveCount(1); // el drawer
+        await expect(page.locator('dialog#mobile-nav-drawer:modal')).toBeVisible();
+        await page.locator('dialog#mobile-nav-drawer').getByTestId('search-command-trigger').click();
+        await expect(page.getByRole('dialog')).toHaveCount(2); // drawer + paleta (dueña: drawer)
 
         // Cruzar el breakpoint desmonta el drawer (y a la dueña) con la paleta abierta.
         await page.setViewportSize({ width: 1280, height: 860 });
-        await expect(page.locator('[role="dialog"]')).toHaveCount(0);
+        await expect(page.getByRole('dialog')).toHaveCount(0);
 
         // El store no puede quedar open=true huérfano: Ctrl+K ABRE (no cierra fantasma).
         await page.keyboard.press('Control+k');
-        await expect(page.locator('[role="dialog"]')).toHaveCount(1);
-        await expect(page.locator('[role="dialog"] input')).toBeFocused();
+        await expect(page.getByRole('dialog')).toHaveCount(1);
+        await expect(page.getByRole('dialog').locator('input')).toBeFocused();
     });
 });
