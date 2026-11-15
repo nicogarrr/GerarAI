@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { E2E_UI_BACKEND_URL } from "./fixtures/e2e-env";
+import { armDepartureScroll } from "./fixtures/departure-scroll";
 
 /**
  * Recorrido real (auditoría de flujo r5, 11-nov): se baja por la ficha en la
@@ -41,7 +42,7 @@ async function post(request: APIRequestContext, path: string, payload: unknown) 
 
 /**
  * Baja por la ficha hasta el enlace al Informe del contenido (no el del menú
- * «Más acciones», que está arriba) y devuelve el scroll desde el que se pulsa.
+ * «Más acciones», que está arriba) y arma la lectura del scroll en el pointerdown real del enlace.
  */
 async function scrollToContentReportLink(page: Page) {
   const link = page.locator('main a[href$="/informe"]').first();
@@ -57,7 +58,7 @@ async function scrollToContentReportLink(page: Page) {
     return settled;
   }).toBe(true);
   await link.scrollIntoViewIfNeeded();
-  return { link, before: await page.evaluate(() => Math.round(window.scrollY)) };
+  return { link, readDeparture: await armDepartureScroll(page, link) };
 }
 
 /** La posición vuelve a la del usuario (o al tope si la página es más corta). */
@@ -238,14 +239,15 @@ for (const [label, viewport] of [["móvil 390", { width: 390, height: 844 }], ["
     test("atrás del navegador desde el Informe vuelve a donde estabas", async ({ page }) => {
       await page.goto("/research/MSFT?view=valoracion");
       await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
-      const { link, before } = await scrollToContentReportLink(page);
-      expect(before).toBeGreaterThan(0);
+      const { link, readDeparture } = await scrollToContentReportLink(page);
       // Tipo de la navegación de ida: un request «document» al informe
       // delataría un clic pre-hidratación (carga completa en vez de SPA).
       // Solo telemetría: no cambia los criterios del test.
       const informeDocNav = watchDocumentNav(page, /\/informe/);
       await link.click();
       await page.waitForURL(/\/research\/MSFT\/informe/);
+      const before = await readDeparture();
+      expect(before).toBeGreaterThan(0);
       await expect(page.locator("h1").first()).toBeVisible();
       // Lectura previa de la memoria antes de la vuelta: referencia del
       // valor que el restore probablemente leerá (algo podría escribir
@@ -263,10 +265,12 @@ for (const [label, viewport] of [["móvil 390", { width: 390, height: 844 }], ["
     test("«← Volver a la ficha» del Informe vuelve a la pestaña y a donde estabas", async ({ page }) => {
       await page.goto("/research/MSFT?view=valoracion");
       await expect(page.getByRole("heading", { name: "MSFT", level: 1 })).toBeVisible();
-      const { link, before } = await scrollToContentReportLink(page);
+      const { link, readDeparture } = await scrollToContentReportLink(page);
       const informeDocNav = watchDocumentNav(page, /\/informe/);
       await link.click();
       await page.waitForURL(/\/research\/MSFT\/informe/);
+      const before = await readDeparture();
+      expect(before).toBeGreaterThan(0);
       const back = page.getByRole("link", { name: "← Volver a la ficha" });
       await expect(back).toHaveAttribute("data-back-mode", "history");
       // Igual que en el test hermano: lectura previa de referencia (no

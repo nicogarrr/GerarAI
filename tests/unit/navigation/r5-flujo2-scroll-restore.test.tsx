@@ -149,6 +149,25 @@ describe('ScrollPreserver: volver por historial', () => {
         expect(readScrollMemory(sessionStorage)['/research/NVDA/informe']).toBe(300);
     });
 
+    it('restaura el pointerdown real después de crecer 32px sobre el enlace, no la medición previa', () => {
+        const view = render(<ScrollPreserver />);
+        userScrollsTo(1613);
+        const early = scrollY;
+        // Cotización tardía: el navegador ancla el contenido visible. No es
+        // otro gesto del usuario; el click posterior sale de la posición nueva.
+        docHeight += 32;
+        scrollY += 32;
+        clickLink('/research/NVDA/informe');
+        expect(readScrollMemory(sessionStorage)['/research/NVDA?view=valoracion']).toBe(1645);
+        go('/research/NVDA/informe', view);
+        scrollY = 0;
+        act(() => { window.dispatchEvent(new PopStateEvent('popstate')); });
+        go('/research/NVDA?view=valoracion', view);
+        advanceMs(4_200);
+        expect(scrollY).toBe(1645);
+        expect(scrollY).not.toBe(early);
+    });
+
     it('si el usuario hace scroll mientras se restaura, manda él', () => {
         const view = render(<ScrollPreserver />);
         userScrollsTo(900);
