@@ -313,11 +313,11 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             {/* Móvil (<sm): una sola fila de 60 px con áreas táctiles de 44 px; el
                 título y la pastilla "Viendo" se abrevian a la vista pero conservan
                 el texto completo para lectores de pantalla. Con selector abierto se reserva su ancho y
-                se truncan las etiquetas, sin perder sus nombres accesibles. */}
-            <CardHeader className="shrink-0 gap-2 space-y-0 px-3 py-2 sm:gap-0 sm:space-y-1.5 sm:p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
-                <div className={`flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 sm:gap-2 ${showGuideInput || guideTicker ? '' : 'sm:flex-initial sm:flex-wrap'}`}>
+                se ajustan los espacios sin recortar las etiquetas. */}
+            <CardHeader className="shrink-0 gap-1 space-y-0 px-2 py-2 sm:gap-0 sm:space-y-1.5 sm:p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
+                <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1 sm:flex-initial sm:flex-wrap sm:gap-2">
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
-                    <CardTitle as="h2" id="global-brain-title" className={`${showGuideInput || guideTicker ? 'min-w-0 shrink truncate' : 'shrink-0'} text-sm font-medium`}>
+                    <CardTitle as="h2" id="global-brain-title" className="shrink-0 text-sm font-medium">
                         <span aria-hidden="true" className="sm:hidden">{t('brain.panel.titleShort')}</span>
                         <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">{t('brain.panel.title')}</span>
                     </CardTitle>
@@ -356,7 +356,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                                 href={viewingHref}
                                 data-testid="brain-page-context"
                                 title={echo?.company_name ?? viewingText}
-                                className="inline-flex min-h-11 min-w-11 shrink items-center justify-center gap-1 max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200 sm:justify-start"
+                                className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 max-w-32 truncate rounded-full border border-indigo-500/40 bg-indigo-500/10 px-2 py-0.5 text-xs text-indigo-300 hover:border-indigo-400 hover:text-indigo-200 sm:justify-start"
                             >
                                 {viewingContent}
                             </Link>
