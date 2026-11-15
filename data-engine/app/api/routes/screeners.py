@@ -874,9 +874,9 @@ def real_time_screener(
     """Screener real con cache por parámetros y stale-while-revalidate.
 
     Nunca espera un refresh de red cuando existe LKG: devuelve la respuesta al
-    instante y actualiza en segundo plano. En cold start espera como máximo
-    50 ms para un primer resultado útil; después devuelve LKG al instante y
-    deja el trabajo largo en background.
+    instante y actualiza en segundo plano. En cold start tampoco espera al
+    refresco: devuelve los datos ya publicados o vacío con refreshing=true
+    mientras el trabajo sigue en background.
 
     El `get_db` no es decorativo: los ratios salen de `financial_facts`, que es
     TenantOwnedMixin, así que la respuesta depende del tenant. Sin esta
@@ -921,21 +921,15 @@ def real_time_screener(
     if not _real_items_are_fresh(vendor.name, now, tenant_id):
         future = _schedule_real_refresh(vendor.name, tenant_id)
         refreshing = future is not None and not future.done()
-        if not has_lkg and not items and (
-            active_vendor_allows_cold_wait(vendor.name, settings)
-        ):
-            # Sin key/no Finnhub no hay una respuesta real que esperar: el mock
-            # o el fallback local puede resolverse en este pequeño budget. Con
-            # Finnhub configurado, una petición de red nunca bloquea el cold start.
-            # nosemgrep: gerarai-broad-except-pass -- espera acotada del arranque en frio; el refresco sigue en segundo plano y la respuesta usa la cache
-            try:
-                future.result(timeout=_COLD_START_WAIT_SECONDS)
-            except Exception:  # noqa: BLE001 — el background seguirá intentando
-                pass
+        # Even offline/local work can be queued behind another tenant. Never
+        # wait on its Future in the request; adopt a result already published
+        # to the bucket, otherwise expose the existing refreshing state.
+        if not has_lkg:
             with _real_cache_lock:
                 bucket = _real_items_cache.get(tenant_id) or {}
                 items = list(bucket.get("items", []))
                 items_at_wall = float(bucket.get("at_wall") or 0.0) or items_at_wall
+            refreshing = future is not None and not future.done()
 
     payload = _real_response_payload(
         items, vendor.name, marketCapMoreThan, sector, limit, as_of=items_at_wall,
