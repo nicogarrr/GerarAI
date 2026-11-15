@@ -65,11 +65,9 @@ test('noticias y movers componen los badges junto al ticker', () => {
     assert.equal((movers.match(/tickerSets=\{tickerSets\}/g) ?? []).length, 1);
 });
 
- test('las tarjetas móviles conservan el contexto de cartera y watchlist', () => {
+ test('la fila única (tabla responsiva 2026-11-14) conserva el contexto de cartera y watchlist', () => {
     const flow = readFileSync('components/research/NewsEventsFlow.tsx', 'utf8');
-    const mobile = flow.slice(flow.indexOf("<ul aria-label={t('research.flow.listAria')}"), flow.indexOf('</ul>'));
-    assert.equal(JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).flow.listAria, 'Eventos de noticias');
-    assert.match(mobile, /<TickerContextBadges/);
-    assert.match(mobile, /portfolioTickers=\{portfolioSet\}/);
-    assert.match(mobile, /watchlistTickers=\{watchlistSet\}/);
+    assert.match(flow, /<TickerContextBadges/);
+    assert.match(flow, /portfolioTickers=\{portfolioSet\}/);
+    assert.match(flow, /watchlistTickers=\{watchlistSet\}/);
 });

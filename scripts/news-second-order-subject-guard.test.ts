@@ -25,5 +25,6 @@ void test('el estado sin_datos explica la exclusión de la empresa protagonista'
 void test('ambos call sites pasan el ticker del evento', () => {
     const flow = source('components/research/NewsEventsFlow.tsx');
     const occurrences = flow.split('<NewsSecondOrder eventId={event.id} subjectTicker={event.ticker}').length - 1;
-    assert.equal(occurrences, 2, 'lista móvil y tabla escritorio');
+    // Tabla responsiva única (2026-11-14): un solo call site por evento.
+    assert.equal(occurrences, 1, 'fila única responsiva');
 });

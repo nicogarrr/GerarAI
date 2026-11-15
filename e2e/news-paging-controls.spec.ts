@@ -50,13 +50,14 @@ for(const width of [390,820,1440]) test(`news pages replace rather than append $
  await page.addStyleTag({content:"nextjs-portal{display:none!important}"});
  const pager=page.getByRole("navigation",{name:"Paginación",exact:true});
  await expect(pager.getByText("Página 1",{exact:true})).toBeVisible();
- const first=await page.locator("main li").allTextContents();
+// Tabla unica responsiva (2026-11-14): un evento = una fila <tr> en todos los anchos.
+ const first=await page.locator("main tbody tr").allTextContents();
  await expect(pager.getByRole("link",{name:"Siguiente"})).toBeInViewport();
  await page.screenshot({path:`test-results/news-pager-${width}.png`});
  await pager.getByRole("link",{name:"Siguiente"}).click();
  await expect(page).toHaveURL(/lane=empresa.*pagina=2/);
  await expect(pager.getByText("Página 2",{exact:true})).toBeVisible();
- const second=await page.locator("main li").allTextContents();
+ const second=await page.locator("main tbody tr").allTextContents();
  expect(first.length).toBe(10);expect(second.length).toBe(10);
  expect(second.some(s=>first.includes(s))).toBe(false);
  await page.getByRole("navigation",{name:"Filtrar por carril"}).getByRole("link",{name:"Macro",exact:true}).click();

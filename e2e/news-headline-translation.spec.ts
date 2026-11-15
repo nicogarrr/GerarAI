@@ -48,7 +48,9 @@ for (const width of [390,820,1440]) test(`translated headline preserves original
  });
  await page.setViewportSize({width,height:1000});await page.goto("/research/news?lane=empresa");
  await page.addStyleTag({content:"nextjs-portal{display:none!important}"});
- const surface=width<768?page.getByRole("list",{name:"Eventos de noticias",exact:true}):page.getByRole("region",{name:"Flujo de eventos de noticias",exact:true});
+ // Tabla unica responsiva (2026-11-14): una sola region en todos los anchos;
+// ya no hay lista <ul> aparte para movil.
+const surface=page.getByRole("region",{name:"Flujo de eventos de noticias",exact:true});
  await expect(surface.getByText(`La empresa anuncia resultados 2026 ${marker}`,{exact:true})).toBeVisible();
  await expect(surface.getByText("Traducción automática · español").first()).toBeVisible();
  await surface.getByText("Ver original").first().click();

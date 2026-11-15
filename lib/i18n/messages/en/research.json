@@ -297,7 +297,6 @@
     "emptyLaneDescription": "This lane has no news available yet.",
     "emptyAction": "Import a source or analyze a news item manually",
     "emptyForYouTitle": "No companies in your portfolio or watchlist.",
-    "listAria": "News events",
     "regionAria": "News event flow",
     "caption": "News events with materiality and source details per row",
     "colTicker": "Ticker",

@@ -23,7 +23,7 @@ test('el motivo sale del tipo de evento real, nunca inventado, y omite lo no inf
   assert.equal(dict.eventTypes.general_news, 'Noticia general');
 });
 
-test('las dos filas (tarjeta movil y tabla md) pasan el tipo de evento al badge', () => {
+test('la fila unica (tabla responsiva 2026-11-14) pasa el tipo de evento al badge', () => {
   const calls = flow.match(/<ImpactBadge direction=\{event\.impact_direction\} eventType=\{event\.event_type\} t=\{t\} locale=\{locale\} \/>/g) ?? [];
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 1);
 });

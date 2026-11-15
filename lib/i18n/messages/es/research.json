@@ -297,7 +297,6 @@
     "emptyLaneDescription": "Este carril todavía no tiene noticias disponibles.",
     "emptyAction": "Importa una fuente o analiza una noticia manual",
     "emptyForYouTitle": "Sin empresas en tu cartera ni watchlist.",
-    "listAria": "Eventos de noticias",
     "regionAria": "Flujo de eventos de noticias",
     "caption": "Eventos de noticias con materialidad y detalles de la fuente por fila",
     "colTicker": "Ticker",

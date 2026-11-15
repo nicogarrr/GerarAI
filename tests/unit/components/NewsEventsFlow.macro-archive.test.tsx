@@ -25,10 +25,10 @@ describe('carril macro sin frescura',()=>{
   expect(screen.queryByText(/archivo reciente/)).not.toBeInTheDocument();
  });
  it('estado vacío macro honesto: fuente caída, no error ni vacío genérico',async()=>{
-  const {container}=render(await view({events:[], hasMore:false, lane:'macro', page:1, portfolioTickers:[], watchlistTickers:[]}));
-  const mobile=container.querySelector('div.md\\:hidden');
-  expect(mobile).toHaveTextContent('Sin eventos macro disponibles.');
-  expect(mobile).toHaveTextContent('La fuente macro no aporta datos nuevos ahora mismo');
+  render(await view({events:[], hasMore:false, lane:'macro', page:1, portfolioTickers:[], watchlistTickers:[]}));
+  // Tabla responsiva única (2026-11-14): el vacío se anuncia una sola vez.
+  expect(screen.getAllByText('Sin eventos macro disponibles.')).toHaveLength(1);
+  expect(screen.getAllByText(/La fuente macro no aporta datos nuevos ahora mismo/)).toHaveLength(1);
   expect(screen.queryByRole('alert')).not.toBeInTheDocument();
  });
 });

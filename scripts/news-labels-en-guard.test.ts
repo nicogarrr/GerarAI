@@ -37,8 +37,9 @@ test('EN cubre exactamente las mismas claves y no deja español', () => {
 test('NewsEventsFlow pasa el locale a etiquetas, fechas relativas y badges; el aviso de error usa clave', () => {
   const flow = readFileSync('components/research/NewsEventsFlow.tsx', 'utf8');
   assert.match(flow, /const locale = await getLocale\(\);/);
-  assert.equal((flow.match(/formatTimeAgo\(event\.date, Date\.now\(\), locale\)/g) ?? []).length, 2);
-  assert.equal((flow.match(/<TickerContextBadges\n\s+locale=\{locale\}/g) ?? []).length, 2);
+  // Tabla responsiva única (2026-11-14): una llamada por evento, no dos árboles.
+  assert.equal((flow.match(/formatTimeAgo\(event\.date, Date\.now\(\), locale\)/g) ?? []).length, 1);
+  assert.equal((flow.match(/<TickerContextBadges\n\s+locale=\{locale\}/g) ?? []).length, 1);
   const second = readFileSync('components/research/NewsSecondOrder.tsx', 'utf8');
   assert.match(second, /\{t\('research\.flow\.second\.error'\)\}/);
   const es = JSON.parse(readFileSync('lib/i18n/messages/es/research.json', 'utf8')).flow.second;
