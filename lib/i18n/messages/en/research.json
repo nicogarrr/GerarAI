@@ -2274,7 +2274,7 @@
   },
   "astsBankSupplement": {
     "title": "ASTS: external scenario attributed to Deutsche Bank",
-    "warning": "Deutsche Bank estimate [not verified against the original report]. Transcribed from a screenshot of a tweet, not actual results, consensus or company guidance. It does not change GerarAI valuation.",
+    "warning": "Deutsche Bank estimate [not verified against the original report]. Figures were received as a text transcription of a screenshot of a tweet; the screenshot is unavailable for comparison and the table has not been visually checked. These are not actual results, consensus or company guidance. It does not change GerarAI valuation.",
     "dates": "Received on 15 Nov 2026. Original report date: unknown. The social aggregator dates the matching text to 15 Nov 2026 at 12:30 UTC; it does not verify the table or the bank report.",
     "table": "Figure 3: ASTS Model Summary (transcription). Amounts in USD millions; satellites in units. 2026E-2030E are estimates. 2025 is a table reference not verified against actual results.",
     "revenue": "Revenue",

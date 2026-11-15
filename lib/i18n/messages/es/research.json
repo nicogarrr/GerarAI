@@ -2274,7 +2274,7 @@
   },
   "astsBankSupplement": {
     "title": "ASTS: escenario externo atribuido a Deutsche Bank",
-    "warning": "Estimación de Deutsche Bank [sin verificar contra el informe original]. Transcripción de una captura de un tuit, no resultados reales, consenso ni previsiones de la compañía. No modifica la valoración de GerarAI.",
+    "warning": "Estimación de Deutsche Bank [sin verificar contra el informe original]. Cifras recibidas como transcripción de texto de una captura de un tuit; la captura no está disponible para cotejo y no se ha comprobado visualmente la tabla. No son resultados reales, consenso ni previsiones de la compañía. No modifica la valoración de GerarAI.",
     "dates": "Recibido el 15/11/2026. Fecha del informe original: desconocida. El agregador social sitúa el texto coincidente el 15/11/2026 a las 12:30 UTC; no verifica la tabla ni el informe del banco.",
     "table": "Figure 3: ASTS Model Summary (transcripción). Importes en millones de USD; satélites en unidades. 2026E-2030E son estimaciones. 2025 es una referencia de la tabla sin validar contra resultados reales.",
     "revenue": "Ingresos",

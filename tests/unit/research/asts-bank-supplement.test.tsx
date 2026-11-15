@@ -14,6 +14,8 @@ describe('isolated ASTS screenshot scenario', () => {
     render(<AstsBankSupplement ticker="asts" locale={locale} t={createTranslator(locale)} />);
     const appendix = screen.getByTestId('asts-bank-supplement');
     expect(screen.getByRole('note').textContent).toMatch(locale === 'es' ? /sin verificar contra el informe original/ : /not verified against the original report/);
+    expect(screen.getByRole('note').textContent).toMatch(locale === 'es' ? /la captura no está disponible para cotejo/ : /the screenshot is unavailable for comparison/);
+    expect(screen.getByRole('note').textContent).toMatch(locale === 'es' ? /no se ha comprobado visualmente la tabla/ : /the table has not been visually checked/);
     for (const row of data.rows) {
       const card = screen.getByRole('region', { name: String(row.year) });
       expect(within(card).getByRole('heading').textContent).toBe(String(row.year) + (row.year > 2025 ? 'E' : ''));

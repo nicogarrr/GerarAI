@@ -2,7 +2,8 @@
 
 Recepción: 2026-11-15. Informe original: fecha y URL desconocidas.
 
-Se conserva una transcripción de una captura de la tabla Figure 3: ASTS
+Se conserva una transcripción textual recibida, sin acceso a la captura para
+cotejar visualmente la tabla Figure 3: ASTS
 Model Summary atribuida a Deutsche Bank. No se ha obtenido ni autenticado
 el informe del banco. La atribución se mantiene como no verificada.
 
