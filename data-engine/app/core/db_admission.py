@@ -57,7 +57,7 @@ def request_gate() -> AdmissionGate:
             # Leave at least two normal pool slots for readiness/background
             # work. Do not count overflow as request capacity.
             limit = max(1, min(16, settings.db_pool_size - 2))
-            _GATE = AdmissionGate(limit, min(8, limit))
+            _GATE = AdmissionGate(limit, min(8, max(1, limit // 2)))
         return _GATE
 
 
