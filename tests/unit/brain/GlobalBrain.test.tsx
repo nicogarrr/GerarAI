@@ -321,6 +321,8 @@ describe('GlobalBrain: modo guía', () => {
         await open();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));
         const field = screen.getByLabelText('Ticker de la guía de investigación');
+        expect(screen.getByRole('dialog')).toHaveClass('[&_[data-slot=popover-content]]:min-w-56');
+        expect(field.parentElement?.parentElement).toHaveClass('w-[4.5rem]', 'shrink-0', 'sm:w-20');
         fireEvent.blur(field);
         expect(screen.queryByLabelText('Ticker de la guía de investigación')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));

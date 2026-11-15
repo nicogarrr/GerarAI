@@ -18,6 +18,10 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
             await expect(input).toBeFocused();
             await trigger.evaluate(e => e.focus());
             await expect(input).toBeFocused();
+            await panel.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }).click();
+            const ticker = panel.getByRole('combobox');
+            await expect(ticker).toBeVisible();
+            expect((await ticker.boundingBox())!.width).toBeGreaterThanOrEqual(72);
             await input.fill('Borrador de prueba, sin enviar');
             await panel.getByRole('button', { name: 'Maximizar el cerebro' }).click();
             await expect.poll(async () => Math.round((await panel.boundingBox())!.x)).toBe(16);

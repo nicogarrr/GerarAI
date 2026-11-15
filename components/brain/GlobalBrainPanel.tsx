@@ -176,7 +176,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         <>
             <Eye aria-hidden="true" className="h-3.5 w-3.5 shrink-0 sm:hidden" />
             <span aria-hidden="true" className="min-w-0 truncate sm:hidden">{viewing}</span>
-            <span className="sr-only sm:not-sr-only">{viewingText}</span>
+            <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">{viewingText}</span>
         </>
     ) : null;
 
@@ -301,7 +301,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             ref={setDialogRef}
             aria-labelledby="global-brain-title"
             aria-busy={loading}
-            className={`fixed z-50 m-0 h-auto w-auto max-h-none max-w-none open:flex flex-col rounded-lg border border-indigo-500/30 p-0 text-card-foreground shadow-2xl transition-all duration-300 motion-reduce:transition-none [&:modal]:overscroll-contain backdrop:bg-transparent backdrop:overflow-hidden backdrop:overscroll-contain ${isMaximized
+            className={`[&_[data-slot=popover-content]]:min-w-56 fixed z-50 m-0 h-auto w-auto max-h-none max-w-none open:flex flex-col rounded-lg border border-indigo-500/30 p-0 text-card-foreground shadow-2xl transition-all duration-300 motion-reduce:transition-none [&:modal]:overscroll-contain backdrop:bg-transparent backdrop:overflow-hidden backdrop:overscroll-contain ${isMaximized
             ? // Maximizado el panel cubre casi toda la pantalla: fondo sólido,
               // sin transparencia; con /95 la barra inferior se veía detrás
               // del campo de texto (informe UX 29-oct, punto 9).
@@ -312,15 +312,17 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             <DialogPortalContainerProvider value={portalContainer}>
             {/* Móvil (<sm): una sola fila de 60 px con áreas táctiles de 44 px; el
                 título y la pastilla "Viendo" se abrevian a la vista pero conservan
-                el texto completo para lectores de pantalla. Escritorio igual. */}
+                el texto completo para lectores de pantalla. Con selector abierto se reserva su ancho y
+                se truncan las etiquetas, sin perder sus nombres accesibles. */}
             <CardHeader className="shrink-0 gap-2 space-y-0 px-3 py-2 sm:gap-0 sm:space-y-1.5 sm:p-4 border-b border-indigo-500/20 flex flex-row items-center justify-between bg-indigo-900/20">
-                <div className="flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 sm:flex-initial sm:flex-wrap sm:gap-2">
+                <div className={`flex min-w-0 flex-1 flex-nowrap items-center gap-1.5 sm:gap-2 ${showGuideInput || guideTicker ? '' : 'sm:flex-initial sm:flex-wrap'}`}>
                     <BrainGlassesIcon className="h-9 w-9 shrink-0 object-contain" />
-                    <CardTitle as="h2" id="global-brain-title" className="shrink-0 text-sm font-medium">
+                    <CardTitle as="h2" id="global-brain-title" className={`${showGuideInput || guideTicker ? 'min-w-0 shrink truncate' : 'shrink-0'} text-sm font-medium`}>
                         <span aria-hidden="true" className="sm:hidden">{t('brain.panel.titleShort')}</span>
-                        <span className="sr-only sm:not-sr-only">{t('brain.panel.title')}</span>
+                        <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">{t('brain.panel.title')}</span>
                     </CardTitle>
                     {showGuideInput || guideTicker ? (
+                        <div className="w-[4.5rem] shrink-0 sm:w-20">
                         <TickerSearchInput
                             value={guideTicker}
                             onValueChange={(value) => { onClearKnowledge(); setGuideTicker(value); setReviewId(undefined); }}
@@ -330,6 +332,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                             ariaLabel={t('brain.panel.tickerAria')}
                             className="w-full min-w-0 rounded-full border border-slate-700 bg-slate-900 px-2 text-slate-200"
                         />
+                        </div>
                     ) : (
                         <button
                             type="button"
