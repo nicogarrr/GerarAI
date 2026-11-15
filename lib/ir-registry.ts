@@ -64,7 +64,14 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         name: 'Brookfield Corporation',
         section: { url: 'https://bn.brookfield.com/reports-filings/quarterly-results', labelKey: 'quarterlyResults' },
         events: [
-            { date: '2026-11-12', period: 'T3 2026', url: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast' },
+            {
+                date: '2026-11-12',
+                period: 'T3 2026',
+                url: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast',
+                assets: [
+                    { kind: 'presentacion', url: 'https://bn.brookfield.com/sites/brookfield-bn-v2/files/Brookfield-BN-IR-V2/2026/Q3/2026-q3-bn-supplemental.pdf', source: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast' },
+                ],
+            },
             {
                 date: '2026-08-13',
                 period: 'T2 2026',
@@ -80,8 +87,19 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     TSLA: {
         name: 'Tesla',
         section: { url: 'https://ir.tesla.com/', labelKey: 'documentsAndEvents' },
-        events: [],
-        verifiedOn: '2026-10-21',
+        events: [
+            // Tesla no tiene pagina por evento: la tabla de ir.tesla.com enlaza deck y webcast del trimestre.
+            {
+                date: '2026-10-21',
+                period: 'T3 2026',
+                url: 'https://ir.tesla.com/',
+                assets: [
+                    { kind: 'presentacion', url: 'https://assets-ir.tesla.com/tesla-contents/IR/TSLA-Q3-2026-Update.pdf', source: 'https://ir.tesla.com/' },
+                    { kind: 'webcast', url: 'https://ir.tesla.com/webcast-2026-10-21', source: 'https://ir.tesla.com/' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-15',
     },
     ASTS: {
         name: 'AST SpaceMobile',
@@ -120,8 +138,10 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     'CGEO.L': {
         name: 'Georgia Capital',
         section: { url: 'https://georgiacapital.ge/investor-relations/financial-results', labelKey: 'resultsAndReports' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            { date: '2026-10-28', period: 'T3 2026', url: 'https://georgiacapital.ge/news/company-news/1324-georgia-capital-plc-3q26-and-9m26-results' },
+        ],
+        verifiedOn: '2026-11-15',
     },
     KRKNF: {
         name: 'Kraken Robotics',
@@ -149,8 +169,17 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     KKR: {
         name: 'KKR & Co.',
         section: { url: 'https://ir.kkr.com/', labelKey: 'eventsAndPresentations' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            {
+                date: '2026-11-09',
+                period: 'T3 2026',
+                url: 'https://ir.kkr.com/media/document/39297093-8255-4c8f-aae0-597950d1d2e8/assets/KKR_Q326_Earnings_Release.pdf?disposition=inline',
+                assets: [
+                    { kind: 'transcripcion', url: 'https://ir.kkr.com/media/document/a67ddf30-f2ff-44ff-be19-b57a090a95bb/assets/KKR_Q326_Earnings_Transcript.pdf?disposition=inline', source: 'https://ir.kkr.com/events-presentations' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-15',
     },
     POOL: {
         name: 'Pool Corporation',
@@ -200,6 +229,199 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
             { date: '2026-11-12', period: 'T3 2026', url: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
         ],
         verifiedOn: '2026-11-09',
+    },
+    AMZN: {
+        name: 'Amazon.com',
+        section: { url: 'https://ir.aboutamazon.com/quarterly-results/default.aspx', labelKey: 'quarterlyResults' },
+        events: [
+            {
+                date: '2026-10-29',
+                period: 'T3 2026',
+                url: 'https://ir.aboutamazon.com/news-release/news-release-details/2026/Amazon-com-Announces-Third-Quarter-Results/default.aspx',
+                assets: [
+                    { kind: 'grabacion', url: 'https://ir.aboutamazon.com/files/doc_earnings/2026/q3/Q3-2026-Amazon-Earnings-Conference-Call.mp3', source: 'https://ir.aboutamazon.com/events/event-details/2026/Q3-2026-Amazoncom-Inc-Earnings-Conference-Call/default.aspx' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    SCHW: {
+        name: 'Charles Schwab',
+        section: { url: 'https://www.aboutschwab.com/investor-relations', labelKey: 'investorRelations' },
+        events: [
+            { date: '2026-10-15', period: 'T3 2026', url: 'https://pressroom.aboutschwab.com/press-releases/press-release/2026/Schwab-Delivers-Record-Net-New-Assets--Earnings/default.aspx' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    SPGI: {
+        name: 'S&P Global',
+        section: { url: 'https://investor.spglobal.com/', labelKey: 'investorRelations' },
+        events: [
+            { date: '2026-10-27', period: 'T3 2026', url: 'https://investor.spglobal.com/news-releases/news-details/2026/SP-Global-Reports-Third-Quarter-Results-Announces-Strategic-Review-for-Capital-IQ-and-Associated-Data-Businesses/default.aspx' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    GFL: {
+        name: 'GFL Environmental',
+        section: { url: 'https://investors.gflenv.com/', labelKey: 'investorRelations' },
+        events: [
+            { date: '2026-10-28', period: 'T3 2026', url: 'https://investors.gflenv.com/English/news/news-details/2026/GFL-Environmental-Reports-Third-Quarter-2026-Results-and-Raises-Full-Year-2026-Guidance/default.aspx' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    REXR: {
+        name: 'Rexford Industrial',
+        section: { url: 'https://ir.rexfordindustrial.com/', labelKey: 'investorRelations' },
+        events: [
+            {
+                date: '2026-10-22',
+                period: 'T3 2026',
+                url: 'https://ir.rexfordindustrial.com/news-events/press-releases/detail/381/rexford-industrial-announces-third-quarter-2026-financial-results',
+                assets: [
+                    { kind: 'presentacion', url: 'https://d1io3yog0oux5.cloudfront.net/_aedb72fc8626441a86045b167edcc762/rexfordindustrial/db/944/9733/earnings_presentation/Earnings+Deck+Q3+2026+vF.pdf', source: 'https://ir.rexfordindustrial.com/news-events/events-webcasts/detail/20261023-third-quarter-2026-earnings-conference-call' },
+                    { kind: 'webcast', url: 'https://events.q4inc.com/attendee/238759897/guest', source: 'https://ir.rexfordindustrial.com/news-events/events-webcasts/detail/20261023-third-quarter-2026-earnings-conference-call' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    JOE: {
+        name: 'St. Joe',
+        section: { url: 'https://www.joe.com/investor-relations', labelKey: 'investorRelations' },
+        events: [
+            { date: '2026-10-28', period: 'T3 2026', url: 'https://ir.joe.com/news-releases/news-release-details/st-joe-company-reports-third-quarter-and-first-nine-months-2026/' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    CSL: {
+        name: 'Carlisle',
+        section: { url: 'https://www.carlisle.com/investors', labelKey: 'investorRelations' },
+        events: [
+            { date: '2026-10-28', period: 'T3 2026', url: 'https://www.carlisle.com/investors/news/press-release-details/2026/Carlisle-Companies-Reports-Third-Quarter-Results/default.aspx' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    BR: {
+        name: 'Broadridge',
+        section: { url: 'https://www.broadridge-ir.com/', labelKey: 'investorRelations' },
+        events: [
+            // Broadridge cierra su ejercicio fiscal en junio: es el T1 del ejercicio 2027.
+            { date: '2026-11-03', period: 'T1 fiscal 2027', url: 'https://www.broadridge-ir.com/news/news-details/2026/Broadridge-Reports-First-Quarter-Fiscal-2027-Results/default.aspx' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    ALX: {
+        name: "Alexander's",
+        section: { url: 'https://alx-inc.com/press-release/', labelKey: 'pressReleases' },
+        events: [
+            { date: '2026-11-02', period: 'T3 2026', url: 'https://alx-inc.com/press-release/news-details/2026/Alexanders-AnnouncesThird-Quarter-Financial-Results/default.aspx' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    'CNQ.TO': {
+        name: 'Canadian Natural Resources',
+        section: { url: 'https://www.cnrl.com/investors', labelKey: 'investorRelations' },
+        events: [
+            { date: '2026-11-05', period: 'T3 2026', url: 'https://www.cnrl.com/news-releases/canadian-natural-announces-2026-third-quarter-results/' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    'FFH.TO': {
+        name: 'Fairfax Financial',
+        section: { url: 'https://www.fairfax.ca/category/press-releases/', labelKey: 'pressReleases' },
+        events: [
+            { date: '2026-11-03', period: 'T3 2026', url: 'https://www.fairfax.ca/press-releases/fairfax-financial-holdings-limited-financial-results-for-the-third-quarter/' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    AMRZ: {
+        name: 'Amrize',
+        section: { url: 'https://investors.amrize.com/', labelKey: 'investorRelations' },
+        events: [
+            {
+                date: '2026-10-28',
+                period: 'T3 2026',
+                url: 'https://investors.amrize.com/news/detail/141/amrize-reports-third-quarter-2026-results',
+                assets: [
+                    { kind: 'transcripcion', url: 'https://investors.amrize.com/_assets/_72932955d4a0fda3f58c771077dfbe6d/amrize/db/938/9666/webcast_transcript/Amrize_Q3_2026_Earnings_Call_Transcript.pdf', source: 'https://investors.amrize.com/news/detail/141/amrize-reports-third-quarter-2026-results' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    FRPH: {
+        // FRP Holdings cotiza como FRPH; su web IR es la de FRP Development.
+        name: 'FRP Development (FRPH)',
+        section: { url: 'https://investors.frpdev.com/quarterly-reports', labelKey: 'quarterlyResults' },
+        events: [
+            {
+                date: '2026-11-05',
+                period: 'T3 2026',
+                url: 'https://investors.frpdev.com/quarterly-reports',
+                assets: [
+                    { kind: 'webcast', url: 'https://www.webcaster5.com/Webcast/Page/3158/54642', source: 'https://investors.frpdev.com/quarterly-reports' },
+                    { kind: 'presentacion', url: 'https://irp.cdn-website.com/fa80a5ca/files/uploaded/FRPH+Earnings+Deck+Q3-26+v1+BW.pdf', source: 'https://investors.frpdev.com/quarterly-reports' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    'GCC.MX': {
+        name: 'GCC',
+        section: { url: 'https://ir.gcc.com/en/financiera/overview', labelKey: 'quarterlyResults' },
+        events: [
+            // Sin pagina por evento: la pagina trimestral lista la presentacion y la transcripcion del 3T26.
+            {
+                date: '2026-10-27',
+                period: 'T3 2026',
+                url: 'https://www.gcc.investorcloud.net/en/financiera/overview/trimestrales',
+                assets: [
+                    { kind: 'presentacion', url: 'https://cdn.investorcloud.net/gcc/InformacionFinanciera/Presentaciones/GCC-Q3-2026-Conference-Call.pdf', source: 'https://www.gcc.investorcloud.net/en/financiera/overview/trimestrales' },
+                    { kind: 'transcripcion', url: 'https://cdn.investorcloud.net/gcc/InformacionFinanciera/InformacionTrimestral/ConferenceCall/GCC-Q3-2026-Call-Transcript-.pdf', source: 'https://www.gcc.investorcloud.net/en/financiera/overview/trimestrales' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    'WOSG.L': {
+        name: 'Watches of Switzerland',
+        section: { url: 'https://www.thewosgroupplc.com/news-media/', labelKey: 'pressReleases' },
+        events: [
+            // Su ejercicio fiscal cierra en abril: esto es el trading update del primer semestre FY27.
+            { date: '2026-11-10', period: 'S1 F2027', url: 'https://www.thewosgroupplc.com/media/fvknqdcx/h1-fy27-trading-update.pdf' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    'MICC.AS': {
+        name: 'The Magnum Ice Cream Company',
+        section: { url: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html', labelKey: 'resultsAndReports' },
+        events: [
+            { date: '2026-10-29', period: 'T3 2026', url: 'https://news.magnumicecream.com/q3-2026-trading-update/' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    'SFC.TO': {
+        name: 'Sagicor Financial',
+        section: { url: 'https://investors.sagicor.com/', labelKey: 'investorRelations' },
+        events: [
+            { date: '2026-11-11', period: 'T3 2026', url: 'https://investors.sagicor.com/2026-11-11-Sagicor-Financial-Reports-Third-Quarter-2026-Results' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    'ERF.PA': {
+        name: 'Eurazeo',
+        section: { url: 'https://www.eurazeo.com/en/shareholders/results-center', labelKey: 'resultsAndReports' },
+        events: [
+            // Trading update 9M (Eurazeo no publica resultados trimestrales completos).
+            { date: '2026-11-05', period: '9M 2026', url: 'https://www.eurazeo.com/sites/default/files/2026-11/Q3-2026-eurazeo-press%20release_.pdf' },
+        ],
+        verifiedOn: '2026-11-15',
+    },
+    SKYH: {
+        name: 'Sky Harbour',
+        section: { url: 'https://ir.skyharbour.group/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-15',
     },
 };
 

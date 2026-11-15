@@ -69,10 +69,14 @@ describe('irLinksFor', () => {
         expect(irLinksFor('NOEXISTE', '2026-11-08')).toBeNull();
     });
 
-    it('cubre las posiciones y watchlist registradas el 2026-11-09', () => {
+    it('cubre las posiciones y watchlist registradas el 2026-11-15', () => {
         // Guard anti-regresion: cada ticker registrado responde con su seccion oficial.
-        for (const ticker of ['META', 'BN', 'TSLA', 'ASTS', 'ZETA', 'CGEO.L', 'KRKNF', 'BABA', 'BWMX', 'KKR', 'POOL', 'CB', 'CPT', 'UBER', 'RKLB', 'ONDS']) {
-            expect(irLinksFor(ticker, '2026-11-08')?.section.url, ticker).toMatch(/^https:\/\//);
+        for (const ticker of [
+            'META', 'BN', 'TSLA', 'ASTS', 'ZETA', 'CGEO.L', 'KRKNF', 'BABA', 'BWMX', 'KKR', 'POOL', 'CB', 'CPT', 'UBER', 'RKLB', 'ONDS',
+            'AMZN', 'SCHW', 'SPGI', 'GFL', 'REXR', 'JOE', 'CSL', 'BR', 'ALX', 'CNQ.TO', 'FFH.TO', 'AMRZ', 'FRPH', 'GCC.MX', 'WOSG.L',
+            'MICC.AS', 'SFC.TO', 'ERF.PA', 'SKYH',
+        ]) {
+            expect(irLinksFor(ticker, '2026-11-15')?.section.url, ticker).toMatch(/^https:\/\//);
         }
     });
 
@@ -123,9 +127,56 @@ describe('irLinksFor', () => {
     });
 
     it('una entrada sin eventos devuelve seccion y eventPage null', () => {
-        const links = irLinksFor('TSLA', '2026-10-22');
+        const links = irLinksFor('KRKNF', '2026-10-22');
         expect(links?.eventPage).toBeNull();
-        expect(links?.section.url).toBe(IR_REGISTRY.TSLA.section.url);
+        expect(links?.section.url).toBe(IR_REGISTRY.KRKNF.section.url);
+    });
+
+    it('TSLA enlaza deck y webcast del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('TSLA', '2026-10-21');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
+        expect(irLiveAssetFor('TSLA', '2026-10-21')?.asset.url).toBe('https://ir.tesla.com/webcast-2026-10-21');
+        expect(irLinksFor('TSLA', '2026-10-22')?.eventPage).toBeNull();
+    });
+
+    it('KKR enlaza la transcripcion del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('KKR', '2026-11-09');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['transcripcion']);
+        expect(irLinksFor('KKR', '2026-11-10')?.eventPage).toBeNull();
+    });
+
+    it.each([
+        ['AMZN', '2026-10-29', ['grabacion']],
+        ['REXR', '2026-10-22', ['presentacion', 'webcast']],
+        ['AMRZ', '2026-10-28', ['transcripcion']],
+        ['FRPH', '2026-11-05', ['webcast', 'presentacion']],
+        ['GCC.MX', '2026-10-27', ['presentacion', 'transcripcion']],
+    ])('los materiales del T3 2026 de %s enlazan solo en su dia exacto', (ticker, date, kinds) => {
+        const exact = irLinksFor(ticker, date);
+        expect(exact?.eventPage?.period, ticker).toBe('T3 2026');
+        expect(exact?.eventPage?.assets.map((a) => a.kind), ticker).toEqual(kinds);
+        expect(irLinksFor(ticker, '2026-12-31')?.eventPage, ticker).toBeNull();
+    });
+
+    it.each([
+        ['SCHW', '2026-10-15', 'aboutschwab.com'],
+        ['SPGI', '2026-10-27', 'spglobal.com'],
+        ['GFL', '2026-10-28', 'gflenv.com'],
+        ['JOE', '2026-10-28', 'ir.joe.com'],
+        ['CSL', '2026-10-28', 'carlisle.com'],
+        ['BR', '2026-11-03', 'broadridge-ir.com'],
+        ['ALX', '2026-11-02', 'alx-inc.com'],
+        ['CNQ.TO', '2026-11-05', 'cnrl.com'],
+        ['FFH.TO', '2026-11-03', 'fairfax.ca'],
+        ['WOSG.L', '2026-11-10', 'thewosgroupplc.com'],
+        ['MICC.AS', '2026-10-29', 'magnumicecream.com'],
+        ['SFC.TO', '2026-11-11', 'sagicor.com'],
+        ['ERF.PA', '2026-11-05', 'eurazeo.com'],
+        ['CGEO.L', '2026-10-28', 'georgiacapital.ge'],
+    ])('el evento de %s enlaza solo en su dia exacto', (ticker, date, host) => {
+        const exact = irLinksFor(ticker, date);
+        expect(exact?.eventPage?.url, ticker).toContain(host);
+        expect(irLinksFor(ticker, '2026-12-31')?.eventPage, ticker).toBeNull();
     });
 
     it('los assets del evento llegan con su tipo', () => {
