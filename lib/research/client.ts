@@ -6,6 +6,9 @@ import { AppError, ExternalAPIError } from '@/lib/types/errors';
 import { researchErrorDetail, researchErrorFields } from '@/lib/research/error-detail';
 import { researchRetryAfterSeconds } from '@/lib/research/rate-limit';
 
+// Only pending network reads are coalesced, never settled response data.
+const pendingReads = new Map<string, Promise<Response>>();
+
 const BACKEND_URL = process.env.FMP_BACKEND_URL ?? 'http://localhost:8000';
 
 /**
@@ -124,17 +127,39 @@ export async function researchRequest<T>(
     return headers;
   };
 
-  const doFetch = async () =>
-    fetch(`${BACKEND_URL}${path}`, {
+  const doFetch = async () => {
+    const headers = await buildHeaders();
+    const fetchInit = {
       ...requestInit,
       body: normalized.body ?? undefined,
-      headers: await buildHeaders(),
+      headers,
       cache: requestInit.cache ?? 'no-store',
-      // Sin timeout un backend colgado deja la página entera esperando.
-      // El presupuesto es ÚNICO para toda la operación (retry 429 incluido):
-      // cada intento recibe solo el tiempo que queda hasta el deadline.
       signal: requestSignal(requestInit.signal, remainingMs()),
-    });
+    };
+    // Scope to the verified signed principal, language and every other stable
+    // header. A fresh nonce/signature does not make an otherwise identical GET
+    // distinct. Unknown/unsigned identities and caller-owned cancellation are
+    // never shared. Writes are never shared, even when their body is identical.
+    const tenant = headers.get('X-CavaAI-Tenant');
+    const user = headers.get('X-CavaAI-User');
+    const mayShare = method === 'GET' && tenant && user && !requestInit.signal
+      && normalized.body == null
+      && Object.keys(requestInit).every(key => ['method', 'headers', 'cache'].includes(key));
+    if (!mayShare) return fetch(`${BACKEND_URL}${path}`, fetchInit);
+    const volatile = new Set(['x-cavaai-nonce', 'x-cavaai-timestamp', 'x-cavaai-signature', 'x-cavaai-email-signature']);
+    const stableHeaders = Array.from(headers.entries()).filter(([name]) => !volatile.has(name));
+    const key = JSON.stringify([BACKEND_URL, method, path, timeoutMs, fetchInit.cache, stableHeaders]);
+    let pending = pendingReads.get(key);
+    if (!pending) {
+      pending = fetch(`${BACKEND_URL}${path}`, fetchInit);
+      pendingReads.set(key, pending);
+      // Cleanup on both success and failure, without an unhandled finally()
+      // rejection. No result survives the end of this pending network read.
+      void pending.then(() => pendingReads.delete(key), () => pendingReads.delete(key));
+    }
+    // Response bodies are one-shot streams. Each caller gets its own clone.
+    return (await pending).clone();
+  };
 
   // Deadline compartido: el peor caso real (intento + espera 429 + reintento)
   // queda acotado por timeoutMs en lugar de multiplicarlo. Sin esta cota un
@@ -155,19 +180,21 @@ export async function researchRequest<T>(
   let response: Response;
   try {
     response = await doFetch();
-    // 429 = ráfaga legítima contra el rate-limit, no un fallo: un único
-    // retry con backoff (Retry-After, máx 5s) en métodos idempotentes evita
-    // la pantalla de error genérica por navegar rápido. La espera también
-    // sale del mismo presupuesto: si no queda tiempo para esperar y aún
-    // lanzar el reintento, se devuelve el 429 tal cual (error honesto, sin
-    // gastar más cuota de función que timeoutMs).
+    // One retry at most, only after the FULL positive Retry-After. Missing,
+    // invalid, zero and negative values use a safe 60s fallback. If the wait
+    // does not fit the caller's existing deadline, surface 429 immediately.
+    // Never turn a 60s lockout into repeated 5s retries.
     if (response.status === 429 && (method === 'GET' || method === 'HEAD')) {
-      const retryAfter = Number(response.headers.get('Retry-After') ?? '1');
-      const waitMs = Math.min(Number.isFinite(retryAfter) ? retryAfter : 1, 5) * 1000;
+      const raw = response.headers.get('Retry-After');
+      const numeric = raw?.trim() ? Number(raw) : NaN;
+      const seconds = Number.isFinite(numeric) ? numeric : raw ? (Date.parse(raw) - Date.now()) / 1000 : NaN;
+      const waitMs = Number.isFinite(seconds) && seconds > 0 ? Math.ceil(seconds * 1000) : 60_000;
       const budgetLeftMs = deadlineMs - Date.now();
       if (budgetLeftMs > waitMs + 250) {
+        // Release the rejected body's stream before waiting.
+        void response.body?.cancel().catch(() => {});
         await new Promise((resolve) => setTimeout(resolve, waitMs));
-        response = await doFetch();
+        if (!requestInit.signal?.aborted && deadlineMs - Date.now() > 250) response = await doFetch();
       }
     }
   } catch (error) {

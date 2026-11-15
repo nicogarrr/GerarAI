@@ -10,22 +10,22 @@ describe('DcaPreparingRefresh compartido', () => {
   beforeEach(() => { vi.useFakeTimers(); refresh.mockClear(); });
   afterEach(() => { cleanup(); vi.useRealTimers(); });
 
-  it('dos tarjetas preparando a la vez: un solo refresco cada 15 s, mismo tope de 5 min', () => {
+  it('dos tarjetas preparando no provocan refrescos de pagina', () => {
     render(<><DcaPreparingRefresh /><DcaPreparingRefresh /></>);
     act(() => { vi.advanceTimersByTime(15_000); });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(15_000 * 40); });
-    expect(refresh).toHaveBeenCalledTimes(20);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
-  it('si una tarjeta termina, la otra sigue refrescando; sin ninguna, para', () => {
+  it('montar y desmontar tarjetas nunca reinicia un presupuesto de refrescos', () => {
     const one = render(<DcaPreparingRefresh />);
     const two = render(<DcaPreparingRefresh />);
     one.unmount();
     act(() => { vi.advanceTimersByTime(15_000); });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
     two.unmount();
     act(() => { vi.advanceTimersByTime(60_000); });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
   });
 });
