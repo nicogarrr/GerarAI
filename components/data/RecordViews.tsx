@@ -11,6 +11,7 @@ import { showErrorToast } from '@/lib/toast';
 import { useT } from '@/lib/i18n/client';
 import type { TranslateFn } from '@/lib/i18n/translate';
 import { Pager } from '@/components/research/Pager';
+import { useViewportDedup } from '@/components/ui/viewport-dedup';
 
 export type DataRecord = Record<string, unknown>;
 
@@ -209,6 +210,7 @@ export function RecordList({
     // `rowActions` y `replaceRecord` siguen siendo los de la lista completa,
     // o un «Aplicar» en página 2 parchearía la fila equivocada.
     const [page, setPage] = useState(1);
+    const viewport = useViewportDedup('(min-width: 768px)');
     const pages = pageSize ? Math.max(1, Math.ceil(records.length / pageSize)) : 1;
     const currentPage = Math.min(page, pages);
     const pageStart = pageSize ? (currentPage - 1) * pageSize : 0;
@@ -272,7 +274,10 @@ export function RecordList({
                 ) : (
                     <>
                         {pager}
-                        {/* Escritorio: tabla completa, con la region de scroll enfocada por teclado */}
+                        {/* Escritorio: tabla completa, con la region de scroll enfocada por teclado.
+                            SSR/primera pintada: ambos arboles (sin flash); tras montar solo el del
+                            viewport activo (scorecard v1, hallazgo 4). El oculto por CSS no se monta. */}
+                        {viewport !== 'mobile' ? (
                         <div className="hidden overflow-x-auto md:block">
                             <Table regionLabel={title}>
                                 <TableCaption className="sr-only">{title}</TableCaption>
@@ -319,7 +324,9 @@ export function RecordList({
                                 </TableBody>
                             </Table>
                         </div>
+                        ) : null}
                         {/* Móvil: cards equivalentes, sin scroll horizontal */}
+                        {viewport !== 'desktop' ? (
                         <ul className="space-y-3 md:hidden">
                             {visibleRecords.map((record, localIndex) => {
                                 const index = pageStart + localIndex;
@@ -356,6 +363,7 @@ export function RecordList({
                                 );
                             })}
                         </ul>
+                        ) : null}
                         {pager}
                     </>
                 )}
