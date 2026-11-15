@@ -144,7 +144,7 @@ export function AnalystHistoryView({ data }: { data: AnalystHistory | null }) {
                         </p>
                     ) : null}
                     <p className="mt-2 break-words text-xs text-gray-500">
-                        {t('research.analystHistory.footer', { source: data.source ?? 'Yahoo Finance', date: fmt.formatUserDateTime(data.fetched_at * 1000) })}
+                        {t('research.analystHistory.dataQuality')}
                     </p>
                 </>
             )}

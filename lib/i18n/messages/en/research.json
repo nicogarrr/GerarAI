@@ -1400,7 +1400,7 @@
     "consensusWhy": "We show the simple mean: in our backtest, weighting by past accuracy did not improve it.",
     "ratingChanges": "Rating changes in the last {days} days: {up} up, {down} down.",
     "contrarianNote": "For information: in our study of 21 software stocks, after a rating change the stock tended to move the other way. It is not a validated signal.",
-    "footer": "Source: {source}. Computed on {date}. Third-party data; targets are split-adjusted."
+    "dataQuality": "Third-party data; price targets are adjusted for splits."
   },
   "thesisApprove": {
     "reason": {

@@ -88,12 +88,29 @@ describe('AnalystHistoryView', () => {
     expect(consensus).toHaveTextContent('frente a 175,4');
     // Las advertencias de veracidad siguen presentes
     expect(screen.getByTestId('analyst-history-rating-note')).toHaveTextContent('No es una señal validada');
-    expect(screen.getByText(/Fuente: Yahoo Finance \(no oficial\)/)).toBeInTheDocument();
+    expect(screen.queryByText(/Fuente:/)).not.toBeInTheDocument();
   });
 
   it('loading skeleton announces itself', () => {
     es(<AnalystHistorySkeleton />);
     expect(screen.getByTestId('analyst-history-loading')).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByRole('status')).toHaveTextContent('Calculando');
+  });
+});
+
+
+describe('AnalystHistoryView fallback branches', () => {
+  it('handles no matured targets and an explicitly unavailable payload', () => {
+    const r=es(<AnalystHistoryView data={{...available,note_code:'no_matured',consensus:null,rating_changes:null}}/>);
+    expect(screen.queryByTestId('analyst-history-stats')).not.toBeInTheDocument();r.unmount();
+    es(<AnalystHistoryView data={{...available,status:'unavailable'}}/>);expect(screen.getByRole('status')).toHaveTextContent('No se pudo consultar');
+  });
+  it.each([-10,0,null])('formats sparse horizon data and consensus upside %s', (upside) => {
+    es(<AnalystHistoryView data={{...available,currency:' ',best_horizon:null,source:null,rating_changes:{window_days:null,upgrades:null,downgrades:1},horizons:[{...available.horizons[0],horizon:'12m',direction_hit_rate:null,median_abs_error_pct:null,small_sample_firms:0,top:[{...firm('Sparse',0),relative_error:null}],bottom:[]}],consensus:{...available.consensus!,upside_percent:upside,reference_price:0}} as unknown as AnalystHistory}/>);
+    expect(screen.getByTestId('analyst-history-consensus')).toBeInTheDocument();expect(screen.getByText('Sparse')).toBeInTheDocument();
+  });
+  it('accepts a payload without horizons, rating changes or currency',()=>{
+    es(<AnalystHistoryView data={{...available,horizons:undefined,best_horizon:null,currency:null,consensus:null,rating_changes:null} as unknown as AnalystHistory}/>);
+    expect(screen.queryByTestId('analyst-history-stats')).not.toBeInTheDocument();
   });
 });

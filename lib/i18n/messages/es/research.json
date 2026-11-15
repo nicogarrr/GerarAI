@@ -1400,7 +1400,7 @@
     "consensusWhy": "Mostramos la media simple: en nuestro backtest, ponderar por el acierto pasado no la mejoró.",
     "ratingChanges": "Cambios de recomendación en {days} días: {up} al alza y {down} a la baja.",
     "contrarianNote": "Informativo: en nuestro estudio de 21 valores de software, tras un cambio de recomendación la acción tendió a moverse al contrario. No es una señal validada.",
-    "footer": "Fuente: {source}. Calculado el {date}. Datos de terceros; los objetivos se ajustan por splits."
+    "dataQuality": "Datos de terceros; los objetivos se ajustan por splits."
   },
   "thesisApprove": {
     "reason": {
