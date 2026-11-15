@@ -76,3 +76,23 @@ describe('semántica de tabla explícita (display responsivo)', () => {
         expect(container.querySelector('tfoot')).toHaveAttribute('role', 'rowgroup');
     });
 });
+
+describe('regionClassName (altura maxima de la region de scroll)', () => {
+    it('aplica clases extra al contenedor con scroll sin tocar la tabla', () => {
+        const { container } = render(
+            <Table regionClassName="xl:max-h-[80vh] xl:overflow-y-auto">
+                <TableBody>
+                    <TableRow>
+                        <TableCell>x</TableCell>
+                    </TableRow>
+                </TableBody>
+            </Table>,
+        );
+        const region = container.querySelector('[data-slot="table-region"]');
+        expect(region).not.toBeNull();
+        expect(region!.className).toContain('xl:max-h-[80vh]');
+        expect(region!.className).toContain('xl:overflow-y-auto');
+        expect(region!.className).toContain('overflow-x-auto');
+        expect(container.querySelector('table')!.className).not.toContain('xl:max-h');
+    });
+});

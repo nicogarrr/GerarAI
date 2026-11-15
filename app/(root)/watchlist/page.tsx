@@ -581,29 +581,32 @@ export default async function WatchlistPage({
                         medido en prod, 2026-11-14). El contenido visible en cada
                         viewport es el de antes. */}
                     <div className="overflow-hidden rounded-lg border-gray-700 bg-gray-900/50 max-xl:border-0 xl:border">
-                        <Table className="block xl:table" regionLabel={t('watchlist.page.tableRegion')}>
+                        <Table className="block xl:table" regionLabel={t('watchlist.page.tableRegion')} regionClassName="xl:max-h-[80vh] xl:overflow-y-auto">
                             <TableCaption className="sr-only">{t('watchlist.page.tableCaption')}</TableCaption>
+                            {/* Cabecera fija al hacer scroll dentro de la region en xl
+                                (Modern Web Guidance, responsive-table): cada celda lleva
+                                fondo opaco propio porque el sticky sale del flujo del thead. */}
                             <TableHeader className="hidden bg-gray-800/80 xl:table-header-group">
                                 <TableRow className="border-gray-700 hover:bg-gray-800/80">
-                                    <TableHead className="text-gray-300" aria-sort={ariaSortFor('symbol')}>
+                                    <TableHead className="text-gray-300 xl:sticky xl:top-0 xl:z-10 xl:bg-gray-800" aria-sort={ariaSortFor('symbol')}>
                                         <Link href={sortHref('symbol')} className="inline-flex min-h-[44px] items-center gap-1 hover:text-gray-100">{t('watchlist.page.sort.symbol')}{sortIndicator('symbol')}</Link>
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('price')}>
+                                    <TableHead className="text-right text-gray-300 xl:sticky xl:top-0 xl:z-10 xl:bg-gray-800" aria-sort={ariaSortFor('price')}>
                                         <Link href={sortHref('price')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.price')}{sortIndicator('price')}</Link>
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('change')}>
+                                    <TableHead className="text-right text-gray-300 xl:sticky xl:top-0 xl:z-10 xl:bg-gray-800" aria-sort={ariaSortFor('change')}>
                                         <Link href={sortHref('change')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.change')}{sortIndicator('change')}</Link>
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('marketCap')}>
+                                    <TableHead className="text-right text-gray-300 xl:sticky xl:top-0 xl:z-10 xl:bg-gray-800" aria-sort={ariaSortFor('marketCap')}>
                                         <Link href={sortHref('marketCap')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.marketCap')}{sortIndicator('marketCap')}</Link>
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('pe')}>
+                                    <TableHead className="text-right text-gray-300 xl:sticky xl:top-0 xl:z-10 xl:bg-gray-800" aria-sort={ariaSortFor('pe')}>
                                         <Link href={sortHref('pe')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.pe')}{sortIndicator('pe')}</Link>
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" title={t('watchlist.page.analystTitle')}>
+                                    <TableHead className="text-right text-gray-300 xl:sticky xl:top-0 xl:z-10 xl:bg-gray-800" title={t('watchlist.page.analystTitle')}>
                                         {t('watchlist.page.analystTarget')}
                                     </TableHead>
-                                    <TableHead className="text-right text-gray-300" aria-sort={ariaSortFor('earnings')}>
+                                    <TableHead className="text-right text-gray-300 xl:sticky xl:top-0 xl:z-10 xl:bg-gray-800" aria-sort={ariaSortFor('earnings')}>
                                         <Link href={sortHref('earnings')} className="inline-flex min-h-[44px] items-center justify-end gap-1 hover:text-gray-100">{t('watchlist.page.sort.earnings')}{sortIndicator('earnings')}</Link>
                                     </TableHead>
 

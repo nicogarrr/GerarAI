@@ -32,17 +32,25 @@ type TableProps = React.HTMLAttributes<HTMLTableElement> &
      * tabulacion inutil.
      */
     regionLabel?: string
+    /**
+     * Clases extra de la region con scroll (NO de la tabla). Sirve para limitar
+     * la altura (`xl:max-h-[80vh] xl:overflow-y-auto`) cuando las cabeceras van
+     * sticky: sin altura maxima el scroll vertical lo hace la pagina y
+     * `sticky top-0` dentro de `overflow-x-auto` es un no-op (la region no se
+     * desplaza en vertical). Patron responsive-table de Modern Web Guidance.
+     */
+    regionClassName?: string
   }
 
 const Table = React.forwardRef<HTMLTableElement, TableProps>(
-  ({ className, dense = false, regionLabel, ...props }, ref) => (
+  ({ className, dense = false, regionLabel, regionClassName, ...props }, ref) => (
     // `overflow-x-auto` y no `overflow-auto`: con `auto` en ambos ejes el
     // contenedor se lleva el scroll vertical de la pagina al hacer scroll sobre
     // la tabla, y `min-w-0` evita que la tabla ensanche un contenedor flex.
     <div
       data-slot="table-region"
       data-dense={dense ? "" : undefined}
-      className="group/table scroll-affordance-x relative w-full min-w-0 overflow-x-auto"
+      className={cn("group/table scroll-affordance-x relative w-full min-w-0 overflow-x-auto", regionClassName)}
       {...(regionLabel
         ? { role: "region", "aria-label": regionLabel, tabIndex: 0 }
         : null)}
