@@ -5401,9 +5401,9 @@ export interface paths {
          * @description Screener real con cache por parámetros y stale-while-revalidate.
          *
          *     Nunca espera un refresh de red cuando existe LKG: devuelve la respuesta al
-         *     instante y actualiza en segundo plano. En cold start espera como máximo
-         *     50 ms para un primer resultado útil; después devuelve LKG al instante y
-         *     deja el trabajo largo en background.
+         *     instante y actualiza en segundo plano. En cold start tampoco espera al
+         *     refresco: devuelve los datos ya publicados o vacío con refreshing=true
+         *     mientras el trabajo sigue en background.
          *
          *     El `get_db` no es decorativo: los ratios salen de `financial_facts`, que es
          *     TenantOwnedMixin, así que la respuesta depende del tenant. Sin esta
