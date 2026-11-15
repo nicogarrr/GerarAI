@@ -17,7 +17,7 @@ describe('DCA historical evidence display',()=>{
   render(<DcaHitRatesCard data={data()}/>);
   expect(screen.getByRole('table')).toHaveAccessibleName('Porcentaje de meses con señal cuyo cierre era más alto N meses después');
   expect(screen.getByText(/12 meses completados/)).toHaveTextContent('2025-01');
-  expect(screen.getByText('75,0 %')).toBeVisible();expect(screen.getAllByText(/sobre 4 casos/)[0]).toHaveTextContent('subida media 10,0 %');
+  expect(screen.getByText('75,0 %')).toBeVisible();expect(screen.getAllByText(/sobre 4 casos/)[0]).toHaveTextContent('variación media 10,0 %');
   expect(screen.getByText('—')).toBeVisible();expect(screen.getByText(/Solo meses confirmados/)).toHaveTextContent('no la rentabilidad de una cartera');
  });
  it.each([null,'red','#000000','#FFFFFF'])('supports contrasting badge color %s and compact mode',color=>{
@@ -60,10 +60,10 @@ describe('DCA historical evidence display',()=>{
  it('explica qué mide cada número arriba y resume la conclusión de cada señal',()=>{
   render(<DcaHitRatesCard data={data()}/>);
   expect(screen.getByTestId('dca-hit-rates-explainer')).toHaveTextContent('De cada 100 meses con señal');
-  expect(screen.getByTestId('dca-hit-rates-explainer')).toHaveTextContent('subieron de media');
-  // celda legible: «más arriba a 3 meses», «sobre 4 casos», «subida media 10,0 %»
+  expect(screen.getByTestId('dca-hit-rates-explainer')).toHaveTextContent('cómo varió el precio de media');
+  // celda legible: «más arriba a 3 meses», «sobre 4 casos», «variación media 10,0 %»
   expect(screen.getByText('más arriba a 1 mes')).toBeVisible();
-  expect(screen.getAllByText(/sobre 4 casos/)[0]).toHaveTextContent('subida media 10,0 %');
+  expect(screen.getAllByText(/sobre 4 casos/)[0]).toHaveTextContent('variación media 10,0 %');
   // conclusión en una línea por señal (horizonte más largo con dato)
   expect(screen.getByTestId('dca-hit-rates-takeaway-2x')).toHaveTextContent('a 1 m, más arriba el 75,0 % de las veces · sobre 4 casos');
   // sin medias extremas no hay nota de contexto
@@ -72,9 +72,10 @@ describe('DCA historical evidence display',()=>{
  it('contextualiza las medias extremas sin quitar ni suavizar los avisos',()=>{
   const extreme=data();extreme.rows[0].cells[0].avg_return=6.694;
   render(<DcaHitRatesCard data={extreme}/>);
-  expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('pocos casos');
+  expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('pueden ser sensibles a la muestra');
   expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('ventanas solapadas');
-  expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('no una promesa');
+  expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('No son una promesa');
+  expect(screen.getByTestId('dca-hit-rates-extreme')).not.toHaveTextContent('sigue cotizando');
   // avisos de veracidad intactos
   expect(screen.getByText(/Solo meses confirmados/)).toHaveTextContent('no la rentabilidad de una cartera');
  });
