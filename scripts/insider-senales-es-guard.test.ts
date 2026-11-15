@@ -58,10 +58,12 @@ describe('Insider: claves de señal con etiqueta ES', () => {
   });
 
   it('la vista pinta la etiqueta y no la clave cruda', () => {
+    // Tabla responsiva única (2026-11-14): un solo árbol, etiqueta y tooltip una vez.
     const usos = signalsView.match(/signalLabel\(typeof signal\.signal/g) ?? [];
-    assert.equal(usos.length, 2, `la tabla y las tarjetas móviles usan signalLabel (${usos.length}/2)`);
+    assert.equal(usos.length, 1, `la fila única usa signalLabel (${usos.length}/1)`);
     assert.ok(!signalsView.includes('formatRecordValue(signal.signal)'), 'sigue la clave en crudo');
     const tooltips = signalsView.match(/title=\{signalTooltip\(typeof signal\.signal/g) ?? [];
-    assert.equal(tooltips.length, 2, 'los dos badges llevan el tooltip con el umbral');
+    assert.equal(tooltips.length, 1, 'el badge único lleva el tooltip con el umbral');
+    assert.ok(!signalsView.includes('grid grid-cols-1 gap-3 md:hidden'), 'sin tarjetas duplicadas: una fila responsiva por señal');
   });
 });
