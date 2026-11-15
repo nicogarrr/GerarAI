@@ -286,7 +286,7 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                 </TabsContent>
                 <TabsContent value="divisas" className="mt-4">
                     <Panel title={ti('paperTrading.panel.fxPanel')}>
-                        <FxTicket submitFx={submitFx} disabled={!wired} />
+                        <FxTicket submitFx={submitFx} disabled={!wired} account={account} />
                         {!wired ? (
                             <p className="mt-3 text-xs text-gray-500">
                                 {ti('paperTrading.panel.notWired')}

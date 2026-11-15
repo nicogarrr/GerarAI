@@ -199,6 +199,7 @@
     "formatHint": "Decimals with dot or comma, no thousands separator (1234.56).",
     "note": "Simulated conversion with the rate you enter; the demo does not query the market.",
     "receivePart": " You would receive {amount}.",
+    "guidanceCash": "Available cash: {cash}",
     "amountInvalid": "The amount is not a valid number ({hint}).",
     "amountPositive": "Enter an amount greater than zero.",
     "rateInvalid": "The exchange rate is not a valid number ({hint}).",

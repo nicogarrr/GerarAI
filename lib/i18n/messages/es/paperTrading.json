@@ -199,6 +199,7 @@
     "formatHint": "Decimales con coma o punto, sin separador de miles (1234,56).",
     "note": "Conversión simulada con el tipo que introduces tú; la demo no consulta el mercado.",
     "receivePart": " Recibirías {amount}.",
+    "guidanceCash": "Saldo disponible: {cash}",
     "amountInvalid": "El importe no es un número válido ({hint}).",
     "amountPositive": "Indica un importe mayor que cero.",
     "rateInvalid": "El tipo de cambio no es un número válido ({hint}).",
