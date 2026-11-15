@@ -139,3 +139,16 @@ describe('vista de lectura de la tesis: documento', () => {
         expect(screen.getByText('La deuda vence en 2027.')).toBeInTheDocument();
     });
 });
+
+describe('ASTS external bank appendix routing', () => {
+    it('shows the isolated appendix only on the ASTS reading page', async () => {
+        render(await ThesisReadingPage({ params: Promise.resolve({ ticker: 'ASTS' }) }));
+        expect(screen.getByTestId('asts-bank-supplement')).toHaveTextContent('sin verificar contra el informe original');
+        expect(screen.getByText('Resumen de prueba')).toBeInTheDocument();
+    });
+    it('does not show an appendix when the ASTS workspace fails', async () => {
+        vi.mocked(getResearchThesisWorkspace).mockRejectedValue(new Error('500'));
+        render(await ThesisReadingPage({ params: Promise.resolve({ ticker: 'ASTS' }) }));
+        expect(screen.queryByTestId('asts-bank-supplement')).not.toBeInTheDocument();
+    });
+});
