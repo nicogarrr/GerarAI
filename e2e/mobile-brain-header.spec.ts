@@ -29,7 +29,7 @@ type HeaderReport = {
 async function measureHeader(page: Page): Promise<HeaderReport> {
   return page.evaluate(() => {
     const title = document.getElementById("global-brain-title");
-    const dialog = title?.closest('[role="dialog"]');
+    const dialog = title?.closest('dialog, [role="dialog"]');
     if (!title || !dialog) throw new Error("sin título o sin diálogo del Cerebro");
     let header: HTMLElement = title;
     while (header.parentElement && header.parentElement !== dialog) header = header.parentElement;

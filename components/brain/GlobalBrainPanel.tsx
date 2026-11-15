@@ -6,10 +6,11 @@ import { memo, useCallback, useState, useRef, useEffect, type ComponentProps } f
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { X, Send, User, Bot, Loader2, Maximize2, Minimize2, Eye } from 'lucide-react';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
+import { DialogPortalContainerProvider } from '@/hooks/useDialogPortalContainer';
 import { useT, useLocale } from '@/lib/i18n/client';
 import { chatWithPortfolio } from '@/lib/actions/brain.actions';
 import { askResearchAssistantAction } from '@/lib/research/assistant-actions';
@@ -113,8 +114,15 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
     const [copied, setCopied] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
-    const dialogRef = useRef<HTMLDivElement>(null);
-    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const dialogRef = useRef<HTMLDialogElement>(null);
+    const [portalContainer, setPortalContainer] = useState<HTMLDialogElement | null>(null);
+    const setDialogRef = useCallback((node: HTMLDialogElement | null) => {
+        dialogRef.current = node;
+        setPortalContainer(node);
+    }, []);
+    const onCloseRef = useRef(onClose);
+    useEffect(() => { onCloseRef.current = onClose; });
+    const closePanel = () => dialogRef.current?.close();
     // Handoffs de apertura: el shell (GlobalBrain) los recibe siempre montado
     // y pasa el detalle con un contador; cada apertura sustituye el anclaje
     // anterior, incluso sin review_id.
@@ -194,97 +202,21 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         setEcho(null);
     }
 
-    /**
-     * Modal de verdad (WCAG 2.1.2): con `aria-modal` el fondo se marca inaccesible
-     * para el lector de pantalla, el foco entra por el campo de mensaje, Tab y
-     * Shift+Tab circulan solo por el panel y Escape cierra sin enviar nada. El
-     * resto del arbol queda `inert` + `aria-hidden` mientras dura el dialogo (el
-     * mismo patron de components/MobileNav.tsx) y el foco vuelve a quien lo abrio
-     * al cerrar. El listener va en `document` porque el panel no recibe el foco
-     * por si solo.
-     */
+    // Native modal owns top layer, inertness, focus containment and Escape.
+    // No body scrollbar mutation and no manual aria-hidden/inert restoration.
     useEffect(() => {
         const dialog = dialogRef.current;
         if (!dialog) return;
-
-        previousFocusRef.current =
-            document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        inputRef.current?.focus();
-
-        // Hermanos del panel hacia arriba: todo lo que no es el propio panel ni
-        // sus ancestros deja de ser alcanzable por teclado/lector. Se guardan
-        // los valores previos para no pisar `inert`/`aria-hidden` ajenos.
-        const hidden: Array<{ element: HTMLElement; inert: boolean; ariaHidden: string | null }> = [];
-        let node: HTMLElement | null = dialog;
-        while (node && node !== document.body && node.parentElement) {
-            const parent: HTMLElement = node.parentElement;
-            for (const sibling of Array.from(parent.children)) {
-                if (sibling === node || !(sibling instanceof HTMLElement)) continue;
-                if (['SCRIPT', 'STYLE', 'LINK', 'TEMPLATE'].includes(sibling.tagName)) continue;
-                hidden.push({
-                    element: sibling,
-                    inert: sibling.inert,
-                    ariaHidden: sibling.getAttribute('aria-hidden'),
-                });
-                sibling.inert = true;
-                sibling.setAttribute('aria-hidden', 'true');
-            }
-            node = parent;
-        }
-
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-
-        const onKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                onClose();
-                return;
-            }
-            if (event.key !== 'Tab') return;
-            const activeDialog = dialogRef.current;
-            if (!activeDialog) return;
-            // Mismo filtro que MobileNav: fuera los focusables invisibles por
-            // breakpoint y los que no son tab stops reales.
-            const focusable = Array.from(
-                activeDialog.querySelectorAll<HTMLElement>(
-                    'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-                ),
-            ).filter((el) => el.tabIndex >= 0 && el.getClientRects().length > 0);
-            if (focusable.length === 0) {
-                event.preventDefault();
-                activeDialog.focus();
-                return;
-            }
-            const first = focusable[0];
-            const last = focusable[focusable.length - 1];
-            // El panel (tabIndex=-1) y el body no estan en el ciclo: sin esto,
-            // Shift+Tab desde ahi salia al chrome del navegador.
-            if (document.activeElement === activeDialog || document.activeElement === document.body) {
-                event.preventDefault();
-                (event.shiftKey ? last : first).focus();
-                return;
-            }
-            if (event.shiftKey && document.activeElement === first) {
-                event.preventDefault();
-                last.focus();
-            } else if (!event.shiftKey && document.activeElement === last) {
-                event.preventDefault();
-                first.focus();
-            }
+        const onNativeClose = () => {
+            // StrictMode cleanup can queue close before a modal reopens.
+            if (!dialog.open) onCloseRef.current();
         };
-        document.addEventListener('keydown', onKeyDown);
+        dialog.addEventListener('close', onNativeClose);
+        if (!dialog.open) dialog.showModal();
+        inputRef.current?.focus();
         return () => {
-            document.removeEventListener('keydown', onKeyDown);
-            document.body.style.overflow = previousOverflow;
-            for (const item of hidden) {
-                item.element.inert = item.inert;
-                if (item.ariaHidden === null) item.element.removeAttribute('aria-hidden');
-                else item.element.setAttribute('aria-hidden', item.ariaHidden);
-            }
-            const previous = previousFocusRef.current;
-            if (previous && previous.isConnected && previous.getClientRects().length > 0) previous.focus();
-            else (document.activeElement as HTMLElement | null)?.blur?.();
+            dialog.removeEventListener('close', onNativeClose);
+            if (dialog.open) dialog.close();
         };
     }, []);
 
@@ -365,14 +297,11 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
     // Panel: lateral derecho a toda altura en escritorio; hoja sobre la
     // BottomNav en móvil.
     const panel = (
-        <Card
-            ref={dialogRef}
-            tabIndex={-1}
-            role="dialog"
-            aria-modal
+        <dialog
+            ref={setDialogRef}
             aria-labelledby="global-brain-title"
             aria-busy={loading}
-            className={`fixed z-50 flex flex-col border-indigo-500/30 shadow-2xl transition-all duration-300 ${isMaximized
+            className={`fixed z-50 m-0 h-auto w-auto max-h-none max-w-none open:flex flex-col rounded-lg border border-indigo-500/30 p-0 text-card-foreground shadow-2xl transition-all duration-300 motion-reduce:transition-none [&:modal]:overscroll-contain backdrop:bg-transparent backdrop:overflow-hidden backdrop:overscroll-contain ${isMaximized
             ? // Maximizado el panel cubre casi toda la pantalla: fondo sólido,
               // sin transparencia; con /95 la barra inferior se veía detrás
               // del campo de texto (informe UX 29-oct, punto 9).
@@ -380,6 +309,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             : 'inset-x-2 bottom-[calc(7rem+env(safe-area-inset-bottom))] top-20 bg-slate-950/95 backdrop-blur-md md:inset-x-auto md:top-0 md:bottom-0 md:right-0 md:w-[420px] md:h-dvh md:rounded-none md:border-y-0 md:border-r-0'
             }`}
         >
+            <DialogPortalContainerProvider value={portalContainer}>
             {/* Móvil (<sm): una sola fila de 60 px con áreas táctiles de 44 px; el
                 título y la pastilla "Viendo" se abrevian a la vista pero conservan
                 el texto completo para lectores de pantalla. Escritorio igual. */}
@@ -451,7 +381,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => onClose()}
+                        onClick={closePanel}
                         aria-label={t('brain.panel.closeAria')}
                         className="size-11 text-slate-400 hover:text-white"
                     >
@@ -546,7 +476,8 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     </Button>
                 </form>
             </CardFooter>
-        </Card>
+            </DialogPortalContainerProvider>
+        </dialog>
     );
     return panel;
 }

@@ -50,9 +50,12 @@ describe('cerebro: panel diferido fuera del bundle inicial', () => {
     });
 
     it('el panel conserva el cierre y el foco modal', () => {
-        assert.match(panel, /onClose\(\)/);
-        assert.match(panel, /aria-modal\n/);
-        assert.match(panel, /role="dialog"/);
+        assert.match(panel, /<dialog\s/);
+        assert.match(panel, /dialog\.showModal\(\)/);
+        assert.match(panel, /onClick=\{closePanel\}/);
+        assert.match(panel, /dialog\.addEventListener\('close', onNativeClose\)/);
+        assert.ok(!panel.includes("document.body.style.overflow ="));
+        assert.ok(!panel.includes("document.addEventListener('keydown'"));
         assert.ok(!panel.includes('createPortal'), 'el Cerebro ya no se incrusta en ninguna página');
     });
 });

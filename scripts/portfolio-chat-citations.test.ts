@@ -43,11 +43,12 @@ test('Cerebro enlaza datos propios solo a rutas internas conocidas', () => {
     }
 });
 
-test('panel Cerebro bloquea y restaura el scroll de fondo', async () => {
+test('panel Cerebro usa modal nativo sin mutar el scroll del body', async () => {
     const { readFileSync } = await import('node:fs');
     const ui = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
-    assert.ok(ui.includes("document.body.style.overflow = 'hidden'"));
-    assert.ok(ui.includes('document.body.style.overflow = previousOverflow'));
+    assert.ok(ui.includes('<dialog'));
+    assert.ok(ui.includes('dialog.showModal()'));
+    assert.ok(!ui.includes('document.body.style.overflow ='));
 });
 
 test('Cerebro no repite la misma fuente ni la etiqueta de tipo si el título ya la dice', () => {
