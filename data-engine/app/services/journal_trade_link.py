@@ -138,6 +138,46 @@ def _thesis_value(row: ThesisVersion) -> float | None:
     return listed_value(basis, fallback={"expected_value": row.expected_value})
 
 
+class _JournalHistory:
+    """One list response, one company: never retained beyond that read.
+
+    Cache exactly the existing queries, including the lazy LIMIT 1 output
+    lookup. Do not eagerly load every model's outputs: most are never visited.
+    """
+
+    def __init__(self, db: Session, company: Company):
+        self.db = db
+        self.company = company
+        self._theses: list[ThesisVersion] | None = None
+        self._models: list[ValuationModel] | None = None
+        self._outputs: dict[int, ValuationOutput | None] = {}
+
+    def theses(self) -> list[ThesisVersion]:
+        if self._theses is None:
+            self._theses = list(self.db.scalars(
+                select(ThesisVersion)
+                .where(ThesisVersion.company_id == self.company.id, ThesisVersion.status == "published")
+                .order_by(desc(ThesisVersion.version))
+            ).all())
+        return self._theses
+
+    def models(self) -> list[ValuationModel]:
+        if self._models is None:
+            self._models = list(self.db.scalars(
+                select(ValuationModel)
+                .where(ValuationModel.company_id == self.company.id)
+                .order_by(desc(ValuationModel.version))
+            ).all())
+        return self._models
+
+    def output(self, model_id: int) -> ValuationOutput | None:
+        if model_id not in self._outputs:
+            self._outputs[model_id] = self.db.scalar(
+                select(ValuationOutput).where(ValuationOutput.valuation_model_id == model_id).limit(1)
+            )
+        return self._outputs[model_id]
+
+
 def fair_value_on(
     db: Session,
     company: Company,
@@ -145,31 +185,22 @@ def fair_value_on(
     *,
     price: Decimal | float | None,
     currency: str | None,
+    _history: _JournalHistory | None = None,
 ) -> dict[str, Any] | None:
     """Valor justo que habia el dia ``day``; None si no habia ninguno."""
+    history = _history if _history is not None else _JournalHistory(db, company)
     theses = [
-        row
-        for row in db.scalars(
-            select(ThesisVersion)
-            .where(ThesisVersion.company_id == company.id, ThesisVersion.status == "published")
-            .order_by(desc(ThesisVersion.version))
-        ).all()
+        row for row in history.theses()
         if _known_on(row, day)
         and _thesis_value(row) is not None
         and not valuation_uses_inferred_inputs(row.valuation_basis)
     ]
     thesis = theses[0] if theses else None
     engine_row: tuple[ValuationModel, float] | None = None
-    for model in db.scalars(
-        select(ValuationModel)
-        .where(ValuationModel.company_id == company.id)
-        .order_by(desc(ValuationModel.version))
-    ).all():
+    for model in history.models():
         if not _known_on(model, day) or model.status not in ("final", "draft"):
             continue
-        output = db.scalar(
-            select(ValuationOutput).where(ValuationOutput.valuation_model_id == model.id).limit(1)
-        )
+        output = history.output(model.id)
         payload = output.output_payload if output and isinstance(output.output_payload, dict) else None
         # Valor por acción COTIZADA: un ADR se compara con su valor por ADR.
         value = listed_value(payload, fallback=payload) if payload else None
@@ -236,7 +267,13 @@ def fair_value_on(
     return reading
 
 
-def journal_entry_payload(db: Session, entry: DecisionJournalEntry) -> dict[str, Any]:
+def journal_entry_payload(
+    db: Session,
+    entry: DecisionJournalEntry,
+    *,
+    _history: _JournalHistory | None = None,
+    _trades: dict[int, Transaction] | None = None,
+) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": entry.id,
         "thesis_version_id": entry.thesis_version_id,
@@ -254,15 +291,36 @@ def journal_entry_payload(db: Session, entry: DecisionJournalEntry) -> dict[str,
     }
     if entry.transaction_id is None:
         return payload
-    trade = db.scalar(select(Transaction).where(Transaction.id == entry.transaction_id))
-    company = db.get(Company, entry.company_id)
+    trade = (_trades.get(entry.transaction_id) if _trades is not None else
+             db.scalar(select(Transaction).where(Transaction.id == entry.transaction_id)))
+    company = _history.company if _history is not None else db.get(Company, entry.company_id)
     if trade is None or company is None:
         return payload
     payload["transaction"] = trade_summary(trade)
     payload["fair_value_on_day"] = fair_value_on(
-        db, company, trade.trade_date, price=trade.price, currency=trade.currency
+        db, company, trade.trade_date, price=trade.price, currency=trade.currency, _history=_history
     )
     return payload
+
+
+def journal_entries_payload(
+    db: Session, company: Company, entries: list[DecisionJournalEntry],
+) -> list[dict[str, Any]]:
+    """Serialize a single company's journal, sharing only this request's reads."""
+    if any(entry.company_id != company.id for entry in entries):
+        raise ValueError("Las entradas deben pertenecer a la misma empresa.")
+    transaction_ids = sorted({entry.transaction_id for entry in entries if entry.transaction_id is not None})
+    trades: dict[int, Transaction] = {}
+    # The journal is not paginated: bound bind parameters without changing
+    # its response cardinality or preloading unlinked historical trades.
+    for start in range(0, len(transaction_ids), 500):
+        trades.update({
+            trade.id: trade for trade in db.scalars(
+                select(Transaction).where(Transaction.id.in_(transaction_ids[start:start + 500]))
+            ).all()
+        })
+    history = _JournalHistory(db, company)
+    return [journal_entry_payload(db, entry, _history=history, _trades=trades) for entry in entries]
 
 
 def journal_trades(db: Session, company: Company, *, limit: int = 100) -> list[dict[str, Any]]:

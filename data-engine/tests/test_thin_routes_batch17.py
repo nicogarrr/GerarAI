@@ -853,11 +853,16 @@ def test_decision_journal_404_y_lista(monkeypatch):
         c.decision_journal("NOPE", db=MagicMock())
     monkeypatch.setattr(c, "resolve_company", lambda db, ticker: SimpleNamespace(id=1))
     monkeypatch.setattr(c, "DecisionJournalService", _JournalService)
+    calls = []
+    def batch(db, company, entries):
+        calls.append((db, company.id, entries))
+        return [{"entry": entry} for entry in entries]
     monkeypatch.setattr(
-        "app.services.journal_trade_link.journal_entry_payload",
-        lambda db, entry: {"entry": entry},
+        "app.services.journal_trade_link.journal_entries_payload", batch,
     )
-    assert c.decision_journal("ASTS", db=MagicMock()) == [{"entry": "entrada"}]
+    db = MagicMock()
+    assert c.decision_journal("ASTS", db=db) == [{"entry": "entrada"}]
+    assert calls == [(db, 1, ["entrada"])]
 
 
 def test_decision_journal_trades_404_y_delega(monkeypatch):
