@@ -17,13 +17,13 @@ describe('DCA historical evidence display',()=>{
   render(<DcaHitRatesCard data={data()}/>);
   expect(screen.getByRole('table')).toHaveAccessibleName('Porcentaje de meses con señal cuyo cierre era más alto N meses después');
   expect(screen.getByText(/12 meses completados/)).toHaveTextContent('2025-01');
-  expect(screen.getByText('75,0 %')).toBeVisible();expect(screen.getByText(/n=4/)).toHaveTextContent('media 10,0 %');
+  expect(screen.getByText('75,0 %')).toBeVisible();expect(screen.getAllByText(/sobre 4 casos/)[0]).toHaveTextContent('subida media 10,0 %');
   expect(screen.getByText('—')).toBeVisible();expect(screen.getByText(/Solo meses confirmados/)).toHaveTextContent('no la rentabilidad de una cartera');
  });
  it.each([null,'red','#000000','#FFFFFF'])('supports contrasting badge color %s and compact mode',color=>{
   const fixture=data();fixture.first_period=null;fixture.rows[0].color=color;
   render(<DcaHitRatesCard data={fixture} compact/>);
-  expect(screen.queryByText(/n=4/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/casos/)).not.toBeInTheDocument();
   // Tinta WCAG (readableInk): negra pura sobre fondos claros, blanca sobre oscuros;
   // antes el umbral YIQ daba gris #111827 (2,04:1 sobre el fondo de reserva #374151).
   expect(screen.getByText('2X')).toHaveStyle({color:color==='#FFFFFF'?'#000000':'#FFFFFF'});
@@ -52,8 +52,31 @@ describe('DCA historical evidence display',()=>{
   const four=data({horizons:[1,3,6,12]});
   four.rows=four.rows.map(r=>({...r,cells:[1,3,6,12].map((h,i)=>({horizon_months:h,months:4-i,pct_higher:0.5+i*0.1,avg_return:0.01}))}));
   render(<DcaHitRatesCard data={four}/>);
-  // cabecera de escritorio (1) + una etiqueta movil por fila (1 fila) = 2 por horizonte
-  for(const h of ['1 m','3 m','6 m','12 m']) expect(screen.getAllByText(h)).toHaveLength(2);
+  // cabecera de escritorio (1 por horizonte) + etiqueta movil legible por fila
+  for(const h of ['1 m','3 m','6 m','12 m']) expect(screen.getAllByText(h)).toHaveLength(1);
+  expect(screen.getByText('más arriba a 1 mes')).toBeVisible();
+  for(const h of [3,6,12]) expect(screen.getByText(`más arriba a ${h} meses`)).toBeVisible();
+ });
+ it('explica qué mide cada número arriba y resume la conclusión de cada señal',()=>{
+  render(<DcaHitRatesCard data={data()}/>);
+  expect(screen.getByTestId('dca-hit-rates-explainer')).toHaveTextContent('De cada 100 meses con señal');
+  expect(screen.getByTestId('dca-hit-rates-explainer')).toHaveTextContent('subieron de media');
+  // celda legible: «más arriba a 3 meses», «sobre 4 casos», «subida media 10,0 %»
+  expect(screen.getByText('más arriba a 1 mes')).toBeVisible();
+  expect(screen.getAllByText(/sobre 4 casos/)[0]).toHaveTextContent('subida media 10,0 %');
+  // conclusión en una línea por señal (horizonte más largo con dato)
+  expect(screen.getByTestId('dca-hit-rates-takeaway-2x')).toHaveTextContent('a 1 m, más arriba el 75,0 % de las veces · sobre 4 casos');
+  // sin medias extremas no hay nota de contexto
+  expect(screen.queryByTestId('dca-hit-rates-extreme')).toBeNull();
+ });
+ it('contextualiza las medias extremas sin quitar ni suavizar los avisos',()=>{
+  const extreme=data();extreme.rows[0].cells[0].avg_return=6.694;
+  render(<DcaHitRatesCard data={extreme}/>);
+  expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('pocos casos');
+  expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('ventanas solapadas');
+  expect(screen.getByTestId('dca-hit-rates-extreme')).toHaveTextContent('no una promesa');
+  // avisos de veracidad intactos
+  expect(screen.getByText(/Solo meses confirmados/)).toHaveTextContent('no la rentabilidad de una cartera');
  });
  it('loads only on demand, reports loading and caches a successful response',async()=>{
   let resolve!:(d:DcaHitRates)=>void;mocks.load.mockReturnValue(new Promise(r=>resolve=r));

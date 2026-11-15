@@ -69,6 +69,7 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                     {data.first_period ? ` (${data.first_period} – ${data.last_period})` : ''}
                 </p>
             </div>
+            <p className="text-[11px] leading-4 text-gray-400" data-testid="dca-hit-rates-explainer">{ti('watchlist.hitRates.explainer')}</p>
             {zoneVisitsLine(data, ti, MONTHS) ? (
                 <p className="text-[11px] text-gray-400" data-testid="dca-zone-visits">{zoneVisitsLine(data, ti, MONTHS)}</p>
             ) : null}
@@ -105,23 +106,40 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                                 const avg = dcaPercent(cell.avg_return, locale);
                                 return (
                                     <div key={cell.horizon_months} role="cell" className="rounded bg-gray-900/60 px-2 py-1 tabular-nums text-gray-200 sm:bg-transparent sm:px-1 sm:py-0 sm:text-right">
-                                        <span className="block text-[10px] font-medium text-gray-500 sm:hidden">{ti('watchlist.hitRates.months', { count: cell.horizon_months })}</span>
+                                        <span className="block text-[10px] font-medium text-gray-500 sm:hidden">
+                                            {cell.horizon_months === 1 ? ti('watchlist.hitRates.afterOne') : ti('watchlist.hitRates.afterOther', { count: INT.format(cell.horizon_months) })}
+                                        </span>
                                         {pct ?? <span className="text-gray-500">—</span>}
                                         {!compact && cell.months > 0 ? (
                                             <span className="block text-[10px] text-gray-500">
-                                                n={INT.format(cell.months)}{avg ? ` · ${ti('watchlist.hitRates.average', { avg })}` : ''}
+                                                {cell.months === 1 ? ti('watchlist.hitRates.casesOne') : ti('watchlist.hitRates.casesOther', { count: INT.format(cell.months) })}{avg ? ` · ${ti('watchlist.hitRates.average', { avg })}` : ''}
                                             </span>
                                         ) : null}
                                     </div>
                                 );
                             })}
                         </div>
+                        {!compact ? (() => {
+                            const last = [...row.cells].reverse().find((cell) => cell.pct_higher !== null && cell.months > 0);
+                            return last ? (
+                                <p className="mt-1 text-[11px] text-gray-400 sm:col-span-full sm:px-1" data-testid={`dca-hit-rates-takeaway-${row.key}`}>
+                                    {ti('watchlist.hitRates.takeaway', {
+                                        horizon: INT.format(last.horizon_months),
+                                        pct: dcaPercent(last.pct_higher, locale) ?? '—',
+                                        cases: last.months === 1 ? ti('watchlist.hitRates.casesOne') : ti('watchlist.hitRates.casesOther', { count: INT.format(last.months) }),
+                                    })}
+                                </p>
+                            ) : null;
+                        })() : null}
                     </div>
                 ))}
             </div>
             <p className="text-[11px] text-gray-500">
                 {dcaReasonText(data.disclaimer, locale)} {ti('watchlist.hitRates.footer')}
             </p>
+            {!compact && data.rows.some((row) => row.cells.some((cell) => cell.avg_return !== null && Math.abs(cell.avg_return) >= 1)) ? (
+                <p className="text-[11px] leading-4 text-gray-500" data-testid="dca-hit-rates-extreme">{ti('watchlist.hitRates.extremeNote')}</p>
+            ) : null}
         </div>
     );
 }
