@@ -927,8 +927,9 @@ def real_time_screener(
         if not has_lkg:
             with _real_cache_lock:
                 bucket = _real_items_cache.get(tenant_id) or {}
-                items = list(bucket.get("items", []))
-                items_at_wall = float(bucket.get("at_wall") or 0.0) or items_at_wall
+                if bucket.get("vendor") in (None, vendor.name):
+                    items = list(bucket.get("items", []))
+                    items_at_wall = float(bucket.get("at_wall") or 0.0) or items_at_wall
             refreshing = future is not None and not future.done()
 
     payload = _real_response_payload(
