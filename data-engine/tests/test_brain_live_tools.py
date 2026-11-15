@@ -314,3 +314,50 @@ def test_english_live_quote_copy(db, monkeypatch):
     assert response.llm_trace["path"] == "live_quote"
     assert "post-market" in response.answer
     assert "+1.25 %" in response.answer
+
+
+def test_closed_postmarket_is_not_regular_close(db, monkeypatch):
+    company(db, "AAPL")
+    quote = live_quote("AAPL", 250.0, session="cerrado")
+    quote.price_session = "post"
+    patch_quotes(monkeypatch, {"AAPL": quote})
+    response = asyncio.run(answer_live_question(db, "precio AAPL"))
+    assert response is not None
+    assert "post-mercado" in response.answer
+    assert "al cierre" not in response.answer
+
+
+@pytest.mark.parametrize("quote_available,news_available", [(True, False), (False, True)])
+def test_mixed_request_does_not_drop_failed_half(db, monkeypatch, quote_available, news_available):
+    company(db, "ASTS", "AST SpaceMobile")
+    patch_quotes(monkeypatch, {"ASTS": live_quote("ASTS", 105.3)} if quote_available else {})
+    patch_news(monkeypatch, {"articles": [
+        {"title": "ASTS signs deal", "url": "https://example.com/a", "language": "english"}
+    ] if news_available else []})
+    assert asyncio.run(answer_live_question(db, "precio y noticias ASTS")) is None
+
+
+@pytest.mark.parametrize("url", ["javascript:alert(1)", "data:text/html,test", "https://", "https://u:p@example.com/a", "https://[invalid"])
+def test_news_rejects_unsafe_source_urls(db, monkeypatch, url):
+    company(db, "ASTS", "AST SpaceMobile")
+    patch_news(monkeypatch, {"articles": [{"title": "ASTS signs deal", "url": url, "language": "english"}]})
+    assert asyncio.run(answer_live_question(db, "noticias ASTS")) is None
+
+
+def test_unknown_explicit_ticker_does_not_use_page_company(db, monkeypatch):
+    a = company(db, "AAPL")
+    patch_quotes(monkeypatch, {"AAPL": live_quote("AAPL", 250.0)})
+    assert asyncio.run(answer_live_question(db, "precio ZZZZZ", page_company=a)) is None
+
+
+def test_news_malformed_fields_fail_closed(db, monkeypatch):
+    company(db, "ASTS", "AST SpaceMobile")
+    patch_news(monkeypatch, {"articles": [
+        None, {"title": {"unexpected": "ASTS"}, "url": "https://example.com/a"},
+        {"title": "ASTS valid", "url": ["https://example.com/a"]},
+        {"title": "ASTS valid", "url": "https://example.com/a", "seendate": 1234, "domain": {"bad": "value"}},
+    ]})
+    response = asyncio.run(answer_live_question(db, "noticias ASTS"))
+    assert response is not None
+    assert "sin fecha" in response.answer
+    assert len(response.sources) == 1

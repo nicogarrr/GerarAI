@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import re
 from datetime import UTC, datetime
+from urllib.parse import urlsplit
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -125,7 +126,7 @@ def _companies_in_question(
     else:
         named = _company_in_question(db, question)
         companies = [named] if named is not None else []
-    if not companies and page_company is not None:
+    if not companies and page_company is not None and not tokens:
         companies = [page_company]
     return companies[:_MAX_COMPANIES]
 
@@ -139,6 +140,13 @@ def _quote_line(company: Company, quote: ExtendedQuote, english: bool) -> str:
     session = session_en if english else session_es
     price = _money(price_value, quote.currency or company.currency)
     instant = _instante(timestamp, english)
+    if quote.session == "cerrado" and quote.price_session in {"pre", "post"}:
+        price_session = _SESSION_LABELS[quote.price_session][1 if english else 0]
+        if english:
+            return (f"**{company.ticker} · {company.name}**: {price}, last {price_session} quote "
+                    f"({instant}; {quote.source}). Market closed.")
+        return (f"**{company.ticker} · {company.name}**: {price}, última cotización de {price_session} "
+                f"({instant}; {quote.source}). Mercado cerrado.")
     if quote.session == "cerrado":
         if english:
             return (f"**{company.ticker} · {company.name}**: {price} at the close "
@@ -233,9 +241,16 @@ async def _live_news_answer(company: Company) -> ChatResponse | None:
         language = article.get("language")
         if isinstance(language, str) and language.lower() not in GDELT_ALLOWED_LANGUAGES:
             continue
-        title = str(article.get("title") or "").strip()
-        url = str(article.get("url") or "").strip()
+        raw_title, raw_url = article.get("title"), article.get("url")
+        title = raw_title.strip() if isinstance(raw_title, str) else ""
+        url = raw_url.strip() if isinstance(raw_url, str) else ""
         if not title or not url:
+            continue
+        try:
+            parsed_url = urlsplit(url)
+            if parsed_url.scheme != "https" or not parsed_url.hostname or parsed_url.username or parsed_url.password:
+                continue
+        except ValueError:
             continue
         # Relevancia fail-closed: solo titulares que citan a la empresa por
         # ticker o por nombre; GDELT ordena por relevancia híbrida y a veces
@@ -249,8 +264,10 @@ async def _live_news_answer(company: Company) -> ChatResponse | None:
         if key in seen:
             continue
         seen.add(key)
-        items.append((title, url, _gdelt_datetime(article.get("seendate")),
-                      str(article.get("domain") or "").strip()))
+        raw_date, raw_domain = article.get("seendate"), article.get("domain")
+        seen_at = _gdelt_datetime(raw_date) if isinstance(raw_date, str) else None
+        domain = raw_domain.strip() if isinstance(raw_domain, str) else ""
+        items.append((title, url, seen_at, domain))
         if len(items) == _MAX_LIVE_NEWS:
             break
     if not items:
@@ -267,7 +284,7 @@ async def _live_news_answer(company: Company) -> ChatResponse | None:
             stamp = _date_en(seen_at) if english else _fecha_es(seen_at)
         else:
             stamp = "undated" if english else "sin fecha"
-        domain_part = f" — {domain}" if domain else ""
+        domain_part = f" - {domain}" if domain else ""
         lines.append(f"- '{title}'{domain_part}, {stamp} (GDELT).")
         sources.append({"type": "live_news", "id": url,
                         "title": f"{company.ticker}: {title}", "url": url})
@@ -315,6 +332,10 @@ async def answer_live_question(
             parts.append(news.answer)
             sources.extend(news.sources)
             paths.append("live_news")
+    # Una respuesta mixta no debe silenciar la mitad fallida: toda la
+    # pregunta sigue a la ruta guardada si falta alguna parte solicitada.
+    if (price_ask and "live_quote" not in paths) or (news_ask and "live_news" not in paths):
+        return None
     if not parts:
         return None
     return ChatResponse(
