@@ -21,9 +21,9 @@ vi.mock('@/lib/actions/brain.actions', () => ({ chatWithPortfolio: (...a: unknow
 const askResearchAssistantAction = vi.fn();
 vi.mock('@/lib/research/assistant-actions', () => ({ askResearchAssistantAction: (...a: unknown[]) => askResearchAssistantAction(...a) }));
 vi.mock('@/components/search/TickerSearchInput', () => ({
-    TickerSearchInput: (p: { value: string; onValueChange: (v: string) => void; onSelect: (s: { symbol: string }) => void; onBlur: () => void; ariaLabel: string }) => (
+    TickerSearchInput: (p: { value: string; onValueChange: (v: string) => void; onSelect: (s: { symbol: string }) => void; onBlur: () => void; ariaLabel: string; placeholder: string }) => (
         <div>
-            <input aria-label={p.ariaLabel} value={p.value} onChange={(e) => p.onValueChange(e.target.value)} onBlur={p.onBlur} />
+            <input placeholder={p.placeholder} aria-label={p.ariaLabel} value={p.value} onChange={(e) => p.onValueChange(e.target.value)} onBlur={p.onBlur} />
             <button type="button" onClick={() => p.onSelect({ symbol: 'ASTS' })}>elegir ASTS</button>
         </div>
     ),
@@ -321,6 +321,13 @@ describe('GlobalBrain: modo guía', () => {
         await open();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));
         const field = screen.getByLabelText('Ticker de la guía de investigación');
+        expect(field).toHaveAttribute('placeholder', 'Ticker');
+        expect(field).toHaveAttribute('aria-label', 'Ticker de la guía de investigación');
+        expect(screen.getByRole('dialog')).toHaveClass('[&_[data-slot=popover-content]]:min-w-56');
+        expect(field.parentElement?.parentElement).toHaveClass('w-[4.5rem]', 'shrink-0', 'sm:w-20');
+        expect(document.getElementById('global-brain-title')).toHaveClass('shrink-0');
+        expect(document.getElementById('global-brain-title')).not.toHaveClass('truncate');
+        expect(screen.getByTestId('brain-page-context')).toHaveClass('shrink-0');
         fireEvent.blur(field);
         expect(screen.queryByLabelText('Ticker de la guía de investigación')).not.toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }));

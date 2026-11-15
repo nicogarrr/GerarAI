@@ -84,7 +84,7 @@
   "panel": {
     "title": "GerarAI Brain",
     "titleShort": "Brain",
-    "tickerPlaceholder": "Guide ticker",
+    "tickerPlaceholder": "Ticker",
     "tickerAria": "Research guide ticker",
     "guideButton": "Guide",
     "guideButtonTitle": "Per-company research guide",
