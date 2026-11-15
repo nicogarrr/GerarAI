@@ -1,9 +1,12 @@
 """Bound request concurrency before synchronous DB dependencies reserve pool slots.
 
 This is a process-local fail-fast admission gate, not a rate-limit replacement.
-A verified tenant cannot occupy every backend connection. Health probes do not
+For pool sizes >=4 a tenant cannot occupy every admission slot. For
+pool sizes 1/2/3 admission degrades to 1 global / 1 tenant, without a
+reserve or cross-tenant isolation guarantee. Health probes do not
 use get_db and remain outside the gate. Counters are released on cancellation.
 """
+import logging
 import threading
 from contextlib import asynccontextmanager
 
@@ -54,8 +57,14 @@ def request_gate() -> AdmissionGate:
     with _GATE_LOCK:
         if _GATE is None:
             settings = get_settings()
-            # Leave at least two normal pool slots for readiness/background
-            # work. Do not count overflow as request capacity.
+            # With pool>=4 leave two normal slots for readiness/background.
+            # Tiny pools stay usable best-effort; no reserve is promised.
+            # Overflow is never counted as request capacity.
+            if settings.db_pool_size < 4:
+                logging.getLogger(__name__).warning(
+                    "DB pool size %s: best-effort admission 1/1; no guaranteed "
+                    "connection reserve or cross-tenant isolation", settings.db_pool_size,
+                )
             limit = max(1, min(16, settings.db_pool_size - 2))
             _GATE = AdmissionGate(limit, min(8, max(1, limit // 2)))
         return _GATE

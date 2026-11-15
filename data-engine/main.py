@@ -68,6 +68,9 @@ def _start_embedder_warmup(settings) -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    from app.core.db_admission import request_gate
+
+    request_gate()  # Initialize and warn about degraded tiny pools at startup.
     settings = get_settings()
     if "app_env" not in settings.model_fields_set:
         # app_env tiene default "local": sin APP_ENV explicito la API arrancaba

@@ -189,3 +189,25 @@ def test_default_pool_preserves_another_tenants_admission(monkeypatch, tmp_path)
         asyncio.run(scenario())
     finally:
         engine.dispose()
+
+
+@pytest.mark.parametrize("pool_size", [1, 2, 3])
+def test_small_pool_degrades_without_reserve_and_warns(monkeypatch, caplog, pool_size):
+    monkeypatch.setattr(admission, "_GATE", None)
+    monkeypatch.setattr(admission, "get_settings", lambda: SimpleNamespace(db_pool_size=pool_size))
+    gate = admission.request_gate()
+    assert (gate.global_limit, gate.tenant_limit) == (1, 1)
+    assert "no guaranteed connection reserve or cross-tenant isolation" in caplog.text
+
+
+def test_real_liveness_remains_available_with_gate_full(monkeypatch):
+    import main
+    gate = admission.AdmissionGate(global_limit=1, tenant_limit=1)
+    monkeypatch.setattr(admission, "request_gate", lambda: gate)
+    async def scenario():
+        async with gate.slot("a"):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://test") as client:
+                response = await client.get("/health/live")
+                assert response.status_code == 200
+                assert response.json() == {"status": "ok"}
+    asyncio.run(scenario())
