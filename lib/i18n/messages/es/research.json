@@ -1177,6 +1177,7 @@
     "year": "Año",
     "source": "Fuente",
     "confidence": "Confianza",
+    "confidenceLegend": "Confianza del analista en cada supuesto, de 0 a 100 %: es un juicio, no un dato reportado.",
     "version": "Versión",
     "empty": "Construye primero el modelo a largo plazo y luego crea aquí los ajustes de drivers.",
     "scenarioBear": "bajista",
@@ -1190,6 +1191,7 @@
     "reconciled": "Promesas reconciliadas",
     "reconcile": "Reconciliar",
     "score": "Puntuación",
+    "scoreExplainer": "Puntuación sobre 100: solo pesan las promesas ya resueltas (cumplida = 1, parcial = 0,5, fallida = 0); las abiertas no cuentan.",
     "grade": "Calificación",
     "open": "Abiertas",
     "met": "Cumplidas",
@@ -2292,5 +2294,21 @@
     "social": "Texto coincidente en agregador social (fuente secundaria)",
     "primary": "Comunicado Blacklift presentado en SEC (fuente primaria, solo Blacklift)",
     "exports": "Anexo de lectura añadido el 15/11/2026. No forma parte de versiones anteriores ni de sus exportaciones PDF/EPUB. No se usa como input del modelo."
+  },
+  "driverLabels": {
+    "growth": "crecimiento",
+    "revenue_growth": "crecimiento de ingresos",
+    "margin": "margen",
+    "gross_margin": "margen bruto",
+    "operating_margin": "margen operativo",
+    "ebit_margin": "margen EBIT",
+    "fcf": "flujo de caja libre",
+    "fcf_margin": "margen FCF",
+    "wacc": "WACC",
+    "tax_rate": "tipo impositivo",
+    "capex": "inversión en activos (capex)",
+    "terminal_growth": "crecimiento terminal",
+    "buyback": "recompras",
+    "dilution": "dilución"
   }
 }

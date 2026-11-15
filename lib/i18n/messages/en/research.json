@@ -1177,6 +1177,7 @@
     "year": "Year",
     "source": "Source",
     "confidence": "Confidence",
+    "confidenceLegend": "The analyst's confidence in each assumption, from 0 to 100%: judgment, not reported data.",
     "version": "Version",
     "empty": "Build the long-term model first, then create the driver adjustments here.",
     "scenarioBear": "bear",
@@ -1190,6 +1191,7 @@
     "reconciled": "Promises reconciled",
     "reconcile": "Reconcile",
     "score": "Score",
+    "scoreExplainer": "Score out of 100: only resolved promises count (met = 1, partial = 0.5, missed = 0); open ones do not count.",
     "grade": "Grade",
     "open": "Open",
     "met": "Met",
@@ -2292,5 +2294,21 @@
     "social": "Matching text on social aggregator (secondary source)",
     "primary": "Blacklift release filed with SEC (primary source, Blacklift only)",
     "exports": "Reading supplement added on 15 Nov 2026. It is not part of earlier versions or their PDF/EPUB exports. It is not used as a model input."
+  },
+  "driverLabels": {
+    "growth": "growth",
+    "revenue_growth": "revenue growth",
+    "margin": "margin",
+    "gross_margin": "gross margin",
+    "operating_margin": "operating margin",
+    "ebit_margin": "ebit margin",
+    "fcf": "fcf",
+    "fcf_margin": "fcf margin",
+    "wacc": "wacc",
+    "tax_rate": "tax rate",
+    "capex": "capex",
+    "terminal_growth": "terminal growth",
+    "buyback": "buyback",
+    "dilution": "dilution"
   }
 }
