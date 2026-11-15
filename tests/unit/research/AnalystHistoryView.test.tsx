@@ -71,6 +71,26 @@ describe('AnalystHistoryView', () => {
     expect(screen.getByTestId('analyst-history-best')).toHaveTextContent('Aún no hay muestra suficiente');
   });
 
+
+  it('jerarquía móvil: stats clave destacadas y consenso con media y potencial prominentes', () => {
+    es(<AnalystHistoryView data={available} />);
+    const stats = screen.getByTestId('analyst-history-stats');
+    expect(stats).toHaveTextContent('50 %'); // dirección acertada (0.5)
+    expect(stats).toHaveTextContent('46 %'); // error mediano (45.9)
+    expect(stats).toHaveTextContent('202'); // objetivos vencidos
+    expect(stats).toHaveTextContent('Dirección acertada');
+    expect(stats).toHaveTextContent('Error mediano');
+    expect(stats).toHaveTextContent('Objetivos vencidos');
+    const consensus = screen.getByTestId('analyst-history-consensus');
+    expect(screen.getByTestId('analyst-history-consensus-mean')).toHaveTextContent('223,68');
+    expect(consensus).toHaveTextContent('potencial +27,5 %');
+    expect(consensus).toHaveTextContent('media de 22 firmas');
+    expect(consensus).toHaveTextContent('frente a 175,4');
+    // Las advertencias de veracidad siguen presentes
+    expect(screen.getByTestId('analyst-history-rating-note')).toHaveTextContent('No es una señal validada');
+    expect(screen.getByText(/Fuente: Yahoo Finance \(no oficial\)/)).toBeInTheDocument();
+  });
+
   it('loading skeleton announces itself', () => {
     es(<AnalystHistorySkeleton />);
     expect(screen.getByTestId('analyst-history-loading')).toHaveAttribute('aria-busy', 'true');

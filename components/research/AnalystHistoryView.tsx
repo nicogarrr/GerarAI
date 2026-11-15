@@ -96,9 +96,18 @@ export function AnalystHistoryView({ data }: { data: AnalystHistory | null }) {
                                     ? t('research.analystHistory.bestHorizon', { horizon: horizonLabel(best), error: pct(bestSummary.median_abs_error_pct) })
                                     : t('research.analystHistory.noBestHorizon')}
                             </p>
-                            <p className="mt-2 text-sm tabular-nums text-gray-300">
-                                {t('research.analystHistory.summary', { count: active.matured_targets, error: pct(active.median_abs_error_pct), hit: pct(active.direction_hit_rate === null || active.direction_hit_rate === undefined ? null : active.direction_hit_rate * 100) })}
-                            </p>
+                            <div className="mt-3 grid grid-cols-3 gap-2 rounded-lg border border-gray-800 bg-gray-900/40 p-3" data-testid="analyst-history-stats">
+                                {([
+                                    [t('research.analystHistory.statDirection'), pct(active.direction_hit_rate === null || active.direction_hit_rate === undefined ? null : active.direction_hit_rate * 100)],
+                                    [t('research.analystHistory.statError'), pct(active.median_abs_error_pct)],
+                                    [t('research.analystHistory.statTargets'), fmt.formatNumber(active.matured_targets)],
+                                ] as const).map(([label, value]) => (
+                                    <div className="min-w-0" key={label}>
+                                        <p className="text-lg font-semibold tabular-nums leading-6 text-gray-100">{value}</p>
+                                        <p className="mt-0.5 text-[10px] uppercase leading-3 tracking-wide text-gray-500">{label}</p>
+                                    </div>
+                                ))}
+                            </div>
                             {(active.ranked_firms ?? 0) === 0 ? (
                                 <p className="mt-2 text-sm text-gray-400" data-testid="analyst-history-no-ranked">{t('research.analystHistory.noRanked', { min: data.min_samples ?? 5 })}</p>
                             ) : (
@@ -113,14 +122,20 @@ export function AnalystHistoryView({ data }: { data: AnalystHistory | null }) {
                         </>
                     )}
                     {data.consensus ? (
-                        <div className="mt-3 border-t border-gray-800 pt-3 text-sm text-gray-300" data-testid="analyst-history-consensus">
-                            <p>
-                                {t('research.analystHistory.consensus', { mean: money(data.consensus.mean), firms: data.consensus.firms })}
-                                {data.consensus.upside_percent !== null && data.consensus.upside_percent !== undefined && data.consensus.reference_price
-                                    ? ` · ${t('research.analystHistory.consensusUpside', { upside: fmt.formatPercent(data.consensus.upside_percent, { fromRatio: false, signDisplay: 'always' }), price: money(data.consensus.reference_price) })}`
-                                    : null}
+                        <div className="mt-3 border-t border-gray-800 pt-3" data-testid="analyst-history-consensus">
+                            <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500">{t('research.analystHistory.consensusLabel')}</p>
+                            <div className="mt-1 flex flex-wrap items-baseline gap-x-2">
+                                <span className="text-xl font-semibold tabular-nums text-gray-50" data-testid="analyst-history-consensus-mean">{money(data.consensus.mean)}</span>
+                                {data.consensus.upside_percent !== null && data.consensus.upside_percent !== undefined ? (
+                                    <span className={`text-sm font-semibold tabular-nums ${data.consensus.upside_percent > 0 ? 'text-teal-300' : data.consensus.upside_percent < 0 ? 'text-red-300' : 'text-gray-400'}`}>
+                                        {t('research.analystHistory.consensusUpside', { upside: fmt.formatPercent(data.consensus.upside_percent, { fromRatio: false, signDisplay: 'always' }) })}
+                                    </span>
+                                ) : null}
+                            </div>
+                            <p className="mt-1 text-xs leading-4 text-gray-500">
+                                {t('research.analystHistory.consensusDetail', { firms: data.consensus.firms, price: data.consensus.reference_price ? money(data.consensus.reference_price) : fmt.na })}
                             </p>
-                            <p className="mt-1 text-xs text-gray-500">{t('research.analystHistory.consensusWhy')}</p>
+                            <p className="mt-1 text-xs leading-4 text-gray-500">{t('research.analystHistory.consensusWhy')}</p>
                         </div>
                     ) : null}
                     {changes && (changes.upgrades ?? 0) + (changes.downgrades ?? 0) > 0 ? (
