@@ -10,12 +10,12 @@ describe('DcaPreparingRefresh', () => {
   beforeEach(() => { vi.useFakeTimers(); refresh.mockClear(); });
   afterEach(() => { vi.useRealTimers(); });
 
-  it('refresca la ficha cada 15 s y para tras 20 intentos (5 min)', () => {
+  it('no refresca toda la ficha mientras una tarjeta se prepara', () => {
     render(<DcaPreparingRefresh />);
     act(() => { vi.advanceTimersByTime(15_000); });
-    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(15_000 * 40); });
-    expect(refresh).toHaveBeenCalledTimes(20);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('al desmontarse deja de refrescar', () => {
