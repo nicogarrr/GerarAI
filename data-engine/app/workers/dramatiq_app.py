@@ -2063,24 +2063,32 @@ def ingest_class_shares_outstanding(
         class_cover_candidates,
     )
 
-    db = _session(tenant_id, user_id)
+    # Igual que el resto de actores: la sesion se abre dentro del try para
+    # que un ValueError permanente de _session (tenant ausente/inactivo)
+    # quede clasificado por _handle_actor_error en vez de reventar crudo
+    # (dramatiq lo reintentaria dos veces y acabaria en dead-letter sin
+    # registro estructurado).
     try:
-        results: dict[str, str] = {}
-        # General (regla «acciones-vigentes-v1»): todo emisor con CIK sin portada consolidada reciente, no una
-        # lista por ticker.
-        for company in class_cover_candidates(db):
-            ticker = company.ticker
-            try:
-                outcome = backfill_class_shares_outstanding(db, company, cik=company.cik)
-                db.commit()
-                results[ticker] = "ok" if outcome.written else f"skipped:{outcome.skipped_reason}"
-            except Exception:
-                _rollback(db)
-                logger.exception("class shares ECSO failed for %s", ticker)
-                results[ticker] = "error"
-        return {"actor": "ingest_class_shares_outstanding", "status": "ok", "results": results}
-    finally:
-        db.close()
+        db = _session(tenant_id, user_id)
+        try:
+            results: dict[str, str] = {}
+            # General (regla «acciones-vigentes-v1»): todo emisor con CIK sin portada consolidada reciente, no una
+            # lista por ticker.
+            for company in class_cover_candidates(db):
+                ticker = company.ticker
+                try:
+                    outcome = backfill_class_shares_outstanding(db, company, cik=company.cik)
+                    db.commit()
+                    results[ticker] = "ok" if outcome.written else f"skipped:{outcome.skipped_reason}"
+                except Exception:
+                    _rollback(db)
+                    logger.exception("class shares ECSO failed for %s", ticker)
+                    results[ticker] = "error"
+            return {"actor": "ingest_class_shares_outstanding", "status": "ok", "results": results}
+        finally:
+            db.close()
+    except Exception as exc:
+        return _handle_actor_error("ingest_class_shares_outstanding", exc, tenant_id=tenant_id)
 
 
 # 429 de filings.xbrl.org en el build: 5 min, 10 min... (techo 1 h). El
