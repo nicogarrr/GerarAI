@@ -1,6 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import { renderToString } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ViewportDedup } from '@/components/ui/viewport-dedup';
 import { RecordList, type DataRecord } from '@/components/data/RecordViews';
 
 // Scorecard v1, hallazgo 4: la lista pintaba DOS arboles (tabla escritorio +
@@ -52,5 +53,41 @@ describe('RecordList: un solo arbol por viewport tras montar', () => {
         mockMatchMedia(true);
         render(<RecordList fetchRecords={async () => []} records={records(3)} title="Prueba" />);
         expect(screen.getByText('T3')).toBeInTheDocument();
+    });
+});
+
+
+describe('ViewportDedup estados límite', () => {
+    it('conserva el único árbol del estado vacío móvil', () => {
+        mockMatchMedia(false);
+        render(<ViewportDedup mobile={null} desktop={<p>Vacío con filtros</p>} />);
+        expect(screen.getByText('Vacío con filtros')).toBeInTheDocument();
+    });
+    it('redimensiona, restaura ambos al imprimir y limpia listeners', () => {
+        const listeners = new Map<string, () => void>();
+        let desktop = false;
+        let printing = false;
+        const remove = vi.fn();
+        window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+            get matches() { return query === 'print' ? printing : desktop; },
+            addEventListener: (_: string, callback: () => void) => listeners.set(query, callback),
+            removeEventListener: remove,
+        }));
+        const { unmount } = render(<ViewportDedup mobile={<p>Móvil</p>} desktop={<p>Escritorio</p>} />);
+        expect(screen.getByText('Móvil')).toBeInTheDocument();
+        expect(screen.queryByText('Escritorio')).toBeNull();
+        desktop = true;
+        act(() => listeners.get('(min-width: 768px)')?.());
+        expect(screen.queryByText('Móvil')).toBeNull();
+        expect(screen.getByText('Escritorio')).toBeInTheDocument();
+        printing = true;
+        act(() => listeners.get('print')?.());
+        expect(screen.getByText('Móvil')).toBeInTheDocument();
+        expect(screen.getByText('Escritorio')).toBeInTheDocument();
+        printing = false;
+        act(() => listeners.get('print')?.());
+        expect(screen.queryByText('Móvil')).toBeNull();
+        unmount();
+        expect(remove).toHaveBeenCalledTimes(2);
     });
 });

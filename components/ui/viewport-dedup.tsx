@@ -38,8 +38,8 @@ export function ViewportDedup({ mobile, desktop, query = '(min-width: 768px)' }:
     const viewport = useViewportDedup(query);
     return (
         <>
-            {viewport !== 'mobile' ? desktop : null}
-            {viewport !== 'desktop' ? mobile : null}
+            {mobile == null || viewport !== 'mobile' ? desktop : null}
+            {desktop == null || viewport !== 'desktop' ? mobile : null}
         </>
     );
 }
