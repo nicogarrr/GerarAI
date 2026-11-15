@@ -2072,6 +2072,19 @@ class ChatService:
                 if personal is not None:
                     personal.context = context_echo
                     return personal
+        # Herramientas en vivo: precio y noticias pedidos al proveedor
+        # gratuito en el momento de la pregunta. Fail-closed: si el proveedor
+        # no responde, la pregunta sigue a la ruta de datos guardados.
+        from app.services.brain_live_tools import answer_live_question
+
+        live_answer = await answer_live_question(
+            db,
+            question or "",
+            page_context.company if page_context is not None else None,
+        )
+        if live_answer is not None:
+            live_answer.context = context_echo
+            return live_answer
         data_answer = answer_data_question(db, question)
         if data_answer is not None:
             # A quote question may also request a concrete metric. Do not let
