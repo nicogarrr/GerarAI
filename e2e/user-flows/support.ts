@@ -1,5 +1,7 @@
 import { expect, test as base } from "@playwright/test";
 import type { Page, Request, Response } from "@playwright/test";
+import { appendFile, mkdir } from "node:fs/promises";
+import path from "node:path";
 import { createHash, createHmac, randomUUID } from "node:crypto";
 import { E2E_UI_BACKEND_URL } from "../fixtures/e2e-env";
 
@@ -136,10 +138,36 @@ export async function visit(page: Page, path: string) {
   return response;
 }
 
-export const test = base.extend<{ health: PageHealth }>({
+export const test = base.extend<{ health: PageHealth; admissionWindow: void }>({
+  // DISPOSABLE CI measurement. Awaited markers also enclose SSR/server actions
+  // reaching the backend, not just page.on(request) browser-visible traffic.
+  admissionWindow: [async ({ request }, provide, testInfo) => {
+    if (process.env.E2E_ADMISSION_TRACE !== "1") {
+      await provide();
+      return;
+    }
+    const caseId = createHash("sha256").update(testInfo.testId).digest("hex").slice(0, 16);
+    const attempt = testInfo.retry;
+    const folder = path.resolve("test-results");
+    await mkdir(folder, { recursive: true });
+    await appendFile(path.join(folder, "admission-cases.jsonl"), JSON.stringify({
+      case_id: caseId, attempt, title: testInfo.titlePath.join(" > "), worker: testInfo.workerIndex,
+    }) + "\n");
+    const mark = async (event: "start" | "end") => {
+      const response = await request.get(`${E2E_UI_BACKEND_URL}/_ci/admission-mark/${event}/${caseId}/${attempt}`);
+      expect(response.status(), "CI admission marker").toBe(204);
+    };
+    await mark("start");
+    try {
+      await provide();
+    } finally {
+      await mark("end");
+    }
+  }, { auto: true }],
   // auto: vigila TODOS los tests aunque no pidan `health` explícitamente.
   health: [
-    async ({ page }, provide) => {
+    async ({ page, admissionWindow }, provide) => {
+      void admissionWindow;
       const health = new PageHealth(page);
       await provide(health);
       health.assertClean();
