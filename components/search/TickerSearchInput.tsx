@@ -214,6 +214,9 @@ export function TickerSearchInput({ value: controlledValue, defaultValue = '', n
         }}>
             <Input
                 id={id}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={value}
                 disabled={disabled}
                 name={name}

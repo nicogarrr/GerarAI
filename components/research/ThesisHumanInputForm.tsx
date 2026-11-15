@@ -56,7 +56,7 @@ export default function ThesisHumanInputForm({ ticker }: { ticker: string }) {
             <input name="driver_key" required maxLength={160} className={inputClass} placeholder="revenue" />
           </label>
           <label className="text-xs text-gray-300">{t('research.thesisHumanInput.fiscalYear')}
-            <input name="fiscal_year" type="number" required min={1900} max={2200} step={1} className={inputClass} />
+            <input name="fiscal_year" type="number" inputMode="numeric" required min={1900} max={2200} step={1} className={inputClass} />
           </label>
           <label className="text-xs text-gray-300">{t('research.thesisHumanInput.scenario')}
             <select name="scenario" defaultValue="base" className={inputClass}>

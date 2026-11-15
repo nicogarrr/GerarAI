@@ -127,6 +127,7 @@ export default function WorkProductDialog() {
                     <Input
                         id="wp-years"
                         type="number"
+                        inputMode="numeric"
                         min={1}
                         max={20}
                         value={years}
