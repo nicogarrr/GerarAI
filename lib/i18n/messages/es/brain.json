@@ -84,7 +84,7 @@
   "panel": {
     "title": "Cerebro GerarAI",
     "titleShort": "Cerebro",
-    "tickerPlaceholder": "Ticker guía",
+    "tickerPlaceholder": "Ticker",
     "tickerAria": "Ticker de la guía de investigación",
     "guideButton": "Guía",
     "guideButtonTitle": "Guía de investigación por empresa",

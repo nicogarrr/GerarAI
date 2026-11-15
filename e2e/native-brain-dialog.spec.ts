@@ -21,6 +21,8 @@ for (const reducedMotion of ['no-preference', 'reduce'] as const) {
             await panel.getByRole('button', { name: 'Abrir la guía de investigación por empresa' }).click();
             const ticker = panel.getByRole('combobox');
             await expect(ticker).toBeVisible();
+            await expect(ticker).toHaveAttribute('placeholder', 'Ticker');
+            await expect(ticker).toHaveAttribute('aria-label', 'Ticker de la guía de investigación');
             expect((await ticker.boundingBox())!.width).toBeGreaterThanOrEqual(72);
             await input.fill('Borrador de prueba, sin enviar');
             await panel.getByRole('button', { name: 'Maximizar el cerebro' }).click();
