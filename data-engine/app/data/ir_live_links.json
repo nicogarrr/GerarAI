@@ -11,11 +11,32 @@
       "source": "https://investors.ast-science.com/events"
     }
   },
+  "FRPH": {
+    "2026-11-05": {
+      "kind": "webcast",
+      "url": "https://www.webcaster5.com/Webcast/Page/3158/54642",
+      "source": "https://investors.frpdev.com/quarterly-reports"
+    }
+  },
   "META": {
     "2026-10-21": {
       "kind": "webcast",
       "url": "https://events.q4inc.com/attendee/132342320",
       "source": "https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx"
+    }
+  },
+  "REXR": {
+    "2026-10-22": {
+      "kind": "webcast",
+      "url": "https://events.q4inc.com/attendee/238759897/guest",
+      "source": "https://ir.rexfordindustrial.com/news-events/events-webcasts/detail/20261023-third-quarter-2026-earnings-conference-call"
+    }
+  },
+  "TSLA": {
+    "2026-10-21": {
+      "kind": "webcast",
+      "url": "https://ir.tesla.com/webcast-2026-10-21",
+      "source": "https://ir.tesla.com/"
     }
   }
 }

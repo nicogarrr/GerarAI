@@ -34,7 +34,8 @@ test('historia: la pagina pide los ultimos dias y el backend solo sirve historia
 test('registro IR: pagina de evento solo con fecha exacta; si no, seccion general; sin entrada = nada', () => {
     assert.equal(irLinksFor('META', '2026-10-21')?.eventPage?.url, 'https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx');
     assert.equal(irLinksFor('META', '2026-10-22')?.eventPage, null);
-    assert.equal(irLinksFor('TSLA', '2026-10-21')?.eventPage, null);
+    assert.equal(irLinksFor('TSLA', '2026-10-21')?.eventPage?.period, 'T3 2026');
+    assert.equal(irLinksFor('TSLA', '2026-10-22')?.eventPage, null);
     assert.equal(irLinksFor('ZZZZ', '2026-10-21'), null);
     for (const entry of Object.values(IR_REGISTRY)) {
         for (const url of [entry.section.url, ...entry.events.map((e) => e.url)]) assert.match(url, /^https:\/\//);
@@ -63,7 +64,7 @@ test('registro IR: BN T2 enlaza grabacion y transcripcion solo con fecha exacta'
     assert.deepEqual(hit?.eventPage?.assets.map((a) => a.kind), ['grabacion', 'transcripcion']);
     for (const a of hit?.eventPage?.assets ?? []) assert.ok(a.url.startsWith('https://bn.brookfield.com/') && a.source.startsWith('https://bn.brookfield.com/events/'));
     assert.equal(irLinksFor('BN', '2026-08-14')?.eventPage, null);
-    assert.deepEqual(irLinksFor('BN', '2026-11-12')?.eventPage?.assets, []);
+    assert.deepEqual(irLinksFor('BN', '2026-11-12')?.eventPage?.assets.map((a) => a.kind), ['presentacion']);
 });
 
 test('registro IR: META T1 enlaza presentacion y transcripcion (fecha exacta); T3 aun sin archivos', () => {
