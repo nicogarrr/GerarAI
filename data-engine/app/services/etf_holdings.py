@@ -1,7 +1,7 @@
-"""Holdings oficiales de ETFs tematicos (UFO, NASA) para la tira de noticias.
+"""Holdings oficiales de ETFs tematicos (UFO, NASA, JEDI) para la tira de noticias.
 
-Fuente: el CSV publicado por el propio emisor (Procure, Tema), descubierto en
-la pagina del fondo (la URL lleva la fecha). Solo se guardan tickers de renta
+Fuente: el fichero publicado por el propio emisor (Procure, Tema: CSV descubierto
+en la pagina del fondo, la URL lleva la fecha; VanEck: Excel de descarga fija). Solo se guardan tickers de renta
 variable con peso y fecha de corte del fichero. Si la descarga o el parseo
 falla, o el fichero parece incompleto, se conserva la carga anterior (nunca se
 borra por un fallo). Sin LLM, coste 0, una descarga por ETF y semana."""
@@ -36,6 +36,8 @@ class EtfSource:
     name: str
     page: str
     link_re: str
+    direct_url: str | None = None  # descarga fija (VanEck): sin descubrimiento en la pagina
+    binary: bool = False  # el parser recibe bytes (xlsx) en vez de texto
 
 
 SOURCES = {
@@ -43,6 +45,13 @@ SOURCES = {
                      r"https://procureetfs\.com/[^\"' ]*UFO[^\"' ]*Holdings[^\"' ]*\.csv"),
     "NASA": EtfSource("NASA", "Tema Space Innovators ETF", "https://temaetfs.com/nasa",
                       r"https://temaetfs\.com/[^\"' ]*NASA-holdings-\d+\.csv"),
+    # UCITS de VanEck: el Excel «All Holdings» es publico; la web exige las
+    # cookies de pais que fija su primera redireccion (?cken=true), por eso el
+    # cliente httpx comparte cookies entre peticiones.
+    "JEDI": EtfSource("JEDI", "VanEck Space Innovators UCITS ETF",
+                      "https://www.vaneck.com/uk/en/investments/space-etf/holdings/", "",
+                      direct_url="https://www.vaneck.com/uk/en/investments/space-etf/downloads/holdings/",
+                      binary=True),
 }
 
 
@@ -103,7 +112,62 @@ def parse_tema(text: str) -> tuple[date | None, list[tuple[str, Decimal]]]:
     return as_of, rows
 
 
-_PARSERS = {"UFO": parse_procure, "NASA": parse_tema}
+_XLSX_NS = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+_JEDI_DATE = re.compile(r"All Holdings\s+(\d{1,2}/\d{1,2}/\d{4})")
+_JEDI_TICKER = re.compile(r"^([A-Z]{1,5}) US$")
+
+
+def _xlsx_rows(data: bytes) -> list[list[str]]:
+    """Filas de la primera hoja de un .xlsx (zip + XML seguro, sin dependencias nuevas)."""
+    import zipfile
+
+    from defusedxml import ElementTree as DET
+
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        shared = [
+            "".join(t.text or "" for t in si.iter(f"{_XLSX_NS}t"))
+            for si in DET.fromstring(zf.read("xl/sharedStrings.xml")).iter(f"{_XLSX_NS}si")
+        ]
+        sheet = DET.fromstring(zf.read("xl/worksheets/sheet1.xml"))
+    rows: list[list[str]] = []
+    for row in sheet.iter(f"{_XLSX_NS}row"):
+        cells: list[str] = []
+        for cell in row.findall(f"{_XLSX_NS}c"):
+            v = cell.find(f"{_XLSX_NS}v")
+            raw = v.text if v is not None and v.text is not None else ""
+            cells.append(shared[int(raw)] if cell.get("t") == "s" and raw else raw)
+        rows.append(cells)
+    return rows
+
+
+def parse_vaneck(data: bytes) -> tuple[date | None, list[tuple[str, Decimal]]]:
+    """Excel «All Holdings» de VanEck. Solo cotizadas en EEUU (ticker «XXXX US» e
+    ISIN US...): excluye cotizadas extranjeras («MRO LN», «9412 JP») y las que
+    cotizan en EEUU con ISIN foraneo, cuya correspondencia con el ticker de la
+    app no esta verificada. Fecha de corte de la cabecera."""
+    rows = _xlsx_rows(data)
+    head = _JEDI_DATE.search(rows[0][0]) if rows and rows[0] else None
+    if head is None:
+        raise ValueError("ETF invalid equity date")
+    try:
+        as_of = datetime.strptime(head.group(1), "%m/%d/%Y").date()
+    except ValueError as exc:
+        raise ValueError("ETF invalid equity date") from exc
+    out: list[tuple[str, Decimal]] = []
+    for cells in rows[1:]:
+        if len(cells) < 7:
+            continue
+        match = _JEDI_TICKER.match(cells[2].strip().upper())
+        if not match or not cells[3].strip().startswith("US"):
+            continue
+        weight = _pct(cells[6], fraction=False)
+        if weight is None:
+            raise ValueError("ETF invalid equity weight")
+        out.append((match.group(1), weight))
+    return as_of, out
+
+
+_PARSERS = {"UFO": parse_procure, "NASA": parse_tema, "JEDI": parse_vaneck}
 
 
 def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None = None) -> dict:
@@ -117,9 +181,12 @@ def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None 
     try:
         for etf, src in SOURCES.items():
             try:
-                page = http.get(src.page)
-                page.raise_for_status()
-                links = sorted(set(re.findall(src.link_re, page.text)))
+                if src.direct_url:
+                    links = [src.direct_url]
+                else:
+                    page = http.get(src.page)
+                    page.raise_for_status()
+                    links = sorted(set(re.findall(src.link_re, page.text)))
                 if not links:
                     out[etf] = "sin enlace de holdings"
                     continue
@@ -128,7 +195,7 @@ def refresh_etf_holdings(db: Session | None = None, client: httpx.Client | None 
                     try:  # un enlace roto (404 de un mes anterior) no aborta los demas
                         resp = http.get(link)
                         resp.raise_for_status()
-                        as_of, rows = _PARSERS[etf](resp.text)
+                        as_of, rows = _PARSERS[etf](resp.content if src.binary else resp.text)
                     except Exception as exc:  # noqa: BLE001
                         logger.warning("etf_holdings %s enlace %s fallo: %s", etf, link, exc)
                         continue

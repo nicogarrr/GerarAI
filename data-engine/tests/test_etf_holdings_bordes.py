@@ -20,6 +20,7 @@ from app.services import etf_holdings as eh
 UFO_PAGE = "https://procureetfs.com/ufo/"
 UFO_CSV_URL = "https://procureetfs.com/files/UFO-Holdings.csv"
 NASA_PAGE = "https://temaetfs.com/nasa"
+JEDI_CAIDO = "ningun fichero valido: se conserva la carga anterior (si la hay)"  # VanEck sin responder (404)
 UFO_HTML = f'<html><a href="{UFO_CSV_URL}">holdings</a></html>'
 
 
@@ -89,6 +90,7 @@ def test_refresh_pesos_incoherentes_conserva_la_carga():
         assert out == {
             "UFO": "pesos incoherentes: se conserva la carga anterior",
             "NASA": "sin enlace de holdings",
+            "JEDI": JEDI_CAIDO,
         }
         assert db.scalars(select(EtfHolding)).all() == []
     finally:
@@ -108,6 +110,7 @@ def test_refresh_ticker_duplicado_se_guarda_una_vez():
         assert out == {
             "UFO": "ok 10 holdings as_of 2026-10-19",
             "NASA": "sin enlace de holdings",
+            "JEDI": JEDI_CAIDO,
         }
         guardados = db.scalars(select(EtfHolding).where(EtfHolding.etf == "UFO")).all()
         assert len(guardados) == 10
@@ -143,7 +146,7 @@ def test_refresh_cierra_cliente_y_sesion_propios(monkeypatch):
 
     out = eh.refresh_etf_holdings()
 
-    assert out == {"UFO": "sin enlace de holdings", "NASA": "sin enlace de holdings"}
+    assert out == {"UFO": "sin enlace de holdings", "NASA": "sin enlace de holdings", "JEDI": JEDI_CAIDO}
     assert cerrado["http"] is True
     # La sesión propia quedó cerrada (la creamos nosotros solo para inyectarla).
     assert not db.in_transaction()

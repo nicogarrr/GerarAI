@@ -263,7 +263,7 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     _register(scheduler, partial(enqueue_for_all_tenants, ingest_house_ptr),
               "interval", job_id="house_ptr", hours=6)
     _register(scheduler, partial(coalesced_send, refresh_macro_context), "cron", job_id="macro_context_refresh", hour=23, minute=10)
-    # Holdings oficiales de ETFs tematicos (UFO, NASA): 1 descarga por ETF y semana.
+    # Holdings oficiales de ETFs tematicos (UFO, NASA, JEDI): 1 descarga por ETF y semana.
     _register(scheduler, refresh_etf_holdings, "cron", job_id="etf_holdings_refresh", day_of_week="mon", hour=7, minute=20)
     # Institucionales de todo el 13F (Form 13F Data Sets de la SEC, trimestral):
     # mira la página una vez por semana y solo descarga si hay ZIP nuevo.
