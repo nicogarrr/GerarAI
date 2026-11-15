@@ -16,6 +16,8 @@ Run from data-engine/:
 
 from __future__ import annotations
 
+from concurrent.futures import Future
+
 from fastapi.testclient import TestClient
 
 import main
@@ -94,17 +96,42 @@ def test_flow_end_to_end(monkeypatch):
     monkeypatch.setattr(
         screeners_module, "_refetch_real_items", lambda **kwargs: list(FAKE_VENDOR_ITEMS)
     )
-    screeners_module._real_items_cache.clear()
+    # El primer GET en frío no espera a la cola, ni siquiera con vendor mock.
+    # Controlar la cola evita carreras de hilos/sleeps: el test publica el
+    # trabajo DESPUÉS de comprobar el estado pendiente de la primera lectura.
+    queued = []
+
+    class ControlledExecutor:
+        def submit(self, function, *args):
+            future = Future()
+            queued.append((future, function, args))
+            return future
+
+    monkeypatch.setattr(screeners_module, "_real_refresh_executor", ControlledExecutor())
+    for state in (
+        "_real_items_cache", "_real_response_cache", "_real_refresh_futures",
+        "_real_refresh_generations", "_real_refresh_last_attempt",
+    ):
+        monkeypatch.setattr(screeners_module, state, {})
 
     client = TestClient(main.app)
     client.headers["X-CSRF-Token"] = generate_csrf_token()
 
-    # 1. Screener real (mock vendor).
+    # 1. Screener real: frío pendiente -> publicación -> lectura útil.
+    cold = client.get("/api/screeners/real", params={"limit": 5})
+    assert cold.status_code == 200, cold.text[:300]
+    assert cold.json()["count"] == 0
+    assert cold.json()["refreshing"] is True
+    assert len(queued) == 1
+    future, function, args = queued.pop()
+    future.set_result(function(*args))
+
     screener = client.get("/api/screeners/real", params={"limit": 5})
     assert screener.status_code == 200, f"screener: {screener.status_code} {screener.text[:300]}"
     payload = screener.json()
     assert payload["source"] == "finnhub_free"
     assert payload["count"] >= 1
+    assert payload["refreshing"] is False
     ticker = payload["screener"][0]["symbol"]
     assert ticker == "MSFT", f"el primer item debe ser MSFT, fue {ticker}"
     ok("GET /api/screeners/real", f"ticker={ticker} count={payload['count']}")
