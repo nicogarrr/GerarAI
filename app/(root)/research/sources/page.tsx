@@ -5,6 +5,7 @@ import { HistoryBackLink } from '@/components/common/HistoryBackLink';
 import { ArrowLeft, FileText, ShieldCheck, UploadCloud } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { OverflowScrollRegion } from '@/components/ui/overflow-scroll-region';
+import { ViewportDedup } from '@/components/ui/viewport-dedup';
 import { Input } from '@/components/ui/input';
 import { FileUploadInputLazy as FileUploadInput } from '@/components/forms/FileUploadInputLazy';
 import { Textarea } from '@/components/ui/textarea';
@@ -217,7 +218,10 @@ export default async function ResearchSourcesPage({
             {t('research.sourcesPage.sortNote')}
           </p>
         ) : null}
-        {documents.length > 0 ? <div className="space-y-3 lg:hidden print:hidden">
+        {/* Scorecard v1, hallazgo 4: cards-movil y tabla-escritorio duplicadas en DOM.
+            SSR/primera pintada con los dos arboles (sin flash); tras montar solo el
+            del viewport activo. Al imprimir vuelven los dos (print:block decide). */}
+        <ViewportDedup query="(min-width: 1024px)" mobile={documents.length > 0 ? <div className="space-y-3 lg:hidden print:hidden">
           {documents.map(document => <section key={document.id} aria-label={`${document.ticker ?? 'GLOBAL'} · ${document.title}`} className="min-w-0 rounded-lg border border-gray-800 p-3 [overflow-wrap:anywhere]">
             <p className="text-xs font-semibold text-teal-300">{document.ticker ?? 'GLOBAL'}</p>
             <h3 className="mt-1 text-sm font-semibold text-gray-200">{document.source_url ? <a className="underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">{document.title}</a> : document.title}</h3>
@@ -228,7 +232,7 @@ export default async function ResearchSourcesPage({
               <div><dt className="text-xs text-gray-400">URL</dt><dd>{document.source_url ? <a aria-label={t('research.sourcesPage.openSource', { title: document.title })} className="inline-flex min-h-11 min-w-11 items-center text-teal-300 hover:text-teal-200" href={document.source_url} rel="noreferrer" target="_blank">{t('research.sourcesPage.open')}</a> : NA}</dd></div>
             </dl>
           </section>)}
-        </div> : null}
+        </div> : null} desktop={
         <OverflowScrollRegion className={documents.length ? 'hidden lg:block print:block' : undefined} label={t('research.sourcesPage.regionLabel')}>
 
           <table className="w-full min-w-[820px] text-left text-sm">
@@ -319,6 +323,7 @@ export default async function ResearchSourcesPage({
             </tbody>
           </table>
         </OverflowScrollRegion>
+        } />
         {pageInfo && pageInfo.pages > 1 ? (
           <nav aria-label={t('research.sourcesPage.paginationAria')} className="mt-4 flex flex-wrap items-center gap-3 text-sm">
             {pageInfo.page > 1 ? (

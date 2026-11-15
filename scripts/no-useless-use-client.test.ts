@@ -84,6 +84,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/brain/BrainSources.tsx': 'useT lee locale para las etiquetas de fuentes del Cerebro',
   'components/ui/methodology-disclosure.tsx': 'useT lee locale para título predeterminado; también usado desde componentes client',
   'components/ui/name-avatar.tsx': 'useT lee locale para el texto alternativo de la foto',
+  'components/ui/viewport-dedup.tsx': 'useState/useEffect + matchMedia: dedup movil/escritorio tras montar (scorecard v1, hallazgo 4)',
   'components/proPicks/WalkForwardResults.tsx': 'importa MethodologyDisclosure client, que ahora consume contexto React de locale',
   'components/proPicks/StrategyFactsheet.tsx': 'useT/useLocale/useFormat: textos y números en el idioma elegido (contexto React de locale)',
   'components/research/ResearchRateLimited.tsx': 'useState/useEffect mantienen la cuenta atras; useRouter refresca solo con reintento manual; useT consume el locale React',
