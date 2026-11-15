@@ -46,13 +46,18 @@ def _experts():
     return experts
 
 
-def _reasoner(starts: list[str]):
+def _reasoner(starts: list[str], *, gates=None, started=None):
     typical = {s.name: s.typical_s for s in default_experts()}
 
     async def reason(system: str, user: str, max_tokens: int, task: str) -> str:
         name = task.removeprefix("expert_team.")
         starts.append(name)
-        await asyncio.sleep(typical.get(name, 1.0) * SCALE)
+        if started is not None:
+            started.put_nowait(name)
+        if gates is not None:
+            await gates[name].wait()
+        else:
+            await asyncio.sleep(typical.get(name, 1.0) * SCALE)
         payload = json.loads(user)
         claims = [
             {"text": f"{name} dato {ev['id']} vale 10", "numbers": [10.0], "citations": [ev["id"]]}
@@ -87,12 +92,34 @@ def test_plan_has_five_experts_for_three_slots():
 
 
 def test_slowest_experts_take_the_slots_first():
-    _, starts, elapsed = _run(3)
-    assert set(starts[:3]) == {"fundamental", "tax", "risk"}
-    assert starts[3:] == ["news", "valuation"]
-    # Antes (orden del plantel): el fiscal esperaba a valoración -> 0,05·SCALE... ≈ 0,46 s;
-    # ahora ≈ 0,36 s (el más lento manda). Margen amplio para no fallar con carga.
-    assert elapsed < 0.44
+    async def scenario():
+        starts: list[str] = []
+        started = asyncio.Queue()
+        gates = {spec.name: asyncio.Event() for spec in _experts()}
+        team = ExpertTeam(_experts(), _tools(), _reasoner(starts, gates=gates, started=started), max_parallel=3)
+        task = asyncio.create_task(team.run(_ctx()))
+        try:
+            first = [await started.get() for _ in range(3)]
+            assert first == ["fundamental", "tax", "risk"]
+            # All three slots are occupied: no fourth reasoner may start.
+            assert started.empty()
+            assert starts == first
+            gates["risk"].set()
+            assert await started.get() == "news"
+            assert started.empty()
+            gates["tax"].set()
+            assert await started.get() == "valuation"
+            assert starts == ["fundamental", "tax", "risk", "news", "valuation"]
+        finally:
+            for gate in gates.values():
+                gate.set()
+            if not task.done():
+                task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
+    # A deadlock watchdog, not a performance threshold: ordering and capacity
+    # are asserted through events, independent of host/coverage scheduling.
+    asyncio.run(asyncio.wait_for(scenario(), timeout=10))
 
 
 def test_same_output_as_without_parallel_cap():
