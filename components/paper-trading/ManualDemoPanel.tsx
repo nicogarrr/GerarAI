@@ -274,7 +274,9 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                 </TabsList>
                 <TabsContent value="operar" className="mt-4">
                     <Panel title={ti('paperTrading.panel.tradePanel')}>
-                        <OrderTicket submitFill={submitFill} disabled={!wired} />
+                        {/* account real del servidor: el ticket guía con saldo
+                            y posición en la divisa elegida (sin inventar). */}
+                        <OrderTicket submitFill={submitFill} disabled={!wired} account={account} />
                         {!wired ? (
                             <p className="mt-3 text-xs text-gray-500">
                                 {ti('paperTrading.panel.notWired')}

@@ -124,7 +124,9 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
     it('con cuenta muestra los saldos y cada pestaña su panel', () => {
         setup();
         expect(screen.getByText('Efectivo EUR')).toBeInTheDocument();
-        expect(screen.getByText(/100\.000,00/)).toBeInTheDocument();
+        // El saldo aparece en el resumen Y en el guiado del ticket («Saldo
+        // disponible», prop account real desde 15-nov-2026).
+        expect(screen.getAllByText(/100\.000,00/).length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('Registrar operación')).toBeInTheDocument();
         openTab('Divisas');
         expect(screen.getByText(/Conversión EUR/)).toBeInTheDocument();
