@@ -544,15 +544,31 @@ async def test_cooling_backup_is_skipped_for_next_member():
 
 
 @run_async
-async def test_extra_openrouter_member_is_last_resort():
-    p = Fake(ProviderHTTPError("opencode-go", 429))
-    groq = Fake(ProviderHTTPError("groq", 429))
+async def test_extra_openrouter_member_is_last_resort(monkeypatch):
+    # This checks member order/model pinning, not deadlines. Removing timers
+    # here avoids a 0.5s host-scheduling race; dedicated tests above still
+    # exercise real timeout cancellation. Every provider is a local Fake.
+    monkeypatch.setattr("app.llm.chat_provider.remaining_seconds", lambda _total: None)
+    attempts = []
+
+    class OrderedFake(Fake):
+        async def complete(self, request):
+            attempts.append(self.name)
+            return await super().complete(request)
+
+    p = OrderedFake(ProviderHTTPError("opencode-go", 429))
+    groq = OrderedFake(ProviderHTTPError("groq", 429))
+    p.name = "synthetic-primary"
     groq.name = "groq"
-    orr = Fake(response(model="x:free", provider="openrouter"))
+    orr = OrderedFake(response(model="x:free", provider="openrouter"))
     orr.name = "openrouter"
-    out = await ChatFallbackProvider(p, groq, total=.5, delay=.01, extra_backups=((orr, "x:free"),)).complete(LLMRequest([Message("user", "hola")], task="chat"))
+    provider = ChatFallbackProvider(p, groq, extra_backups=((orr, "x:free"),))
+    provider.delay = None  # asyncio.wait: wait for the synthetic primary result.
+    out = await provider.complete(LLMRequest([Message("user", "hola")], task="chat"))
     assert out.provider == "openrouter" and orr.calls[0].model == "x:free"
 
+    assert attempts == ["synthetic-primary", "groq", "openrouter"]
+    assert len(p.calls) == len(groq.calls) == len(orr.calls) == 1
 
 @run_async
 async def test_fallback_trail_names_failed_members_without_messages_and_is_not_degraded():
