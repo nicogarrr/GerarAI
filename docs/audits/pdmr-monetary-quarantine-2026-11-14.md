@@ -47,3 +47,27 @@ and local CSS, in ES/EN at 390 and 1440 pixels. They are component previews,
 not authenticated production screenshots. The before/after images retain
 shares and filing links, remove the bad prices/totals and show readable
 warnings without horizontal overflow.
+
+## Reconciliación 2026-11-15 sobre main 43db2436
+
+Se conservan las tablas/grid responsivas de #5663/#5665/#5667, el corte
+independiente de publicación de #5673/#5679 y los importes desconocidos de
+#5674. Conflicto de InsiderFeed resuelto manteniendo una sola tabla/fila:
+normalizar PDMR antes del map y poner el aviso monetario en la celda importe.
+No se recupera OperationCard ni el árbol móvil duplicado. Aviso con wrap en
+móvil y ancho máximo en escritorio. Tests de warnings actualizados para
+exigir una sola copia, no dos. Catálogo compacto regenerado.
+
+Incluye el fix de cache previamente entregado: summary:pdmr-money-v2 y
+supresión defensiva de agregados cacheados PDMR en InsidersSection.
+
+132 pytest verdes con regresiones de publicación/unknown-money/PDMR,
+95.55% combinado en quality/summary/ownership. 57 vitest verdes incluyendo
+responsive tests; cache+summary frontend 100% líneas y 96.63% ramas.
+check-i18n, guards completos, typecheck, ESLint, Ruff y diff-check verdes.
+
+12 capturas inspeccionadas de componentes reales, fixtures estáticos ES/EN
+390/1440: feed, summary y filings. Sin overflow horizontal; warnings legibles,
+precios/importes PDMR ausentes y agregados cacheados suprimidos. Filings usa
+un fallo parcial controlado en las señales para enseñar el estado persistido.
+No prueba de hidratación, clics, producción ni suite VM/Browser E2E/Semgrep.

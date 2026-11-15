@@ -259,7 +259,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                             usd(f, tx.value, 0, txCurrency(tx))
                                                         )}
                                                     </span>
-                                                    {tx.form === 'PDMR' ? <span className="mt-1 block whitespace-normal text-xs font-normal text-amber-300">{t(tx.monetary_verification === 'inconsistent' ? 'insider.feed.monetaryInconsistent' : 'insider.feed.monetaryUnverified')}</span> : null}
+                                                    {tx.form === 'PDMR' ? <span className="mt-1 block whitespace-normal text-xs font-normal text-amber-300 md:max-w-64">{t(tx.monetary_verification === 'inconsistent' ? 'insider.feed.monetaryInconsistent' : 'insider.feed.monetaryUnverified')}</span> : null}
                                                     {tx.currency == null && (tx.price != null || tx.value != null) ? (
                                                         <span className="block text-xs font-normal text-gray-500">{t('insider.feed.currencyMissing')}</span>
                                                     ) : null}
