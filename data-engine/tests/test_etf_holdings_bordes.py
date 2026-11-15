@@ -131,8 +131,8 @@ def test_refresh_cierra_cliente_y_sesion_propios(monkeypatch):
         def __init__(self, **kwargs):
             self._real = inner
 
-        def get(self, url):
-            return self._real.get(url)
+        def stream(self, method, url, **kwargs):
+            return self._real.stream(method, url, **kwargs)
 
         def close(self):
             cerrado["http"] = True

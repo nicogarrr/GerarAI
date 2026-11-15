@@ -76,7 +76,7 @@ def test_parse_vaneck_rejects_missing_or_bad_date_and_bad_weight():
     with pytest.raises(ValueError, match="invalid equity date"):
         eh.parse_vaneck(make_xlsx("All Holdings  13/13/2026", REAL_ROWS))
     with pytest.raises(ValueError, match="invalid equity weight"):
-        eh.parse_vaneck(make_xlsx("All Holdings  11/13/2026", [["1", "X", "XYZ US", "US1", "1", "$ 1", "n/d"]]))
+        eh.parse_vaneck(make_xlsx("All Holdings  11/13/2026", [["1", "X", "XYZ US", "US0000000000", "1", "$ 1", "n/d"]]))
 
 
 def _cookie_client(payload: bytes, status: int = 200):
