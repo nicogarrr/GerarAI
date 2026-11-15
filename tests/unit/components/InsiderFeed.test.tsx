@@ -126,11 +126,11 @@ describe('InsiderFeed', () => {
         expect(within(rows[3]).getByText('Canadá · fuente no oficial')).toBeInTheDocument();
         expect(within(rows[3]).getByText('Divisa no informada')).toBeInTheDocument();
         expect(within(rows[4]).getAllByText('—').length).toBeGreaterThan(0);
-        // la tarjeta móvil repite lo mismo
-        expect(screen.getAllByText('Divisa no informada').length).toBeGreaterThanOrEqual(2);
+        // Tabla responsiva única (2026-11-14): cada dato aparece una sola vez.
+        expect(screen.getAllByText('Divisa no informada')).toHaveLength(1);
         expect(screen.getByText(/Fuente: tracefour/)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'SEDI' })).toHaveAttribute('href', 'https://www.sedi.ca');
-        expect(screen.getAllByRole('link', { name: /12\.500/ })).toHaveLength(2);
+        expect(screen.getAllByRole('link', { name: /12\.500/ })).toHaveLength(1);
     });
 
 

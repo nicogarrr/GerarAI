@@ -182,13 +182,18 @@ def test_build_feed_final_contract_keeps_ca_out_of_usd_totals_and_signals(db, mo
 def test_desktop_and_mobile_preserve_source_and_missing_currency_labels():
     root = Path(__file__).resolve().parents[2]
     source = (root / "components/insider/InsiderFeed.tsx").read_text(encoding="utf-8")
-    desktop = source.split("<table", 1)[1].split("</table>", 1)[0]
-    mobile = source.split("function OperationCard", 1)[1].split("export", 1)[0]
-    for layout in (desktop, mobile):
-        assert "tx.form === 'CA-INSIDER'" in layout
-        assert "insider.feed.canadaBadge" in layout
-        assert "tx.source_url" in layout
-        assert "Divisa no informada" in layout or "insider.feed.currencyMissing" in layout
+    # Tabla responsiva unica (decision de diseno, 2026-11-14): una sola fila
+    # por operacion sirve movil y escritorio; ya no existe la tarjeta
+    # OperationCard ni un segundo arbol <table> de escritorio. La fila unica
+    # debe conservar la fuente y la honestidad de divisa en ambos layouts.
+    assert "function OperationCard" not in source
+    assert "<table" not in source.replace("<Table", "")  # solo el componente Table
+    row = source.split("feed.transactions.map", 1)[1]
+    assert "tx.form === 'CA-INSIDER'" in row
+    assert "insider.feed.canadaBadge" in row
+    assert "tx.source_url" in row
+    assert "insider.feed.currencyMissing" in row
+    assert "md:hidden" in row  # etiquetas de la version movil en la fila unica
     assert "insider.feed.totalsNote" in source
 
     # Las cadenas visibles viven en i18n: la semántica debe sobrevivir allí.
