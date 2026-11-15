@@ -1,7 +1,7 @@
 'use client';
 import { openBrain } from '@/lib/brain/open-brain';
 
-import { useRef, type RefObject } from 'react';
+import { useRef, useState, useCallback, type RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { GerarAIWordmark } from '@/components/GerarAIWordmark';
@@ -9,7 +9,8 @@ import NavItems from '@/components/NavItems';
 import SearchCommand from '@/components/SearchCommand';
 import { BrainGlassesIcon } from '@/components/brain/BrainGlassesIcon';
 import { useT } from '@/lib/i18n/client';
-import { useNavDrawer } from '@/hooks/useNavDrawer';
+import { DialogPortalContainerProvider } from '@/hooks/useDialogPortalContainer';
+import { useNativeNavDrawer } from '@/hooks/useNativeNavDrawer';
 
 type Props = {
     onClose: () => void;
@@ -21,44 +22,45 @@ type Props = {
  * Drawer de la navegación móvil: MISMO árbol que el sidebar de escritorio.
  * Carga diferido al abrir el menú (ver MobileNav): su JS no viaja en el
  * bundle inicial de ninguna ruta. El gatillo hamburguesa queda eager.
+ *
+ * <dialog> NATIVO modal (guía Modern Web Guidance, dialog regla 1): sin
+ * role="dialog" ni aria-modal escritos a mano, sin trampa de foco, sin inert
+ * y sin bloqueo manual de scroll del body. El aislamiento lo aporta
+ * showModal() (ver hooks/useNativeNavDrawer). El fondo es ::backdrop, no un
+ * botón absoluto. open:flex respeta el estado cerrado nativo. El buscador
+ * Radix anidado conserva su portal dentro del modal para no quedar inerte.
  */
 export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: Props) {
     const t = useT();
-    const drawerRef = useRef<HTMLDivElement>(null);
+    const dialogRef = useRef<HTMLDialogElement>(null);
     const closeButtonRef = useRef<HTMLButtonElement>(null);
-    const dialogRef = useRef<HTMLDivElement>(null);
-    // Escape, ciclo de Tab, bloqueo de scroll, cierre al cruzar a md+ y
-    // foco: comportamiento compartido con PublicMobileNav (hooks/useNavDrawer).
-    useNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef });
+    const [portalContainer, setPortalContainer] = useState<HTMLDialogElement | null>(null);
+    const setDialogRef = useCallback((node: HTMLDialogElement | null) => {
+        dialogRef.current = node;
+        setPortalContainer(node);
+    }, []);
+    const closeDrawer = () => {
+        dialogRef.current?.close();
+    };
+    // showModal al montar, propagación del cierre nativo, cierre por fondo y
+    // por breakpoint md+: comportamiento compartido en hooks/useNativeNavDrawer.
+    useNativeNavDrawer({ active: true, onClose, dialogRef, closeButtonRef, triggerRef });
 
     return createPortal(
-        <div
-            ref={dialogRef}
-            tabIndex={-1}
-            className="fixed inset-0 z-[60] md:hidden"
-            role="dialog"
-            aria-modal="true"
+        <dialog
+            ref={setDialogRef}
+            id="mobile-nav-drawer"
             aria-labelledby="mobile-nav-title"
+            className="fixed left-0 top-0 z-[60] m-0 open:flex h-full max-h-dvh w-[85vw] max-w-xs flex-col border-r border-gray-700/50 bg-gray-900 p-0 text-gray-300 shadow-2xl md:hidden [&:modal]:overscroll-contain backdrop:bg-black/60 backdrop:backdrop-blur-sm backdrop:overscroll-contain backdrop:overflow-hidden"
         >
-            <h2 id="mobile-nav-title" className="sr-only">{t('shell.nav.menuTitle')}</h2>
-            <button
-                type="button"
-                aria-label={t('shell.nav.closeBackdrop')}
-                onClick={onClose}
-                tabIndex={-1}
-                className="absolute inset-0 cursor-default bg-black/60 backdrop-blur-sm"
-            />
-            <aside
-                id="mobile-nav-drawer"
-                ref={drawerRef}
-                className="absolute left-0 top-0 flex h-full max-h-dvh w-[85vw] max-w-xs flex-col border-r border-gray-700/50 bg-gray-900 shadow-2xl"
-            >
+            <DialogPortalContainerProvider value={portalContainer}>
+                <h2 id="mobile-nav-title" className="sr-only">{t('shell.nav.menuTitle')}</h2>
                 <div className="flex min-h-16 items-center justify-between gap-2 border-b border-gray-700/50 px-4 py-3">
                     <GerarAIWordmark />
                     <button
                         type="button"
                         ref={closeButtonRef}
-                        onClick={onClose}
+                        onClick={closeDrawer}
                         aria-label={t('shell.nav.closeMenu')}
                         className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg p-2 text-gray-300 transition-colors hover:bg-gray-700/50 hover:text-white"
                     >
@@ -81,19 +83,19 @@ export default function MobileNavDrawer({ onClose, triggerRef, initialStocks }: 
                     un clic en el titulo de seccion o en el fondo
                     cerraba el menu. */}
                 <nav
-                    className="flex-1 overflow-y-auto"
+                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
                     aria-label={t('shell.nav.mobileAria')}
                     onClick={(event) => {
-                        if ((event.target as HTMLElement).closest('a[href]')) onClose();
+                        if ((event.target as HTMLElement).closest('a[href]')) closeDrawer();
                     }}
                 >
-                    <button type="button" className="mb-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-teal-300 hover:bg-gray-800" onClick={() => { onClose(); openBrain(); }}>
+                    <button type="button" className="mb-3 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-teal-300 hover:bg-gray-800" onClick={() => { closeDrawer(); openBrain(); }}>
                         <BrainGlassesIcon className="h-5 w-5" />Cerebro
                     </button>
                     <NavItems />
                 </nav>
-            </aside>
-        </div>,
+            </DialogPortalContainerProvider>
+        </dialog>,
         document.body,
     );
 }

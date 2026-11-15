@@ -7,7 +7,8 @@ test('menú móvil ofrece Cerebro aunque el FAB esté oculto por solape', () => 
   const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
   assert.ok(nav.includes('>Cerebro'));
   assert.ok(nav.includes("from '@/lib/brain/open-brain'"));
-  assert.ok(nav.includes("onClose(); openBrain();"));
+  assert.ok(nav.includes("closeDrawer(); openBrain();"));
+  assert.ok(nav.includes("dialogRef.current?.close();"));
   assert.ok(!nav.includes('dispatchEvent'), 'el drawer debe conservar aperturas anteriores al listener');
   assert.ok(brain.includes("window.addEventListener('gerarai:open-brain', openFromNavigation)"));
   assert.ok(brain.includes("window.removeEventListener('gerarai:open-brain', openFromNavigation)"));

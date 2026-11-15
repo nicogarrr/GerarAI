@@ -28,11 +28,11 @@ import MobileNav from '@/components/MobileNav';
 
 // El drawer contiene el gatillo real del buscador (SearchCommand): su
 // onFocus precarga el chunk de SearchCommandDialog (TickerSearchInput ->
-// finnhub.actions) con un import() fire-and-forget, y los tests de la trampa
-// de foco enfocan los botones del drawer. Si ese chunk sigue cargando cuando
-// el archivo termina, Vitest reporta EnvironmentTeardownError como error no
-// manejado y la run falla con todos los tests en verde (visto en CI,
-// #3992/#3995). Drenar el chunk antes del teardown lo evita.
+// finnhub.actions) con un import() fire-and-forget, y los tests enfocan los
+// botones del drawer. Si ese chunk sigue cargando cuando el archivo termina,
+// Vitest reporta EnvironmentTeardownError como error no manejado y la run
+// falla con todos los tests en verde (visto en CI, #3992/#3995). Drenar el
+// chunk antes del teardown lo evita.
 afterAll(async () => {
     await import('@/components/SearchCommandDialog');
 });
@@ -51,36 +51,87 @@ async function openDrawer() {
     await screen.findByRole('dialog', { name: 'Menú de navegación' });
 }
 
-describe('MobileNav', () => {
-    it('el hamburger abre el drawer con el MISMO árbol que el sidebar', async () => {
+function dialogEl(): HTMLDialogElement {
+    return screen.getByRole('dialog', { name: 'Menú de navegación' }) as HTMLDialogElement;
+}
+
+describe('MobileNav (dialog nativo)', () => {
+    it('el hamburger abre un <dialog> nativo modal con el MISMO árbol que el sidebar', async () => {
         render(<MobileNav />);
         await openDrawer();
-        expect(screen.getByRole('dialog', { name: 'Menú de navegación' })).toBeInTheDocument();
+        const dialog = dialogEl();
+        // Nativo: sin role="dialog" ni aria-modal escritos a mano (los aporta
+        // el elemento) y abierto como modal (showModal), no con el atributo open.
+        expect(dialog.tagName).toBe('DIALOG');
+        expect(dialog).not.toHaveAttribute('role');
+        expect(dialog).not.toHaveAttribute('aria-modal');
+        expect(dialog).toHaveAttribute('aria-labelledby', 'mobile-nav-title');
+        expect(dialog.open).toBe(true);
+        expect(dialog).toHaveAttribute('closedby', 'any');
         expect(screen.getByRole('link', { name: 'Cartera' })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Biblioteca' })).toBeInTheDocument();
     });
-    it('Escape cierra y el scroll del body se restaura', async () => {
+
+    it('no bloquea el scroll del body (ni al abrir ni al cerrar)', async () => {
         render(<MobileNav />);
         await openDrawer();
-        expect(document.body.style.overflow).toBe('hidden');
-        fireEvent.keyDown(document, { key: 'Escape' });
+        // Guia dialog: sin modificar el scrollbar raíz; la contención de scroll
+        // por CSS es progresiva y no está verificada en Safari.
+        expect(document.body.style.overflow).toBe('');
+        fireEvent(dialogEl(), new Event('cancel'));
+        act(() => { dialogEl().close(); });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(document.body.style.overflow).toBe('');
     });
+
+    it('Escape (cancel nativo) cierra a traves del evento close', async () => {
+        render(<MobileNav />);
+        await openDrawer();
+        // En el navegador Escape dispara cancel y, si no se previene, close.
+        // jsdom no implementa ese paso UA: se reproduce la secuencia.
+        fireEvent(dialogEl(), new Event('cancel', { cancelable: true }));
+        act(() => { dialogEl().close(); });
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
     it('el botón de cerrar recibe el foco al abrir', async () => {
         render(<MobileNav />);
         await openDrawer();
         expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cerrar menú de navegación' }));
     });
-    it('cerrar por el fondo no deja el diálogo montado', async () => {
+
+    it('cierre por fondo (fallback de closedby="any" donde no existe, p.ej. Safari)', async () => {
         render(<MobileNav />);
         await openDrawer();
-        fireEvent.click(screen.getByRole('button', { name: 'Cerrar menú por fondo' }));
+        const dialog = dialogEl();
+        // jsdom no tiene layout: se fija un rectangulo para el calculo de
+        // dentro/fuera (la guia pide medir posicion del puntero, no el target).
+        vi.spyOn(dialog, 'getBoundingClientRect').mockReturnValue({
+            left: 0, right: 300, top: 0, bottom: 800, width: 300, height: 800, x: 0, y: 0, toJSON: () => ({}),
+        } as DOMRect);
+        fireEvent(dialog, new MouseEvent('pointerdown', { bubbles: true, clientX: 350, clientY: 400 }));
+        fireEvent(dialog, new MouseEvent('pointerup', { bubbles: true, clientX: 350, clientY: 400 }));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
+
+    it('un clic DENTRO del panel no cierra (target del padding no cierra)', async () => {
+        render(<MobileNav />);
+        await openDrawer();
+        const dialog = dialogEl();
+        vi.spyOn(dialog, 'getBoundingClientRect').mockReturnValue({
+            left: 0, right: 300, top: 0, bottom: 800, width: 300, height: 800, x: 0, y: 0, toJSON: () => ({}),
+        } as DOMRect);
+        fireEvent(dialog, new MouseEvent('pointerdown', { bubbles: true, clientX: 150, clientY: 400 }));
+        fireEvent(dialog, new MouseEvent('pointerup', { bubbles: true, clientX: 150, clientY: 400 }));
+        expect(screen.getByRole('dialog', { name: 'Menú de navegación' })).toBeInTheDocument();
+        // Y un arrastre que empieza fuera pero suelta dentro tampoco.
+        fireEvent(dialog, new MouseEvent('pointerdown', { bubbles: true, clientX: 350, clientY: 400 }));
+        fireEvent(dialog, new MouseEvent('pointerup', { bubbles: true, clientX: 150, clientY: 400 }));
+        expect(screen.getByRole('dialog', { name: 'Menú de navegación' })).toBeInTheDocument();
     });
 });
 
-describe('MobileNav (trampas de foco y breakpoints)', () => {
+describe('MobileNav (handoffs y breakpoints)', () => {
     function stubMatchMedia(matches = false) {
         const listeners: Record<string, EventListener[]> = {};
         vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
@@ -99,7 +150,6 @@ describe('MobileNav (trampas de foco y breakpoints)', () => {
         await openDrawer();
         fireEvent.click(screen.getByRole('button', { name: /Cerebro/ }));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-        expect(document.body.style.overflow).toBe('');
         expect(onBrain).toHaveBeenCalledTimes(ready ? 1 : 0);
         expect(window.sessionStorage.getItem(OPEN_BRAIN_PENDING_KEY)).toBe(ready ? null : 'null');
         if (!ready) {
@@ -120,42 +170,14 @@ describe('MobileNav (trampas de foco y breakpoints)', () => {
         await openDrawer();
         fireEvent.click(screen.getByRole('link', { name: 'Cartera' }));
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-        expect(document.body.style.overflow).toBe('');
     });
 
-    it('el ciclo Tab vuelve del último focuseable al primero y Shift+Tab al revés', async () => {
-        stubMatchMedia();
-        // jsdom no layouta: sin rectángulos el filtro deja la lista vacía.
-        vi.spyOn(Element.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
+    it('cruzar a md+ con el drawer abierto lo cierra (modal nativo invisible no puede quedar activo)', async () => {
+        const listeners = stubMatchMedia(false);
         render(<MobileNav />);
         await openDrawer();
-        const dialog = screen.getByRole('dialog', { name: 'Menú de navegación' });
-        const focusables = Array.from(dialog.querySelectorAll<HTMLElement>('button:not([disabled]), a[href]'))
-            .filter((el) => el.tabIndex >= 0);
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        last.focus();
-        fireEvent.keyDown(document, { key: 'Tab' });
-        expect(document.activeElement).toBe(first);
-        first.focus();
-        fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-        expect(document.activeElement).toBe(last);
-        vi.restoreAllMocks();
-    });
-
-    it('Tab sin focuseables visibles deja el foco en el diálogo', async () => {
-        stubMatchMedia();
-        render(<MobileNav />);
-        await openDrawer();
-        fireEvent.keyDown(document, { key: 'Tab' });
-        expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'Menú de navegación' }));
-    });
-
-    it('cruzar a md+ con el drawer abierto lo cierra', async () => {
-        const listeners = stubMatchMedia(true);
-        render(<MobileNav />);
-        await openDrawer();
-        expect(screen.getByRole('dialog')).toBeInTheDocument();
+        expect(dialogEl().open).toBe(true);
+        vi.mocked(window.matchMedia).mock.results[0].value.matches = true;
         act(() => { for (const cb of listeners['change'] ?? []) cb(new Event('change')); });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });

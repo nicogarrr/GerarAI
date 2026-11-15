@@ -7,6 +7,9 @@ import { XIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useT } from "@/lib/i18n/client"
 
+import { useDialogPortalContainer } from '@/hooks/useDialogPortalContainer'
+export { DialogPortalContainerProvider } from '@/hooks/useDialogPortalContainer'
+
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
@@ -20,9 +23,11 @@ function DialogTrigger({
 }
 
 function DialogPortal({
+  container,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />
+  const inheritedContainer = useDialogPortalContainer()
+  return <DialogPrimitive.Portal data-slot="dialog-portal" container={container ?? inheritedContainer} {...props} />
 }
 
 function DialogClose({
