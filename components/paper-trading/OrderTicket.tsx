@@ -9,11 +9,11 @@ import { Label } from '@/components/ui/label';
 import { useLocale, useT, useFormat } from '@/lib/i18n/client';
 import { paperTradingMessage, paperTradingReason } from '@/lib/paper-trading/messages-en';
 import { useRouter } from 'next/navigation';
-import type { Currency, OptionContract } from '@/lib/paper-trading/types';
+import { instrumentKey, type Currency, type OptionContract } from '@/lib/paper-trading/types';
 import { expirationState, isRealDate } from '@/lib/paper-trading/options';
 import { clientOrderIdAfter, parseEsNumber } from './submit';
 import { invalidMessage, TicketFeedbackMessages, useExecutedAtLocal, type FieldInvalid } from './ticket-feedback';
-import type { FillSubmit, SubmitFill } from './submit';
+import type { DemoStateView, FillSubmit, SubmitFill } from './submit';
 
 type Kind = 'accion' | 'opcion';
 
@@ -44,8 +44,16 @@ function newClientOrderId(): string {
  * strikes/vencimientos, la identidad del contrato queda manual y etiquetada.
  * La divisa nunca se preselecciona desde el buscador (su exchange no es
  * prueba de divisa): el toggle manual manda.
+ *
+ * Guiado con datos REALES de la cuenta (prop `account`, del servidor): el
+ * ticket muestra el saldo disponible en la divisa elegida y, cuando el
+ * instrumento ya es identificable (símbolo, y en opciones strike +
+ * vencimiento válidos), la posición abierta EN ESA DIVISA — como el ticket
+ * de un bróker, para no descubrir un rechazo al enviar. La validación de
+ * saldo/posición sigue siendo solo del servidor; esto es información, no
+ * una barrera. Sin `account` no se muestra nada (nunca se inventa).
  */
-export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; disabled?: boolean }) {
+export function OrderTicket({ submitFill, disabled, account = null }: { submitFill: SubmitFill; disabled?: boolean; account?: DemoStateView | null }) {
     const ti = useT();
     const locale = useLocale();
     const f = useFormat();
@@ -217,6 +225,31 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
     }
 
     const kindLabel = kind === 'accion' ? ti('paperTrading.ticket.unitShares') : ti('paperTrading.ticket.unitContracts');
+
+    // Guiado con datos reales de la cuenta (ver cabecera): saldo en la
+    // divisa elegida y posición abierta del instrumento EN ESA DIVISA. La
+    // clave se construye con el instrumentKey compartido (misma forma que el
+    // libro), solo cuando el instrumento ya es identificable: símbolo en
+    // acciones; símbolo + strike válido + vencimiento real en opciones.
+    const guidance = useMemo(() => {
+        if (!account) return null;
+        const cash = currency === 'EUR' ? account.cashEUR : account.cashUSD;
+        const trimmed = symbol.trim().toUpperCase();
+        let key: string | null = null;
+        if (trimmed) {
+            if (kind === 'accion') {
+                key = instrumentKey({ kind: 'accion', symbol: trimmed, name: '' });
+            } else if (Number.isFinite(parsedStrike) && parsedStrike > 0 && EXPIRY_RE.test(expiry) && isRealDate(expiry)) {
+                key = instrumentKey({
+                    kind: 'opcion',
+                    contract: { underlying: trimmed, callPut, strike: parsedStrike, expiry, multiplier: 100, deliverable: 'acciones', adjusted: false },
+                    name: '',
+                });
+            }
+        }
+        const position = key ? account.positions.find((p) => p.instrumentKey === key && p.currency === currency) : undefined;
+        return { cash, key, position };
+    }, [account, currency, symbol, kind, parsedStrike, expiry, callPut]);
     const sideLabel = kind === 'accion'
         ? (side === 'buy' ? ti('paperTrading.ticket.buy') : ti('paperTrading.ticket.sell'))
         : side === 'buy'
@@ -393,6 +426,25 @@ export function OrderTicket({ submitFill, disabled }: { submitFill: SubmitFill; 
                     </div>
                 </div>
             </div>
+
+            {guidance ? (
+                // Guiado con datos reales de la cuenta (no es validación: el
+                // servidor decide). El saldo siempre; la posición cuando el
+                // instrumento ya es identificable, y EN LA DIVISA elegida:
+                // una posición en otra divisa no sirve para cerrar aquí.
+                <p className="text-xs text-gray-500">
+                    {ti('paperTrading.ticket.guidanceCash', { cash: f.formatMoney(guidance.cash, currency) })}
+                    {guidance.key
+                        ? ` · ${guidance.position
+                              ? ti('paperTrading.ticket.guidancePosition', {
+                                    currency,
+                                    quantity: f.formatNumber(guidance.position.quantity, { maximumFractionDigits: 0 }),
+                                    unit: kindLabel,
+                                })
+                              : ti('paperTrading.ticket.guidanceNoPosition', { currency })}`
+                        : ''}
+                </p>
+            ) : null}
 
             <div className="space-y-1.5">
                 <Label htmlFor={`${uid}-executed`}>{ti('paperTrading.ticket.executed')}</Label>

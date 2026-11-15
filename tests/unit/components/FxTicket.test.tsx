@@ -178,4 +178,18 @@ describe('FxTicket (conversión EUR ⇄ USD simulada)', () => {
         render(<FxTicket submitFx={vi.fn<SubmitFx>()} disabled />);
         expect(screen.getByRole('button', { name: 'Registrar conversión simulada' })).toBeDisabled();
     });
+
+    describe('guiado con saldo real de la cuenta', () => {
+        it('sin account no muestra saldo (nada se inventa)', () => {
+            setup();
+            expect(screen.queryByText(/Saldo disponible:/)).not.toBeInTheDocument();
+        });
+
+        it('muestra el saldo de la divisa ORIGEN y cambia al alternar origen', () => {
+            render(<FxTicket submitFx={vi.fn<SubmitFx>()} account={{ ...stateView(), cashEUR: 1000, cashUSD: 50 }} />);
+            expect(norm(screen.getByText(/Saldo disponible:/).textContent ?? '')).toContain(`Saldo disponible: ${norm(formatMoney(1000, 'EUR'))}`);
+            fireEvent.click(screen.getByRole('button', { name: 'USD' }));
+            expect(norm(screen.getByText(/Saldo disponible:/).textContent ?? '')).toContain(`Saldo disponible: ${norm(formatMoney(50, 'USD'))}`);
+        });
+    });
 });

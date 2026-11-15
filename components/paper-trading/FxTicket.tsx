@@ -9,7 +9,7 @@ import { useLocale, useT, useFormat } from '@/lib/i18n/client';
 import { paperTradingMessage, paperTradingReason } from '@/lib/paper-trading/messages-en';
 import { useRouter } from 'next/navigation';
 import type { Currency } from '@/lib/paper-trading/types';
-import { clientOrderIdAfter, parseEsNumber, type SubmitFx } from './submit';
+import { clientOrderIdAfter, parseEsNumber, type DemoStateView, type SubmitFx } from './submit';
 import { invalidMessage, TicketFeedbackMessages, useExecutedAtLocal, type FieldInvalid } from './ticket-feedback';
 
 function newClientOrderId(): string {
@@ -21,8 +21,14 @@ function newClientOrderId(): string {
 /**
  * Conversión EUR<->USD de la cuenta demo: operación manual simulada con el
  * tipo de cambio que introduce el usuario. No consulta ningún mercado.
+ *
+ * Guiado con datos REALES de la cuenta (prop `account`, del servidor): se
+ * muestra el saldo disponible en la divisa ORIGEN antes de convertir, para
+ * no descubrir el rechazo al enviar (misma guía que el ticket de órdenes).
+ * Es información, no validación: el servidor decide. Sin `account` no se
+ * muestra nada (nunca se inventa).
  */
-export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?: boolean }) {
+export function FxTicket({ submitFx, disabled, account = null }: { submitFx: SubmitFx; disabled?: boolean; account?: DemoStateView | null }) {
     const ti = useT();
     const locale = useLocale();
     const f = useFormat();
@@ -45,6 +51,8 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
     const validationError = invalidMessage(invalid, fieldKey);
 
     const to: Currency = from === 'EUR' ? 'USD' : 'EUR';
+    // Saldo real en la divisa ORIGEN (prop account); null sin cuenta: no se muestra.
+    const availableCash = account ? (from === 'EUR' ? account.cashEUR : account.cashUSD) : null;
     const numInputHint = ti('paperTrading.numInputHint');
     const parsedAmount = parseEsNumber(amount);
     const parsedRate = parseEsNumber(rate);
@@ -186,6 +194,12 @@ export function FxTicket({ submitFx, disabled }: { submitFx: SubmitFx; disabled?
                     <>
                         {' '}
                         {ti('paperTrading.fx.receivePart', { amount: f.formatMoney(received, to) })}
+                    </>
+                ) : null}
+                {availableCash !== null ? (
+                    <>
+                        {' '}
+                        {ti('paperTrading.fx.guidanceCash', { cash: f.formatMoney(availableCash, from) })}
                     </>
                 ) : null}
             </p>

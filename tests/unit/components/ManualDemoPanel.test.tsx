@@ -124,7 +124,9 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
     it('con cuenta muestra los saldos y cada pestaña su panel', () => {
         setup();
         expect(screen.getByText('Efectivo EUR')).toBeInTheDocument();
-        expect(screen.getByText(/100\.000,00/)).toBeInTheDocument();
+        // El saldo aparece en el resumen Y en el guiado del ticket («Saldo
+        // disponible», prop account real desde 15-nov-2026).
+        expect(screen.getAllByText(/100\.000,00/).length).toBeGreaterThanOrEqual(1);
         expect(screen.getByText('Registrar operación')).toBeInTheDocument();
         openTab('Divisas');
         expect(screen.getByText(/Conversión EUR/)).toBeInTheDocument();
@@ -329,4 +331,40 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         await act(async () => { await vi.advanceTimersByTimeAsync(3 * 60_000); });
         expect(refreshValuation).not.toHaveBeenCalled();
     });
+    it('el saldo del servidor llega también al ticket FX y sigue su origen', () => {
+        setup({ account: accountView({ cashEUR: 1234, cashUSD: 42 }) });
+        openTab('Divisas');
+        expect(screen.getByText(/Saldo disponible:/)).toHaveTextContent('1.234,00');
+        fireEvent.click(screen.getByRole('button', { name: 'USD' }));
+        expect(screen.getByText(/Saldo disponible:/)).toHaveTextContent('42,00');
+    });
+
+    it('un fallo de red conserva la valoración y muestra el error de red', async () => {
+        const pos = position();
+        const refreshValuation = vi.fn<NonNullable<ManualDemoPanelProps['refreshValuation']>>()
+            .mockRejectedValue(new Error('network'));
+        setup({ account: accountView({ positions: [pos] }), valuation: valuationFor(pos), refreshValuation });
+        openTab('Posiciones');
+        fireEvent.click(screen.getByRole('button', { name: 'Actualizar cotizaciones' }));
+        await flush();
+        expect(screen.getByRole('alert')).toBeInTheDocument();
+        expect(byTextContent('P', /^Valoradas 1 de 1 posición/)).toBeInTheDocument();
+    });
+
+    it('respeta Retry-After y reanuda al volver a visible tras vencerlo', async () => {
+        vi.useFakeTimers();
+        const pos = position();
+        const refreshValuation = vi.fn<NonNullable<ManualDemoPanelProps['refreshValuation']>>()
+            .mockResolvedValue({ ok: true, valuation: valuationFor(pos), asOf: 1, listingUnavailable: false, quoteFetchFailed: false, retryAfterSeconds: 180 });
+        setup({ account: accountView({ positions: [pos] }), refreshValuation });
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(refreshValuation).toHaveBeenCalledTimes(1);
+        await act(async () => { await vi.advanceTimersByTimeAsync(120_000); });
+        fireEvent(document, new Event('visibilitychange'));
+        await flush();
+        expect(refreshValuation).toHaveBeenCalledTimes(1);
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        expect(refreshValuation).toHaveBeenCalledTimes(2);
+    });
+
 });

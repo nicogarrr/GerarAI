@@ -276,6 +276,69 @@ describe('OrderTicket (ticket manual de la cuenta demo)', () => {
         expect(screen.getByRole('button', { name: 'Registrar compra simulada' })).toBeDisabled();
     });
 
+    describe('guiado con saldo y posición reales de la cuenta', () => {
+        const accountWith = (patch: Partial<DemoStateView> = {}): DemoStateView => ({ ...stateView(), ...patch });
+
+        it('sin account no muestra guiado (nada se inventa)', () => {
+            setup();
+            expect(screen.queryByText(/Saldo disponible:/)).not.toBeInTheDocument();
+        });
+
+        it('muestra el saldo de la divisa elegida y cambia al alternar divisa', () => {
+            render(<OrderTicket submitFill={vi.fn<SubmitFill>()} account={accountWith({ cashEUR: 1000, cashUSD: 50 })} />);
+            expect(norm(screen.getByText(/Saldo disponible:/).textContent ?? '')).toContain(`Saldo disponible: ${norm(formatMoney(1000, 'EUR'))}`);
+            fireEvent.click(screen.getByRole('button', { name: 'USD' }));
+            expect(norm(screen.getByText(/Saldo disponible:/).textContent ?? '')).toContain(`Saldo disponible: ${norm(formatMoney(50, 'USD'))}`);
+        });
+
+        it('con símbolo informa de la posición en la divisa elegida; la de otra divisa no cuenta', () => {
+            const account = accountWith({
+                positions: [
+                    { instrumentKey: 'A:ASTS', name: 'AST SpaceMobile', kind: 'accion', currency: 'USD', quantity: 5, avgCost: 50, realizedPnl: 0, optionExpiry: null, optionBadge: null },
+                ],
+            });
+            render(<OrderTicket submitFill={vi.fn<SubmitFill>()} account={account} />);
+            // EUR por defecto: la posición es USD, así que en EUR no hay.
+            fireEvent.change(screen.getByLabelText('Símbolo'), { target: { value: 'ASTS' } });
+            expect(screen.getByText(/Sin posición en EUR/)).toBeInTheDocument();
+            // Al cambiar a USD aparece la posición real.
+            fireEvent.click(screen.getByRole('button', { name: 'USD' }));
+            expect(screen.getByText(/Posición en USD: 5 acciones/)).toBeInTheDocument();
+        });
+
+        it('en opciones la posición solo aparece con strike y vencimiento válidos (contrato identificable)', () => {
+            const expiry = isoDate(inDays(30));
+            const account = accountWith({
+                positions: [
+                    { instrumentKey: `O:AAPL:${expiry}:call:200:100`, name: 'AAPL call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5, realizedPnl: 0, optionExpiry: expiry, optionBadge: 'vigente' },
+                ],
+            });
+            render(<OrderTicket submitFill={vi.fn<SubmitFill>()} account={account} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Opción (call/put)' }));
+            fireEvent.click(screen.getByRole('button', { name: 'USD' }));
+            fireEvent.change(screen.getByLabelText('Subyacente'), { target: { value: 'AAPL' } });
+            // Contrato incompleto: saldo sí, posición no (ni siquiera “sin posición”).
+            expect(screen.getByText(/Saldo disponible:/)).toBeInTheDocument();
+            expect(screen.queryByText(/posición en USD/i)).not.toBeInTheDocument();
+            fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '200' } });
+            fireEvent.change(screen.getByLabelText('Vencimiento'), { target: { value: expiry } });
+            expect(screen.getByText(/Posición en USD: 2 contratos/)).toBeInTheDocument();
+            // Un strike distinto es OTRO contrato: sin posición, no la del vecino.
+            fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '210' } });
+            expect(screen.getByText(/Sin posición en USD/)).toBeInTheDocument();
+        });
+
+        it('un vencimiento inválido no identifica contrato: no se afirma posición', () => {
+            render(<OrderTicket submitFill={vi.fn<SubmitFill>()} account={accountWith()} />);
+            fireEvent.click(screen.getByRole('button', { name: 'Opción (call/put)' }));
+            fireEvent.change(screen.getByLabelText('Subyacente'), { target: { value: 'AAPL' } });
+            fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '200' } });
+            fireEvent.change(screen.getByLabelText('Vencimiento'), { target: { value: '2026-02-30' } });
+            expect(screen.getByText(/Saldo disponible:/)).toBeInTheDocument();
+            expect(screen.queryByText(/posición en EUR/i)).not.toBeInTheDocument();
+        });
+    });
+
     describe('buscador guiado', () => {
         beforeEach(() => vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] }));
         afterEach(() => vi.useRealTimers());
