@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { writeFileSync } from 'node:fs';
 import { getResearchCompanySnapshot, getResearchThesisWorkspace } from '@/lib/actions/research.actions';
 import { researchRequest } from '@/lib/research/client';
+import { AppError } from '@/lib/types/errors';
 import ThesisReadingPage from '@/app/(root)/research/[ticker]/tesis/page';
 vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => undefined }) }));
 vi.mock('@/lib/actions/research.actions', () => ({ getResearchCompanySnapshot: vi.fn(), getResearchThesisWorkspace: vi.fn() }));
@@ -53,4 +54,28 @@ describe('printable thesis does not bypass current valuation gate', () => {
 
 it('optional exact page SSR fixture for visual inspection', async () => {
  if (process.env.READING_VISUAL_OUT) { setup(false); writeFileSync(process.env.READING_VISUAL_OUT, renderToStaticMarkup(await ThesisReadingPage({ params: Promise.resolve({ ticker: 'AAPL' }) }))); }
+});
+
+
+it.each(['published', 'superseded', 'insufficient_data'])('keeps the isolated ASTS appendix visible for archived %s text', async (status) => {
+ setup(false, status);
+ const page = await ThesisReadingPage({ params: Promise.resolve({ ticker: 'ASTS' }) });
+ if (process.env.ASTS_READING_VISUAL_OUT && status === 'superseded') writeFileSync(process.env.ASTS_READING_VISUAL_OUT, renderToStaticMarkup(page));
+ render(page);
+ expect(screen.getByTestId('asts-bank-supplement')).toBeInTheDocument();
+ expect(screen.getAllByRole('note').some(note => note.textContent?.includes('v11'))).toBe(true);
+ expect(screen.queryByText(/65,1/)).not.toBeInTheDocument();
+ expect(screen.queryByText(/119,92/)).not.toBeInTheDocument();
+ expect(screen.queryByRole('link', { name: 'PDF' })).not.toBeInTheDocument();
+ expect(screen.getByRole('button', { name: 'Regenerar tesis' })).toBeInTheDocument();
+});
+
+
+it('does not show the ASTS appendix when the company is missing even with a stored archive', async () => {
+ setup(false, 'superseded');
+ vi.mocked(getResearchCompanySnapshot).mockResolvedValue(null);
+ vi.mocked(researchRequest).mockRejectedValue(new AppError('Company not found', 'RESEARCH_API_ERROR', 404));
+ render(await ThesisReadingPage({ params: Promise.resolve({ ticker: 'ASTS' }) }));
+ expect(screen.queryByTestId('asts-bank-supplement')).not.toBeInTheDocument();
+ expect(screen.queryByText(/65,1/)).not.toBeInTheDocument();
 });
