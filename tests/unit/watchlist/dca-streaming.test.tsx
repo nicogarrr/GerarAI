@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 // /watchlist no debe esperar a getDcaSignals (7,9 s medidos en prod por
 // rendimiento movil, 2026-11-14) para devolver el documento: el panel DCA y
@@ -44,8 +44,14 @@ function find(node: unknown, name: string, out: El[] = []): El[] {
   return out;
 }
 
+// Import/transform time is not page data latency. Load the module before
+// the streaming assertion's clock starts (cold VM imports can exceed 1s).
+let WatchlistPage: typeof import('@/app/(root)/watchlist/page')['default'];
+beforeAll(async () => {
+  ({ default: WatchlistPage } = await import('@/app/(root)/watchlist/page'));
+});
+
 async function renderPage() {
-  const { default: WatchlistPage } = await import('@/app/(root)/watchlist/page');
   return WatchlistPage({ searchParams: Promise.resolve({}) });
 }
 
