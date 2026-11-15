@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import random
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -24,7 +25,7 @@ def _resp(status: int, retry_after: str | None = None) -> httpx.Response:
     return httpx.Response(status, headers=headers, request=_REQ)
 
 
-def _run(steps, monkeypatch, **kwargs):
+def _run(steps, monkeypatch, *, before_fetch=None, **kwargs):
     """Ejecuta get_with_retry con respuestas/excepciones en orden; devuelve
     (resultado o excepción, nº de llamadas, esperas)."""
     sleeps: list[float] = []
@@ -36,12 +37,16 @@ def _run(steps, monkeypatch, **kwargs):
 
     async def fetch():
         calls["n"] += 1
+        if before_fetch is not None:
+            await before_fetch()
         step = queue.pop(0)
         if isinstance(step, BaseException):
             raise step
         return step
 
-    monkeypatch.setattr(base.asyncio, "sleep", fake_sleep)
+    # Only this connector sees the spy. Mutating asyncio.sleep itself also
+    # intercepts unrelated event loops / background timers in the pytest worker.
+    monkeypatch.setattr(base, "asyncio", SimpleNamespace(sleep=fake_sleep))
     try:
         outcome = asyncio.run(get_with_retry(fetch, **kwargs))
     except Exception as exc:  # noqa: BLE001 - la excepción es parte del contrato
@@ -141,3 +146,31 @@ def test_jitter_draws_same_uniform_sequence(monkeypatch, statuses):
     expected = [random.uniform(0.0, 1.0), random.uniform(0.0, 2.0)]
     assert out.status_code == 200
     assert (n, sleeps) == (3, expected)
+
+
+def test_sleep_spy_does_not_capture_unrelated_asyncio_tasks(monkeypatch):
+    """A concurrent timer must neither become a retry wait nor be skipped.
+
+    The yield uses the original sleep, so the timer definitely starts before
+    cancellation. With a process-global sleep patch it returns immediately and
+    contaminates the retry log with 10.0; with a local facade it stays pending.
+    No wall-clock wait or network is needed.
+    """
+    original_sleep = asyncio.sleep
+    pending = []
+
+    async def unrelated_timer():
+        task = asyncio.create_task(asyncio.sleep(10.0))
+        await original_sleep(0)
+        pending.append(not task.done())
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+    out, n, sleeps = _run(
+        [_resp(429, "5"), _resp(429, "0.1"), _resp(200)],
+        monkeypatch, before_fetch=unrelated_timer, base_seconds=1.0,
+    )
+    assert out.status_code == 200
+    assert (n, sleeps) == (3, [5.0, 2.0])
+    assert pending == [True, True, True]
+    assert asyncio.sleep is original_sleep
