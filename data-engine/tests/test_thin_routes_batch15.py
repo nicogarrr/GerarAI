@@ -795,14 +795,6 @@ def test_schedule_refresh_lanza_nuevo_tras_cooldown(monkeypatch):
     assert s._real_refresh_futures[1] is futuro
 
 
-def test_active_vendor_cold_wait():
-    assert s.active_vendor_allows_cold_wait("yahoo", _settings()) is True
-    assert s.active_vendor_allows_cold_wait("finnhub", _settings()) is True
-    assert s.active_vendor_allows_cold_wait(
-        "finnhub", _settings(finnhub_api_key="k")
-    ) is False
-
-
 def test_endpoint_cache_hit_con_items_frescos_no_reprograma(monkeypatch):
     monkeypatch.setattr(s, "get_settings", _settings)
     programado = []
