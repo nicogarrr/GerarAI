@@ -361,3 +361,29 @@ def test_news_malformed_fields_fail_closed(db, monkeypatch):
     assert response is not None
     assert "sin fecha" in response.answer
     assert len(response.sources) == 1
+
+
+@pytest.mark.parametrize("tickers,question", [
+    (["ASTS"], "Precio de ASTS y ZZZZZ ahora"),
+    (["ASTS", "AAPL", "MSFT", "META", "AMZN"], "Precio de ASTS AAPL MSFT META AMZN ahora"),
+])
+def test_incomplete_company_coverage_falls_back_before_network(db, monkeypatch, tickers, question):
+    from app.services import brain_live_tools
+
+    for ticker in tickers:
+        company(db, ticker)
+
+    async def unexpected_network(*args, **kwargs):
+        pytest.fail("incomplete company coverage must fall back before network")
+
+    monkeypatch.setattr(brain_live_tools, "_live_quote_answer", unexpected_network)
+    monkeypatch.setattr(brain_live_tools, "_live_news_answer", unexpected_network)
+    assert asyncio.run(answer_live_question(db, question)) is None
+
+
+def test_repeated_ticker_does_not_exhaust_company_limit(db, monkeypatch):
+    company(db, "ASTS")
+    patch_quotes(monkeypatch, {"ASTS": live_quote("ASTS", 105.3)})
+    response = asyncio.run(answer_live_question(db, "precio ASTS ASTS ASTS ASTS ASTS"))
+    assert response is not None
+    assert len(response.sources) == 1

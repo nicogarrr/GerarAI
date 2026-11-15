@@ -115,11 +115,17 @@ def _companies_in_question(
     empresa de la pastilla «Viendo X». Nunca se adivina una empresa.
     """
     tokens = re.findall(r"\b[A-Z][A-Z0-9.-]{1,14}\b", question)
+    # Cobertura completa o nada antes de consultar proveedores: ni un ticker
+    # desconocido ni el límite operativo pueden desaparecer de la respuesta.
+    if len(set(tokens)) > _MAX_COMPANIES:
+        return []
     companies = (
         list(db.scalars(select(Company).where(Company.ticker.in_(set(tokens)))).all())
         if tokens
         else []
     )
+    if tokens and {item.ticker for item in companies} != set(tokens):
+        return []
     if companies:
         order = {ticker: index for index, ticker in reversed(list(enumerate(tokens)))}
         companies.sort(key=lambda item: order.get(item.ticker, len(tokens)))
@@ -128,7 +134,7 @@ def _companies_in_question(
         companies = [named] if named is not None else []
     if not companies and page_company is not None and not tokens:
         companies = [page_company]
-    return companies[:_MAX_COMPANIES]
+    return companies
 
 
 def _quote_line(company: Company, quote: ExtendedQuote, english: bool) -> str:
