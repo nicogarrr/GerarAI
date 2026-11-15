@@ -32,6 +32,8 @@ vi.mock('@/components/brain/BrainGuideAnswer', () => ({
     BrainGuideAnswer: ({ result }: { result: { answer: string } }) => <div data-testid="guide-answer">{result.answer}</div>,
 }));
 
+import { StrictMode } from 'react';
+import { GlobalBrainPanel } from '@/components/brain/GlobalBrainPanel';
 import BottomNav from '@/components/layout/BottomNav';
 import { LibraryChat } from '@/app/(root)/inversores/_components/LibraryChat';
 import { renderToString } from 'react-dom/server';
@@ -119,24 +121,27 @@ describe('GlobalBrain: botón y apertura', () => {
         render(<GlobalBrain userId="u1" />);
         await open();
         const dialog = screen.getByRole('dialog', { name: 'Cerebro GerarAI' });
-        expect(dialog).toHaveAttribute('aria-modal', 'true');
+        expect(dialog.tagName).toBe('DIALOG');
+        expect((dialog as HTMLDialogElement).open).toBe(true);
+        expect(dialog).not.toHaveAttribute('aria-modal');
         expect(await within(dialog).findByText(/Soy el cerebro de GerarAI/)).toBeInTheDocument();
-        expect(document.body.style.overflow).toBe('hidden');
+        expect(document.body.style.overflow).toBe('');
         expect(document.activeElement).toBe(box());
         fireEvent.click(screen.getByRole('button', { name: '¿Qué riesgos tiene mi cartera?' }));
         expect(box()).toHaveValue('¿Qué riesgos tiene mi cartera?');
     });
-    it('Escape cierra, restaura el scroll del body y devuelve el foco al botón que abrió', async () => {
+    it('el cierre nativo desmonta el panel sin modificar el scroll del body', async () => {
         render(<GlobalBrain userId="u1" />);
         const trigger = screen.getByRole('button', { name: 'Abrir el cerebro' });
         trigger.focus();
         fireEvent.click(trigger);
         await screen.findByRole('dialog', { name: 'Cerebro GerarAI' });
-        fireEvent.keyDown(document, { key: 'Escape' });
+        // Native Escape defaults are browser-tested, not implemented in jsdom.
+        act(() => { (screen.getByRole('dialog') as HTMLDialogElement).close(); });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(document.body.style.overflow).toBe('');
     });
-    it('mientras está abierto el resto de la página queda inert y aria-hidden, y se restaura al cerrar', async () => {
+    it('el modal nativo no modifica los atributos aria-hidden/inert del fondo', async () => {
         const { container } = render(
             <div>
                 <main id="page" aria-hidden="false">página</main>
@@ -145,8 +150,10 @@ describe('GlobalBrain: botón y apertura', () => {
         );
         const page = container.querySelector('#page') as HTMLElement;
         await open();
-        expect(page.inert).toBe(true);
-        expect(page).toHaveAttribute('aria-hidden', 'true');
+        // Native inertness does not mutate these attributes. Browser tests
+        // assert actual background focus rejection.
+        expect(page.inert).toBeFalsy();
+        expect(page).toHaveAttribute('aria-hidden', 'false');
         fireEvent.click(screen.getByRole('button', { name: 'Cerrar el cerebro' }));
         expect(page.inert).toBeFalsy();
         expect(page).toHaveAttribute('aria-hidden', 'false');
@@ -161,50 +168,15 @@ describe('GlobalBrain: botón y apertura', () => {
     });
 });
 
-describe('GlobalBrain: trampa de foco', () => {
-    const focusables = () => [
-        ...screen.getByRole('dialog').querySelectorAll<HTMLElement>('button:not([disabled]), a[href], input:not([disabled])'),
-    ];
-    beforeEach(() => {
-        // jsdom no tiene layout: se declara que todo es visible para el filtro de tab stops.
-        vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([{}] as unknown as DOMRectList);
-    });
-    it('Tab desde el último vuelve al primero y Shift+Tab desde el primero va al último', async () => {
+describe('GlobalBrain: native close wiring', () => {
+    it('updates React state after native close without sending a message', async () => {
         render(<GlobalBrain userId="u1" />);
         await open();
-        const items = focusables();
-        const first = items[0];
-        const last = items[items.length - 1];
-        last.focus();
-        fireEvent.keyDown(document, { key: 'Tab' });
-        expect(document.activeElement).toBe(first);
-        fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-        expect(document.activeElement).toBe(last);
-    });
-    it('con el foco en el propio panel, Tab entra por el primero y Shift+Tab por el último', async () => {
-        render(<GlobalBrain userId="u1" />);
-        await open();
-        const items = focusables();
-        screen.getByRole('dialog').focus();
-        fireEvent.keyDown(document, { key: 'Tab' });
-        expect(document.activeElement).toBe(items[0]);
-        screen.getByRole('dialog').focus();
-        fireEvent.keyDown(document, { key: 'Tab', shiftKey: true });
-        expect(document.activeElement).toBe(items[items.length - 1]);
-    });
-    it('una tecla cualquiera que no es Tab no mueve el foco', async () => {
-        render(<GlobalBrain userId="u1" />);
-        await open();
-        const before = document.activeElement;
-        fireEvent.keyDown(document, { key: 'a' });
-        expect(document.activeElement).toBe(before);
-    });
-    it('sin elementos enfocables, Tab se queda en el panel', async () => {
-        render(<GlobalBrain userId="u1" />);
-        await open();
-        vi.spyOn(HTMLElement.prototype, 'getClientRects').mockReturnValue([] as unknown as DOMRectList);
-        fireEvent.keyDown(document, { key: 'Tab' });
-        expect(document.activeElement).toBe(screen.getByRole('dialog'));
+        const panel = screen.getByRole('dialog') as HTMLDialogElement;
+        expect(panel.open).toBe(true);
+        act(() => { panel.close(); });
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        expect(chatWithPortfolio).not.toHaveBeenCalled();
     });
 });
 
@@ -552,5 +524,53 @@ describe('GlobalBrain: autoscroll y prefers-reduced-motion', () => {
         await open();
         await waitFor(() => expect(Element.prototype.scrollTo).toHaveBeenCalled());
         expect(Element.prototype.scrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: 'smooth' }));
+    });
+});
+
+describe('GlobalBrain: library response variants remain intact', () => {
+    it.each([
+        { text: 'Texto con referencia', author: 'Buffett', page_number: 12, publication_date: '2026-01-01' },
+        { text: null, author: null, page_number: null, publication_date: null },
+    ])('renders a cited library answer without changing the endpoint ($author)', async (variant) => {
+        askKnowledge.mockResolvedValue({ answers: [{ text: variant.text, citation: { ...variant, quote: 'Cita fixture', title: 'Carta fixture', chunk_index: 0 } }], status: 'ok', retrieval: 'solo_texto' });
+        render(<GlobalBrain userId="u1" />);
+        act(() => openBrain({ knowledge: { scope: 'library' }, question: 'Pregunta de biblioteca' }));
+        await screen.findByRole('dialog');
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar pregunta' }));
+        await screen.findByText('Citas conservadas');
+        expect(askKnowledge).toHaveBeenCalled();
+    });
+    it.each([new Error('backend unavailable'), new Error('401 sesión terminada'), null])('keeps library failure handling (%s)', async (error) => {
+        askKnowledge.mockRejectedValue(error);
+        render(<GlobalBrain userId="u1" />);
+        act(() => openBrain({ knowledge: { scope: 'library' }, question: 'Pregunta válida' }));
+        await screen.findByRole('dialog');
+        fireEvent.click(screen.getByRole('button', { name: 'Enviar pregunta' }));
+        await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+        expect(askKnowledge).toHaveBeenCalled();
+    });
+});
+
+
+describe('GlobalBrainPanel native lifecycle', () => {
+    it('ignores a queued stale close after reopen, uses current callback and cleans up', () => {
+        const oldClose = vi.fn();
+        const currentClose = vi.fn();
+        const props = { userId: 'u1', knowledge: null, openDetail: null, messages: [], setMessages: vi.fn(), onClearKnowledge: vi.fn() };
+        const view = render(<StrictMode><GlobalBrainPanel {...props} onClose={oldClose} /></StrictMode>);
+        const dialog = screen.getByRole('dialog') as HTMLDialogElement;
+        expect(dialog.open).toBe(true);
+        // Browser StrictMode cleanup may queue a close event, then reopen.
+        fireEvent(dialog, new Event('close'));
+        expect(oldClose).not.toHaveBeenCalled();
+        view.rerender(<StrictMode><GlobalBrainPanel {...props} onClose={currentClose} /></StrictMode>);
+        act(() => dialog.close());
+        expect(currentClose).toHaveBeenCalledOnce();
+        expect(oldClose).not.toHaveBeenCalled();
+        // Cleanup closes a reopened modal but must not call either callback.
+        act(() => dialog.showModal());
+        view.unmount();
+        expect(dialog.open).toBe(false);
+        expect(currentClose).toHaveBeenCalledOnce();
     });
 });

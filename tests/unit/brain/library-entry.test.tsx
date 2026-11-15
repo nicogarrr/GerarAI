@@ -27,7 +27,8 @@ it('starts collapsed: no embedded panel, only the docked trigger, which asks the
  expect(document.body.style.overflow).not.toBe('hidden');
  fireEvent.click(trigger);
  const dialog=await screen.findByRole('dialog',{name:'Cerebro GerarAI'},{timeout:10000});
- expect(dialog).toHaveAttribute('aria-modal','true');
+ expect(dialog.tagName).toBe('DIALOG');
+ expect(dialog).not.toHaveAttribute('aria-modal');
  expect(dialog).toHaveTextContent('Cartas · Doctrina, no datos actuales de empresas');
  fireEvent.click(screen.getByText('Autor y análisis'));
  expect(screen.getByLabelText('Autor')).toBeInTheDocument();
