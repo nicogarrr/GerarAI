@@ -78,7 +78,7 @@ export interface YahooChartMeta {
     exchangeTimezoneName?: string | null;
 }
 
-/** Barras diarias del MISMO response de la chart API (range=2d&interval=1d). */
+/** Barras diarias del MISMO response de la chart API (range=5d&interval=1d). */
 export interface YahooBars {
     timestamps?: (number | null)[] | null;
     closes?: (number | null)[] | null;
@@ -329,7 +329,11 @@ export const YAHOO_CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/char
 
 export function yahooChartRequest(symbol: string): { url: string; init: RequestInit } {
     return {
-        url: `${YAHOO_CHART_URL}/${encodeURIComponent(symbol)}?range=2d&interval=1d`,
+        // range=5d (antes 2d): los futuros CME/NYM solo devuelven 1 barra diaria
+        // con 2d en fin de semana, y sin barra anterior el cambio quedaba N/D todo
+        // el finde (medido 15-nov-2026: ES=F/GC=F 1 barra con 2d, 4 con 5d). Con
+        // 5 barras siempre hay cierre de referencia real en finde y festivos.
+        url: `${YAHOO_CHART_URL}/${encodeURIComponent(symbol)}?range=5d&interval=1d`,
         init: {
             headers: {
                 // Sin UA de navegador Yahoo responde 429/403 a peticiones de servidor.
@@ -342,7 +346,8 @@ export function yahooChartRequest(symbol: string): { url: string; init: RequestI
 
 /* ------------------------------------------------------------------ *
  * Catalogo: solo simbolos verificados contra la chart API (21-oct-2026,
- * los ~40 devolvieron precio y timestamp). Anadir uno nuevo exige la
+ * los ~40 devolvieron precio y timestamp; re-verificados 15-nov-2026:
+ * 38/38 OK, ver scripts/verify-live-markets.mjs). Anadir uno nuevo exige la
  * misma verificacion y actualizar el guard live-quotes-guard.test.ts.
  * Decimales por instrumento (21-oct-2026): cruces sin JPY a 4 (un pip),
  * cruces con JPY a 3; resto a 2.
