@@ -10,7 +10,7 @@ entera cabe en ese deadline.
 """
 
 import asyncio
-import time
+from types import SimpleNamespace
 
 from app.services import catalyst_calendar_service as svc
 from app.services.connectors import earnings_calendar as connector
@@ -25,9 +25,28 @@ def test_catalysts_route_is_bounded_by_range_deadline_when_edgar_hangs(engine, d
     svc._FAILED_UNTIL.clear()
     _company(db, "LOOP", 10)
 
+    entered = asyncio.Event()
+    cancelled = []
+    observed_budgets = []
+
     async def slow_cik(_ticker):
-        await asyncio.sleep(3)
-        return "0000000001"
+        entered.set()
+        try:
+            await asyncio.Event().wait()  # No result until the service cancels it.
+        finally:
+            cancelled.append(_ticker)
+
+    async def deadline_wait(tasks, *, timeout):
+        # Advance only this service's deadline after the real child entered.
+        # HTTP/DB/host scheduling time is deliberately not the assertion.
+        await asyncio.wait_for(entered.wait(), timeout=5)
+        observed_budgets.append(timeout)
+        assert all(not task.done() for task in tasks)
+        return set(), set(tasks)
+
+    service_asyncio = SimpleNamespace(**{name: getattr(asyncio, name) for name in dir(asyncio)})
+    service_asyncio.wait = deadline_wait
+    monkeypatch.setattr(svc, "asyncio", service_asyncio)
 
     async def subs(_cik):
         return {}
@@ -41,17 +60,17 @@ def test_catalysts_route_is_bounded_by_range_deadline_when_edgar_hangs(engine, d
         dividend_rows=[],
     )
     try:
-        started = time.monotonic()
         res = client.get("/api/calendar/catalysts?desde=2026-10-14&hasta=2026-10-28")
-        elapsed = time.monotonic() - started
     finally:
         main.app.dependency_overrides.clear()
         svc._FAILED_UNTIL.clear()
         connector._day_cache.clear()
         connector._day_failures.clear()  # noqa: SLF001
     assert res.status_code == 200
-    # EDGAR dormia 3 s; con el deadline del rango (0,4 s) la ruta no lo espera.
-    assert elapsed < 1.5, f"catalysts tardo {elapsed:.2f}s"
+    # The route passes NASDAQ's budget, not EDGAR's independent default;
+    # the real service cancels/reaps the unresolved provider before returning.
+    assert observed_budgets == [0.4]
+    assert cancelled == ["LOOP"]
     body = res.json()
     assert body["status"] == "partial"
     assert [(e["ticker"], e["type"]) for e in body["events"]] == [("LOOP", "earnings")]
