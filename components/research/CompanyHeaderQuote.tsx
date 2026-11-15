@@ -155,40 +155,44 @@ export function CompanyHeaderQuote({
     const hasDatedMetrics = !!quote?.metrics_timestamp && !!quote.metrics_session;
     return (
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
-            <div>
+            <div data-testid="company-header-price-block">
                 <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `${lastIsClose ? t('research.headerQuote.chartClose') : t('research.headerQuote.chartLastCandle')} · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
-                <div className={compact ? 'text-3xl font-semibold tracking-tight text-gray-100' : 'text-4xl font-semibold tracking-tight text-gray-100 sm:text-5xl'} aria-busy={loading || undefined}>
+                <div className={compact ? 'min-h-10 text-3xl font-semibold tracking-tight text-gray-100 sm:min-h-12' : 'min-h-10 text-4xl font-semibold tracking-tight text-gray-100 sm:min-h-12 sm:text-5xl'} aria-busy={loading || undefined}>
                     {showPrice ? headerMoney(fmt, quote!.price, currency) : useFallback ? headerMoney(fmt, fallbackPrice, fallbackCurrency!) : loading ? (
                         <>
                             <span className="sr-only">{t('research.headerQuote.loadingPrice')}</span>
-                            <span aria-hidden="true" className="inline-block h-10 w-44 animate-pulse rounded bg-gray-800 align-middle sm:h-12" />
+                            <span aria-hidden="true" className="block h-10 w-44 animate-pulse rounded bg-gray-800 sm:h-12" />
                         </>
                     ) : NA}
                 </div>
-                {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) && signBase !== 0 ? (
-                    <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
-                        {[
-                            quote.change != null ? headerChangeMoney(fmt, quote.change, currency) : null,
-                            quote.change_percent != null ? formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }) : null,
-                        ].filter(Boolean).join(' · ')}
-                    </div>
-                ) : null}
-                {showPrice && quote && quote.session === 'cerrado' && quote.close_change_percent != null && quote.close_change_date && quote.close_change_previous_date ? (
-                    <div data-testid="close-change">
-                        <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${quote.close_change_percent > 0 ? 'bg-emerald-500/10 text-emerald-300' : quote.close_change_percent < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
+                {/* Reserve the variation row while loading, flat or unavailable.
+                    Late quotes must not move content or trigger scroll anchoring. */}
+                <div className="flow-root min-h-9" data-testid="company-header-quote-status">
+                    {showPrice && quote && quote.session !== 'cerrado' && (quote.change != null || quote.change_percent != null) && signBase !== 0 ? (
+                        <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${signBase > 0 ? 'bg-emerald-500/10 text-emerald-300' : signBase < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
                             {[
-                                quote.close_change != null ? headerChangeMoney(fmt, quote.close_change, currency) : null,
-                                formatPercent(quote.close_change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }),
+                                quote.change != null ? headerChangeMoney(fmt, quote.change, currency) : null,
+                                quote.change_percent != null ? formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }) : null,
                             ].filter(Boolean).join(' · ')}
                         </div>
-                    </div>
-                ) : null}
-                {/* N/D nunca silencioso (regla de Nico): con fallback se rotula
-                    la vela y, con o sin él, la cabecera declara por qué no hay
-                    precio en vivo. Sin la segunda rama, un listado cuya lectura
-                    falla y cuya escala no permite fallback (CGEO.L en prod,
-                    9-nov-2026) quedaba en «N/D» desnudo, sin motivo. */}
-                {useFallback || (settled && !showPrice) ? <p className="mt-1 text-xs text-gray-500">{t('research.headerQuote.liveUnavailable')}</p> : null}
+                    ) : null}
+                    {showPrice && quote && quote.session === 'cerrado' && quote.close_change_percent != null && quote.close_change_date && quote.close_change_previous_date ? (
+                        <div data-testid="close-change">
+                            <div className={`mt-2 inline-flex w-fit items-center rounded-full px-2.5 py-1 text-sm font-medium ${quote.close_change_percent > 0 ? 'bg-emerald-500/10 text-emerald-300' : quote.close_change_percent < 0 ? 'bg-red-500/10 text-red-300' : 'bg-gray-800 text-gray-300'}`}>
+                                {[
+                                    quote.close_change != null ? headerChangeMoney(fmt, quote.close_change, currency) : null,
+                                    formatPercent(quote.close_change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' }),
+                                ].filter(Boolean).join(' · ')}
+                            </div>
+                        </div>
+                    ) : null}
+                    {/* N/D nunca silencioso (regla de Nico): con fallback se rotula
+                        la vela y, con o sin él, la cabecera declara por qué no hay
+                        precio en vivo. Sin la segunda rama, un listado cuya lectura
+                        falla y cuya escala no permite fallback (CGEO.L en prod,
+                        9-nov-2026) quedaba en «N/D» desnudo, sin motivo. */}
+                    {useFallback || (settled && !showPrice) ? <p className="mt-1 text-xs text-gray-500">{t('research.headerQuote.liveUnavailable')}</p> : null}
+                </div>
             </div>
             {compact ? null : <div className="min-w-0 max-w-full">
                 <dl className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800" data-testid="company-metric-strip">
