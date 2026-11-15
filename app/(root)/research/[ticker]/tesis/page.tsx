@@ -337,6 +337,7 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
             <EmptyLink href={`/research/${encoded}?view=thesis`}>{t('research.thesisDoc.reviewInFicha')}</EmptyLink>
             <ThesisGenerateButton ticker={ticker} label={t('research.thesisDoc.regenerate')} />
           </div>
+          {!companyMissing ? <AstsBankSupplement ticker={ticker} locale={locale} t={t} /> : null}
         </div>
       </main>
     );
