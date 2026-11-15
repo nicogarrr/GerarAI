@@ -2271,5 +2271,23 @@
     "reviewAmount": "Importe reportado {value} USD: revisar.",
     "buybacks": "recompras",
     "unplannedCount": "Fuera de plan: {count}"
+  },
+  "astsBankSupplement": {
+    "title": "ASTS: escenario externo atribuido a Deutsche Bank",
+    "warning": "Estimación de Deutsche Bank [sin verificar contra el informe original]. Transcripción de una captura de un tuit, no resultados reales, consenso ni previsiones de la compañía. No modifica la valoración de GerarAI.",
+    "dates": "Recibido el 15/11/2026. Fecha del informe original: desconocida. El agregador social sitúa el texto coincidente el 15/11/2026 a las 12:30 UTC; no verifica la tabla ni el informe del banco.",
+    "table": "Figure 3: ASTS Model Summary (transcripción). Importes en millones de USD; satélites en unidades. 2026E-2030E son estimaciones. 2025 es una referencia de la tabla sin validar contra resultados reales.",
+    "revenue": "Ingresos",
+    "ebitda": "EBITDA ajustado",
+    "fcf": "Flujo de caja libre",
+    "capex": "Capex",
+    "satellites": "Satélites comerciales acumulados",
+    "missing": "No transcrito",
+    "ramp": "El escenario atribuido al banco alcanza 4.490,3 M$ de ingresos y 80,3% de margen EBITDA ajustado en 2030. Gobierno y otros contratos aportarían aproximadamente el 73% de los ingresos de 2027; la suscripción comercial se aceleraría en 2028.",
+    "funding": "Según el texto del tuit, caja existente, apoyo J-LEO y financiación prevista podrían cubrir unos 4.600 M$ de consumo de caja modelado antes de FCF positivo en 2029. Es una hipótesis de financiación, no capital asegurado; sigue habiendo riesgo de ejecución, dilución y financiación.",
+    "blacklift": "Blacklift: el comunicado de AST SpaceMobile del 06/11/2026 describe un cohete diseñado para llevar hasta cinco BlueBird por lanzamiento desde finales de 2028. Es un plan de desarrollo, no una capacidad operativa demostrada.",
+    "social": "Texto coincidente en agregador social (fuente secundaria)",
+    "primary": "Comunicado Blacklift presentado en SEC (fuente primaria, solo Blacklift)",
+    "exports": "Anexo de lectura añadido el 15/11/2026. No forma parte de versiones anteriores ni de sus exportaciones PDF/EPUB. No se usa como input del modelo."
   }
 }

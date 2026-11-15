@@ -1,3 +1,4 @@
+import { AstsBankSupplement } from '@/components/research/AstsBankSupplement';
 import { getLocale, getT } from '@/lib/i18n/server';
 import type { Locale } from '@/lib/i18n/locale';
 import type { TranslateFn } from '@/lib/i18n/translate';
@@ -702,6 +703,7 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
           <ThesisToc items={toc} variant="aside" t={t} />
           </div>
         )}
+        {!companyMissing && !loadFailed ? <AstsBankSupplement ticker={ticker} locale={locale} t={t} /> : null}
         {!companyMissing && !loadFailed ? (
           <div className="max-w-[40rem]">
             <ExpertThesisPanel
