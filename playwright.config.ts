@@ -44,10 +44,12 @@ export default defineConfig({
   webServer: runUiE2E
     ? [
       {
-        command: `${pythonBin} -m uvicorn main:app --host 127.0.0.1 --port ${e2eUiBackendPort()}`,
+        command: `${pythonBin} -m uvicorn ${process.env.E2E_ADMISSION_TRACE === "1" ? "scripts.ci_admission_probe:make_app --factory" : "main:app"} --host 127.0.0.1 --port ${e2eUiBackendPort()}`,
         cwd: "data-engine",
         env: {
           APP_ENV: "test",
+          E2E_ADMISSION_TRACE: process.env.E2E_ADMISSION_TRACE ?? "0",
+          E2E_ADMISSION_TRACE_PATH: process.env.E2E_ADMISSION_TRACE_PATH ?? "storage/admission-ci.jsonl",
           DATABASE_URL: E2E_UI_DATABASE_URL,
           RESEARCH_AUTH_REQUIRED: "true",
           RESEARCH_AUTH_SECRET: e2eResearchSecret,

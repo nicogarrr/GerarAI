@@ -43,6 +43,7 @@ jobs:
       CI: "true"
       E2E_UI_RUN: "1"
       E2E_USER_FLOWS: "1"
+      E2E_ADMISSION_TRACE: "1"
       RESEARCH_AUTH_SECRET: cavaai-browser-e2e-research-secret-at-least-32-characters
       MONGODB_URI: mongodb://127.0.0.1:27017/cavaai_e2e
     services:
@@ -87,7 +88,10 @@ jobs:
         run: npx playwright install chromium
       - name: Suite de flujos de usuario
         timeout-minutes: 10
-        run: npx playwright test e2e/user-flows --workers=1
+        run: npx playwright test e2e/user-flows/ficha.spec.ts e2e/user-flows/first-steps.spec.ts --workers=1
+      - name: Resumen de admission (rama de medicion desechable)
+        if: ${{ always() }}
+        run: python data-engine/scripts/summarize_admission_probe.py data-engine/storage/admission-ci.jsonl test-results/admission-summary.json
       - name: Informe y trazas
         if: ${{ always() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
@@ -96,5 +100,6 @@ jobs:
           path: |
             playwright-report/
             test-results/
+            data-engine/storage/admission-ci.jsonl
           if-no-files-found: ignore
           retention-days: 7
