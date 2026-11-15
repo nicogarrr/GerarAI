@@ -1384,7 +1384,9 @@
     "bestBadge": "best",
     "bestHorizon": "Best horizon for this stock: {horizon} (median error {error}, the lowest in the backtest).",
     "noBestHorizon": "Not enough samples yet to pick a horizon.",
-    "summary": "{count} matured targets · median error {error} · direction right {hit}",
+    "statDirection": "Direction hit rate",
+    "statError": "Median error",
+    "statTargets": "Matured targets",
     "topTitle": "Most accurate",
     "bottomTitle": "Least accurate",
     "firmLine": "{count} targets · median error {error} · direction {hit}",
@@ -1392,12 +1394,13 @@
     "relativeTitle": "Error versus the other firms that published around the same dates (±45 days), shrunk toward the stock's average. Negative = more accurate.",
     "noRanked": "No firm has {min} matured targets yet: small sample, no ranking.",
     "smallSample": "{count} firms with fewer than {min} matured targets (small sample) are not ranked.",
-    "consensus": "Simple consensus: {mean} (mean of {firms} firms, each firm's latest target in 12 months)",
-    "consensusUpside": "upside {upside} vs {price}",
+    "consensusLabel": "Simple consensus",
+    "consensusDetail": "mean of {firms} firms · each firm's latest target in 12 months · vs {price}",
+    "consensusUpside": "upside {upside}",
     "consensusWhy": "We show the simple mean: in our backtest, weighting by past accuracy did not improve it.",
     "ratingChanges": "Rating changes in the last {days} days: {up} up, {down} down.",
     "contrarianNote": "For information: in our study of 21 software stocks, after a rating change the stock tended to move the other way. It is not a validated signal.",
-    "footer": "Source: {source}. Computed on {date}. Third-party data; targets are split-adjusted."
+    "dataQuality": "Third-party data; price targets are adjusted for splits."
   },
   "thesisApprove": {
     "reason": {
