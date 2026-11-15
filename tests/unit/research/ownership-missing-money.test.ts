@@ -1,0 +1,7 @@
+import {expect,it} from 'vitest';
+import {insiderLines,insiderTone,ownershipMoney,ownershipText,type InsiderOwnershipBlock} from '@/lib/research/ownership-signals';
+const block={status:'ok',window_days:180,source:'SEC',buys:{trades:2,insiders:2,shares:1000,value:null,value_missing:1},sells:{trades:1,insiders:1,shares:100,value:1000},net_value:null,cluster_buying:false,last_date:null,reading:'Saldo neto no estimable: faltan importes'} as unknown as InsiderOwnershipBlock;
+it('unknown money is N/D, not zero and not a negative/positive balance',()=>{expect(ownershipMoney(null)).toBe('N/D');expect(insiderTone(block)).toBe('neutro');expect(insiderLines(block).join(' ')).toContain('1 sin importe');expect(insiderLines(block,'en').join(' ')).toContain('1 amount missing');expect(insiderLines(block,'en').join(' ')).not.toContain('$0');expect(ownershipText(block.status==='ok'?block.reading:'','en')).toBe('Net flow unavailable: amounts are missing');});
+
+it('missing count defeats stale numeric subtotal in prose',()=>{if(block.status!=='ok')throw Error('fixture'); const stale={...block,buys:{...block.buys,value:999}}; expect(insiderLines(stale)[0]).toContain('N/D'); expect(insiderLines(stale,'en')[0]).not.toContain('$999');});
+it('known zero stays zero and count-based cluster stays positive',()=>{expect(ownershipMoney(0,'en')).toBe('$0');if(block.status!=='ok')throw Error('fixture');expect(insiderTone({...block,cluster_buying:true})).toBe('positivo');});

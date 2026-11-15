@@ -1,3 +1,6 @@
+// @ts-expect-error TS5097: node --experimental-strip-types requires the extension.
+import { createTranslator } from '../i18n/translate.ts';
+
 /**
  * Insiders (Form 4) y fondos 13F de un ticker para la ficha (conexión 10b).
  *
@@ -6,7 +9,7 @@
  * node --test.
  */
 
-export type InsiderSide = { trades: number; insiders: number; shares: number; value: number; planned_10b5_1?: number };
+export type InsiderSide = { trades: number; insiders: number; shares: number; value: number | null; value_missing?: number; planned_10b5_1?: number };
 
 export type InsiderOwnershipBlock =
   | {
@@ -15,7 +18,7 @@ export type InsiderOwnershipBlock =
       source: string;
       buys: InsiderSide;
       sells: InsiderSide;
-      net_value: number;
+      net_value: number | null;
       cluster_buying: boolean;
       last_date: string | null;
       reading: string;
@@ -67,7 +70,8 @@ const usd = new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'USD',
 const usdEn = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 
 /** Importe en USD con formato es-ES («113.100 US$») o en-US («$113,100»). */
-export function ownershipMoney(value: number, locale: OwnershipLocale = 'es'): string {
+export function ownershipMoney(value: number | null | undefined, locale: OwnershipLocale = 'es'): string {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'N/D';
   return (locale === 'en' ? usdEn : usd).format(value);
 }
 
@@ -79,8 +83,8 @@ export function holderChangeLabel(change: HolderChange | null | undefined, local
 /** Tono del bloque insider: compras en grupo o netas = positivo; ventas netas = negativo. */
 export function insiderTone(block: InsiderOwnershipBlock): OwnershipTone {
   if (block.status !== 'ok') return 'neutro';
-  if (block.cluster_buying || block.net_value > 0) return 'positivo';
-  if (block.net_value < 0) return 'negativo';
+  if (block.cluster_buying || (block.net_value !== null && block.net_value > 0)) return 'positivo';
+  if (block.net_value !== null && block.net_value < 0) return 'negativo';
   return 'neutro';
 }
 
@@ -125,6 +129,7 @@ const NOT_IN_UNIVERSE_RE = /^(.+) no está en el universo de empresas: sin cruce
 /** Lectura o motivo del backend en el idioma de la pantalla. */
 export function ownershipText(text: string, locale: OwnershipLocale = 'es'): string {
   if (locale !== 'en') return text;
+  if (text === createTranslator('es')('ownership.netAmountMissing')) return createTranslator(locale)('ownership.netAmountMissing');
   if (Object.hasOwn(TEXT_EN, text)) return TEXT_EN[text];
   const noTrades = NO_TRADES_RE.exec(text);
   if (noTrades) return `No open-market insider buys or sells (Form 4) stored for ${noTrades[1]} in the last ${noTrades[2]} days.`;
@@ -136,18 +141,23 @@ export function ownershipText(text: string, locale: OwnershipLocale = 'es'): str
 /** Líneas legibles del bloque insider (o su motivo si no hay datos). */
 export function insiderLines(block: InsiderOwnershipBlock, locale: OwnershipLocale = 'es'): string[] {
   if (block.status !== 'ok') return [block.detail ? ownershipText(block.detail, locale) : (locale === 'en' ? 'No insider data.' : 'Sin datos de insiders.')];
+  const amount = (side: InsiderSide) => {
+    const missing = side.value_missing ?? 0;
+    if (missing > 0 || side.value == null) return missing > 0 ? createTranslator(locale)('ownership.amountMissing', { n: missing }) : 'N/D';
+    return ownershipMoney(side.value, locale);
+  };
   const planned = block.sells.planned_10b5_1 ?? 0;
   if (locale === 'en') {
-    const money = (value: number) => ownershipMoney(value, 'en');
+    const money = (value: number | null) => ownershipMoney(value, 'en');
     return [
-      `Buys: ${block.buys.trades} by ${block.buys.insiders} ${block.buys.insiders === 1 ? 'insider' : 'insiders'} for ${money(block.buys.value)}.`,
-      `Sells: ${block.sells.trades} by ${block.sells.insiders} ${block.sells.insiders === 1 ? 'insider' : 'insiders'} for ${money(block.sells.value)}${planned ? ` (${planned} under a 10b5-1 plan)` : ''}.`,
+      `Buys: ${block.buys.trades} by ${block.buys.insiders} ${block.buys.insiders === 1 ? 'insider' : 'insiders'} for ${amount(block.buys)}.`,
+      `Sells: ${block.sells.trades} by ${block.sells.insiders} ${block.sells.insiders === 1 ? 'insider' : 'insiders'} for ${amount(block.sells)}${planned ? ` (${planned} under a 10b5-1 plan)` : ''}.`,
       `Net: ${money(block.net_value)}${block.last_date ? ` · last trade ${block.last_date}` : ''}.`,
     ];
   }
   return [
-    `Compras: ${block.buys.trades} de ${block.buys.insiders} insiders por ${ownershipMoney(block.buys.value)}.`,
-    `Ventas: ${block.sells.trades} de ${block.sells.insiders} insiders por ${ownershipMoney(block.sells.value)}${planned ? ` (${planned} con plan 10b5-1)` : ''}.`,
+    `Compras: ${block.buys.trades} de ${block.buys.insiders} insiders por ${amount(block.buys)}.`,
+    `Ventas: ${block.sells.trades} de ${block.sells.insiders} insiders por ${amount(block.sells)}${planned ? ` (${planned} con plan 10b5-1)` : ''}.`,
     `Saldo neto: ${ownershipMoney(block.net_value)}${block.last_date ? ` · última operación ${block.last_date}` : ''}.`,
   ];
 }

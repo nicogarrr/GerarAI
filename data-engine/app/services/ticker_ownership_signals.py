@@ -90,8 +90,8 @@ def insider_signal(
         )
     ).all()
     sides: dict[str, dict[str, Any]] = {
-        "P": {"trades": 0, "insiders": set(), "shares": 0.0, "value": 0.0, "planned": 0},
-        "S": {"trades": 0, "insiders": set(), "shares": 0.0, "value": 0.0, "planned": 0},
+        "P": {"trades": 0, "insiders": set(), "shares": 0.0, "value": 0.0, "value_missing": 0, "planned": 0},
+        "S": {"trades": 0, "insiders": set(), "shares": 0.0, "value": 0.0, "value_missing": 0, "planned": 0},
     }
     last: date | None = None
     for tx, filing_date in rows:
@@ -110,6 +110,8 @@ def insider_signal(
             side["value"] += float(tx.value)
         elif tx.shares is not None and tx.price is not None:
             side["value"] += float(tx.shares) * float(tx.price)
+        else:
+            side["value_missing"] += 1
         side["planned"] += int(bool(tx.rule_10b5_1))
         last = effective if last is None or effective > last else last
     buys, sells = sides["P"], sides["S"]
@@ -123,10 +125,16 @@ def insider_signal(
                 f"persistidas para {normalized} en los últimos {window_days} días."
             ),
         }
-    net_value = buys["value"] - sells["value"]
+    for side in sides.values():
+        if side["value_missing"]:
+            side["value"] = None
+    net_value = (buys["value"] - sells["value"]
+                 if buys["value"] is not None and sells["value"] is not None else None)
     cluster = len(buys["insiders"]) >= CLUSTER_MIN_INSIDERS
     if cluster:
         reading = f"Compras en grupo de insiders ({CLUSTER_MIN_INSIDERS} o más)"
+    elif net_value is None:
+        reading = "Saldo neto no estimable: faltan importes"
     elif net_value > 0:
         reading = "Compras netas de insiders"
     elif net_value < 0:
@@ -142,12 +150,14 @@ def insider_signal(
             "insiders": len(buys["insiders"]),
             "shares": buys["shares"],
             "value": buys["value"],
+            **({"value_missing": buys["value_missing"]} if buys["value_missing"] else {}),
         },
         "sells": {
             "trades": sells["trades"],
             "insiders": len(sells["insiders"]),
             "shares": sells["shares"],
             "value": sells["value"],
+            **({"value_missing": sells["value_missing"]} if sells["value_missing"] else {}),
             "planned_10b5_1": sells["planned"],
         },
         "net_value": net_value,
@@ -263,13 +273,21 @@ def ownership_signals(db: Session, ticker: str, *, as_of: date | None = None) ->
 
 def _insider_line(ticker: str, insider: dict[str, Any]) -> str:
     buys, sells = insider["buys"], insider["sells"]
+    def amount(side: dict[str, Any]) -> str:
+        missing_count = side.get("value_missing")
+        if missing_count is None:
+            missing_count = 0
+        if missing_count or side.get("value") is None:
+            return f"N/D ({missing_count} sin importe)" if missing_count else "N/D"
+        return _money(side["value"])
+
     planned = sells.get("planned_10b5_1") or 0
     planned_text = f" ({planned} con plan 10b5-1)" if planned else ""
     return (
         f"Insiders de {ticker} en los últimos {insider['window_days']} días (Form 4, mercado abierto): "
-        f"{buys['insiders']} insiders compraron en {buys['trades']} operaciones por {_money(buys['value'])}; "
-        f"{sells['insiders']} vendieron en {sells['trades']} operaciones por {_money(sells['value'])}{planned_text}. "
-        f"Saldo neto {_money(insider['net_value'])}. Lectura: {insider['reading']}."
+        f"{buys['insiders']} insiders compraron en {buys['trades']} operaciones por {amount(buys)}; "
+        f"{sells['insiders']} vendieron en {sells['trades']} operaciones por {amount(sells)}{planned_text}. "
+        f"Saldo neto {('N/D' if insider.get('net_value') is None else _money(insider['net_value']))}. Lectura: {insider['reading']}."
     )
 
 

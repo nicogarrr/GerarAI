@@ -118,5 +118,7 @@
     "next": "Siguiente",
     "page": "Página {page} de {total}",
     "periods": "Periodos 13F: {periods}"
-  }
+  },
+  "amountMissing": "N/D ({n} sin importe)",
+  "netAmountMissing": "Saldo neto no estimable: faltan importes"
 }
