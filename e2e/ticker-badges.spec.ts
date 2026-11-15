@@ -80,8 +80,9 @@ test("los eventos de noticias muestran En cartera / En watchlist", async ({ page
   // del frontend (memoryTTL ~15s sobre watchlist/posiciones) no se entera
   // hasta expirar. toPass + reload cubre esa ventana (mismo patrón que la
   // caché de movers) sin depender de timing.
-  const mobile = (page.viewportSize()?.width ?? 1440) < 768;
-  const newsRows = mobile ? page.getByRole("list", { name: "Eventos de noticias" }).getByRole("listitem") : page.getByRole("row");
+  // Tabla unica responsiva (2026-11-14): filas <tr> en todos los anchos;
+  // ya no hay lista <ul> aparte para movil.
+  const newsRows = page.getByRole("row");
   const costRow = newsRows.filter({ hasText: `COST expands warehouses ${marker}` });
   const nflxRow = newsRows.filter({ hasText: `NFLX raises prices ${marker}` });
   await expect(async () => {
