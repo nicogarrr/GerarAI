@@ -576,7 +576,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                         >
                             <p className="font-semibold text-gray-100">{hoveredNode.label}</p>
                             <p className="text-gray-400">
-                                {t('knowledgeGraph.canvas.tooltipMeta', { type: hoveredNode.type, degree: hoveredNode.degree })}
+                                {t('knowledgeGraph.canvas.tooltipMeta', { type: graphNodeTypeLabel(hoveredNode.type, t), degree: hoveredNode.degree })}
                             </p>
                             <p className="line-clamp-2 text-gray-500">
                                 {hoveredNode.description || t('knowledgeGraph.detail.absent')}
@@ -589,7 +589,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
                         {hoveredNode
                             ? t('knowledgeGraph.canvas.hoverNode', {
                                   label: hoveredNode.label,
-                                  type: hoveredNode.type,
+                                  type: graphNodeTypeLabel(hoveredNode.type, t),
                                   degree: hoveredNode.degree,
                               })
                             : ''}
