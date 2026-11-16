@@ -19,6 +19,7 @@ router = APIRouter()
 
 
 class AssistantRequest(BaseModel):
+    model: Literal["hy4-flash-free"] | None = None
     mode: Literal["explore", "guide"]
     question: str = Field(min_length=3, max_length=2000)
     ticker: str | None = Field(default=None, min_length=1, max_length=20)
@@ -100,7 +101,22 @@ async def research_assistant(payload: AssistantRequest, db: Session = Depends(ge
         payload = payload.model_copy(update={"ticker": page_context.company.ticker})
     try:
         baseline = await run_in_threadpool(answer, db, payload)
-        response = AssistantResponse.model_validate(await synthesize(db, payload, baseline))
+        if payload.model:
+            from app.core.config import get_settings
+            from app.llm.errors import ProviderDisabledError
+            from app.llm.hy4 import NOTICE, blocked, create_hy4_provider, selection_scope
+            try:
+                with selection_scope(True):
+                    provider = create_hy4_provider(get_settings())
+                    result = await synthesize(db, payload, baseline, provider=provider)
+                    if blocked():
+                        raise ProviderDisabledError(NOTICE)
+            except ProviderDisabledError:
+                result = {**baseline, "answer": NOTICE + "\n\n" + baseline["answer"],
+                    "missing_data": [*baseline.get("missing_data", []), NOTICE]}
+            response = AssistantResponse.model_validate(result)
+        else:
+            response = AssistantResponse.model_validate(await synthesize(db, payload, baseline))
         response.context = page_context.echo() if page_context else None
         return response
     except LookupError as exc:

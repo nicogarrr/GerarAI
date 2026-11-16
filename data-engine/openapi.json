@@ -1255,6 +1255,18 @@
             "title": "Mode",
             "type": "string"
           },
+          "model": {
+            "anyOf": [
+              {
+                "const": "hy4-flash-free",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "page": {
             "anyOf": [
               {
