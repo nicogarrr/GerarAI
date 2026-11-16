@@ -259,3 +259,30 @@ def test_worker_call_needs_no_http_selection_and_scope_never_leaks():
             return result
     assert asyncio.run(run()).message.content=='ok'
     assert sent==[('GET',True),('POST',True)]
+
+
+@pytest.mark.parametrize('during_catalog',[False,True])
+def test_live_provider_expiry_stops_before_post(monkeypatch,during_catalog):
+    ended=False
+    monkeypatch.setattr(hy4,'promotion_ended',lambda:ended)
+    calls=[]
+    async def run():
+        nonlocal ended
+        def handler(request):
+            nonlocal ended
+            calls.append(request.method)
+            if during_catalog:ended=True
+            return httpx.Response(200,json=catalog() if request.method=='GET' else completion())
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider=hy4.create_hy4_provider(settings(),client)
+            if not during_catalog:ended=True
+            with pytest.raises(ProviderDisabledError):
+                await provider.complete(LLMRequest([Message('user','synthetic')],task='chat'))
+    asyncio.run(run())
+    assert calls==(['GET'] if during_catalog else [])
+
+
+def test_transport_expiry_cannot_bypass_preflight(monkeypatch):
+    monkeypatch.setattr(hy4,'promotion_ended',lambda:True)
+    with hy4.selection_scope(True),pytest.raises(ProviderDisabledError):
+        hy4.enforce_destination(hy4.BASE+'/chat/completions',{'model':hy4.MODEL})

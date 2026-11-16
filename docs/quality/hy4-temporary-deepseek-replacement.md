@@ -54,3 +54,9 @@ free_interactive97,30/85,71; free_only98,08/95,45;
 hy498,15/97,06; thesis_go100/100.
 TSC no aplica; pyright focalizado0errores11avisos heredados. Ruffverde.
 No implica green de toda la suite ni permiso de deploy.
+
+Caducidad comprobada por cada peticion en Hy4Provider (antes de catalogo,
+despues del await de catalogo) y en enforce_destination al transportar.
+Objeto ya creado no sobrevive al techo operativo30nov10:56Z.
+Tests con reloj mutable y objeto creado antes del corte; mutante quitando
+los3checks hace fallar3tests. 334tests focalizados verdes tras correccion.

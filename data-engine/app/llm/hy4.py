@@ -35,7 +35,7 @@ def selection_scope(enabled):
 
 def enforce_destination(url, payload):
     if _selected.get():
-        if blocked() or str(url) != BASE+'/chat/completions' or payload.get('model') != MODEL:
+        if promotion_ended() or blocked() or str(url) != BASE+'/chat/completions' or payload.get('model') != MODEL:
             raise ProviderDisabledError(NOTICE)
         return True
     return False
@@ -73,7 +73,7 @@ class Hy4Provider(GoSubscriptionChatProvider):
             _admission.release()
 
     async def _complete_guarded(self, request, model):
-        if blocked() or model != MODEL:
+        if promotion_ended() or blocked() or model != MODEL:
             raise ProviderDisabledError(NOTICE)
         # Read current price before EVERY inference. Metadata arriving after
         # inference cannot undo a first charge if the provider changes price.
@@ -98,7 +98,7 @@ class Hy4Provider(GoSubscriptionChatProvider):
             trip()
         # Another request may have tripped while this catalog GET awaited.
         # Never let an earlier successful preflight reopen the circuit.
-        if blocked():
+        if promotion_ended() or blocked():
             raise ProviderDisabledError(NOTICE)
         return await super()._complete(request, model)
 
