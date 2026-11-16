@@ -38,6 +38,8 @@ describe('lista de eventos del gráfico en móvil', () => {
     it('la fuente enlaza y abre en pestaña nueva', () => {
         renderPanel();
         const source = screen.getByRole('link', { name: 'Yahoo Finance' });
+        expect(source.className).toContain('min-h-11');
+        expect(source.className).toContain('min-w-11');
         expect(source.getAttribute('target')).toBe('_blank');
         expect(source.getAttribute('rel')).toContain('noreferrer');
     });

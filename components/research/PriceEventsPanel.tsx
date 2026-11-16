@@ -44,7 +44,7 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
                                     fecha + tipo + fuente (~60 px a 390 px) y salía una palabra por
                                     línea, ilegible. Desde sm vuelve al comportamiento en línea. */}
                                 <span className="min-w-0 flex-1 basis-full text-gray-200 sm:basis-auto">{event.title}</span>
-                                {event.source_url ? <a href={event.source_url} target="_blank" rel="noreferrer" className="text-[10px] text-gray-500 underline">{event.source}</a> : <span className="text-[10px] text-gray-500">{event.source}</span>}
+                                {event.source_url ? <a href={event.source_url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-[10px] text-gray-500 underline sm:min-h-0 sm:min-w-0">{event.source}</a> : <span className="text-[10px] text-gray-500">{event.source}</span>}
                                 {event.detail && !visibleDetail(event) ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="text-[10px] text-gray-500 hover:text-gray-200">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
                             </div>
                             {event.detail && (visibleDetail(event) || open === event.id) ? <p className="mt-1 whitespace-pre-line text-gray-400">{event.detail}</p> : null}
