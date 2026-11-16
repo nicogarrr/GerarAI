@@ -231,3 +231,8 @@ it('PDMR filings preserve shares and explain why unverified money is missing', (
     expect(screen.queryByText(/987/)).toBeNull();
     expect(screen.getByText(/18.137/)).toBeInTheDocument();
 });
+
+it('declares persisted counts instead of presenting saved filings as live reads', () => {
+ render(<InsiderSignalsView initialTicker="ASTS" initialResult={signals({filings_from_persisted: 2,latest_persisted_filing_date:'2026-10-01'} as Partial<InsiderSignalsResult>)} initialFilings={filings([filing(1)])}/>);
+ expect(screen.getByText(/2 de 10 Form 4 desde filings persistidos/)).toBeInTheDocument();
+});
