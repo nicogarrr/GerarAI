@@ -90,7 +90,8 @@
     "noQuote": "There's no quote for your positions yet. Once there is, you'll see here how your portfolio is doing since the purchase.",
     "partial": "Among the positions with a cost basis: the gain/loss does not include the others.",
     "reviewMover": "Review {symbol} (largest move since purchase)",
-    "reviewAll": "Review your portfolio"
+    "reviewAll": "Review your portfolio",
+    "cachedAt": "Saved at {time}"
   },
   "alerts": {
     "title": "Alerts",

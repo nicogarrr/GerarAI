@@ -19,6 +19,7 @@ import { PortfolioValueBreakdown } from '@/components/portfolio/PortfolioValueBr
 import { DcaLevelChip, useHoldingSignals } from '@/components/portfolio/HoldingSignals';
 import { fairValueGapPercent } from '@/lib/portfolio/holding-signals';
 import { getPortfolioSummary, type PortfolioHolding, type PortfolioSummary } from '@/lib/actions/portfolio.actions';
+import { readCachedPortfolio, writeCachedPortfolio } from '@/lib/home/portfolio-cache';
 import {
     getHomeWatchlistPreview,
     getHomeOpportunities,
@@ -302,7 +303,11 @@ async function fetchHomeSection<T>(url: string, fallback: T): Promise<HomeSectio
     }
 }
 
-export default function PersonalizedOverview({ userId, afterAlerts }: PersonalizedOverviewProps) {
+export default function PersonalizedOverview(props: PersonalizedOverviewProps) {
+    return <PersonalizedOverviewForUser key={props.userId} {...props} />;
+}
+
+function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOverviewProps) {
     const t = useT();
     // Cifras y fechas con el formato del idioma elegido (antes siempre es-ES).
     const { formatCompact, formatUserDateTime, formatMarketDate, formatMoney, formatNumber, formatPercent, formatPrice, na: NA } = useFormat();
@@ -316,6 +321,8 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
     const [opportunities, setOpportunities] = useState<UndervaluedStock[]>([]);
     const [dcfScope, setDcfScope] = useState<DcfScope | null>(null);
     const [portfolioLoading, setPortfolioLoading] = useState(true);
+    // ISO del dato cacheado que se está mostrando (null = dato fresco del fetch).
+    const [portfolioStaleAt, setPortfolioStaleAt] = useState<string | null>(null);
     const [watchlistLoading, setWatchlistLoading] = useState(true);
     const [opportunitiesLoading, setOpportunitiesLoading] = useState(true);
     const [alertsLoading, setAlertsLoading] = useState(true);
@@ -337,15 +344,43 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
         let active = true;
 
         const load = async () => {
-            setPortfolioLoading(true);
+            // Primera carga: pinta el último dato bueno guardado (con marca de
+            // «Guardado de …») mientras llega el fetch. La clave va por
+            // usuario: otra cuenta en este navegador no ve esta cartera.
+            let cachedShown = false;
+            {
+                const cached = readCachedPortfolio(userId);
+                if (cached) {
+                    cachedShown = true;
+                    setPortfolioSummary(cached.summary);
+                    setPortfolioStaleAt(cached.fetchedAt);
+                    setPortfolioLoading(false);
+                } else {
+                    setPortfolioSummary(null);
+                    setPortfolioStaleAt(null);
+                    setPortfolioLoading(true);
+                }
+            }
             setPortfolioError(null);
             const result = retryTokens.portfolio === 0
                 ? await fetchHomeSection('/api/home/portfolio', null as PortfolioSummary | null)
                 : await settle(getPortfolioSummary(userId), null as PortfolioSummary | null);
             if (!active) return;
-            setPortfolioSummary(result.data);
+            if (!result.error && result.data) {
+                // Solo el dato real y fresco sustituye al cacheado y se guarda;
+                // un fallo nunca pisa el último dato bueno.
+                setPortfolioSummary(result.data);
+                setPortfolioStaleAt(null);
+                writeCachedPortfolio(userId, result.data);
+            } else if (!cachedShown) {
+                setPortfolioSummary(result.data);
+                setPortfolioError(result.error);
+            } else {
+                // Con caché visible el aviso de error va sobre el dato guardado,
+                // que sigue mostrándose con su marca de hora.
+                setPortfolioError(result.error);
+            }
             setPortfolioLoading(false);
-            setPortfolioError(result.error);
         };
 
         void load();
@@ -524,11 +559,13 @@ export default function PersonalizedOverview({ userId, afterAlerts }: Personaliz
                     )}
                 </CardHeader>
                 <CardContent className="pt-4">
+                    {!portfolioLoading && portfolioSummary && portfolioError ? <InlineSectionError message={portfolioError} onRetry={() => retrySection('portfolio')} /> : null}
+                    {!portfolioLoading && portfolioSummary && portfolioStaleAt ? <p className="mb-3 text-xs text-gray-500" role="status">{t('home.portfolio.cachedAt', { time: formatUserDateTime(portfolioStaleAt) })}</p> : null}
                     {portfolioLoading ? (
                         // Misma estructura que la tarjeta con posiciones: el hueco
                         // reservado crece igual por breakpoint (CLS móvil).
                         <PortfolioCardSkeleton />
-                    ) : portfolioError ? (
+                    ) : portfolioError && !portfolioSummary ? (
                         <InlineSectionError message={portfolioError} onRetry={() => retrySection('portfolio')} />
                     ) : portfolioSummary && portfolioSummary.holdings.length > 0 ? (
                         <div className="space-y-5">

@@ -125,6 +125,7 @@ async function renderHome(props: Partial<React.ComponentProps<typeof Personalize
 }
 
 beforeEach(() => {
+    window.localStorage.clear();
     markBrainReady(false);
     window.sessionStorage.removeItem(OPEN_BRAIN_PENDING_KEY);
     [getPortfolioSummary, getUserAlerts, getRecentTriggeredAlerts, getHomeWatchlistPreview, getHomeOpportunities, getHoldingSignals].forEach((m) => m.mockReset());
