@@ -290,7 +290,10 @@ class KPIExtractionService:
         try:
             from app.services.jev_gates import kpi_chunk_keep_flags
 
-            keep_flags = await kpi_chunk_keep_flags([chunk.text for chunk in chunks])
+            # Hy4 replacement is one guarded model only. Jev may use a paid
+            # micro-model; do not call it as an invisible KPI prefilter.
+            keep_flags = (None if getattr(self.provider, "name", "") == "hy4-go-zero"
+                          else await kpi_chunk_keep_flags([chunk.text for chunk in chunks]))
         except Exception:  # noqa: BLE001 — Jev best-effort: sin filtro, como hoy
             keep_flags = None
         if keep_flags is not None:
@@ -306,7 +309,8 @@ class KPIExtractionService:
         metric_keys = [row.metric_key for row in registry if row.active]
         schema = self._schema(metric_keys)
         budget = BudgetController()
-        if not budget.can_spend(db, 0.02):
+        hy4_mode = getattr(self.provider, "name", "") == "hy4-go-zero"
+        if not budget.can_spend(db, 0 if hy4_mode else 0.02):
             from app.services.budget import BudgetExceededError
 
             raise BudgetExceededError("LLM budget exhausted")
@@ -366,11 +370,11 @@ class KPIExtractionService:
                 reserve(db.info.get("tenant_id"))
                 response = await self.provider.complete(request)
                 payload = parse_json_response(response.text)
-                cost = budget.estimate_cost_eur(
+                cost = (0 if hy4_mode else budget.estimate_cost_eur(
                     response.model,
                     response.usage.input_tokens,
                     response.usage.output_tokens,
-                )
+                ))
                 budget.record(
                     db,
                     response.model,
