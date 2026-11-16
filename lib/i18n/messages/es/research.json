@@ -1254,7 +1254,6 @@
     "colStatus": "Estado",
     "colSegment": "Segmento",
     "colConfidence": "Confianza",
-    "colSource": "Fuente",
     "noData": "Sin datos para esta métrica.",
     "noObservations": "Sin observaciones para esta métrica y filtro de periodo.",
     "noUnit": "N/D (unidad no disponible)",
@@ -1598,8 +1597,6 @@
     "colMetric": "Métrica",
     "colPeriod": "Periodo",
     "colValue": "Valor",
-    "sourceProvider": "Fuente: {provider}",
-    "sourceUnavailable": "No disponible",
     "publishedDate": "Publicado: {date}",
     "publicationUnavailable": "Fecha de publicación no disponible"
   },
