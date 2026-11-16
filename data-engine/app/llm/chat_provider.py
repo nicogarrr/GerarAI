@@ -633,6 +633,10 @@ def create_chat_llm_provider(settings: Settings | None = None, *, client: httpx.
     from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
+    from app.llm.hy4 import replacement_provider
+    promoted = replacement_provider(settings, client)
+    if promoted is not None:
+        return promoted
     if current_tenant_llm_config() is not None:
         # El tenant paga su clave: sin respaldos de plataforma (Groq/Gemini)
         # ni modelos de OpenCode. Mismo contrato fail-closed del factory.
@@ -727,6 +731,10 @@ def create_background_llm_provider(settings: Settings | None = None, *, client: 
     from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
+    from app.llm.hy4 import replacement_provider
+    promoted = replacement_provider(settings, client)
+    if promoted is not None:
+        return promoted
     if current_tenant_llm_config() is not None:
         # Sin respaldos de plataforma: la clave del tenant nunca se mezcla con
         # la de GerarAI, ni siquiera cuando su proveedor falla.

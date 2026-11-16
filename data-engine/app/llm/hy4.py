@@ -35,7 +35,7 @@ def selection_scope(enabled):
 
 def enforce_destination(url, payload):
     if _selected.get():
-        if blocked() or str(url) != BASE+'/chat/completions' or payload.get('model') != MODEL:
+        if promotion_ended() or blocked() or str(url) != BASE+'/chat/completions' or payload.get('model') != MODEL:
             raise ProviderDisabledError(NOTICE)
         return True
     return False
@@ -73,7 +73,7 @@ class Hy4Provider(GoSubscriptionChatProvider):
             _admission.release()
 
     async def _complete_guarded(self, request, model):
-        if blocked() or model != MODEL:
+        if promotion_ended() or blocked() or model != MODEL:
             raise ProviderDisabledError(NOTICE)
         # Read current price before EVERY inference. Metadata arriving after
         # inference cannot undo a first charge if the provider changes price.
@@ -98,7 +98,7 @@ class Hy4Provider(GoSubscriptionChatProvider):
             trip()
         # Another request may have tripped while this catalog GET awaited.
         # Never let an earlier successful preflight reopen the circuit.
-        if blocked():
+        if promotion_ended() or blocked():
             raise ProviderDisabledError(NOTICE)
         return await super()._complete(request, model)
 
@@ -127,3 +127,35 @@ def create_hy4_provider(settings, client=None):
         max_output_tokens=4000, reasoning_effort='none', reasoning_effort_models={MODEL},
         extra_headers={'User-Agent': 'GerarAI-brain/1.0', 'x-opencode-session': settings.opencode_go_session},
         client=client)
+
+
+def promotion_ended():
+    # Operational 14-day ceiling from the owner's Nov 16 11:56 Madrid request,
+    # NOT a claim about the provider's unconfirmed contractual end time.
+    from datetime import UTC, datetime
+    return datetime.now(UTC) >= datetime(2026, 11, 30, 10, 56, tzinfo=UTC)
+
+
+def replacement_provider(settings, client=None, *, model=None):
+    """Deployment switch, never an unrestricted free-model registry entry.
+
+    Pilot enables HY4_REPLACE_DEEPSEEK=1 after exact-SHA review. A missing or
+    repriced promotion stays closed; there is no automatic paid restoration.
+    """
+    import os
+    if os.environ.get('HY4_REPLACE_DEEPSEEK', '').strip() != '1':
+        return None
+    from app.llm.tenant_config import current_tenant_llm_config
+    tenant = current_tenant_llm_config()
+    # Never replace a tenant-owned configuration or its credentials.
+    if tenant is not None or not settings.llm_enabled:
+        return None
+    candidate = model or settings.opencode_go_model
+    if candidate not in {'deepseek-v4.1-flash', 'deepseek-v4.1-flash-free', MODEL}:
+        return None
+    if settings.llm_provider not in {'auto', 'opencode', 'opencode_go', 'opencode-go', 'cascade'}:
+        return None
+    if promotion_ended():
+        from app.llm.adapters import DisabledProvider
+        return DisabledProvider('hy4_promotion_window_ended_no_paid_restore')
+    return create_hy4_provider(settings, client)

@@ -40,6 +40,8 @@ def enforce_free_only(url, payload, settings=None):
     from app.llm.errors import ProviderDisabledError
     from app.llm.hy4 import enforce_destination
     if enforce_destination(url, payload):
+        if restricted(settings) and _tenant.get() is None:
+            raise ProviderDisabledError('llm_free_only_verified_tenant_required')
         return
     if not restricted(settings):
         return
@@ -58,6 +60,10 @@ def free_only_provider(settings, client=None):
         return DisabledProvider('disabled_by_configuration')
     if not (settings.opencode_go_api_key and settings.opencode_go_api_key.strip()):
         return DisabledProvider('llm_free_only_key_not_configured')
+    from app.llm.hy4 import replacement_provider
+    promoted = replacement_provider(settings, client, model=FREE_MODEL)
+    if promoted is not None:
+        return promoted
     from app.llm.chat_provider import GoSubscriptionChatProvider
     from app.llm.factory import _pin_to_model
     return GoSubscriptionChatProvider(

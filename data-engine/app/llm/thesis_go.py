@@ -66,6 +66,10 @@ def create_thesis_narrative_provider(
     from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
+    from app.llm.hy4 import replacement_provider
+    promoted = replacement_provider(settings, client, model=settings.thesis_go_model)
+    if promoted is not None:
+        return promoted
     if current_tenant_llm_config() is not None:
         return create_llm_provider(settings, client=client)
     if not getattr(settings, "thesis_go_enabled", False):
