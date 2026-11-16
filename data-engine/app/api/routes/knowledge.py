@@ -75,6 +75,7 @@ def validate_upload_metadata(
 
 
 class LibraryQuestion(BaseModel):
+    model: Literal["hy4-flash-free"] | None = None
     question: str = Field(min_length=3, max_length=1200)
     scope: Literal["letters", "library"] = "letters"
     author: str | None = Field(default=None, max_length=240)
@@ -93,9 +94,23 @@ async def chat_library(payload: LibraryQuestion, db: Session = Depends(get_db)) 
     fields = payload.model_dump()
     page_context = resolve_page_context(db, payload.page)
     fields.pop("page", None)
-    result = await run_in_threadpool(
-        lambda: run_from_any_context(ask_library(db, **fields))
-    )
+    model = fields.pop("model", None)
+    def work():
+        if not model:
+            return run_from_any_context(ask_library(db, **fields))
+        from app.core.config import get_settings
+        from app.llm.errors import ProviderDisabledError
+        from app.llm.hy4 import NOTICE, blocked, create_hy4_provider, selection_scope
+        try:
+            with selection_scope(True):
+                result = run_from_any_context(ask_library(db, **fields, provider=create_hy4_provider(get_settings())))
+                if blocked():
+                    raise ProviderDisabledError(NOTICE)
+                return result
+        except ProviderDisabledError:
+            return {"status": "sin_datos", "kind": "doctrina", "mode": payload.mode,
+                    "retrieval": "solo_texto", "answers": [], "message": NOTICE}
+    result = await run_in_threadpool(work)
     # Eco del contexto de página resuelto en servidor (pastilla "Viendo X").
     result["context"] = page_context.echo() if page_context else None
     return result
