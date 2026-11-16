@@ -25,6 +25,10 @@ from typing import Any
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
+_REGISTRY_KEY = "companies_house"
+
 API_BASE_URL = "https://api.company-information.service.gov.uk"
 DOCUMENT_API_HOST = "document-api.company-information.service.gov.uk"
 PUBLIC_BASE_URL = "https://find-and-update.company-information.service.gov.uk"
@@ -123,10 +127,25 @@ class CompaniesHouseClient:
     async def _get(self, url: str, *, params: dict[str, Any] | None = None,
                    accept: str = "application/json") -> httpx.Response:
         await self._throttle()
-        resp = await self._client.get(url, params=params, auth=self._auth,
-                                      headers={"Accept": accept}, follow_redirects=False)
+        registry = get_data_source_registry()
+        started = time.perf_counter()
+        try:
+            resp = await self._client.get(url, params=params, auth=self._auth,
+                                          headers={"Accept": accept}, follow_redirects=False)
+        except httpx.TransportError as exc:
+            registry.record_failure(_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+            raise
         if resp.status_code == 429:
+            registry.record_failure(_REGISTRY_KEY, "HTTP 429 (limite de peticiones)")
             raise CompaniesHouseBudgetExceeded("Companies House respondio 429 (limite de peticiones)")
+        if resp.status_code >= 500 or resp.status_code in (401, 403):
+            registry.record_failure(_REGISTRY_KEY, f"HTTP {resp.status_code}")
+            return resp
+        if resp.status_code >= 400:
+            # 404 y demas 4xx son del recurso concreto: neutros. No degradar
+            # no es sanar: no se toca el registro (un 404 no resetea fallos).
+            return resp
+        registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return resp
 
     async def _json(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any] | None:

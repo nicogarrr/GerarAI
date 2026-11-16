@@ -24,6 +24,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import tempfile
+import time
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -37,7 +38,10 @@ from app.core.errors import redact_secrets
 from app.models.entities import Company, InstrumentReference
 from app.models.public_market_data import PublicFinancialFact, PublicSourceDocument
 from app.services.connectors import form13f_dataset as ds
+from app.services.data_source_health import get_data_source_registry
 from app.services.investor_overlap import _cusip
+
+_REGISTRY_KEY = "form13f_dataset"
 
 logger = logging.getLogger("gerarai.institutional_holders")
 
@@ -438,11 +442,14 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
     session = db or SessionLocal()
     http = client or httpx.Client(timeout=120, follow_redirects=True, headers={"User-Agent": get_settings().sec_user_agent})
     paths: list[str] = []
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     try:
         page = http.get(ds.DATASETS_PAGE)
         page.raise_for_status()
         refs = ds.list_datasets(page.text)[:2]
         if len(refs) < 2:
+            registry.record_failure(_REGISTRY_KEY, "la pagina de la SEC no lista dos ficheros")
             return {"status": "sin_datos", "reason": "la página de la SEC no lista dos ficheros"}
         cusips = universe_cusips(session)
         if not cusips:
@@ -461,6 +468,7 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
             PublicSourceDocument.checksum.startswith(DETAIL_VERSION))).all()
         processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
         if all(company.id in processed for company in cusips.values()):
+            registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
             return {"status": "sin_cambios", "dataset": refs[0].url}
         parses, checksums = [], []
         for ref in refs:
@@ -468,8 +476,16 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
             paths.append(path)
             parses.append(ds.parse_dataset(path, set(cusips), url=ref.url))
             checksums.append(checksum)
-        return ingest_parsed(session, parses, checksums, cusips)
+        result = ingest_parsed(session, parses, checksums, cusips)
+        if result.get("status") != "ok":
+            # Dataset ilegible (parseador roto o cabeceras cambiadas), no una
+            # ausencia observada: no se afirma salud; la próxima pasada reintenta.
+            registry.record_failure(_REGISTRY_KEY, f"dataset ilegible: {result.get('reason', '')[:120]}")
+            return result
+        registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+        return result
     except Exception as exc:  # noqa: BLE001 - job programado: se informa, no se cae
+        registry.record_failure(_REGISTRY_KEY, type(exc).__name__)
         logger.warning("institutional_holders refresh fallo: %s", redact_secrets(str(exc)))
         session.rollback()
         return {"status": "error", "error": redact_secrets(str(exc))[:300]}
