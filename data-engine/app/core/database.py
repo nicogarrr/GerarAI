@@ -8,6 +8,7 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker, with_loader_c
 
 from app.core.auth import MSG_IDENTITY_REQUIRED, ResearchPrincipal, get_research_principal
 from app.core.config import Settings, get_settings
+from app.core.db_admission import admit_database_request
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +253,7 @@ def _assign_tenant_to_new_rows(session: Session, _flush_context, _instances) -> 
 def get_db(
     principal: ResearchPrincipal | None = Depends(get_research_principal),
     request: Request = None,
+    _admission: None = Depends(admit_database_request),
 ) -> Generator[Session, None, None]:
     # Fail-closed: with research auth required there is never an anonymous
     # session. Writes without a tenant must be impossible, not just unscoped.
@@ -348,6 +350,11 @@ def get_db(
         if language == DEFAULT_LANGUAGE:
             language = tenant_stored_language(db) or DEFAULT_LANGUAGE
         db.info["language"] = language
+        # Preflight writes (new tenant/email binding) were committed above.
+        # Release the read transaction before an endpoint queues for a worker
+        # thread or waits on external I/O. Session.info survives rollback; the
+        # endpoint lazily acquires a connection only when it actually uses DB.
+        db.rollback()
         yield db
     finally:
         db.rollback()
