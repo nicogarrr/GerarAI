@@ -45,6 +45,10 @@ from app.services.source_hierarchy_service import classify_source
 from app.services.text_clip import clip_words
 from app.services.thesis_context import retrieve_thesis_context
 from app.services.thesis_deep_narrative import is_sin_datos, maybe_deep_narrative
+from app.services.thesis_invalidation_rules import (
+    RULES_ORIGIN_KEY,
+    rules_for_valuation,
+)
 from app.services.thesis_narrative_llm import evidence_sections
 from app.services.thesis_news_narrative import prepare_news_narrative, sin_datos
 from app.services.thesis_provenance import (
@@ -78,7 +82,7 @@ def _hora_es(value: object) -> str:
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "thesis-render-v5-number-formats"
+PROMPT_VERSION = "thesis-render-v6-derived-invalidation-rules"
 
 # Keys de missing_inputs (literales en long_term_model_service) CUBIERTAS por
 # un input presente-excluido. La métrica excluida y la key de missing viven en
@@ -1276,6 +1280,7 @@ class ThesisService:
         hypothesis = self._hypothesis(company, valuation, excluded_present=snapshot.excluded_present)
         catalysts = self._catalysts(evidence)
         invalidation = self._invalidation_criteria(company, valuation)
+        invalidation_rules, rules_origin = rules_for_valuation(valuation, previous)
         scenario_probabilities = self._scenario_probabilities(long_term_model)
 
         summary = self._card_summary(company, valuation, hypothesis, news_items, long_term_model)
@@ -1399,6 +1404,7 @@ class ThesisService:
                 ),
             }
 
+        valuation_basis = {**(valuation_basis or {}), RULES_ORIGIN_KEY: rules_origin}
         _phase("persist_thesis")
         thesis = ThesisVersion(
             company_id=company.id,
@@ -1426,13 +1432,11 @@ class ThesisService:
             hypothesis=hypothesis,
             catalysts=catalysts,
             invalidation_criteria=invalidation,
-            # Los criterios medibles los pone el usuario: sobreviven a cada
-            # regeneracion de la tesis (si no, el aviso dejaria de vigilarse).
-            invalidation_rules=(
-                list(previous.invalidation_rules)
-                if previous is not None and previous.invalidation_rules
-                else None
-            ),
+            # Las reglas del usuario siempre ganan y sobreviven a cada
+            # regeneracion de la tesis (si no, el aviso dejaria de
+            # vigilarse). Las derivadas NO se conservan: se recalculan con
+            # la valoracion nueva, para no vigilar un valor base obsoleto.
+            invalidation_rules=invalidation_rules or None,
             scenario_probabilities=scenario_probabilities,
             narrative_sections=narrative_sections,
             valuation_basis=valuation_basis,

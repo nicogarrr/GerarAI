@@ -790,6 +790,11 @@ def set_invalidation_rules(
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     thesis.invalidation_rules = rules or None
+    # Guardar incluso [] es una decision manual: no volver a derivar reglas
+    # en la siguiente regeneracion. No inferir autoria de la descripcion.
+    thesis.valuation_basis = {
+        **(thesis.valuation_basis or {}), "invalidation_rules_origin": "user",
+    }
     db.flush()
     alert_rules = sync_thesis_rules(db, company)
     db.commit()
