@@ -5,7 +5,7 @@ import { test } from 'node:test';
 const watchlist = readFileSync('app/(root)/watchlist/page.tsx', 'utf8');
 const research = readFileSync('app/(root)/research/page.tsx', 'utf8');
 
-test('watchlist starts dated changes, monitor and per-symbol reads together (no serial chain)', () => {
+function assertWatchlistParallelStreaming(watchlist) {
     assert.doesNotMatch(watchlist, /await fetchDatedChanges/);
     assert.doesNotMatch(watchlist, /await getWatchlistMonitor/);
     // #3255 (A9) añade el contexto FX de la cartera en el mismo Promise.all: sigue en paralelo.
@@ -28,12 +28,31 @@ test('watchlist starts dated changes, monitor and per-symbol reads together (no 
     assert.doesNotMatch(watchlist.slice(first, second), /await\s/, 'no puede haber un await entre el lanzamiento de dated changes y el de monitor');
     const basicsStart = watchlist.indexOf('await getResearchCompaniesBasics(');
     assert.ok(basicsStart === -1 || (datedStart < basicsStart && monitorStart < basicsStart), 'dated changes y monitor deben lanzarse antes del await del batch de basics');
-    // El join las espera juntas. #5210: con orden por métrica el cierre datado
-    // se espera aquí (hay que ordenar con él); sin él, las filas se repintan
-    // vía <Suspense> con la MISMA promesa compartida y el join espera un
-    // resolved vacío. Ambas formas conservan el arranque paralelo; lo que
-    // sigue prohibido es serializar (cubierto por los doesNotMatch de arriba).
-    assert.match(watchlist, /await Promise\.all\(\[(metricSort \? )?datedChangesPromise( : Promise\.resolve\(\{\} as DatedMap\))?, monitorPromise, Promise\.all\(basicsPromises\)(, Promise\.all\(notFoundPromises\))?\]\)/);
+    // Default/symbol order streams monitor decorations. Every explicit metric
+    // sort (including earnings) still joins the same already-started monitor.
+    assert.match(watchlist, /const metricSort = sort !== 'added' && sort !== 'symbol';/);
+    assert.match(watchlist, /case 'earnings': return stock\.monitor\?\.next_earnings_date \?\? null;/);
+    assert.match(watchlist, /await Promise\.all\(\[metricSort \? datedChangesPromise : Promise\.resolve\(\{\} as DatedMap\), metricSort \? monitorPromise : Promise\.resolve\(\{ items: \{\}, earningsStatus: 'pending' \} as MonitorData\), Promise\.all\(basicsPromises\)\]\)/);
+    assert.match(watchlist, /<MonitorStockStream promise=\{monitorPromise\} render=\{render\}/);
+}
+
+test('watchlist starts shared reads in parallel, streams default order and awaits monitor for metric sorts', () => {
+    assertWatchlistParallelStreaming(watchlist);
+});
+
+test('waterfall guard rejects monitor and sorting regressions', () => {
+    const mutants = [
+        watchlist.replace('const monitorPromise = getWatchlistMonitor(', 'const monitorPromise = await getWatchlistMonitor('),
+        watchlist.replace('const monitorPromise = getWatchlistMonitor(', 'await Promise.resolve(); const monitorPromise = getWatchlistMonitor('),
+        watchlist.replace('metricSort ? monitorPromise :', 'false ? monitorPromise :'),
+        watchlist.replace("sort !== 'added' && sort !== 'symbol'", "sort !== 'added' && sort !== 'symbol' && sort !== 'earnings'"),
+        watchlist.replace('promise={monitorPromise}', 'promise={Promise.resolve({items:{}})}'),
+        watchlist.replace("case 'earnings': return stock.monitor?.next_earnings_date ?? null;", "case 'earnings': return null;"),
+    ];
+    for (const mutant of mutants) {
+        assert.notEqual(mutant, watchlist, 'mutation must actually change source');
+        assert.throws(() => assertWatchlistParallelStreaming(mutant));
+    }
 });
 
 test('research starts user context before awaiting the dashboard', () => {

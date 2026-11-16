@@ -18,3 +18,16 @@ must check repository-lockfile versions. No full-build claim.
 Visual evidence: actual monitor fragments rendered by SSR test in390px fixture,
 not full Next app. Summary/rank/minimum/earnings visible. Translation keys are
 intentional test mocks. Pilot full page and productionLCP remain outstanding.
+
+## Auditor follow-up: waterfall guard
+
+Guard now requires conditional monitor join for every metric sort, retains
+synchronous parallel starts before basics, requires shared monitor stream and
+checks earnings uses monitor date. Six source mutations must all be rejected:
+serial monitor await, await between launches, metric monitor wait omitted,
+earnings exempted from metricSort, stream promise replaced, earnings sort date
+removed. Four waterfall guard tests pass, full guard runner3098pass/0fail/1skip
+(3099tests),110watchlist tests still99.61%lines91.81%branches.
+Local TS7 caused broad guard environment failures; local deps reset toTS5.9.3
+and eslint/config-next installed, node_modules actual directory. No dependency
+or lockfile edits included in this change.
