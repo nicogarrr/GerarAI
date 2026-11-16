@@ -18,3 +18,11 @@ and node --experimental-strip-types scripts/thesis-text-guard.test.ts.
 Focused strict TypeScript passed on changed sources/tests and their imports.
 Local Vitest3.2.7/Node22.23.4 were available; repository CI uses its lockfile
 and still needs to run. No full frontend build/typecheck/production claim.
+
+Auditor follow-up: contextual None rules now cover parenthesized field values,
+closing delimiters and isolated inline-code None. English prose beginning
+None followed by comma/semicolon remains unchanged, as do quoted field values.
+The old fixture "... y None" was made an explicit "... y ROE: None" field;
+end-of-sentence prose alone is no longer taken as missing data.49unit tests
+and7node guards pass. Local branch measurement97.5%; Auditor measured96.66%
+on the prior SHA in its environment, both above85; no cross-environment claim.

@@ -19,3 +19,10 @@ describe('source-preserving thesis presentation',()=>{
   });
  }
 });
+
+for(const clean of [cleanThesisText,cleanThesisMarkdown]){
+ it('localizes delimited missing field values without changing None prose',()=>{
+  for(const text of ['(ROE: None)','ROE: None)','ROE = None]','ROE: None, EPS: 2','`None`','(None)'])expect(clean(text)).toBe(text.replace('None','N/D'));
+  for(const text of ['None, but some may change.','None; others may change.','None of the above','"ROE: None"',"'None of the above'",'«ROE: None»','“None of the above”'])expect(clean(text)).toBe(text);
+ });
+}

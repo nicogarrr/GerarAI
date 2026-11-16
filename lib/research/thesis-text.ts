@@ -38,7 +38,11 @@ function missingTokens(text: string): string {
     // Source quotations are evidence, never Python-style missing values.
     return text.split(/("[^"\n]*"|'[^'\n]*'|«[^»\n]*»|“[^”\n]*”)/g).map((part, index) => {
         if (index % 2) return part;
-        return part.replace(/\bNone\b(?=[:=]|\s*(?:$|[.,;](?=\s|$)))/gm, 'N/D');
+        return part
+            .replace(/`None`/g, '`N/D`')
+            .replace(/([:=]\s*)None(?=\s*(?:$|[)\]},;.]|\n))/gm, '$1N/D')
+            .replace(/^(\s*[([]?\s*)None(\s*[)\]]?\s*)$/gm, '$1N/D$2')
+            .replace(/^None(?=\s*[:=])/gm, 'N/D');
     }).join('');
 }
 

@@ -52,7 +52,7 @@ describe('cleanThesisMarkdown', () => {
         expect(cleanThesisMarkdown(text)).toBe('Intro\n\n## 25. Riesgos\nBien');
     });
     it('traduce restos técnicos conocidos sin tocar URLs', () => {
-        const out = cleanThesisMarkdown('median of latest annual FCF margins, ver https://sec.gov/x y None');
+        const out = cleanThesisMarkdown('median of latest annual FCF margins, ver https://sec.gov/x y ROE: None');
         expect(out).toContain('Mediana de los últimos márgenes FCF anuales');
         expect(out).toContain('https://sec.gov/x');
         expect(out).toContain('N/D');
