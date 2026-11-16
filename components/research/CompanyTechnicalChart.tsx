@@ -186,7 +186,7 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
 }
 
 type CanvasMarker = { date: string; text: string; color: string; count: number };
-type CanvasPriceLine = { label: string; price: number; color: string; axisLabelColor?: string };
+type CanvasPriceLine = { label: string; price: number; color: string; axisLabelColor?: string; narrowLabel?: string };
 
 const TARGET_LINE_COLOR = '#a78bfa';
 const UPSIDE_COLOR = '#22c55e';
@@ -198,11 +198,12 @@ const DOWNSIDE_COLOR = '#ef4444';
  * eje) va en verde si hay potencial y en rojo si el precio ya está por encima del objetivo.
  */
 export function targetPriceLine(target: number, distance: number | null, t: TranslateFn, fmt: Pick<Formatters, 'formatNumber'>): CanvasPriceLine {
-    if (distance == null) return { label: t('research.chart.lineTarget'), price: target, color: TARGET_LINE_COLOR };
+    if (distance == null) return { label: t('research.chart.lineTarget'), narrowLabel: '', price: target, color: TARGET_LINE_COLOR };
     const sign = distance > 0 ? '+' : '';
     const value = t('research.chart.fibRatio', { value: `${sign}${fmt.formatNumber(distance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` });
     return {
         label: t('research.chart.lineTargetDistance', { distance: value }),
+        narrowLabel: value,
         price: target,
         color: TARGET_LINE_COLOR,
         axisLabelColor: distance > 0 ? UPSIDE_COLOR : distance < 0 ? DOWNSIDE_COLOR : undefined,
@@ -240,6 +241,14 @@ function PriceCanvas({ bars, levels, currency, candleMode = false, hourly = fals
     useEffect(() => {
         latest.current = { bars, levels, currency, fmt };
     });
+    const [narrow, setNarrow] = useState(false);
+    useEffect(() => {
+        const element = container.current;
+        if (!element) return;
+        const observer = new ResizeObserver(([entry]) => setNarrow(entry.contentRect.width < 480));
+        observer.observe(element);
+        return () => observer.disconnect();
+    }, []);
     const [ready, setReady] = useState(false);
     const [error, setError] = useState(false);
     useEffect(() => {
@@ -314,9 +323,9 @@ function PriceCanvas({ bars, levels, currency, candleMode = false, hourly = fals
         for (const level of current.levels) { current.line.removePriceLine(level); current.candles.removePriceLine(level); }
         current.levels = levels.map((level) => priceSeries.createPriceLine({ price: level.price, title: level.label, color: level.kind === 'support' ? '#2dd4bf' : level.kind === 'resistance' ? '#fb7185' : '#a78bfa', lineWidth: 1, lineStyle: 2, axisLabelVisible: wide }));
         for (const dashed of current.dashed) { current.line.removePriceLine(dashed); current.candles.removePriceLine(dashed); }
-        current.dashed = priceLines.map((line) => priceSeries.createPriceLine({ price: line.price, title: line.label, color: line.color, ...(line.axisLabelColor ? { axisLabelColor: line.axisLabelColor } : {}), lineWidth: 1, lineStyle: current.dashedStyle, axisLabelVisible: true }));
+        current.dashed = priceLines.map((line) => priceSeries.createPriceLine({ price: line.price, title: narrow && line.narrowLabel !== undefined ? line.narrowLabel : line.label, color: line.color, ...(line.axisLabelColor ? { axisLabelColor: line.axisLabelColor } : {}), lineWidth: 1, lineStyle: current.dashedStyle, axisLabelVisible: true }));
         current.chart.timeScale().fitContent();
-    }, [ready, bars, levels, hourly, spikes, markers, priceLines, candleMode]);
+    }, [ready, bars, levels, hourly, spikes, markers, priceLines, candleMode, narrow]);
     useEffect(() => {
         const current = engine.current;
         if (!ready || !current || !focusDate) return;
