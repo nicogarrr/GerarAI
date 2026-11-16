@@ -7612,6 +7612,8 @@ export interface components {
              * @enum {string}
              */
             mode: "explore" | "guide";
+            /** Model */
+            model?: "hy4-flash-free" | null;
             page?: components["schemas"]["ChatPageContext"] | null;
             /** Question */
             question: string;
