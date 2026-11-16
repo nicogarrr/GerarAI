@@ -29,7 +29,7 @@ from __future__ import annotations
 import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 MIN_SAMPLES_PER_FIRM = 3
@@ -37,6 +37,12 @@ MIN_BACKTEST_YEARS = 3
 ERROR_FLOOR = 0.02
 RULE_ID = "precision_inversa_mediana_v1 (prerregistrada 8-nov-2026)"
 CONSENSUS_FIRM = "Consenso (prensa)"
+# Frescura de la mediana vigente: una estimacion mas vieja que la ventana no
+# entra en low/median/high de un año aun sin reportar; se lista aparte como
+# caducada. Misma ventana que el consenso de precios objetivo
+# (analyst_history_service.CONSENSUS_WINDOW_DAYS) para no tener dos varas de
+# medir la frescura de analistas.
+ESTIMATE_WINDOW_DAYS = 365
 
 
 @dataclass(frozen=True)
@@ -145,8 +151,17 @@ def backtest(history: Sequence[FirmEstimate], actuals: Mapping[int, float], *, m
 
 
 def aggregate(history: Sequence[FirmEstimate], actuals: Mapping[int, float] | None = None, *,
-              year_ends: Mapping[int, date] | None = None) -> list[dict[str, Any]]:
-    """Por (métrica, año): estimación vigente de cada firma, agregados, revisiones y ponderación."""
+              year_ends: Mapping[int, date] | None = None,
+              today: date | None = None) -> list[dict[str, Any]]:
+    """Por (métrica, año): estimación vigente de cada firma, agregados, revisiones y ponderación.
+
+    Para años AÚN sin reportar y con ``today`` informado, la mediana solo
+    cuenta estimaciones frescas (``ESTIMATE_WINDOW_DAYS``): la última de cada
+    firma entraba en la mediana sin importar su edad y una cifra fosilizada se
+    publicaba como consenso vigente (Lote 2, hallazgo 2). Las caducadas se
+    listan en ``stale_firms`` con su fecha, fuera del agregado. Años ya
+    reportados: histórico completo, sin filtro.
+    """
     actuals = actuals or {}
     errors = firm_errors(history, actuals, year_ends=year_ends)
     check = backtest(history, actuals, year_ends=year_ends)
@@ -163,11 +178,19 @@ def aggregate(history: Sequence[FirmEstimate], actuals: Mapping[int, float] | No
                                   "from_date": prev.as_of.isoformat(), "to_date": est.as_of.isoformat()})
             latest[est.firm] = est
         firms = {f: e for f, e in latest.items() if f != CONSENSUS_FIRM}
+        stale: dict[str, FirmEstimate] = {}
+        if today is not None and year not in actuals:
+            cutoff = today - timedelta(days=ESTIMATE_WINDOW_DAYS)
+            stale = {f: e for f, e in firms.items() if e.as_of < cutoff}
+            firms = {f: e for f, e in firms.items() if e.as_of >= cutoff}
         values = [e.value for e in firms.values()]
         item: dict[str, Any] = {
             "metric": metric, "year": year, "firms": [
                 {"firm": f, "value_millions": e.value, "as_of": e.as_of.isoformat(), "url": e.url}
                 for f, e in sorted(firms.items(), key=lambda kv: kv[1].value)],
+            "stale_firms": [
+                {"firm": f, "value_millions": e.value, "as_of": e.as_of.isoformat(), "url": e.url}
+                for f, e in sorted(stale.items(), key=lambda kv: kv[1].value)],
             "n_firms": len(values), "low": min(values) if values else None, "median": _median(values),
             "high": max(values) if values else None, "revisions": revisions,
             "press_consensus": ({"value_millions": latest[CONSENSUS_FIRM].value,

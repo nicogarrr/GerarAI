@@ -929,7 +929,7 @@ def build_company_consensus(db: Any, company: Any, tenant_id: int, *, today: dat
         # Cierres reales de cada ejercicio: la precisión por firma se mide
         # contra la fecha de cierre verdadera, no contra un 31-dic supuesto.
         analyst = aggregate(history_for(db, company, tenant_id), reported_revenue(db, company),
-                            year_ends=revenue_year_ends(db, company))
+                            year_ends=revenue_year_ends(db, company), today=today)
     except Exception:  # noqa: BLE001 - sin analistas el consenso sigue con el resto de fuentes
         analyst = []
     if measured_errors is None:
