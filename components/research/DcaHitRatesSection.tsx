@@ -20,7 +20,7 @@ export async function DcaHitRatesSection({ ticker }: { ticker: string }) {
         return (
             <p role="status" aria-live="polite" data-testid="dca-hit-rates-preparing" className={EMPTY_CLASS}>
                 {t('watchlist.hitRates.section.preparing')}
-                <DcaPreparingRefresh />
+                <DcaPreparingRefresh ticker={ticker} kind="dca" />
             </p>
         );
     }

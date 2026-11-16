@@ -3,6 +3,7 @@ import { act, cleanup, render } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const refresh = vi.fn();
+vi.mock('@/lib/actions/preparing-status.actions', () => ({getPreparingStatus: vi.fn().mockResolvedValue('preparing')}));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh }) }));
 import DcaPreparingRefresh from '@/components/research/DcaPreparingRefresh';
 
@@ -11,7 +12,7 @@ describe('DcaPreparingRefresh compartido', () => {
   afterEach(() => { cleanup(); vi.useRealTimers(); });
 
   it('dos tarjetas preparando no provocan refrescos de pagina', () => {
-    render(<><DcaPreparingRefresh /><DcaPreparingRefresh /></>);
+    render(<><DcaPreparingRefresh ticker="ASTS" kind="dca" /><DcaPreparingRefresh ticker="ASTS" kind="dca" /></>);
     act(() => { vi.advanceTimersByTime(15_000); });
     expect(refresh).not.toHaveBeenCalled();
     act(() => { vi.advanceTimersByTime(15_000 * 40); });
@@ -19,8 +20,8 @@ describe('DcaPreparingRefresh compartido', () => {
   });
 
   it('montar y desmontar tarjetas nunca reinicia un presupuesto de refrescos', () => {
-    const one = render(<DcaPreparingRefresh />);
-    const two = render(<DcaPreparingRefresh />);
+    const one = render(<DcaPreparingRefresh ticker="ASTS" kind="dca" />);
+    const two = render(<DcaPreparingRefresh ticker="ASTS" kind="dca" />);
     one.unmount();
     act(() => { vi.advanceTimersByTime(15_000); });
     expect(refresh).not.toHaveBeenCalled();
