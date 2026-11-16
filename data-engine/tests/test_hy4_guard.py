@@ -176,3 +176,71 @@ def test_breaker_opened_while_catalog_waits_prevents_post():
     with pytest.raises(ProviderDisabledError):
         asyncio.run(run())
     assert calls == ['GET']
+
+
+@pytest.mark.parametrize('case', ['busy', 'timeout_early', 'timeout_wall', 'error'])
+def test_chat_route_admission_and_deadline_paths(monkeypatch, case):
+    from app.api.routes import chat as route
+    from app.schemas import ChatRequest
+    class DB:
+        info = {'tenant_id': 5}
+        def get_bind(self): return None
+    recorded = []
+    monkeypatch.setattr(route, '_live_workers', route.CHAT_MAX_LIVE_WORKERS if case == 'busy' else 0)
+    monkeypatch.setattr(route, 'get_settings', lambda: SimpleNamespace(chat_total_timeout_seconds=1))
+    monkeypatch.setattr(route, 'record_chat_event', lambda **kw: recorded.append(kw))
+    clock = iter([0, 8, 8] if case == 'timeout_wall' else [0, 0, 0])
+    monkeypatch.setattr(route, 'time', SimpleNamespace(monotonic=lambda: next(clock)))
+    async def fail(*args, **kwargs):
+        if case == 'error': raise RuntimeError('synthetic')
+        raise TimeoutError
+    monkeypatch.setattr(route.anyio.to_thread, 'run_sync', fail)
+    async def run(): return await route.chat(ChatRequest(question='hola'), DB())
+    if case == 'error':
+        with pytest.raises(RuntimeError): asyncio.run(run())
+        assert recorded[0]['route'] == 'error'
+    else:
+        result = asyncio.run(run())
+        path = result.llm_trace.get('path') or result.llm_trace.get('fallback_reason')
+        assert path == {'busy': 'chat_busy', 'timeout_early': 'chat_total_deadline', 'timeout_wall': 'chat_hard_deadline'}[case]
+    if case != 'busy': assert route._live_workers == 0
+
+
+def test_worker_stack_and_schema_existing_boundaries():
+    import threading
+    from typing import Annotated
+
+    from pydantic import TypeAdapter, ValidationError
+    from test_thesis_withhold_inferred import Row
+
+    from app.api.routes.chat import _log_stuck_worker
+    from app.schemas.api import AlertRuleOut, ThesisOut, not_blank
+    _log_stuck_worker(threading.get_ident(), 1)
+    _log_stuck_worker(None, 1)
+    validator = TypeAdapter(Annotated[str, not_blank(3)])
+    with pytest.raises(ValidationError): validator.validate_python(' \u200b ')
+    assert validator.validate_python('hola') == 'hola'
+    assert AlertRuleOut._coerce_legacy_dict(None) == {}
+    assert AlertRuleOut._coerce_legacy_dict({'x': 1}) == {'x': 1}
+    for raw, expected in [('mail', ['mail']), ([1, 'mail'], ['mail']), ([], ['in_app']), (None, ['in_app'])]:
+        assert AlertRuleOut._coerce_legacy_channels(raw) == expected
+    row = Row({'margin_of_safety_convention': 'discount_to_value_v1'})
+    assert ThesisOut.model_validate(row).margin_of_safety_status == 'verified'
+    row.margin_of_safety = None
+    assert ThesisOut.model_validate(row).margin_of_safety_status == 'missing'
+    row.valuation_withheld_reason = 'synthetic'
+    row.margin_of_safety_status = 'withheld'
+    row.archived_margin_of_safety = None
+    assert ThesisOut.model_validate(row).valuation_withheld_reason == 'synthetic'
+
+
+def test_only_one_admitted_request_per_process():
+    run, calls = execute()
+    assert hy4._admission.acquire(blocking=False)
+    try:
+        with pytest.raises(ProviderDisabledError, match='ocupado'):
+            asyncio.run(run())
+    finally:
+        hy4._admission.release()
+    assert calls == []
+    assert asyncio.run(run()).message.content == 'ok'

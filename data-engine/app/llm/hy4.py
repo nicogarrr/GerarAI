@@ -19,6 +19,7 @@ CATALOG = 'https://opencode.ai/inference/go/v1/models'
 NOTICE = 'Hy4 Flash bloqueado: no se pudo confirmar coste cero y facturación Go. No se usó otro modelo.'
 _selected = ContextVar('hy4_explicit_chat_selection', default=False)
 _lock = threading.Lock()
+_admission = threading.Lock()
 _blocked = False
 logger = logging.getLogger(__name__)
 
@@ -59,6 +60,16 @@ def trip() -> NoReturn:
 
 class Hy4Provider(GoSubscriptionChatProvider):
     async def _complete(self, request, model):
+        # One admitted inference per process. Do not queue catalog checks
+        # behind in-flight requests or let them pass after a circuit trip.
+        if not _admission.acquire(blocking=False):
+            raise ProviderDisabledError('Hy4 ocupado; no se ha usado otro modelo.')
+        try:
+            return await self._complete_guarded(request, model)
+        finally:
+            _admission.release()
+
+    async def _complete_guarded(self, request, model):
         if blocked() or model != MODEL:
             raise ProviderDisabledError(NOTICE)
         # Read current price before EVERY inference. Metadata arriving after
