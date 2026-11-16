@@ -311,21 +311,13 @@ def test_wacc_unavailable_when_capital_amounts_have_different_scales(company_fac
 # --------------------------------------------------------------------------
 
 
-def test_dcf_keeps_a_negative_fcf_margin_negative():
-    result = run_dcf(
-        DCFInputs(
-            revenue=1000.0,
-            revenue_growth=0.05,
-            fcf_margin=-0.15,
-            wacc=0.10,
-            terminal_growth=0.03,
-            net_debt=2000.0,
-            shares_outstanding=100.0,
-        )
-    )
-    assert all(row["fcf"] < 0 for row in result.forecast)
-    assert result.enterprise_value < 0
-    assert result.value_per_share < 0
+def test_dcf_no_inventa_gordon_con_margen_negativo():
+    from app.valuation.dcf_fcff import TerminalFCFNotPositiveError
+
+    with pytest.raises(TerminalFCFNotPositiveError):
+        run_dcf(DCFInputs(revenue=1000.0, revenue_growth=0.05, fcf_margin=-0.15,
+                          wacc=0.10, terminal_growth=0.03, net_debt=2000.0,
+                          shares_outstanding=100.0))
 
 
 def test_pre_revenue_engine_refuses_negative_per_share_value_on_cash_burn(company_factory):

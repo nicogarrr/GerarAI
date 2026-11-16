@@ -197,3 +197,20 @@ def test_funciones_puras_mantienen_el_contrato_value_error():
             revenue=100.0, growth_path=[0.1], margin_path=[0.1], wacc=0.02,
             terminal_growth=0.03, net_debt=0.0, shares_outstanding=10.0,
         )
+
+
+def test_red_del_servicio_cubre_fcf_terminal_no_positivo(db, monkeypatch):
+    from app.services.valuation_service import ValuationService
+    from app.valuation.dcf_fcff import TerminalFCFNotPositiveError
+
+    company = _company(db)
+    _facts(db, company, growth=0.03)
+
+    def boom(self, context):
+        raise TerminalFCFNotPositiveError()
+
+    monkeypatch.setattr(StandardDCFEngine, "value", boom)
+    result = ValuationService().value_company(db, company)
+    assert isinstance(result, dict)
+    assert "positive_terminal_fcf" in repr(result)
+    assert "wacc_above_terminal_growth" not in repr(result)

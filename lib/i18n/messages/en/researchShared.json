@@ -101,7 +101,8 @@
       "batterySupply": "battery supply",
       "autonomyRegulation": "autonomous driving regulation",
       "label": "Auto / energy / optionality"
-    }
+    },
+    "positiveTerminalFcf": "positive terminal free cash flow"
   },
   "missingMetricLabels": {
     "netDebtAtTargetValue": "net debt at target valuation date",

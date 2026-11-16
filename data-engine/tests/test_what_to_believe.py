@@ -101,7 +101,10 @@ def test_limite_inferior_respeta_el_crecimiento_terminal():
 
 
 def test_fcf_negativo_no_da_wacc_implicito():
-    paths = dcf_paths_from_trace(_flat_trace(fcf_margin=-0.05))
+    # Traza historica invalida: el guard actual ya no permite crearla.
+    trace = _flat_trace()
+    trace["inputs"]["fcf_margin"] = -0.05
+    paths = dcf_paths_from_trace(trace)
     assert paths is not None
     assert solve_implied_wacc(paths, 10.0)["status"] == "not_available"
 
@@ -260,8 +263,8 @@ def test_extremo_a_extremo_con_el_motor_real_adr_y_ordinaria_mismo_wacc_implicit
         paths = dcf_paths_from_trace(ord_val["trace"]["scenarios"]["base"]["trace"])
         assert paths is not None
         assert value_at_wacc(paths, paths.wacc) == pytest.approx(ord_val["base_value"])
-        if ordinary.implied_wacc_price.status == "ok":
-            assert value_at_wacc(paths, ordinary.implied_wacc_price.wacc) == pytest.approx(15.0, rel=1e-6)
+        assert ordinary.implied_wacc_price.status == "ok"
+        assert value_at_wacc(paths, ordinary.implied_wacc_price.wacc) == pytest.approx(15.0, rel=1e-6)
         assert adr.base_value == pytest.approx(adr_val["base_value"] * 2)
     finally:
         _cleanup(db, tickers)

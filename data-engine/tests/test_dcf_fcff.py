@@ -9,7 +9,7 @@ import math
 
 import pytest
 
-from app.valuation.dcf_fcff import DCFInputs, DCFResult, run_dcf
+from app.valuation.dcf_fcff import DCFInputs, DCFResult, TerminalFCFNotPositiveError, run_dcf
 
 
 def _inputs(**overrides) -> DCFInputs:
@@ -88,24 +88,13 @@ def test_years_menor_que_uno_lanza():
         run_dcf(_inputs(years=-3))
 
 
-def test_margen_cero_da_valor_cero_menos_deuda():
-    result = run_dcf(_inputs(fcf_margin=0.0, revenue=500.0, net_debt=80.0))
-    assert result.enterprise_value == pytest.approx(0.0)
-    assert result.equity_value == pytest.approx(-80.0)
-    assert result.value_per_share == pytest.approx(-8.0)
-
-
-def test_margen_negativo_produce_fcf_negativo_finito():
-    result = run_dcf(_inputs(fcf_margin=-0.10, net_debt=0.0))
-    assert all(row["fcf"] < 0 for row in result.forecast)
-    assert result.enterprise_value < 0
-    assert math.isfinite(result.value_per_share)
-
-
-def test_revenue_cero_no_divide_entre_cero():
-    result = run_dcf(_inputs(revenue=0.0, net_debt=10.0))
-    assert result.enterprise_value == pytest.approx(0.0)
-    assert result.value_per_share == pytest.approx(-1.0)
+@pytest.mark.parametrize("overrides", [
+    {"fcf_margin": -0.05}, {"fcf_margin": 0.0}, {"revenue": 0.0},
+    {"terminal_growth": -1.0}, {"terminal_growth": -1.1},
+])
+def test_fcf_terminal_no_positivo_invalida_el_camino(overrides):
+    with pytest.raises(TerminalFCFNotPositiveError, match="terminal fcf must be positive"):
+        run_dcf(_inputs(**overrides))
 
 
 def test_caja_neta_deuda_negativa_sube_el_valor_por_accion():
@@ -141,3 +130,26 @@ def test_deuda_neta_mayor_que_enterprise_value_da_valor_por_accion_negativo():
     result = run_dcf(_inputs(net_debt=10_000.0, shares_outstanding=1000.0))
     assert result.equity_value < 0
     assert result.value_per_share < 0
+
+
+def test_wacc_menor_que_menos_uno_se_rechaza_antes_del_descuento():
+    with pytest.raises(ValueError, match="wacc must be greater than -1"):
+        run_dcf(_inputs(wacc=-1.01, terminal_growth=-1.1))
+
+
+@pytest.mark.parametrize("overrides,message", [
+    ({"shares_outstanding": 0}, "shares_outstanding"),
+    ({"wacc": 0.02}, "wacc must be greater than terminal_growth"),
+    ({"years": 0}, "years must be at least 1"),
+    ({"wacc": -1.01, "terminal_growth": -1.1}, "wacc must be greater than -1"),
+    ({"terminal_growth": -1.0}, "terminal fcf must be positive"),
+])
+def test_validacion_convergencia_incluye_el_flujo_gordon(overrides, message):
+    from app.valuation.dcf_fcff import ConvergenceDCFInputs, run_dcf_margin_convergence
+
+    values = dict(revenue=100.0, revenue_growth=0.0, initial_fcf_margin=-0.2,
+                  target_fcf_margin=0.2, wacc=0.1, terminal_growth=0.02,
+                  net_debt=0.0, shares_outstanding=10.0, years=5)
+    values.update(overrides)
+    with pytest.raises(ValueError, match=message):
+        run_dcf_margin_convergence(ConvergenceDCFInputs(**values))

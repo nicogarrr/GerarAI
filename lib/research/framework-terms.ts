@@ -15,6 +15,7 @@ import { createTranslator } from '../i18n/translate.ts';
  *  y no puede crecer. seed/ingesta dejan el stub sin motor («unassigned»):
  *  la ficha mostraba el slug crudo. */
 const FRAMEWORK_TERMS_I18N: Record<string, TranslationKey> = {
+    positive_terminal_fcf: 'researchShared.frameworkTerms.positiveTerminalFcf',
     unassigned: 'researchShared.frameworkTerms.unassigned',
     deliveries: 'researchShared.frameworkTerms.autoEnergy.deliveries',
     storage: 'researchShared.frameworkTerms.autoEnergy.storage',

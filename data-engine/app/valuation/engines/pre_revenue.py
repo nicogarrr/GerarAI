@@ -24,6 +24,7 @@ from app.services.inferred_input_service import InferredInputService
 from app.valuation.dcf_fcff import (
     ConvergenceDCFInputs,
     DCFInputs,
+    TerminalFCFNotPositiveError,
     run_dcf,
     run_dcf_margin_convergence,
 )
@@ -503,17 +504,26 @@ class PreRevenueScenarioEngine(ValuationEngine):
         )
         scenario_results = {}
         for scenario in scenarios:
-            dcf = run_dcf(
-                DCFInputs(
-                    revenue=max(revenue, 1.0),
-                    revenue_growth=float(scenario.assumptions["revenue_growth"]),
-                    fcf_margin=float(scenario.assumptions["fcf_margin"]),
-                    wacc=float(scenario.assumptions["wacc"]),
-                    terminal_growth=float(scenario.assumptions["terminal_growth"]),
-                    net_debt=net_debt,
-                    shares_outstanding=shares,
+            try:
+                dcf = run_dcf(
+                    DCFInputs(
+                        revenue=max(revenue, 1.0),
+                        revenue_growth=float(scenario.assumptions["revenue_growth"]),
+                        fcf_margin=float(scenario.assumptions["fcf_margin"]),
+                        wacc=float(scenario.assumptions["wacc"]),
+                        terminal_growth=float(scenario.assumptions["terminal_growth"]),
+                        net_debt=net_debt,
+                        shares_outstanding=shares,
+                    )
                 )
-            )
+            except TerminalFCFNotPositiveError:
+                scenario_results[scenario.name] = {
+                    "definition": scenario_definition_trace(scenario),
+                    "value_per_share": None,
+                    "undiluted_value_per_share": None,
+                    "trace": {"missing_inputs": ["positive_terminal_fcf"]},
+                }
+                continue
             extra_dilution = float(scenario.assumptions.get("extra_dilution_pct") or 0.0)
             # La dilución recorta un valor positivo. Multiplicar un valor
             # NEGATIVO (quema de caja) lo acercaría a cero y rompería el
@@ -535,11 +545,15 @@ class PreRevenueScenarioEngine(ValuationEngine):
         base_v = ordered[1]["value_per_share"]
         bull_v = ordered[2]["value_per_share"]
 
-        weighted = probability_weighted_value(
-            [
-                Scenario(s["definition"]["name"], s["definition"]["probability"], s["value_per_share"])
-                for s in ordered
-            ]
+        incomplete_terminal = any(s["value_per_share"] is None for s in ordered)
+        weighted = (
+            {"expected_value": None, "trace": {"reason": "positive_terminal_fcf", "complete": False}}
+            if incomplete_terminal else probability_weighted_value(
+                [
+                    Scenario(s["definition"]["name"], s["definition"]["probability"], s["value_per_share"])
+                    for s in ordered
+                ]
+            )
         )
         expected = weighted["expected_value"]
 
@@ -571,7 +585,7 @@ class PreRevenueScenarioEngine(ValuationEngine):
             wacc_values=[wacc - 0.01, wacc, wacc + 0.02],
         )
 
-        publishable = funding.status != "incomplete" and inferred_margin is None
+        publishable = funding.status != "incomplete" and inferred_margin is None and not incomplete_terminal
         status = "ok" if publishable else "partial"
         missing = list(funding.missing_inputs) if funding.status == "incomplete" else []
         # Sin un CalculatedMetric fechado el WACC es un supuesto por tags: no
@@ -617,6 +631,10 @@ class PreRevenueScenarioEngine(ValuationEngine):
             "base_value": base_v,
             "bull_value": bull_v,
             "expected_value": expected,
+            **({"scenario_notes": {
+                "expected": "Valor esperado N/D: un escenario tiene FCF terminal no positivo; "
+                "Gordon no es valido. Se conservan los caminos validos sin reponderarlos."
+            }} if incomplete_terminal else {}),
             "margin_of_safety": margin_of_safety(expected, current_price),
             "missing_inputs": missing,
             "publication_blockers": publication_blockers,
@@ -828,17 +846,26 @@ class PreRevenueScenarioEngine(ValuationEngine):
         )
         scenario_results = {}
         for scenario in scenarios:
-            dcf = run_dcf(
-                DCFInputs(
-                    revenue=max(revenue, 1.0),
-                    revenue_growth=float(scenario.assumptions["revenue_growth"]),
-                    fcf_margin=float(scenario.assumptions["fcf_margin"]),
-                    wacc=float(scenario.assumptions["wacc"]),
-                    terminal_growth=float(scenario.assumptions["terminal_growth"]),
-                    net_debt=net_debt_used,
-                    shares_outstanding=shares,
+            try:
+                dcf = run_dcf(
+                    DCFInputs(
+                        revenue=max(revenue, 1.0),
+                        revenue_growth=float(scenario.assumptions["revenue_growth"]),
+                        fcf_margin=float(scenario.assumptions["fcf_margin"]),
+                        wacc=float(scenario.assumptions["wacc"]),
+                        terminal_growth=float(scenario.assumptions["terminal_growth"]),
+                        net_debt=net_debt_used,
+                        shares_outstanding=shares,
+                    )
                 )
-            )
+            except TerminalFCFNotPositiveError:
+                scenario_results[scenario.name] = {
+                    "definition": scenario_definition_trace(scenario),
+                    "value_per_share": None,
+                    "undiluted_value_per_share": None,
+                    "trace": {"missing_inputs": ["positive_terminal_fcf"]},
+                }
+                continue
             extra_dilution = float(scenario.assumptions.get("extra_dilution_pct") or 0.0)
             # La dilución recorta un valor positivo. Multiplicar un valor
             # NEGATIVO (quema de caja) lo acercaría a cero y rompería el
@@ -858,11 +885,15 @@ class PreRevenueScenarioEngine(ValuationEngine):
         bear_v = ordered[0]["value_per_share"]
         base_v = ordered[1]["value_per_share"]
         bull_v = ordered[2]["value_per_share"]
-        weighted = probability_weighted_value(
-            [
-                Scenario(s["definition"]["name"], s["definition"]["probability"], s["value_per_share"])
-                for s in ordered
-            ]
+        incomplete_terminal = any(s["value_per_share"] is None for s in ordered)
+        weighted = (
+            {"expected_value": None, "trace": {"reason": "positive_terminal_fcf", "complete": False}}
+            if incomplete_terminal else probability_weighted_value(
+                [
+                    Scenario(s["definition"]["name"], s["definition"]["probability"], s["value_per_share"])
+                    for s in ordered
+                ]
+            )
         )
         expected = weighted["expected_value"]
 
@@ -912,6 +943,10 @@ class PreRevenueScenarioEngine(ValuationEngine):
             "base_value": base_v,
             "bull_value": bull_v,
             "expected_value": expected,
+            **({"scenario_notes": {
+                "expected": "Valor esperado N/D: un escenario tiene FCF terminal no positivo; "
+                "Gordon no es valido. Se conservan los caminos validos sin reponderarlos."
+            }} if incomplete_terminal else {}),
             "margin_of_safety": margin_of_safety(expected, current_price),
             "missing_inputs": missing,
             "publication_blockers": publication_blockers,

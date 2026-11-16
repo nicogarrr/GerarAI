@@ -40,64 +40,41 @@ def test_far_value_vs_market_is_published_with_warning_and_trace():
     init_db()
     db = SessionLocal()
     try:
-        result = _value(db, "NDG", price=20.0)
+        result = _value(db, "NDG", facts={**FACTS, "free_cash_flow": 70}, price=200.0)
         assert result["status"] == "ok"
         assert result["publishable"] is True
         assert result["expected_value"] is not None and result["expected_value"] > 0
         assert result["margin_of_safety"] is not None
         warning = result["plausibility_warning"]
         assert warning["code"] == "fair_value_far_from_price"
-        assert warning["ratio_to_price"] == pytest.approx(result["expected_value"] / 20.0)
+        assert warning["ratio_to_price"] == pytest.approx(result["expected_value"] / 200.0)
         assert warning["ratio_to_price"] < 0.2
         assert warning["band"] == [0.2, 5.0]
-        assert result["trace"]["comparable_price"] == 20.0
+        assert result["trace"]["comparable_price"] == 200.0
         assert result["trace"]["plausibility_warning"] == warning
     finally:
         _cleanup(db, ["NDG"])
         db.close()
 
 
-def test_negative_bear_scenario_is_explained_nd_and_expected_keeps_ordering():
+def test_bear_sin_terminal_positivo_no_inventa_esperado():
     init_db()
     db = SessionLocal()
     try:
         result = _value(db, "NDA")
-        assert result["status"] == "ok"
-        # El bear no se publica como cifra negativa: N/D con explicación.
+        assert result["status"] == "partial"
+        assert result["publishable"] is False
         assert result["bear_value"] is None
-        note = result["scenario_notes"]["bear"]
-        assert "bajista" in note and "N/D" in note
-        assert "quema" in note  # el margen FCF del escenario es negativo
-        # El bruto queda en la traza y confirma que el bear salía negativo.
-        raw_bear = result["trace"]["scenarios"]["bear"]["value_per_share_raw"]
-        assert raw_bear < 0
-        assert result["trace"]["scenarios"]["bear"]["value_per_share"] is None
-        assert result["trace"]["scenarios"]["bear"]["value_note"] == note
-        # El esperado se calcula con los brutos: pondera el bear negativo y
-        # queda por debajo del base (no se infla excluyéndolo).
-        assert result["base_value"] is not None and result["base_value"] > 0
-        assert result["expected_value"] is not None
-        assert result["status"] == "ok"
-        assert result["publishable"] is True
-        assert result["trace"]["expected_value_raw"] == pytest.approx(result["expected_value"])
-        # El esperado sale de los brutos (bear negativo incluido): se
-        # recompute a mano con las probabilidades de la traza y coincide;
-        # excluir el bear daría un esperado mayor (inflado).
-        scenarios_trace = result["trace"]["scenarios"]
-        raw_values = {
-            name: scenarios_trace[name].get("value_per_share_raw", scenarios_trace[name]["value_per_share"])
-            for name in ("bear", "base", "bull")
-        }
-        probs = {name: scenarios_trace[name]["definition"]["probability"] for name in ("bear", "base", "bull")}
-        prob_sum = sum(probs.values())
-        manual = sum(probs[name] * raw_values[name] for name in probs) / prob_sum
-        assert result["expected_value"] == pytest.approx(manual)
-        without_bear = (probs["base"] * raw_values["base"] + probs["bull"] * raw_values["bull"]) / (
-            probs["base"] + probs["bull"]
-        )
-        assert result["expected_value"] < without_bear
-        # Sin ratio ADR no hay conversiones por listado.
-        assert result["listed_share_values"] is None
+        assert result["base_value"] > 0
+        assert result["bull_value"] > result["base_value"]
+        assert result["expected_value"] is None
+        assert result["margin_of_safety"] is None
+        bear = result["trace"]["scenarios"]["bear"]
+        assert bear["trace"]["missing_inputs"] == ["positive_terminal_fcf"]
+        assert bear["value_per_share_raw"] is None
+        assert "FCF terminal no positivo" in result["scenario_notes"]["bear"]
+        assert "reponderan" in result["scenario_notes"]["expected"]
+        assert result["trace"]["expected_value_raw"] is None
     finally:
         _cleanup(db, ["NDA"])
         db.close()
@@ -124,7 +101,7 @@ def test_negative_expected_value_is_explained_nd():
     init_db()
     db = SessionLocal()
     try:
-        leveraged = {"revenue": 1000, "free_cash_flow": 11, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 100000}
+        leveraged = {"revenue": 1000, "free_cash_flow": 120, "revenue_growth": 0.07, "shares_diluted": 100, "net_debt": 100000}
         result = _value(db, "NDC", facts=leveraged)
         assert result["status"] == "partial"
         assert result["publishable"] is False
