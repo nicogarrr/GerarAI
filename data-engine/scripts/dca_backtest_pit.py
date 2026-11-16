@@ -20,6 +20,22 @@ Sin look-ahead (se comprueba en cada ejecucion; ver ``assert_no_leak``):
 * un valor solo es elegible desde su primer filing en la SEC (``filed`` de
   companyfacts) y desde que tiene precio; nunca con fechas posteriores.
 
+Sin sesgo de supervivencia (``scripts/pit_exits.py``):
+
+* la elegibilidad en ``t0`` solo mira informacion disponible EN ``t0`` (precio
+  en ``t0``, veredicto de ``t0-1``, primer filing <= ``t0`` y, si se da,
+  pertenencia historica al indice en ``t0``): nunca exige precios en meses
+  posteriores, asi que las quiebras y adquisiciones posteriores a ``t0``
+  permanecen en el universo;
+* una posicion cuyo valor desaparece (baja real) se cierra a su retorno de
+  salida (``--exits``) o, sin dato, al supuesto conservador ``--unknown-exit``;
+  un hueco de datos con precios posteriores NO cierra la posicion, y el fin de
+  los datos tampoco (no es una quiebra);
+* el informe contrasta ``--unknown-exit -1.0`` (cota inferior) con ``0.0``
+  (cota superior): si el signo de la ventaja de la app cambia, el resultado se
+  declara no concluyente;
+* los retornos inferidos por una baja sin dato se etiquetan como supuesto.
+
 Puro: sin DB ni red. Precios: CSV ``Date, Close|Adj Close[, Low]`` (cierre
 ajustado como la app). Los niveles son invariantes a la escala, asi que el ajuste
 por dividendos/splits no mete informacion futura en los ratios.
@@ -31,6 +47,7 @@ import argparse
 import contextlib
 import csv
 import gzip
+import hashlib
 import json
 import math
 import random
@@ -52,6 +69,7 @@ from app.services.dca_signal_engine import (  # noqa: E402
     DcaParams,
     evaluate_series,
 )
+from scripts import pit_exits  # noqa: E402
 
 COST = 0.001  # comision por compra/venta (la del backtest de calibracion)
 TAX_RATE = 0.21  # IRPF del ahorro (tramo 6-50 k EUR), solo para el diagnostico trim_exec
@@ -78,6 +96,11 @@ class Series:
     level: dict[int, int] = field(default_factory=dict)
     vol: dict[int, float | None] = field(default_factory=dict)
     eligible_from: int | None = None  # mes del primer filing SEC (None = sin filtro)
+
+    @property
+    def last_month(self) -> int | None:
+        """Ultimo mes con cierre conocido (None si la serie esta vacia)."""
+        return max(self.first) if self.first else None
 
 
 def read_price_csv(path: Path) -> list[DailyBar]:
@@ -215,8 +238,10 @@ class Result:
     buys_per_year: float = 0.0  # compras / valor medio, anualizado
     tax_paid: float = 0.0
     monthly_returns: list[float] = field(default_factory=list)
+    turnover_monthly: list[float] = field(default_factory=list)
     curve: list[float] = field(default_factory=list)
     zone_months: dict[int, int] = field(default_factory=dict)
+    exits_log: list[dict] = field(default_factory=list)  # cierres por baja (quiebra, adquisicion...)
 
 
 def simulate(
@@ -226,6 +251,9 @@ def simulate(
     strategy: str,
     budget_per_stock: float = 100.0,
     spy: Series | None = None,
+    exits: dict[str, pit_exits.ExitEvent] | None = None,
+    unknown_exit: float = -1.0,
+    cost: float = COST,
 ) -> Result:
     """Simula una cartera mes a mes.
 
@@ -252,19 +280,48 @@ def simulate(
     zones: dict[int, int] = {}
     last_px = [math.nan] * k
     total_cash = contrib * len(months)
+    exits = exits or {}
+    data_end = months[-1]
+    exits_log: list[dict] = []
+    turn_monthly: list[float] = []
     for step, t in enumerate(months):
         px = [s.first.get(t, math.nan) for s in universe]
         alive = [math.isfinite(p) for p in px]
         for i, p in enumerate(px):
             if alive[i]:
                 last_px[i] = p
+        # Bajas reales: la posicion se cierra a su valor de salida y la caja
+        # entra en el reparto normal del mes. Un hueco de datos con precios
+        # posteriores NO cierra (su last_month sigue por delante de t) y el
+        # fin de los datos tampoco (no es una quiebra).
+        month_sold = 0.0
+        for i in range(k):
+            if shares[i] > 0 and pit_exits.is_delisted(
+                t, universe[i].last_month, data_end, exits.get(universe[i].symbol)
+            ):
+                ev = exits.get(universe[i].symbol)
+                recovered = pit_exits.exit_value(shares[i], last_px[i], ev, cost=cost, unknown=unknown_exit)
+                cash += recovered
+                month_sold += shares[i] * last_px[i]
+                exits_log.append(
+                    {
+                        "symbol": universe[i].symbol,
+                        "month": month_label(t),
+                        "kind": ev.kind if ev is not None else "unknown (supuesto)",
+                        "exit_return": ev.exit_return if ev is not None else unknown_exit,
+                        "recovered": round(recovered, 2),
+                    }
+                )
+                shares[i] = 0.0
+                basis[i] = 0.0
+        sold_value += month_sold
         flow = contrib if strategy != "buy_hold" else (total_cash if step == 0 else 0.0)
         flows.append(contrib)
         cash += flow
         if strategy == "spy":
             assert spy is not None
             p = spy.first[t]
-            spy_shares += cash * (1 - COST) / p
+            spy_shares += cash * (1 - cost) / p
             traded += cash
             cash = 0.0
         elif strategy == "buy_hold":
@@ -272,7 +329,7 @@ def simulate(
                 live = [i for i in range(k) if alive[i]]
                 for i in live:
                     amt = cash / len(live)
-                    shares[i] += amt * (1 - COST) / px[i]
+                    shares[i] += amt * (1 - cost) / px[i]
                     basis[i] += amt
                 traded += cash
                 cash = 0.0
@@ -301,7 +358,7 @@ def simulate(
                     frac = TRIM_SELL.get(lvl or 0, 0.0)
                     if frac and shares[i] > 0:
                         sold = shares[i] * frac
-                        proceeds = sold * px[i] * (1 - COST)
+                        proceeds = sold * px[i] * (1 - cost)
                         cost_part = basis[i] * frac
                         gain = proceeds - cost_part
                         t_amt = max(gain, 0.0) * TAX_RATE
@@ -321,7 +378,7 @@ def simulate(
                 for i in live:
                     amt = by.get(universe[i].symbol, 0.0)
                     if amt > 0:
-                        shares[i] += amt * (1 - COST) / px[i]
+                        shares[i] += amt * (1 - cost) / px[i]
                         basis[i] += amt
                         spent += amt
                 traded += spent
@@ -335,6 +392,7 @@ def simulate(
         if strategy == "spy":
             assert spy is not None
             v = cash + spy_shares * spy.last[t]
+        turn_monthly.append(month_sold / v if v > 0 else 0.0)
         base = prev_v + flow
         r = v / base - 1 if base > 0 else 0.0
         rets.append(r)
@@ -362,8 +420,10 @@ def simulate(
         buys_per_year=traded / max(avg_v, 1e-9) / n_years,
         tax_paid=tax,
         monthly_returns=rets,
+        turnover_monthly=turn_monthly,
         curve=values,
         zone_months=zones,
+        exits_log=exits_log,
     )
 
 
@@ -433,6 +493,10 @@ def run_benchmark(
     seed: int,
     strategies: Sequence[str] = STRATEGIES,
     fixed: Sequence[Series] | None = None,
+    membership: pit_exits.Membership | None = None,
+    exits: dict[str, pit_exits.ExitEvent] | None = None,
+    unknown_exit: float = -1.0,
+    cost: float = COST,
 ) -> dict:
     """Carteras aleatorias (y opcionalmente una cartera fija) con las mismas fechas y dinero.
 
@@ -442,14 +506,37 @@ def run_benchmark(
     la diferencia media de rentabilidad mensual; y el % de meses en cada zona.
     """
     t0 = months[0]
-    elig = [s for s in universe if all(m in s.first for m in months) and (t0 - 1) in s.level]
+    # Elegibilidad PIT: solo lo sabido EN t0 (precio en t0, veredicto de t0-1,
+    # primer filing <= t0 y pertenencia en t0). No exige precios futuros: las
+    # quiebras y adquisiciones posteriores permanecen en el universo.
+    elig_names = pit_exits.eligible_at(
+        (s.symbol for s in universe),
+        t0,
+        has_price_at={s.symbol: t0 in s.first for s in universe},
+        level_prev={s.symbol: (t0 - 1) in s.level for s in universe},
+        first_filing={s.symbol: s.eligible_from for s in universe},
+        membership=membership,
+    )
+    by_symbol = {s.symbol: s for s in universe}
+    elig = [by_symbol[sym] for sym in elig_names]
     rng = random.Random(seed)
     per: dict[str, list[Result]] = {st: [] for st in strategies}
     for size in sizes:
         for _ in range(portfolios):
-            pick = rng.sample(elig, size)
+            # Universo pequeno (p. ej. un fold tardio con pocas vivas): se capa el tamano.
+            pick = rng.sample(elig, min(size, len(elig)))
             for st in strategies:
-                per[st].append(simulate(pick, months, strategy=st, spy=spy))
+                per[st].append(
+                    simulate(
+                        pick,
+                        months,
+                        strategy=st,
+                        spy=spy,
+                        exits=exits,
+                        unknown_exit=unknown_exit,
+                        cost=cost,
+                    )
+                )
     out: dict = {"eligible": len(elig), "portfolios": len(per[strategies[0]]), "strategies": {}}
     for st, res in per.items():
         out["strategies"][st] = {
@@ -458,6 +545,7 @@ def run_benchmark(
             "max_dd_median": _median([r.max_dd for r in res]),
             "turnover_median": _median([r.turnover for r in res]),
             "tax_over_invested_median": _median([r.tax_paid / r.invested for r in res]),
+            "exits_median": _median([float(len(r.exits_log)) for r in res]),
         }
     if "app" in per and "plano" in per:
         diffs = [a.irr - b.irr for a, b in zip(per["app"], per["plano"], strict=True)]
@@ -487,11 +575,177 @@ def run_benchmark(
         out["zone_share"] = {str(k): zones.get(k, 0) / tot for k in LEVELS}
     if fixed:
         out["fixed"] = {
-            st: {"irr": r.irr, "twr_cagr": r.twr_cagr, "max_dd": r.max_dd, "turnover": r.turnover}
+            st: {
+                "irr": r.irr,
+                "twr_cagr": r.twr_cagr,
+                "max_dd": r.max_dd,
+                "turnover": r.turnover,
+                "exits": r.exits_log,
+            }
             for st in strategies
-            for r in [simulate(fixed, months, strategy=st, spy=spy)]
+            for r in [
+                simulate(
+                    fixed,
+                    months,
+                    strategy=st,
+                    spy=spy,
+                    exits=exits,
+                    unknown_exit=unknown_exit,
+                    cost=cost,
+                )
+            ]
         }
     return out
+
+
+def unknown_exit_sensitivity(
+    universe: Sequence[Series],
+    spy: Series,
+    months: Sequence[int],
+    *,
+    portfolios: int,
+    sizes: Sequence[int],
+    seed: int,
+    membership: pit_exits.Membership | None,
+    exits: dict[str, pit_exits.ExitEvent] | None,
+    base_diff: float,
+) -> dict:
+    """Cota superior de las bajas sin dato (unknown=0.0) frente a la inferior (-1.0).
+
+    Si el signo de la ventaja de la app cambia entre ambas cotas, el resultado
+    depende de un supuesto sobre bajas sin dato y se declara no concluyente.
+    """
+    alt = run_benchmark(
+        universe,
+        spy,
+        months,
+        portfolios=portfolios,
+        sizes=sizes,
+        seed=seed,
+        strategies=("app", "plano"),
+        membership=membership,
+        exits=exits,
+        unknown_exit=0.0,
+    )
+    alt_diff = alt["app_vs_plano"]["irr_diff_median"]
+    concluyente = (base_diff > 0) == (alt_diff > 0) or base_diff == 0
+    return {
+        "cota_inferior_unknown": -1.0,
+        "cota_superior_unknown": 0.0,
+        "irr_diff_median_cota_inferior": base_diff,
+        "irr_diff_median_cota_superior": alt_diff,
+        "concluyente": concluyente,
+        "nota": (
+            "mismo signo en ambas cotas: la ventaja no depende del supuesto sobre bajas sin dato"
+            if concluyente
+            else "NO CONCLUYENTE: el signo de la ventaja cambia segun el supuesto sobre bajas sin dato"
+        ),
+    }
+
+
+def cost_sweep(
+    universe: Sequence[Series],
+    spy: Series,
+    months: Sequence[int],
+    *,
+    portfolios: int,
+    sizes: Sequence[int],
+    seed: int,
+    membership: pit_exits.Membership | None,
+    exits: dict[str, pit_exits.ExitEvent] | None,
+    unknown_exit: float,
+    bps_list: Sequence[float],
+) -> dict:
+    """TIR mediana de la app con comision de 5/10/25 bps (barrido explicito de costes)."""
+    out = {}
+    for bps in bps_list:
+        res = run_benchmark(
+            universe,
+            spy,
+            months,
+            portfolios=portfolios,
+            sizes=sizes,
+            seed=seed,
+            strategies=("app",),
+            membership=membership,
+            exits=exits,
+            unknown_exit=unknown_exit,
+            cost=bps / 1e4,
+        )
+        out[f"{bps:g}_bps"] = res["strategies"]["app"]["irr_median"]
+    return out
+
+
+def walk_forward_report(
+    universe: Sequence[Series],
+    spy: Series,
+    months: Sequence[int],
+    *,
+    train: int,
+    test: int,
+    portfolios: int,
+    sizes: Sequence[int],
+    seed: int,
+    membership: pit_exits.Membership | None,
+    exits: dict[str, pit_exits.ExitEvent] | None,
+    unknown_exit: float,
+) -> dict:
+    """Evaluacion walk-forward con folds expansivos (train -> test, sin solape).
+
+    Los umbrales del motor (``DEFAULT_PARAMS``) son fijos: nada se calibra con
+    datos del tramo de test. Carteras muestreadas con semilla fija por fold.
+    """
+    folds = pit_exits.walk_forward_folds(months, train=train, test=test)
+    out_folds = []
+    for k, (_tr, te) in enumerate(folds):
+        res = run_benchmark(
+            universe,
+            spy,
+            te,
+            portfolios=portfolios,
+            sizes=sizes,
+            seed=seed + k,
+            strategies=("app", "plano"),
+            membership=membership,
+            exits=exits,
+            unknown_exit=unknown_exit,
+        )
+        app = res["strategies"]["app"]
+        out_folds.append(
+            {
+                "fold": k + 1,
+                "test_window": [month_label(te[0]), month_label(te[-1])],
+                "eligible": res["eligible"],
+                "irr_diff_median": res["app_vs_plano"]["irr_diff_median"],
+                "app_irr_median": app["irr_median"],
+                "plano_irr_median": res["strategies"]["plano"]["irr_median"],
+            }
+        )
+    return {
+        "train_meses": train,
+        "test_meses": test,
+        "folds": out_folds,
+        "nota": "folds expansivos sin solape; umbrales fijos (DEFAULT_PARAMS), sin calibracion en test",
+    }
+
+
+def _data_hash(
+    px_dirs: Sequence[Path], symbols: Sequence[str], membership: Path | None, exits: Path | None
+) -> str:
+    """SHA256 de los datos de entrada (precios usados, pertenencia y bajas): reproducibilidad."""
+    h = hashlib.sha256()
+    for sym in sorted(symbols):
+        for d in sorted(px_dirs):
+            p = d / f"{sym}.csv"
+            if p.exists():
+                h.update(sym.encode())
+                h.update(p.read_bytes())
+                break
+    for extra in (membership, exits):
+        if extra is not None:
+            h.update(extra.name.encode())
+            h.update(extra.read_bytes())
+    return h.hexdigest()
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -510,10 +764,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     ap.add_argument("--sizes", default="10,15,20")
     ap.add_argument("--seed", type=int, default=2026)
     ap.add_argument("--leak-samples", type=int, default=400)
+    ap.add_argument(
+        "--membership",
+        type=Path,
+        default=None,
+        help="CSV symbol,start,end (YYYY-MM; end vacio = sigue): pertenencia historica al indice",
+    )
+    ap.add_argument(
+        "--exits",
+        type=Path,
+        default=None,
+        help="CSV symbol,last_month,kind[,exit_return]: bajas (quiebra, adquisicion...) y su retorno",
+    )
+    ap.add_argument(
+        "--unknown-exit",
+        type=float,
+        choices=(-1.0, 0.0),
+        default=-1.0,
+        help="retorno supuesto de una baja sin dato: -1.0 (cota inferior, defecto) o 0.0 (superior)",
+    )
+    ap.add_argument("--wf-train", type=int, default=60, help="meses de train del walk-forward")
+    ap.add_argument("--wf-test", type=int, default=12, help="meses de test por fold del walk-forward")
+    ap.add_argument(
+        "--cost-sweep-bps",
+        default="5,10,25",
+        help="barrido de comision en bps para la sensibilidad de costes",
+    )
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args(argv)
     syms = [x.strip() for x in a.symbols.read_text().split() if x.strip()]
     fixed_syms = [x.strip() for x in a.fixed.read_text().split() if x.strip()] if a.fixed else []
+    membership = pit_exits.Membership.from_csv(a.membership) if a.membership else None
+    exits = pit_exits.load_exits(a.exits) if a.exits else None
     uni = load_universe(a.px, list(dict.fromkeys([*syms, *fixed_syms, "SPY"])), a.sec, DEFAULT_PARAMS)
     spy = next(s for s in uni if s.symbol == "SPY")
     uni = [s for s in uni if s.symbol != "SPY"]
@@ -525,17 +807,59 @@ def main(argv: Sequence[str] | None = None) -> int:
     # Universo PIT: con filing SEC anterior al inicio (nunca una fecha posterior).
     pit = [s for s in uni if s.symbol in syms and s.eligible_from is not None and s.eligible_from <= t0]
     fixed = [s for s in uni if s.symbol in fixed_syms]
+    sizes = [int(x) for x in a.sizes.split(",")]
     out = run_benchmark(
         pit,
         spy,
         months,
         portfolios=a.portfolios,
-        sizes=[int(x) for x in a.sizes.split(",")],
+        sizes=sizes,
         seed=a.seed,
         fixed=fixed or None,
+        membership=membership,
+        exits=exits,
+        unknown_exit=a.unknown_exit,
     )
     out["checked_no_leak"] = checked
     out["window"] = [month_label(months[0]), month_label(months[-1])]
+    out["unknown_exit"] = a.unknown_exit
+    out["sensibilidad_unknown_exit"] = unknown_exit_sensitivity(
+        pit,
+        spy,
+        months,
+        portfolios=a.portfolios,
+        sizes=sizes,
+        seed=a.seed,
+        membership=membership,
+        exits=exits,
+        base_diff=out["app_vs_plano"]["irr_diff_median"],
+    )
+    out["costes_bps"] = cost_sweep(
+        pit,
+        spy,
+        months,
+        portfolios=a.portfolios,
+        sizes=sizes,
+        seed=a.seed,
+        membership=membership,
+        exits=exits,
+        unknown_exit=a.unknown_exit,
+        bps_list=[float(x) for x in a.cost_sweep_bps.split(",")],
+    )
+    out["walk_forward"] = walk_forward_report(
+        pit,
+        spy,
+        months,
+        train=a.wf_train,
+        test=a.wf_test,
+        portfolios=a.portfolios,
+        sizes=sizes,
+        seed=a.seed,
+        membership=membership,
+        exits=exits,
+        unknown_exit=a.unknown_exit,
+    )
+    out["data_hash"] = _data_hash(a.px, [s.symbol for s in uni], a.membership, a.exits)
     a.out.write_text(json.dumps(out, indent=1))
     print(
         json.dumps({"checked_no_leak": checked, "eligible": out["eligible"], "portfolios": out["portfolios"]})
