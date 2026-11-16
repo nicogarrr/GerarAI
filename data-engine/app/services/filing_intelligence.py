@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from decimal import Decimal
 from urllib.parse import quote, urlsplit
@@ -122,6 +123,25 @@ def _facts_query(tenant: int, company_id: int, name: str):
     return query
 
 
+def _quarter_rank(fact: FinancialFact) -> int:
+    q = fact.fiscal_quarter
+    return QUARTER_LABELS.index(q) + 1 if q in QUARTER_LABELS else 0
+
+
+def _period_key(fact: FinancialFact) -> tuple:
+    """Orden explícito de periodo: (ejercicio, trimestre, etiqueta de periodo).
+
+    Un ratio/balance del Q3 2026 es dato NUEVO frente al Q1 2026 del mismo
+    ejercicio; la comparación por año solo los trataba como reingesta. Los
+    flujos trimestrales ya están excluidos en ``_facts_query`` (umbral anual).
+    """
+    return (fact.fiscal_year or 0, _quarter_rank(fact), fact.period or "")
+
+
+def _latest(facts: Sequence[FinancialFact]) -> FinancialFact | None:
+    return max(facts, key=lambda f: (*_period_key(f), f.id or 0), default=None)
+
+
 def _fact_value(db: Session, company_id: int, name: str, fact: FinancialFact) -> Decimal | None:
     """Valor comparable con el umbral: reexpresado por splits como en observe()."""
     if fact.value is None:
@@ -171,23 +191,25 @@ def _thesis_check(
             "operator": rule.get("operator"),
             "fact_id": None,
         }
-        new_fact = db.scalar(
-            _facts_query(tenant, company.id, name)
-            .where(FinancialFact.source_id == document.id)
-            .order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.id))
-            .limit(1)
+        new_fact = _latest(
+            db.scalars(
+                _facts_query(tenant, company.id, name).where(FinancialFact.source_id == document.id)
+            ).all()
         )
         if new_fact is None:
             checks.append({**base, "status": "missing"})
             continue
-        previous = db.scalar(
-            _facts_query(tenant, company.id, name)
-            .where(FinancialFact.source_id != document.id)
-            .order_by(desc(FinancialFact.fiscal_year), desc(FinancialFact.id))
-            .limit(1)
+        previous = _latest(
+            db.scalars(
+                _facts_query(tenant, company.id, name).where(
+                    # ``!=`` en SQL excluye NULL: los hechos previos sin
+                    # source_id (importados sin documento) también cuentan.
+                    or_(FinancialFact.source_id != document.id, FinancialFact.source_id.is_(None))
+                )
+            ).all()
         )
-        if previous is not None and (new_fact.fiscal_year or 0) <= (previous.fiscal_year or 0):
-            # No es dato nuevo (reingesta del mismo ejercicio): no reevalúa ni dispara.
+        if previous is not None and _period_key(new_fact) <= _period_key(previous):
+            # No es dato nuevo (reingesta del mismo periodo): no reevalúa ni dispara.
             checks.append({**base, "status": "missing", "fact_id": new_fact.id})
             continue
         observed = _fact_value(db, company.id, name, new_fact)
@@ -316,10 +338,13 @@ def analyze_document(db: Session, document: Document) -> dict:
 
 
 def _watched(db: Session, tenant: int, company: Company) -> bool:
-    """¿Sigue el tenant a esta compañía? Resolución por símbolo cacheada en la
-    sesión (por tenant): la watchlist no cambia dentro de una pasada y un
-    símbolo no resoluble no bloquea ni se reintenta. Los no resueltos se
-    cuentan en el log (métrica unresolved_watch_symbols)."""
+    """¿Sigue el tenant a esta compañía? Resolución por símbolo cacheada en
+    ``db.info`` por (tenant, símbolo): la caché vive TODA la sesión (la
+    unidad de trabajo), no una pasada; un símbolo añadido o que se haga
+    resoluble a mitad de sesión no se refleja hasta la siguiente. Se asume
+    que la watchlist no cambia dentro de la sesión y un símbolo no resoluble
+    no bloquea ni se reintenta. Los no resueltos se cuentan en el log
+    (métrica unresolved_watch_symbols)."""
     symbols = db.scalars(select(WatchItem.symbol).where(WatchItem.tenant_id == tenant)).all()
     cache = db.info.setdefault("watch_resolution_cache", {})
     unresolved = 0

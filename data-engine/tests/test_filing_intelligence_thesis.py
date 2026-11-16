@@ -80,14 +80,14 @@ def thesis(db, rules):
     return t
 
 
-def fact(db, metric, value, *, year, doc_id=None, quarter=None):
+def fact(db, metric, value, *, year, doc_id=None, quarter=None, period=None):
     f = FinancialFact(
         tenant_id=db.info["tenant_id"],
         company_id=db.info["company_id"],
         metric=metric,
-        value=Decimal(str(value)),
+        value=Decimal(str(value)) if value is not None else None,
         unit="ratio",
-        period=f"FY{year}",
+        period=period or f"FY{year}",
         fiscal_year=year,
         fiscal_quarter=quarter,
         source_id=doc_id,
@@ -245,3 +245,101 @@ def test_sin_chunks_sin_cruce_alerta_media_como_antes(db):
     assert alert.severity == "medium"
     assert alert.alert_type == "new_filing"
     assert alert.metadata_["reason"] == result["reason"]
+
+
+def test_ratio_nuevo_trimestre_del_mismo_ejercicio_es_dato_nuevo(db):
+    # Regresión auditor (2): ROIC Q3 2026 frente a Q1 2026 (mismo ejercicio) es
+    # periodo nuevo: evalúa y cruza. Antes salía missing por comparar solo año.
+    thesis(db, [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08}])
+    fact(db, "roic", 0.10, year=2026, quarter="Q1", period="2026:Q1")
+    doc = document(db, number=2)
+    fact(db, "roic", 0.06, year=2026, quarter="Q3", period="2026:Q3", doc_id=doc.id)
+    result = analyze_document(db, doc)
+    db.commit()
+    check = result["thesis_check"][0]
+    assert check["status"] == "crossed"
+    assert check["period"] == "2026:Q3"
+    alert = db.scalar(select(ResearchAlert))
+    assert alert.severity == "high"
+
+
+def test_mismo_trimestre_reingestado_no_es_nuevo(db):
+    thesis(db, [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08}])
+    old = document(db, number=1)
+    fact(db, "roic", 0.10, year=2026, quarter="Q3", period="2026:Q3", doc_id=old.id)
+    doc = document(db, number=2)
+    fact(db, "roic", 0.06, year=2026, quarter="Q3", period="2026:Q3", doc_id=doc.id)
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"][0]["status"] == "missing"
+    assert not any(a.severity == "high" for a in db.scalars(select(ResearchAlert)).all())
+
+
+def test_hechos_previos_con_source_id_null_cuentan(db):
+    # Regresión auditor (3): un hecho previo sin source_id (NULL) no debe
+    # desaparecer del "anterior" (el != de SQL excluye NULL).
+    thesis(db, [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08}])
+    fact(db, "roic", 0.10, year=2026)  # doc_id=None -> source_id NULL
+    doc = document(db, number=2)
+    fact(db, "roic", 0.06, year=2025, doc_id=doc.id)  # ejercicio ANTERIOR: no es nuevo
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"][0]["status"] == "missing"
+    assert not any(a.severity == "high" for a in db.scalars(select(ResearchAlert)).all())
+
+
+def test_criterios_corruptos_guardados_no_rompen(db):
+    # Rama: normalize_rules ValueError -> sin check, análisis normal.
+    t = ThesisVersion(
+        tenant_id=db.info["tenant_id"],
+        company_id=db.info["company_id"],
+        version=1,
+        thesis_markdown="x",
+        executive_summary="y",
+        invalidation_rules=[{"metric": "metrica:roic", "operator": "~", "threshold": 0.08}],
+    )
+    db.add(t)
+    db.commit()
+    doc = document(db)
+    fact(db, "roic", 0.06, year=2026, doc_id=doc.id)
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"] == []
+
+
+def test_fact_value_none_devuelve_none(db):
+    # Rama defensiva: value NULL (el modelo lo prohíbe en BD) -> None.
+    from app.services.filing_intelligence import _fact_value
+
+    f = FinancialFact(
+        tenant_id=db.info["tenant_id"],
+        company_id=db.info["company_id"],
+        metric="roic",
+        value=None,
+        unit="ratio",
+        period="FY2026",
+        fiscal_year=2026,
+        source_type="sec",
+        filed=date(2026, 10, 1),
+    )
+    assert _fact_value(db, db.info["company_id"], "roic", f) is None
+
+
+def test_metrica_por_accion_reexpresada_por_split(db):
+    # Rama: métrica por acción pasa por split_factor_for_fact (sin split: 1).
+    thesis(db, [{"metric": "metrica:eps_diluted", "operator": ">", "threshold": 1.0}])
+    doc = document(db)
+    fact(db, "eps_diluted", 2.0, year=2026, doc_id=doc.id)
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"][0]["status"] == "crossed"
+
+
+def test_documento_sin_fecha_de_publicacion(db):
+    # Rama: _citation con published_at None.
+    doc = document(db, number=9)
+    doc.published_at = None
+    db.commit()
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["source"]["published_at"] is None
