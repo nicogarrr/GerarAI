@@ -82,6 +82,17 @@ def run_manual_batch() -> dict:
 def client(monkeypatch):
     init_db()
     _cleanup()
+    # Legacy API tests use tenant=None, which sees rows left by other modules.
+    # A manual job admits only ten pending symbols. Scope this fixture's real
+    # queries to its own symbols without deleting or evaluating foreign data.
+    from app.services import dca_manual
+    tracked_symbols = dca_signal_service.tracked_symbols
+
+    def fixture_symbols(db):
+        return {key: item for key, item in tracked_symbols(db).items() if key in SYMBOLS}
+
+    monkeypatch.setattr(dca_signal_service, "tracked_symbols", fixture_symbols)
+    monkeypatch.setattr(dca_manual, "tracked_symbols", fixture_symbols)
     import redis
     store = _RedisGate()
     monkeypatch.setattr(redis.Redis, 'from_url', lambda *a, **kw: store)
