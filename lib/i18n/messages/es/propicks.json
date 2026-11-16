@@ -462,5 +462,81 @@
     "aria": "Estrategia",
     "placeholder": "Seleccionar estrategia",
     "noData": "Sin datos"
+  },
+  "unifiedStates": {
+    "states": {
+      "empty": "No hay una selección guardada para mostrar.",
+      "partial": "Hay datos que no se han podido completar. Revisa los avisos de cada bloque.",
+      "error": "No se han podido cargar estos datos.",
+      "stale": "Datos antiguos. No se han actualizado.",
+      "retained": "Se muestran los últimos datos cargados; no se han actualizado."
+    },
+    "reasons": {
+      "delisted": "La acción ha dejado de cotizar.",
+      "instrument_cancelled": "La acción ha sido cancelada.",
+      "trading_suspended": "La cotización está suspendida.",
+      "quality_failed": "No cumple los criterios de calidad de esta selección.",
+      "sector_model_required": "Este sector necesita una evaluación diferente.",
+      "quality_funnel_not_passed": "No supera el filtro de calidad.",
+      "leverage_missing_or_high": "Deuda sin verificar o por encima del límite.",
+      "fundamentals_stale_or_missing": "Faltan datos financieros recientes.",
+      "fcf_periods_not_comparable": "Los periodos de flujo de caja no se pueden comparar.",
+      "fcf_not_positive_and_growing": "El flujo de caja no cumple el criterio de ser positivo y creciente.",
+      "liquidity_missing_or_low": "Liquidez sin verificar o por debajo del mínimo.",
+      "market_cap_missing_or_low": "Capitalización sin verificar o por debajo del mínimo.",
+      "identity_disputed": "Los datos no coinciden en la identidad de la empresa.",
+      "identity_invalid": "No se ha podido validar la identidad de la empresa.",
+      "identity_unverified": "Identidad de la empresa pendiente de verificar.",
+      "valuation_stale": "La valoración usa datos antiguos.",
+      "valuation_disputed": "Hay datos de valoración que no coinciden.",
+      "valuation_invalid": "No se ha podido validar la valoración.",
+      "quality_score_stale": "La puntuación de calidad usa datos antiguos.",
+      "quality_score_disputed": "Hay datos de calidad que no coinciden.",
+      "quality_score_invalid": "No se ha podido validar la puntuación de calidad.",
+      "quality_unknown": "No hay una evaluación de calidad disponible.",
+      "price_missing": "No hay un precio disponible.",
+      "extreme_value": "Valor extremo: necesita revisión.",
+      "stale": "Dato antiguo.",
+      "non_finite": "No se ha podido calcular un valor válido.",
+      "block_error": "No se ha podido cargar este bloque."
+    },
+    "eligibility": {
+      "investigate": "Para investigar",
+      "quality_waiting_price": "Calidad evaluada; falta el precio",
+      "review_data": "Revisar datos",
+      "excluded": "Fuera de esta selección"
+    },
+    "errors": {
+      "timeout": "La consulta tardó demasiado. Puedes reintentar.",
+      "unauthenticated": "Tu sesión ha caducado. Inicia sesión de nuevo.",
+      "forbidden": "No tienes permiso para ver estos datos.",
+      "rate_limited": "Se han hecho demasiadas consultas. Espera antes de reintentar.",
+      "unavailable": "El servicio no está disponible. Puedes reintentar más tarde.",
+      "invalid_response": "La respuesta recibida no se ha podido validar."
+    },
+    "unknownReason": "Hay un dato pendiente de verificar.",
+    "missing": "No disponible",
+    "asOf": "Fecha de los datos: {date}",
+    "retryAfter": "Puedes reintentar en {seconds} s."
+  },
+  "unified": {
+    "heading": "Calidad a buen precio",
+    "subheading": "Primero el negocio. Después el precio. Una sola ficha por instrumento.",
+    "colQuality": "Calidad",
+    "colValuation": "Precio / valoración",
+    "colDca": "Señal DCA",
+    "qualityPassed": "Supera el filtro",
+    "qualityNotPassed": "No supera el filtro",
+    "valuationValid": "Dato válido",
+    "dcaConfirmed": "Confirmada",
+    "dcaForming": "En formación",
+    "outOfMainTitle": "Fuera de la selección principal",
+    "outOfMainNote": "Revisión de datos y candidatos sin evidencia suficiente. No se presentan como gangas.",
+    "openFile": "Abrir ficha",
+    "trackingTitle": "Seguimiento",
+    "trackingSubtitle": "Sin compras, ventas ni rebalanceo automático.",
+    "trackingFollow": "En seguimiento",
+    "trackingWait": "En tu lista",
+    "reviewThesis": "Revisar tesis"
   }
 }
