@@ -33,6 +33,19 @@ export function formatScreenCriterionRight(value: string | null | undefined, loc
     : metricLabel(trimmed, locale);
 }
 
+/**
+ * Fórmula de ranking para la insignia de resultados: si es una métrica
+ * conocida, etiqueta legible + slug entre paréntesis (la persona reconoce
+ * lo que escribió); una fórmula libre («roic - wacc») se muestra tal
+ * cual, nunca reinterpretada.
+ */
+export function screenRankingFormulaLabel(formula: string, locale: Locale = DEFAULT_LOCALE): string {
+  const trimmed = formula.trim();
+  if (trimmed === '') return naFor(locale);
+  const label = metricLabel(trimmed, locale);
+  return label !== trimmed ? `${label} (${trimmed})` : trimmed;
+}
+
 /** Campos sin dato (missing_fields) con etiqueta legible, no el slug técnico. */
 export function screenMissingFieldsLabel(fields: string[], locale: Locale = DEFAULT_LOCALE): string {
   return fields.map((field) => metricLabel(field, locale)).join(', ');

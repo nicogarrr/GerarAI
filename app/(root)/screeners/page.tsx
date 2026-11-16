@@ -28,7 +28,7 @@ import { getErrorMessage } from '@/lib/types/errors';
 import type { Formatters } from '@/lib/format';
 import { getFormat, getT } from '@/lib/i18n/server';
 import type { TranslateFn } from '@/lib/i18n/translate';
-import { formatScreenCriterionRight, formatScreenCriterionValue, formatScreenRank, screenCriterionMetricLabel, screenMissingFieldsLabel } from '@/lib/screener-results';
+import { formatScreenCriterionRight, formatScreenCriterionValue, formatScreenRank, screenCriterionMetricLabel, screenMissingFieldsLabel, screenRankingFormulaLabel } from '@/lib/screener-results';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -43,6 +43,14 @@ const operators: ScreenCriterion['operator'][] = ['>', '>=', '<', '<=', '==', '!
 
 const RESULTS_PAGE_SIZE = 25;
 
+/** Dirección del ranking en palabras («desc»/«asc» crudos del backend no
+ *  le dicen nada); un valor desconocido se muestra crudo antes que «null». */
+function rankingDirectionLabel(direction: string | null | undefined, t: TranslateFn): string {
+  if (direction === 'desc') return t('screener.screens.desc');
+  if (direction === 'asc') return t('screener.screens.asc');
+  return direction?.trim() ?? '';
+}
+
 function Results({ result, page, pageHref, t, fmt }: { result: ScreenResult; page: number; pageHref: (target: number) => string; t: TranslateFn; fmt: Formatters }) {
   const { formatDate, formatNumber, formatPercent, na: NA } = fmt;
   const count = (value: number) => formatNumber(value, { maximumFractionDigits: 0 });
@@ -55,7 +63,7 @@ function Results({ result, page, pageHref, t, fmt }: { result: ScreenResult; pag
   const pageRows = matchedRows.slice((currentPage - 1) * RESULTS_PAGE_SIZE, currentPage * RESULTS_PAGE_SIZE);
   return (
     <section className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center"><div><h2 className="text-lg font-semibold text-gray-100">{t('screener.screens.resultsTitle')}</h2><p className="text-sm text-gray-500">{result.match_count === 1 ? t('screener.screens.matchesOne', { count: count(1) }) : t('screener.screens.matchesMany', { count: count(result.match_count) })} {result.company_count === 1 ? t('screener.screens.inCompaniesOne', { count: count(1) }) : t('screener.screens.inCompaniesMany', { count: count(result.company_count) })}</p></div>{result.ranking_formula ? <Badge className="md:ml-auto" variant="outline">ranking: {result.ranking_formula} · {result.ranking_direction}</Badge> : null}</div>
+      <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center"><div><h2 className="text-lg font-semibold text-gray-100">{t('screener.screens.resultsTitle')}</h2><p className="text-sm text-gray-500">{result.match_count === 1 ? t('screener.screens.matchesOne', { count: count(1) }) : t('screener.screens.matchesMany', { count: count(result.match_count) })} {result.company_count === 1 ? t('screener.screens.inCompaniesOne', { count: count(1) }) : t('screener.screens.inCompaniesMany', { count: count(result.company_count) })}</p></div>{result.ranking_formula ? <Badge className="md:ml-auto" variant="outline">{t('screener.rankingBadge', { formula: screenRankingFormulaLabel(result.ranking_formula, fmt.locale), direction: rankingDirectionLabel(result.ranking_direction, t) })}</Badge> : null}</div>
       {result.metrics_without_data && result.metrics_without_data.length > 0 ? <p className="mb-3 rounded-md border border-amber-800 bg-amber-950/30 p-3 text-sm text-amber-200" role="alert">{t('screener.screens.noDataFor', { fields: screenMissingFieldsLabel(result.metrics_without_data, fmt.locale) })}</p> : null}
       {/*
         Misma <table> en el DOM en todos los viewports (accesibilidad): en <md
