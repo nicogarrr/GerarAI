@@ -61,3 +61,26 @@ export function holdingsVerificationNote(status: string, locale: 'es' | 'en' = '
   const table = locale === 'en' ? VERIFICATION_NOTE_EN : VERIFICATION_NOTE_ES;
   return table[status] ?? null;
 }
+
+// Uso por literal para el guard de i18n (claves consumidas por iteración).
+export const OWNERSHIP_HOLDING_TYPE_KEY_LITERALS = [
+    'ownership.page.type.put',
+    'ownership.page.type.call',
+    'ownership.page.type.shares',
+    'ownership.page.type.principal',
+] as const;
+const HOLDING_TYPE_EN: Record<string, string> = enOwnership.page.type;
+const HOLDING_TYPE_ES: Record<string, string> = esOwnership.page.type;
+
+/**
+ * Tipo de una posición 13F legible: put_call manda sobre share_type (como
+ * ya hacía la página) y los códigos SEC («SH», «PRN», «PUT», «CALL») se
+ * traducen; un código desconocido se muestra crudo, nunca inventado.
+ */
+export function holdingTypeLabel(putCall: string | null | undefined, shareType: string | null | undefined, locale: 'es' | 'en' = 'es'): string | null {
+  const raw = (putCall ?? shareType)?.trim();
+  if (!raw) return null;
+  const table = locale === 'en' ? HOLDING_TYPE_EN : HOLDING_TYPE_ES;
+  const key = raw.toUpperCase() === 'SH' ? 'shares' : raw.toUpperCase() === 'PRN' ? 'principal' : raw.toUpperCase() === 'PUT' ? 'put' : raw.toUpperCase() === 'CALL' ? 'call' : null;
+  return key ? table[key] : raw;
+}
