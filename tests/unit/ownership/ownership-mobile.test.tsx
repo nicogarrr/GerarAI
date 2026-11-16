@@ -46,7 +46,8 @@ it('keeps nullable snapshot fields honest and shows no filing link when absent',
  render(await OwnershipPage({searchParams:Promise.resolve({cik:'1'})}));
  const cards=dataRows();
  expect(within(cards[0]).queryByRole('link')).toBeNull();
- expect(within(cards[0]).getByText('PUT')).toBeVisible();
+ // put_call se normaliza y traduce (PUT -> Put), ya no se pinta crudo.
+ expect(within(cards[0]).getByText('Put')).toBeVisible();
  expect(within(cards[0]).getAllByText('N/D').length).toBeGreaterThan(3);
  expect(within(cards[1]).getByText('backend-new-code')).toBeVisible();
  expect(within(cards[1]).getAllByText('N/D').length).toBeGreaterThan(3);
@@ -104,7 +105,8 @@ it('keeps English mobile labels and formatted values in the single responsive ro
  expect(rows).toHaveLength(2);
  // Cada valor aparece UNA vez por fila (antes iba duplicado: tarjeta + tabla).
  expect(within(rows[0]).getAllByText('123456789')).toHaveLength(1);
- expect(within(rows[0]).getByText('Shares')).toBeInTheDocument();
+ // «Shares» sale dos veces: etiqueta de columna y tipo traducido (SH -> Shares).
+ expect(within(rows[0]).getAllByText('Shares')).toHaveLength(2);
  expect(within(rows[1]).getByText('Shares before')).toBeInTheDocument();
  expect(within(rows[1]).getByText('Value now')).toBeInTheDocument();
 });

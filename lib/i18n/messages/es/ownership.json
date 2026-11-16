@@ -50,7 +50,14 @@
       "sharesBefore": "Acciones antes",
       "sharesNow": "Acciones ahora",
       "valueBefore": "Valor antes",
-      "valueNow": "Valor ahora"
+      "valueNow": "Valor ahora",
+      "filing": "Informe"
+    },
+    "type": {
+      "put": "Put",
+      "call": "Call",
+      "shares": "Acciones",
+      "principal": "Principal"
     },
     "amendment": "enmienda",
     "fetchedAt": "Datos obtenidos el {datetime}.",

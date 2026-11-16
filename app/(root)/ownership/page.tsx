@@ -25,7 +25,7 @@ type TranslationKey = Parameters<TranslateFn>[0];
 import SyncButton from './SyncButton';
 import { MostBought } from './_components/MostBought';
 import { Overlap } from './_components/Overlap';
-import { holdingsVerificationNote, ownershipManagerName } from '@/lib/ownership-display';
+import { holdingsVerificationNote, holdingTypeLabel, ownershipManagerName } from '@/lib/ownership-display';
 import { ownershipLimitations, ownershipNote } from '@/lib/research/ownership-display';
 
 const CHANGE_LABELS = {
@@ -201,7 +201,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                         <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.value')}</th>
                                         <th className="border-b border-gray-800 py-2 text-right" scope="col">{t('ownership.page.col.shares')}</th>
                                         <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.type')}</th>
-                                        <th className="border-b border-gray-800 py-2" scope="col">Filing</th>
+                                        <th className="border-b border-gray-800 py-2" scope="col">{t('ownership.page.col.filing')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="block space-y-3 md:table-row-group md:space-y-0">
@@ -217,9 +217,9 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                             <td className="block whitespace-nowrap font-mono text-xs text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">CUSIP</span>{row.cusip ?? NA}</td>
                                             <td className="block whitespace-nowrap tabular-nums text-gray-200 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.value')}</span>{formatValueUsd(row.value_usd_thousands, holdings.report_date, fmt)}</td>
                                             <td className="block whitespace-nowrap tabular-nums text-gray-400 md:table-cell md:py-3 md:text-right"><span className="block text-xs font-normal text-gray-400 tabular-nums md:hidden">{t('ownership.page.col.shares')}</span>{formatShares(row.shares, fmt)}</td>
-                                            <td className="block whitespace-nowrap text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.type')}</span>{row.put_call ?? row.share_type ?? NA}</td>
+                                            <td className="block whitespace-nowrap text-gray-400 md:table-cell md:py-3"><span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.type')}</span>{holdingTypeLabel(row.put_call, row.share_type, fmt.locale) ?? NA}</td>
                                             <td className="block whitespace-nowrap md:table-cell md:py-3">
-                                                <span className="block text-xs text-gray-400 md:hidden">Filing</span>
+                                                <span className="block text-xs text-gray-400 md:hidden">{t('ownership.page.col.filing')}</span>
                                                 {row.filing_url ? (
                                                     <a
                                                         className="inline-flex min-h-11 items-center gap-1 text-teal-300 hover:text-teal-200"
