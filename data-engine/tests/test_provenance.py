@@ -8,13 +8,30 @@ from app.services.provenance import Coverage, SourceKind, coverage_for_age, prov
 
 
 def test_provenance_block_shape():
-    block = provenance("SEC EDGAR", SourceKind.OFFICIAL, source_url="https://www.sec.gov/", coverage=Coverage.OK)
+    fetched = datetime(2026, 11, 1, 12, 0, tzinfo=UTC)
+    block = provenance("SEC EDGAR", SourceKind.OFFICIAL, source_url="https://www.sec.gov/",
+                       fetched_at=fetched, coverage=Coverage.OK)
     assert block["source"] == "SEC EDGAR"
     assert block["source_kind"] == "official"
     assert block["source_url"] == "https://www.sec.gov/"
     assert block["coverage"] == "ok"
-    datetime.fromisoformat(block["fetched_at"])  # parses, real timestamp
+    assert block["fetched_at"] == fetched.isoformat()  # the real fetch time, verbatim
     assert "note" not in block
+
+
+def test_omitted_fetched_at_is_null_never_fabricated():
+    """A caller without a real fetch time must surface fetched_at=None.
+
+    Regression: provenance() used to substitute datetime.now(UTC) on omission,
+    making cached/stale/unavailable data look freshly fetched (Lote 1, hallazgo 1).
+    """
+    before = datetime.now(UTC)
+    block = provenance("SEC EDGAR", SourceKind.OFFICIAL, coverage=Coverage.UNAVAILABLE)
+    after = datetime.now(UTC)
+    assert block["fetched_at"] is None
+    # and it is not a hidden now() either (paranoia: the value is null, period)
+    assert block["fetched_at"] != before.isoformat()
+    assert block["fetched_at"] != after.isoformat()
 
 
 def test_source_kind_tiers_are_distinct():

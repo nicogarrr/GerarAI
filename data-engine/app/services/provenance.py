@@ -46,8 +46,12 @@ def provenance(
 
     Additive: endpoints keep their existing fields and add this block under
     the ``provenance`` key. ``fetched_at`` is the real fetch time, never a
-    request-time fabrication when the data was cached — callers serving from
-    cache must pass the original fetch time.
+    request-time fabrication: when the caller has no real fetch time (data
+    served from cache without its original timestamp, an unavailable source,
+    or no fetch attempted at all) the block carries ``fetched_at: None`` —
+    an honest "no fetch time on record" — instead of a fabricated ``now()``
+    that would make stale or missing data look freshly fetched. Callers
+    serving from cache must pass the original fetch time.
     """
     kind = SourceKind(source_kind)
     cov = Coverage(coverage)
@@ -55,7 +59,7 @@ def provenance(
         "source": source,
         "source_kind": kind.value,
         "source_url": source_url,
-        "fetched_at": (fetched_at or datetime.now(UTC)).isoformat(),
+        "fetched_at": fetched_at.isoformat() if fetched_at is not None else None,
         "coverage": cov.value,
     }
     if note:

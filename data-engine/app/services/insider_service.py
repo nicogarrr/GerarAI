@@ -419,19 +419,25 @@ def get_signals_for_ticker(
         # "idle in transaction") durante las descargas lentas de EDGAR de los
         # demas filings. Con varias peticiones a la vez eso agotaba el pool (5+10)
         # y todo el backend devolvia 503.
-        fetched: list[tuple[dict, str | None, dict | None, Exception | None]] = []
+        fetched: list[tuple[dict, str | None, dict | None, Exception | None, datetime | None]] = []
         for filing in filings[:limit]:
             try:
                 if fetcher is not None:
                     xml_text = fetcher(filing)
+                    source_at = datetime.now(UTC)  # el fetcher ES la descarga
                 else:
                     xml_text, _cached_at = _cached_filing_xml(filing, client=client)
+                    # Descarga fresca -> ahora; XML cacheado -> SU fecha real de
+                    # descarga, nunca ahora (frescura fabricada: el Auditor la
+                    # reprodujo sirviendo cache con fetched_at=now).
+                    source_at = (datetime.fromisoformat(_cached_at) if _cached_at
+                                 else datetime.now(UTC))
                 parsed = form4_connector.parse_form4_xml(xml_text)
-                fetched.append((filing, xml_text, parsed, None))
+                fetched.append((filing, xml_text, parsed, None, source_at))
             except Exception as exc:  # noqa: BLE001 - best-effort por filing
-                fetched.append((filing, None, None, exc))
+                fetched.append((filing, None, None, exc, None))
         # Fase 2: BD (persistencia y copia persistida), sin red.
-        for filing, xml_text, parsed, fetch_exc in fetched:
+        for filing, xml_text, parsed, fetch_exc, _source_at in fetched:
             try:
                 if fetch_exc is not None:
                     raise fetch_exc
@@ -501,6 +507,12 @@ def get_signals_for_ticker(
                 errors.append(f"{filing.get('accession_number')}: {public_reason(exc)}")
                 failure_reasons.append(public_reason(exc))
         signals = detect_signals(transactions)
+        # Fecha real de descarga de la respuesta: la del filing MAS VIEJO usado
+        # (politica explicita al mezclar: la respuesta es tan fresca como su
+        # componente menos fresco). Si ningun filing se pudo leer, None: no hay
+        # dato y no se finge una descarga.
+        source_times = [s for (_f, x, _p, e, s) in fetched if e is None and x is not None and s is not None]
+        fetch_time = min(source_times) if source_times else None
         parse_error_count = len(errors)
         scanned = len(filings[:limit])
         parsed_ok = scanned - parse_error_count
@@ -526,10 +538,11 @@ def get_signals_for_ticker(
             "buy_count": len(open_market_buys(transactions)),
             "signals": signals,
             "parse_error_count": parse_error_count,
-            "fetched_at": datetime.now(UTC).isoformat(),
+            "fetched_at": fetch_time.isoformat() if fetch_time else None,
             "provenance": provenance(
                 "SEC EDGAR",
                 SourceKind.OFFICIAL,
+                fetched_at=fetch_time,
                 source_url=f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={resolved_cik}&type=4",
                 coverage=Coverage.PARTIAL if errors or persist_errors else Coverage.OK,
                 note=(
