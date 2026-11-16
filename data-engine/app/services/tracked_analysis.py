@@ -82,17 +82,36 @@ def tracked_statuses(db: Session, tickers: list[str]) -> dict[str, dict]:
     insufficient = [t for t, state in out.items()
                     if state.get('thesis_status') == 'insufficient_data']
     if insufficient:
-        from app.models import Company
-        from app.services.thesis_service import latest_missing_inputs
+        from app.models import Company, FundamentalModelVersion
+        from app.services.thesis_service import missing_inputs_from_model
         company_ids = {
             c.ticker: c.id
             for c in db.scalars(
                 select(Company).where(Company.ticker.in_(insufficient))).all()
         }
+        ranked_models = select(
+            FundamentalModelVersion,
+            func.row_number().over(
+                partition_by=FundamentalModelVersion.company_id,
+                order_by=desc(FundamentalModelVersion.version),
+            ).label("model_rank"),
+        ).where(
+            FundamentalModelVersion.company_id.in_(list(company_ids.values())),
+            FundamentalModelVersion.tenant_id == db.info['tenant_id'],
+        ).subquery()
+        latest_model = aliased(FundamentalModelVersion, ranked_models)
+        models = {
+            model.company_id: model for model in db.scalars(
+                select(latest_model).where(ranked_models.c.model_rank == 1)
+            ).all()
+        }
         for ticker in insufficient:
             company_id = company_ids.get(ticker)
             if company_id is not None:
-                out[ticker]['missing_inputs'] = latest_missing_inputs(db, company_id)
+                model = models.get(company_id)
+                out[ticker]['missing_inputs'] = (
+                    missing_inputs_from_model(model) if model is not None else None
+                )
     return out
 
 

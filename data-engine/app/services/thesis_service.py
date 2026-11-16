@@ -179,6 +179,11 @@ def latest_missing_inputs(db: Session, company_id: int) -> list[str] | None:
     )
     if model is None:
         return None
+    return missing_inputs_from_model(model)
+
+
+def missing_inputs_from_model(model: FundamentalModelVersion) -> list[str]:
+    """Misma lectura de pendientes para consultas individuales y por lotes."""
     snapshot = model.model_snapshot or {}
     # Mismo criterio que en generación (_pendings_markdown/_card_summary):
     # un input presente-excluido persistido (p. ej. ingresos reportados 0)
