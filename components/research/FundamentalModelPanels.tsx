@@ -272,7 +272,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
                     <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.fcfMargin')}</dt><dd className="text-gray-300">{fcfMarginDisplay(point?.fcf_margin, fmt)}</dd></div>
                     <div className="flex items-center justify-between gap-2"><dt className="text-gray-500">{ti('research.model.valuePerShare')}</dt><dd className="font-semibold text-teal-200">{num(scenario.valuation?.value_per_share)}</dd></div>
                     {scenario.valuation == null && scenarioValuationCause(scenario, ti) ? (
-                      <p className="text-xs leading-5 text-gray-500">{scenarioValuationCause(scenario, ti)}</p>
+                      <p className="[overflow-wrap:anywhere] text-xs leading-5 text-gray-500">{scenarioValuationCause(scenario, ti)}</p>
                     ) : null}
                   </dl>
                 </div>
@@ -303,7 +303,7 @@ export function LongTermModelPanel({ model, ticker, t: ti = esT, locale = 'es' }
                       <td className="py-3 text-right text-teal-200">
                         {num(scenario.valuation?.value_per_share)}
                         {scenario.valuation == null && scenarioValuationCause(scenario, ti) ? (
-                          <div className="mt-1 text-xs leading-4 text-gray-500">{scenarioValuationCause(scenario, ti)}</div>
+                          <div className="[overflow-wrap:anywhere] mt-1 text-xs leading-4 text-gray-500">{scenarioValuationCause(scenario, ti)}</div>
                         ) : null}
                       </td>
                     </tr>
