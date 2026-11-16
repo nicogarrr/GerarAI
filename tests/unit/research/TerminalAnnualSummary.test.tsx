@@ -68,7 +68,7 @@ describe('Terminal financiero con resumen de 10 años', () => {
     } as unknown as FinancialTerminalData;
     render(<FinancialTerminalSection locale="es" periodicity="annual" terminal={terminal} years={11} />);
     const line = screen.getByTestId('terminal-annual-summary');
-    expect(line).toHaveTextContent('TACC 2015–2025: +8,4 % al año');
+    expect(line).toHaveTextContent('Crecimiento anual compuesto 2015–2025: +8,4 % al año (TACC)');
     expect(line).toHaveTextContent('11 ejercicios (2015–2025) · media');
     expect(line).toHaveTextContent(/mín .* \(2015\) · máx .* \(2022\)/);
   });

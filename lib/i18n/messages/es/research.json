@@ -541,7 +541,7 @@
     "scenariosCaption": "Escenarios bajista, base y alcista del modelo, con ingresos, FCF, margen FCF y valor por acción",
     "scenario": "Escenario",
     "baseAssumptions": "Supuestos base",
-    "revenueCagr": "CAGR de ingresos",
+    "revenueCagr": "Crecimiento anual compuesto (TACC) de ingresos",
     "normalizedFcfMargin": "Margen FCF normalizado",
     "revenueSources": "Fuentes ingresos:",
     "fcfSources": "FCF:",
@@ -549,7 +549,7 @@
     "reverseMargin": ", con margen FCF normalizado {margin}",
     "reverseHelp": "El reverse DCF parte del precio de mercado y calcula qué crecimiento está descontando ya.",
     "growthQuality": "Calidad del crecimiento",
-    "growthLine": "CAGR de ingresos {cagr} · cambio de margen FCF {change}",
+    "growthLine": "Crecimiento anual compuesto de ingresos {cagr} · cambio de margen FCF {change}",
     "ownerEarnings": "Beneficio del propietario",
     "insufficient": "Insuficiente: {items}.",
     "opportunity": "Motor de oportunidad de mercado",
@@ -719,7 +719,7 @@
   "scenarioHelp": {
     "title": "Supuestos del escenario",
     "bear": "crecimiento de ingresos −hasta 8pp (mínimo 2pp de ajuste), margen FCF −hasta 6pp (suelo 0%) y WACC +2pp (crecimiento terminal −0,5pp). Impulsores: ejecución adversa, compresión de margen y capital más caro.",
-    "base": "supuestos normalizados sobre hechos históricos (CAGR de ingresos y margen FCF normalizado), sin ajustes de escenario. Es el ancla, no una predicción puntual.",
+    "base": "supuestos normalizados sobre hechos históricos (crecimiento anual compuesto de ingresos y margen FCF normalizado), sin ajustes de escenario. Es el ancla, no una predicción puntual.",
     "bull": "crecimiento +hasta 8pp (techo 50%), margen FCF +hasta 6pp (techo 60%) y WACC −1pp (suelo: crecimiento terminal +1pp). Impulsores: ejecución favorable, expansión de margen y capital más barato.",
     "note": "Los spreads se ajustan a la volatilidad histórica de cada compañía (entre 2pp y el máximo indicado). Las probabilidades de cada escenario se derivan de la confianza de la evidencia y del sesgo de crecimiento histórico, no de opiniones del modelo."
   },
@@ -1271,9 +1271,9 @@
       "unavailable": "sin datos",
       "blocked": "bloqueada"
     },
-    "summaryCagr": "TACC {from}–{to}: {pct} al año",
-    "summaryCagrRatio": "TACC: no aplica a ratios ni márgenes",
-    "summaryCagrSign": "TACC: no se calcula si el primer o el último ejercicio es ≤ 0",
+    "summaryCagr": "Crecimiento anual compuesto {from}–{to}: {pct} al año (TACC)",
+    "summaryCagrRatio": "Crecimiento anual compuesto (TACC): no aplica a ratios ni márgenes",
+    "summaryCagrSign": "Crecimiento anual compuesto (TACC): no se calcula si el primer o el último ejercicio es ≤ 0",
     "summaryStats": "{years} ejercicios ({from}–{to}) · media {mean}",
     "summaryRange": "mín {min} ({minYear}) · máx {max} ({maxYear})"
   },
