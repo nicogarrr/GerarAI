@@ -52,4 +52,10 @@ describe('InstitutionalActivityTable', () => {
     expect(screen.getByRole('status')).toHaveTextContent('No hay filas para este filtro');
     expect(screen.getByText('Página 1 de 1 · 0 gestores')).toBeInTheDocument();
   });
+  it.each([['es', '1,0'], ['en', '1.0']] as const)('uses the shared locale percentage formatter for %s', (locale, number) => {
+    render(<InstitutionalActivityTable data={{ ...data, rows: [{ ...row, company_ownership_pct: 1 }] }} locale={locale} baseHref={baseHref} />);
+    const values = screen.getAllByRole('cell').map(cell => cell.textContent);
+    expect(values).toContain(locale === 'en' ? `${number}%` : `${number}\u00a0%`);
+  });
+
 });

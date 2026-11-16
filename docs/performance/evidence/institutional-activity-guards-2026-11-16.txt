@@ -1,0 +1,67 @@
+639 guard files, exhaustive sorted groups160,160,160,159, concurrency4. Sum exit codes=0.
+026)
+ok 513 - cabecera limpia: sin «Más detalle» ni líneas de procedencia/comparativa (Nico, 30-oct-2026)
+  ---
+  duration_ms: 0.155706
+  type: 'test'
+  ...
+1..513
+# tests 744
+# suites 100
+# pass 744
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 21689.81026
+ion_ms: 0.450375
+      type: 'test'
+      ...
+    1..1
+ok 507 - barrera aplicada en la acción de noticias
+  ---
+  duration_ms: 0.548546
+  type: 'suite'
+  ...
+1..507
+# tests 814
+# suites 86
+# pass 814
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9839.676591
+escapes E2E conocen los tres estados honestos
+ok 517 - los escapes E2E conocen los tres estados honestos
+  ---
+  duration_ms: 0.447216
+  type: 'test'
+  ...
+1..517
+# tests 786
+# suites 100
+# pass 786
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 19006.759807
+tion_ms: 4.572936
+      type: 'test'
+      ...
+    1..1
+ok 421 - published_at backend/frontend contract
+  ---
+  duration_ms: 4.886898
+  type: 'suite'
+  ...
+1..421
+# tests 750
+# suites 101
+# pass 749
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 29742.463271

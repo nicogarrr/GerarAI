@@ -1,3 +1,4 @@
+import { formatPercent } from '@/lib/format';
 import { DEFAULT_LOCALE, intlLocale, type Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
 import type { ActivityFilter, InstitutionalActivity } from '@/lib/research/institutional-holders';
@@ -61,7 +62,7 @@ export function InstitutionalActivityTable({ data, locale = DEFAULT_LOCALE, base
             <tbody>{data.rows.map(row => <tr className="border-t border-gray-800" key={row.cik}>
               <th scope="row" className="min-w-48 p-2 font-medium text-gray-100">{row.filing_url || row.prev_filing_url ? <a className="text-teal-300 underline" href={(row.filing_url || row.prev_filing_url) as string} target="_blank" rel="noopener noreferrer">{row.name || row.cik}</a> : row.name || row.cik}</th>
               <td className="p-2 text-gray-300">{row.status && FILTERS.includes(row.status as ActivityFilter) ? labels[row.status as ActivityFilter] : row.status === 'igual' ? t('research.institucionales.status.igual') : row.status === 'sin_13f_aun' ? t('research.institucionales.status.sin13fAun') : row.status === 'sin_13f_previo' ? t('research.institucionales.status.sin13fPrevio') : na}</td>
-              <td className="p-2">{fmt(row.shares)}</td><td className="p-2">{fmt(row.prev_shares)}</td><td className="p-2">{fmt(row.change)}</td><td className="p-2">{fmt(row.reported_value_usd)}</td><td className="p-2">{row.company_ownership_pct === null ? na : `${row.company_ownership_pct.toLocaleString(intl)} %`}</td><td className="whitespace-nowrap p-2">{row.filed ?? na}</td>
+              <td className="p-2">{fmt(row.shares)}</td><td className="p-2">{fmt(row.prev_shares)}</td><td className="p-2">{fmt(row.change)}</td><td className="p-2">{fmt(row.reported_value_usd)}</td><td className="p-2">{row.company_ownership_pct === null ? na : formatPercent(row.company_ownership_pct, { fromRatio: false }, na, locale)}</td><td className="whitespace-nowrap p-2">{row.filed ?? na}</td>
             </tr>)}</tbody>
           </table>
         </div> : <p role="status" className="text-sm text-gray-400">{t('research.institutionalActivity.empty')}</p>}
