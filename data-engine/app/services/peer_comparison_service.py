@@ -1,5 +1,6 @@
 import math
 import re
+from contextlib import nullcontext
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -256,7 +257,9 @@ class PeerComparisonService:
         metric_names = [metric for metric in (metrics or DEFAULT_PEER_METRICS) if metric in METRIC_DEFINITIONS]
         peers, basis, selection_trace = self._find_peers(db, company, limit)
         participants = [company, *peers]
-        rows = [self._company_row(db, participant, metric_names, participant.id == company.id, refresh) for participant in participants]
+        # Write/refresh retains its existing per-company transaction lifecycle.
+        with nullcontext() if refresh else self.metric_service.prefetched_companies(db, participants):
+            rows = [self._company_row(db, participant, metric_names, participant.id == company.id, refresh) for participant in participants]
 
         # F26: un comparable sin ninguna metrica calculada (status ok) no es
         # muestra. peer_count solo cuenta los que aportan dato; el resto se

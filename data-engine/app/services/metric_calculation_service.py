@@ -1,4 +1,5 @@
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
@@ -351,6 +352,24 @@ _PREFETCH_METRICS = frozenset(
 
 
 class MetricCalculationService:
+    @contextmanager
+    def prefetched_companies(self, db: Session, companies: list[Company]):
+        """One bounded read per company batch, cache only for this computation."""
+        owns_cache = _FACTS_CACHE_KEY not in db.info
+        if owns_cache:
+            cache = {}
+            db.info[_FACTS_CACHE_KEY] = cache
+        else:
+            cache = db.info[_FACTS_CACHE_KEY]
+        try:
+            # Keep bind parameters bounded even when reused outside peer comparison.
+            for start in range(0, len(companies), 100):
+                self._prefetch_company_ids(db, [c.id for c in companies[start:start + 100]], cache)
+            yield
+        finally:
+            if owns_cache:
+                db.info.pop(_FACTS_CACHE_KEY, None)
+
     def calculate_all(self, db: Session, company: Company, persist: bool = True) -> list[MetricResult]:
         # Cache de hechos SOLO durante este calculate_all: muchas metricas
         # comparten entradas (revenue, net_income...) y cada una repetia la
@@ -653,31 +672,38 @@ class MetricCalculationService:
         y orden que ``_facts_for_metric``; un insumo sin hechos queda en
         cache como lista vacia para no volver a consultarlo.
         """
+        self._prefetch_company_ids(db, [company.id], cache)
+
+    def _prefetch_company_ids(
+        self, db: Session, company_ids: list[int], cache: dict[tuple[int, str], list[FinancialFact]],
+    ) -> None:
+        if not company_ids:
+            return
         metrics = sorted(_PREFETCH_METRICS)
         ranked = (
             select(
                 FinancialFact.id,
                 func.row_number()
-                .over(partition_by=FinancialFact.metric, order_by=_FACT_ORDER)
+                .over(partition_by=(FinancialFact.company_id, FinancialFact.metric), order_by=_FACT_ORDER)
                 .label("rn"),
             )
             .where(
-                FinancialFact.company_id == company.id,
+                FinancialFact.company_id.in_(company_ids),
                 FinancialFact.metric.in_(metrics),
                 *tenant_filters(db, FinancialFact),
             )
             .subquery()
         )
-        grouped: dict[str, list[FinancialFact]] = {metric: [] for metric in metrics}
+        grouped = {(company_id, metric): [] for company_id in company_ids for metric in metrics}
         rows = db.execute(
             select(FinancialFact, ranked.c.rn)
             .join(ranked, FinancialFact.id == ranked.c.id)
             .where(ranked.c.rn <= _FACTS_PER_METRIC)
         ).all()
         for fact, rn in sorted(rows, key=lambda row: (row[0].metric, row[1])):
-            grouped[fact.metric].append(fact)
-        for metric, facts in grouped.items():
-            cache[(company.id, metric)] = facts
+            grouped[(fact.company_id, fact.metric)].append(fact)
+        for key, facts in grouped.items():
+            cache[key] = facts
 
     def _match_fact(self, db: Session, company: Company, metric: str, anchor: FinancialFact) -> FinancialFact | None:
         candidates = self._facts_for_metric(db, company, metric)
