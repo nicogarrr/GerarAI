@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { ChevronRight, ExternalLink } from 'lucide-react';
 import { CompanyLogo } from '@/components/calendar/CompanyLogo';
+import { Skeleton } from '@/components/ui/skeleton';
 import { formatMarketDate, type Formatters } from '@/lib/format';
 
 /** Formateador de fechas ligado al idioma activo (getFormat en servidor); sin él, español (tests y render directo). */
@@ -44,6 +45,17 @@ function materialLabel(doc: MaterialDocument, ti: TiFn): string {
     }
 }
 
+/** Reserva la altura real de la línea de materiales (mt-1.5 + chip h-6) mientras la
+ *  promesa compartida resuelve: con fallback={null} todas las líneas se insertaban a
+ *  la vez y desplazaban las filas visibles (CLS medido 0,32 en el rig, umbral 0,1). */
+export function MaterialsLineSkeleton() {
+    return (
+        <div className="mt-1.5" aria-hidden="true">
+            <Skeleton className="h-6 w-2/3" />
+        </div>
+    );
+}
+
 /** Material oficial de la SEC para resultados ya publicados; sin dato = no se pinta nada. */
 export function MaterialsLine({ materials, ti = esT, f }: { materials: EventMaterials | undefined; ti?: TiFn; f?: DateFormatter }) {
     const fmt = f?.formatMarketDate ?? formatMarketDate;
@@ -54,8 +66,10 @@ export function MaterialsLine({ materials, ti = esT, f }: { materials: EventMate
     if (materials.status === 'sin_filing' || materials.documents.length === 0) {
         return <p className="mt-1 text-xs text-gray-500">{ti('calendar.earnings.materialsNone')}</p>;
     }
+    // Una sola línea con scroll-x (patrón EarningsDayStrip): envolver a 2 líneas
+    // rompía la altura que reserva MaterialsLineSkeleton y recreaba el salto.
     return (
-        <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
+        <p className="scrollbar-hide mt-1.5 flex flex-nowrap items-center gap-1.5 overflow-x-auto text-xs">
             {materials.documents.map((doc) => (
                 <a
                     key={doc.url}
@@ -63,13 +77,13 @@ export function MaterialsLine({ materials, ti = esT, f }: { materials: EventMate
                     target="_blank"
                     rel="noopener noreferrer"
                     title={ti('calendar.earnings.materialsDocTitle', { exhibit: doc.exhibit, date: fmt(materials.filed_at) })}
-                    className="inline-flex items-center gap-1 rounded-md border border-teal-800/60 px-1.5 py-0.5 font-medium text-teal-300 hover:bg-gray-800"
+                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-teal-800/60 px-1.5 py-0.5 font-medium text-teal-300 hover:bg-gray-800"
                 >
                     {materialLabel(doc, ti)}
                     <ExternalLink aria-hidden="true" className="h-3 w-3" />
                 </a>
             ))}
-            <span className="text-gray-500">{ti('calendar.earnings.materialsSec', { date: fmt(materials.filed_at) })}</span>
+            <span className="shrink-0 whitespace-nowrap text-gray-500">{ti('calendar.earnings.materialsSec', { date: fmt(materials.filed_at) })}</span>
         </p>
     );
 }
