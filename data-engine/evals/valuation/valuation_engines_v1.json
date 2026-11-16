@@ -4989,7 +4989,7 @@
     {
       "id": "evpre05_funding_gap_dilutes_a_positive_value",
       "engine": "pre_revenue",
-      "category": "happy_path",
+      "category": "honesty",
       "company": {
         "ticker": "EVPRE05",
         "name": "eval EVPRE05",
@@ -5020,18 +5020,15 @@
         ],
         "trace_engine": "pre_revenue",
         "closed_form": {
-          "bear_value": -2.18804239354,
+          "bear_value": null,
           "base_value": 2.862800104,
           "bull_value": 12.26968216,
-          "expected_value": 3.931548954
+          "expected_value": null
         }
       },
       "applies_to": [
         "engine_publishable_status",
-        "bear_le_base_le_bull",
-        "expected_value_within_band",
         "value_matches_closed_form",
-        "probabilities_sum_to_one",
         "sensitivity_covers_base",
         "missing_inputs_declared",
         "no_silent_zero_net_debt",
@@ -5040,7 +5037,7 @@
         "gate_does_not_omit_itself"
       ],
       "price": 20,
-      "hand_calculation": "Funding gap = capex 100x2 + quemadura 20x2 + colchon 6 meses de salida de caja (6/12 x (20 + 100) = 60) - caja 150 = 150; emision a 17.0 -> 150/17 = 8,8235 acciones nuevas -> dilucion 8,8235/108,8235 = 0.081081. Aqui el valor es POSITIVO, asi que la dilucion recorta el valor por accion en vez de empujarlo a 0. base = 2.862800 (sin dilucion 3.115400). Re-baseline: el WACC sale del tag pre_fcf (tag_default), sin base documentada, asi que main lo marca blocker traceable_wacc: status partial y publishable False. Los valores no cambian."
+      "hand_calculation": "Funding gap = capex 100x2 + quemadura 20x2 + colchon 6 meses de salida de caja (6/12 x (20 + 100) = 60) - caja 150 = 150; emision a 17.0 -> 150/17 = 8,8235 acciones nuevas -> dilucion 8,8235/108,8235 = 0.081081. Aqui el valor es POSITIVO, asi que la dilucion recorta el valor por accion en vez de empujarlo a 0. base = 2.862800 (sin dilucion 3.115400). Re-baseline: el WACC sale del tag pre_fcf (tag_default), sin base documentada, asi que main lo marca blocker traceable_wacc: status partial y publishable False. Los valores no cambian. Contrato actualizado: el bear tiene FCF terminal no positivo, Gordon no es valido y bear/esperado son N/D. Se conservan base2.862800104 y bull12.26968216; no se aplica banda completa ni esperado/probabilidades de tres valores a una banda incompleta. El test test_pre_revenue_terminal_fcf verifica explícitamente motivo y ausencia de reponderacion."
     },
     {
       "id": "evpre06_indicative_range_without_net_debt",

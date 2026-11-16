@@ -236,7 +236,13 @@ def test_scenarios_are_ordered_by_construction_across_allowed_range(db, margin):
         assert result["base_value"] is None
         return
     assert result["status"] == "partial" and result["publishable"] is False
-    assert result["bear_value"] < result["base_value"] < result["bull_value"], margin
+    if Decimal(margin) == Decimal("0.05"):
+        assert result["bear_value"] is None
+        assert result["expected_value"] is None
+        assert "FCF terminal no positivo" in result["scenario_notes"]["expected"]
+        assert result["base_value"] < result["bull_value"]
+    else:
+        assert result["bear_value"] < result["base_value"] < result["bull_value"], margin
     band = result["trace"]["assumed"]["fcf_margin_band"]
     assert band[0] < band[1] <= band[2]
 

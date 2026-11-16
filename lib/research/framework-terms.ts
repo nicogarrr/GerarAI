@@ -61,6 +61,7 @@ function esFrameworkLabel(key: string): string | null {
 }
 
 export const FRAMEWORK_TERMS: Record<string, string> = {
+    positive_terminal_fcf: 'flujo de caja libre terminal positivo',
     non_negative_fcf_margin: 'margen de flujo de caja libre no negativo',
     normalized_fcf_or_fcf_margin: 'flujo de caja libre normalizado o margen de flujo de caja libre',
     standard_dcf: 'DCF de flujo de caja libre',
