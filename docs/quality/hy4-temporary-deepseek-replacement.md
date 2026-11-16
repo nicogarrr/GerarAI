@@ -35,3 +35,22 @@ Validacion: bateria focalizada factories/guards/regresiones, todos archivos
 fuente modificados >=85% lineas y ramas. Comando y salida en evidencia adjunta.
 Pyright ficheroscambiados0errores (warningsheredados), ruffverde. CIcompleto
 pendiente; no se atribuye despliegue ni activacion por crear este paquete.
+
+## Revision de aislamiento
+
+restricted/free_only se evalua ANTES del reemplazo en las cinco factories.
+free_only_provider exige identidad interna verificada, enabled y clave antes
+siquiera de resolver Hy4. El transporte mantiene la exigencia de identidad
+incluso dentro de selection_scope Hy4. replacement_provider ignora TODA
+configuracion de tenant (BYOK), Go incluido: nunca cambia su modelo/endpoint,
+no toma su clave y nunca sustituye su clave por la de plataforma. Configuracion
+invalida o deshabilitada sigue cerrada. La politica preexistente free_only
+para tenants restringidos no cambia.
+
+Reproducir: sh scripts/test-hy4-default-routing.sh (331 tests, sin red real).
+Cobertura por fichero completo, lineas/ramas:
+chat_provider94,50/89,41; factory96,70/92,50;
+free_interactive97,30/85,71; free_only98,08/95,45;
+hy498,15/97,06; thesis_go100/100.
+TSC no aplica; pyright focalizado0errores11avisos heredados. Ruffverde.
+No implica green de toda la suite ni permiso de deploy.

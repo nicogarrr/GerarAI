@@ -36,13 +36,13 @@ def create_llm_provider(
     settings.
     """
     settings = settings or get_settings()
+    from app.llm.free_only import free_only_provider, restricted
+    if restricted(settings):
+        return free_only_provider(settings, client)
     from app.llm.hy4 import replacement_provider
     promoted = replacement_provider(settings, client)
     if promoted is not None:
         return promoted
-    from app.llm.free_only import free_only_provider, restricted
-    if restricted(settings):
-        return free_only_provider(settings, client)
     tenant = current_tenant_llm_config()
     if tenant is not None:
         return _tenant_provider(

@@ -147,12 +147,13 @@ def replacement_provider(settings, client=None, *, model=None):
         return None
     from app.llm.tenant_config import current_tenant_llm_config
     tenant = current_tenant_llm_config()
-    candidate = tenant.model if tenant is not None else (model or settings.opencode_go_model)
+    # Never replace a tenant-owned configuration or its credentials.
+    if tenant is not None or not settings.llm_enabled:
+        return None
+    candidate = model or settings.opencode_go_model
     if candidate not in {'deepseek-v4.1-flash', 'deepseek-v4.1-flash-free', MODEL}:
         return None
-    if tenant is not None and tenant.provider != 'opencode-go':
-        return None
-    if tenant is None and settings.llm_provider not in {'auto', 'opencode', 'opencode_go', 'opencode-go', 'cascade'}:
+    if settings.llm_provider not in {'auto', 'opencode', 'opencode_go', 'opencode-go', 'cascade'}:
         return None
     if promotion_ended():
         from app.llm.adapters import DisabledProvider
