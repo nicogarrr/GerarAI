@@ -6,8 +6,8 @@ import json
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 
-from sqlalchemy import desc, select
-from sqlalchemy.orm import Session
+from sqlalchemy import desc, func, select
+from sqlalchemy.orm import Session, aliased
 
 from app.models import Company, MarketPrice, NewsEvent, PortfolioMoveDigest, Position
 from app.services.trading_sessions import missing_sessions
@@ -34,31 +34,45 @@ def build_digest(db: Session, as_of: date, generated_at: datetime | None = None)
     )
     prices_by_company: dict[int, list[MarketPrice]] = {cid: [] for cid in company_ids}
     if company_ids:
-        for price in db.scalars(select(MarketPrice).where(
+        ranked_prices = select(
+            MarketPrice,
+            func.row_number().over(
+                partition_by=MarketPrice.company_id, order_by=desc(MarketPrice.date),
+            ).label("row_rank"),
+        ).where(
             MarketPrice.company_id.in_(company_ids),
             MarketPrice.date <= as_of,
             MarketPrice.date >= as_of - timedelta(days=8),
             MarketPrice.source.in_(DAILY_BAR_SOURCES),
             MarketPrice.adj_close.is_not(None),
-        ).order_by(MarketPrice.company_id, desc(MarketPrice.date))).all():
-            bucket = prices_by_company[price.company_id]
-            if len(bucket) < 2:
-                bucket.append(price)
+        ).subquery()
+        price_alias = aliased(MarketPrice, ranked_prices)
+        for price in db.scalars(select(price_alias).where(
+            ranked_prices.c.row_rank <= 2,
+        ).order_by(price_alias.company_id, desc(price_alias.date))):
+            prices_by_company[price.company_id].append(price)
     start = datetime.combine(as_of, time.min, tzinfo=UTC)
     end = start + timedelta(days=1)
     # Filtro connector en SQL ANTES del cap por empresa: si se filtra en
     # Python, 5 noticias RSS/manuales recientes ocultan las GDELT del dia.
     news_by_company: dict[int, list[NewsEvent]] = {cid: [] for cid in company_ids}
     if company_ids:
-        for row in db.scalars(select(NewsEvent).where(
+        ranked_news = select(
+            NewsEvent,
+            func.row_number().over(
+                partition_by=NewsEvent.company_id, order_by=desc(NewsEvent.date),
+            ).label("row_rank"),
+        ).where(
             NewsEvent.company_id.in_(company_ids),
             NewsEvent.date >= start, NewsEvent.date < end,
             NewsEvent.url.is_not(None),
             NewsEvent.metadata_["connector"].as_string() == "gdelt",
-        ).order_by(NewsEvent.company_id, desc(NewsEvent.date))).all():
-            bucket = news_by_company[row.company_id]
-            if len(bucket) < 5:
-                bucket.append(row)
+        ).subquery()
+        news_alias = aliased(NewsEvent, ranked_news)
+        for row in db.scalars(select(news_alias).where(
+            ranked_news.c.row_rank <= 5,
+        ).order_by(news_alias.company_id, desc(news_alias.date))):
+            news_by_company[row.company_id].append(row)
     items = []
     for position in positions:
         company = companies.get(position.company_id)
