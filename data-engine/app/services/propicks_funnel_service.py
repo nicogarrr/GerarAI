@@ -40,6 +40,7 @@ from app.models import (
     ProPickCandidate,
     ProPickRun,
 )
+from app.valuation.irr_pit_backtest import LookAheadError
 
 # --- Funnel constants (declared; tune only with an explicit decision) -------
 
@@ -85,6 +86,19 @@ FINANCIALS_EXCLUDED_COMPONENTS = ("spread_roic_wacc", "spread_cfroi_wacc")
 
 FUNNEL_VERSION = "propicks-funnel-v1"
 
+# Factores observacionales (contrato factors-v0): se calculan y se muestran,
+# pero NO entran en SCORE_WEIGHTS ni cambian el ranking. Pendientes de
+# validación PIT/OOS antes de ponderar nada. Definición fiel de cada uno:
+#   quality  = percentil empírico del universo de quality_moat_score_v2.
+#   momentum = percentil empírico del universo de momentum_12_1.
+#   value    = no financieras: percentil de earnings yield / FCF yield;
+#              financieras: 0,5·(1−percentil P/B) + 0,5·percentil ROE.
+FACTOR_CONTRACT_VERSION = "factors-v0-observational"
+# Inputs de valoración del factor value: earnings yield / FCF yield como
+# FinancialFact (hoy no existen persistidos: value=null, cobertura 0, sin
+# imputar). Financieras: P/B + ROE, nunca EBIT/EV.
+VALUE_FACT_METRICS = ("earnings_yield", "fcf_yield")
+
 # One entry per company: several share classes of the same issuer (GOOG and
 # GOOGL) must not take several slots of the ranking. Explicit map first; for
 # anything not listed, classes are linked only when name AND exchange are
@@ -129,7 +143,7 @@ class FunnelResult:
     components: dict[str, float | None] = field(default_factory=dict)
 
 
-def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
+def _latest_metrics(db: Session, as_of: date | None = None) -> dict[tuple[int, str], float]:
     """Latest stored value per (company, metric) across the metrics we read.
 
     ProPicks runs per tenant: CalculatedMetric/FinancialFact are
@@ -137,8 +151,24 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
     global market-data table to read here, so the old include_all_tenants
     bypass (which mixed other tenants' rows into the funnel) is gone;
     MarketPrice/Company remain global and need no tenant predicate.
+
+    PIT: con ``as_of`` solo entran métricas persistidas ANTES del corte
+    (``created_at < as_of + 1 día``: el ``period`` es texto ("FY2025") y el
+    único "cuándo la conocíamos" fechado es created_at), tanto al elegir el
+    periodo más reciente como al traer sus filas. De las revisiones de un
+    mismo periodo gana la más reciente DISPONIBLE en el corte. Una métrica
+    calculada después del corte no existe para esa corrida: sale missing,
+    nunca se usa a futuro.
     """
-    wanted = set(COVERAGE_METRICS) | {"wacc", LEVERAGE_METRIC, "fcf_conversion", "momentum_12m"}
+    wanted = (
+        set(COVERAGE_METRICS)
+        | {"wacc", LEVERAGE_METRIC, "fcf_conversion", "momentum_12m", "momentum_12_1", "price_to_book"}
+    )
+    cutoff = (
+        [CalculatedMetric.created_at < as_of + timedelta(days=1)]
+        if as_of is not None
+        else []
+    )
     latest_period = (
         select(
             CalculatedMetric.company_id.label("company_id"),
@@ -147,6 +177,7 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
         )
         .where(
             CalculatedMetric.metric.in_(wanted),
+            *cutoff,
             *tenant_filters(db, CalculatedMetric),
         )
         .group_by(CalculatedMetric.company_id, CalculatedMetric.metric)
@@ -157,20 +188,73 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
             CalculatedMetric.company_id,
             CalculatedMetric.metric,
             CalculatedMetric.value,
-        ).join(
+        )
+        .join(
             latest_period,
             (CalculatedMetric.company_id == latest_period.c.company_id)
             & (CalculatedMetric.metric == latest_period.c.metric)
             & (CalculatedMetric.period == latest_period.c.max_period),
         )
-        .where(*tenant_filters(db, CalculatedMetric))
-        .order_by(CalculatedMetric.tenant_id.desc().nulls_last())
+        # El cutoff tambien aqui: un (company, metric, period) puede tener
+        # varias revisiones (definition_version distinta); sin este filtro el
+        # JOIN exterior traeria revisiones creadas DESPUES del corte.
+        .where(
+            *cutoff,
+            *tenant_filters(db, CalculatedMetric),
+        )
+        # Revision determinista: la mas reciente DISPONIBLE en el corte
+        # (created_at desc, id desc como desempate estable). La primera fila
+        # por (company, metric) gana.
+        .order_by(
+            CalculatedMetric.created_at.desc().nulls_last(),
+            CalculatedMetric.id.desc(),
+        )
     ).all()
-    return {
-        (cid, metric): float(value)
-        for cid, metric, value in rows
-        if value is not None
-    }
+    latest: dict[tuple[int, str], float] = {}
+    for cid, metric, value in rows:
+        if value is None:
+            continue
+        latest.setdefault((cid, metric), float(value))
+    return latest
+
+
+def _value_fact_inputs(
+    db: Session, company_ids: list[int], *, as_of: date
+) -> dict[int, float]:
+    """Earnings yield / FCF yield por empresa (FinancialFact), solo filed <= as_of.
+
+    PIT estricto: un hecho presentado DESPUÉS de as_of no puede alimentar el
+    factor; si aparece en la consulta es un error de entrada y se rechaza con
+    LookAheadError (misma política que irr_pit_backtest). Un hecho con filed
+    NULL se descarta por no fechado. Hoy ninguna de las dos métricas existe
+    persistida: el factor value queda null con cobertura 0, sin imputar.
+    v0: si una empresa tiene ambas, se toma la revisión más reciente de
+    cualquiera de las dos (observacional, sin mezclar escalas).
+    """
+    rows = db.execute(
+        select(
+            FinancialFact.company_id,
+            FinancialFact.metric,
+            FinancialFact.value,
+            FinancialFact.filed,
+        )
+        .where(
+            FinancialFact.metric.in_(VALUE_FACT_METRICS),
+            FinancialFact.company_id.in_(company_ids),
+            *tenant_filters(db, FinancialFact),
+        )
+        .order_by(FinancialFact.company_id, FinancialFact.created_at.desc())
+    ).all()
+    out: dict[int, float] = {}
+    for cid, metric, value, filed in rows:
+        if filed is not None and filed > as_of:
+            raise LookAheadError(
+                f"{metric} de company {cid} presentado {filed} > as_of {as_of}: entrada con look-ahead"
+            )
+        if cid in out or filed is None or value is None:
+            continue
+        out[cid] = float(value)
+    return out
 
 
 def _annual_fact_rows(db: Session, metric: str, *, recent: int | None = None):
@@ -367,11 +451,23 @@ def apply_share_class_dedupe(
     return dropped
 
 
-def run_funnel(db: Session, *, top_n: int = 20) -> tuple[list[FunnelResult], dict[str, Any]]:
-    """Evaluate every company; return ranked results (best first) + run stats."""
+def run_funnel(
+    db: Session, *, top_n: int = 20, as_of: date | None = None
+) -> tuple[list[FunnelResult], dict[str, Any]]:
+    """Evaluate every company; return ranked results (best first) + run stats.
+
+    `as_of` es la fecha de corte PIT de los factores observacionales (hoy:
+    la corrida). El score NO depende de ella: score, gates y ranking leen el
+    mapa de métricas sin corte (idéntico a v1); solo los factores leen el
+    mapa con cutoff (created_at < as_of+1d, revisión más reciente disponible)."""
+    as_of = as_of or date.today()
     started = time.monotonic()
     companies = list(db.scalars(select(Company).order_by(Company.id)).all())
+    # Dos mapas: el score, las gates y el ranking leen SIEMPRE el mapa sin
+    # corte (idéntico a v1: el score no depende de as_of); solo los factores
+    # observacionales leen el mapa con cutoff PIT.
     metrics = _latest_metrics(db)
+    factor_metrics = _latest_metrics(db, as_of)
     consistency = _earnings_consistency(db)
     growth = _revenue_cagr(db)
 
@@ -446,7 +542,9 @@ def run_funnel(db: Session, *, top_n: int = 20) -> tuple[list[FunnelResult], dic
             "quality_moat_score_v2": get("quality_moat_score_v2"),
             "roe_5y": roe,
             "fcf_margin_5y": get("fcf_margin_5y"),
-                    "momentum_12m": get("momentum_12m"),
+            "momentum_12m": get("momentum_12m"),
+            # Observacional (factors-v0): se guarda y se muestra, NO puntúa.
+            "momentum_12_1": get("momentum_12_1"),
             "owner_earnings_5y": get("owner_earnings_5y"),
             "revenue_cagr": cagr,
             "fcf_conversion": get("fcf_conversion"),
@@ -471,6 +569,7 @@ def run_funnel(db: Session, *, top_n: int = 20) -> tuple[list[FunnelResult], dic
                     # aqui (sin esto la tarjeta siempre salia n/d). No pesa en
                     # SCORE_WEIGHTS: solo se muestra y puntua en el front.
                     "momentum_12m": get("momentum_12m"),
+                    "momentum_12_1": get("momentum_12_1"),
                 },
                 coverage=coverage,
                 components=components,
@@ -510,6 +609,59 @@ def run_funnel(db: Session, *, top_n: int = 20) -> tuple[list[FunnelResult], dic
     for idx, r in enumerate(ranked[:top_n], start=1):
         r.metrics["rank"] = float(idx)
 
+    # --- Factores observacionales (factors-v0) ---------------------------
+    # Percentiles sobre el universo DEDUPLICADO (raw). Se publican en
+    # metrics y en stats["factors"], pero NO entran en SCORE_WEIGHTS ni
+    # cambian score/orden/rank. Pendientes de validación PIT/OOS.
+    pct_momentum = _percentile_ranks(
+        {
+            cid: v
+            for cid in raw
+            if (v := factor_metrics.get((cid, "momentum_12_1"))) is not None
+        }
+    )
+    pct_quality = _percentile_ranks(
+        {
+            cid: v
+            for cid in raw
+            if (v := factor_metrics.get((cid, "quality_moat_score_v2"))) is not None
+        }
+    )
+    fin_ids = {c.id for c in companies if _is_financial(c)}
+    value_inputs = _value_fact_inputs(db, [c.id for c in companies], as_of=as_of)
+    pct_value_nf = _percentile_ranks(
+        {cid: v for cid, v in value_inputs.items() if cid in raw and cid not in fin_ids}
+    )
+    pb_values = {
+        cid: v
+        for cid in raw
+        if cid in fin_ids and (v := factor_metrics.get((cid, "price_to_book"))) is not None and v > 0
+    }
+    pct_pb = _percentile_ranks(pb_values)
+    pct_roe_factor = _percentile_ranks(
+        {cid: v for cid in raw if (v := factor_metrics.get((cid, "roe_5y"))) is not None}
+    )
+    factor_value_count = 0
+    for result in results:
+        cid = result.company_id
+        if cid not in raw:
+            continue  # clase deduplicada: fuera del universo de factores
+        if cid in fin_ids:
+            # Financieras: P/B (invertido) + ROE, nunca EBIT/EV.
+            p = pct_pb.get(cid)
+            ro = pct_roe_factor.get(cid)
+            value_pct = (0.5 * (1.0 - p) + 0.5 * ro) if (p is not None and ro is not None) else None
+        else:
+            value_pct = pct_value_nf.get(cid)  # null si no hay EY/FCFY: sin imputar
+        if value_pct is not None:
+            factor_value_count += 1
+        # Percentil empírico del universo de la métrica de calidad (moat):
+        # no es el score normalizado ni lo usa; el score no se toca.
+        result.metrics["factor_quality_pct"] = pct_quality.get(cid)
+        result.metrics["factor_momentum_pct"] = pct_momentum.get(cid)
+        result.metrics["factor_value_pct"] = value_pct
+
+    universe_n = len(raw)
     stats = {
         "version": FUNNEL_VERSION,
         "universe_size": len(companies),
@@ -521,6 +673,21 @@ def run_funnel(db: Session, *, top_n: int = 20) -> tuple[list[FunnelResult], dic
             "consistency": f"{CONSISTENCY_MIN_POSITIVE}/{CONSISTENCY_YEARS}",
             "leverage_max": LEVERAGE_MAX,
             "weights": SCORE_WEIGHTS,
+        },
+        "factors": {
+            "version": FACTOR_CONTRACT_VERSION,
+            "factors": ["quality", "momentum", "value"],
+            "coverage": {
+                "quality": (
+                    sum(1 for r in results if r.metrics.get("factor_quality_pct") is not None)
+                    / universe_n
+                    if universe_n
+                    else 0.0
+                ),
+                "momentum": len(pct_momentum) / universe_n if universe_n else 0.0,
+                "value": factor_value_count / universe_n if universe_n else 0.0,
+            },
+            "as_of": as_of.isoformat(),
         },
     }
     return results, stats

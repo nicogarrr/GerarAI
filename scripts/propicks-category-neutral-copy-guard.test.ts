@@ -37,9 +37,9 @@ describe('copy de categorías ProPicks derivado del run (no literal)', () => {
     assert.ok(note);
     assert.equal(note.marker, '~');
     assert.deepEqual(note.neutralKeys, ['value', 'momentum']);
-    assert.match(note.text, /Valoración, Momentum: sin datos en los 20 picks de este run/);
-    // La causalidad es la del embudo: CFROI+WACC para valoración, serie de
-    // precios para momentum (no al revés).
+    assert.match(note.text, /Spread CFROI-WACC, Momentum: sin datos en los 20 picks de este run/);
+    // La causalidad es la del embudo: CFROI+WACC alimentan el spread de la
+    // categoría value, serie de precios para momentum (no al revés).
     assert.match(note.text, /sin CFROI y WACC por empresa/);
     assert.match(note.text, /sin la serie de precios de 12 meses/);
     // El 50 se declara explícitamente como «sin dato», no como score.

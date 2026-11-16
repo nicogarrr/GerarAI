@@ -168,7 +168,9 @@
       "rankingStrong": "Ranking:",
       "rankingRest": "each component is converted to a percentile over the universe and weighted: ROIC-WACC spread 25%, CFROI-WACC spread 15%, MOAT V2 20%, 5y ROE 10%, 5y FCF margin 10%, revenue growth (CAGR) 10%, 5y owner earnings 5%, FCF conversion 5%. If a component does not apply or is missing, the weights are renormalised and it is declared.",
       "v1Strong": "What v1 does NOT include yet:",
-      "v1Rest": "valuation (FCF yield / earnings yield) and momentum do not enter the v1 funnel yet: price series are only stored for the top-N of each run, not for the whole universe. Every run is stored in full, with the discarded candidates and their reasons, so the history and the entries and exits are auditable."
+      "v1Rest": "valuation (FCF yield / earnings yield) and momentum do not enter the v1 funnel yet: price series are only stored for the top-N of each run, not for the whole universe. Every run is stored in full, with the discarded candidates and their reasons, so the history and the entries and exits are auditable.",
+      "factorsStrong": "Observational factors (factors-v0):",
+      "factorsRest": " the momentum_12_1 metric and the factor_quality (empirical universe percentile of the quality_moat_score_v2 quality metric), factor_momentum (momentum_12_1 percentile) and factor_value (non-financials: earnings yield / FCF yield percentile; financials: 0.5·(1−P/B percentile) + 0.5·ROE percentile) percentiles are computed and returned in funnel stats for observation ONLY: they do not enter the score or the weights, do not change the ranking, and are pending PIT/OOS validation. Separately, the score's \"value\" category is now labeled \"CFROI-WACC spread\" because that is what it measures: return on capital minus its cost, not multiple-based valuation."
     },
     "moat": {
       "title": "Quality framework (MOAT)",

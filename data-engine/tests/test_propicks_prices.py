@@ -129,7 +129,7 @@ def test_refresh_writes_metrics_only_with_coverage():
         metrics = db.scalars(
             select(CalculatedMetric).where(CalculatedMetric.company_id == company.id)
         ).all()
-        assert {m.metric for m in metrics} == {"momentum_6m", "momentum_12m"}
+        assert {m.metric for m in metrics} == {"momentum_6m", "momentum_12m", "momentum_12_1"}
         assert all(m.value is not None and m.value > 0 for m in metrics)
         assert all("yfinance" in m.formula for m in metrics)
 

@@ -62,9 +62,9 @@ describe('Pro Picks en inglés: walk-forward, ficha de estrategia y nota de cate
 
     it('la nota de categorías neutras sale en inglés y en español igual', () => {
         expect(categoryNeutralNote(['value', 'momentum'], 20, 'en')?.text).toMatch(
-            /^Valuation, Momentum: data missing for the 20 picks in this run \(missing per-company CFROI and WACC; missing the 12-month price series\)/,
+            /^CFROI-WACC spread, Momentum: data missing for the 20 picks in this run \(missing per-company CFROI and WACC; missing the 12-month price series\)/,
         );
         expect(categoryNeutralNote([], 12, 'en')?.text).toMatch(/All 6 funnel categories have data for the 12 picks/);
-        expect(categoryNeutralNote(['value'], 3)?.text).toMatch(/^Valoración: sin datos en los 3 picks/);
+        expect(categoryNeutralNote(['value'], 3)?.text).toMatch(/^Spread CFROI-WACC: sin datos en los 3 picks/);
     });
 });

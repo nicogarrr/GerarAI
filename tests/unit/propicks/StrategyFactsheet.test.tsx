@@ -13,7 +13,7 @@ describe('strategy factsheet honest performance display',()=>{
   render(<StrategyFactsheet {...props} loading/>);expect(screen.getByText('Calculando métricas de Estrategia de prueba…')).toBeVisible();
  });
  it('shows real rulebook instead of invented performance when no global baseline exists',()=>{
-  render(<StrategyFactsheet {...props}/>);expect(screen.getByText('Sin métricas de desempeño')).toBeVisible();expect(screen.getByText('Qué decide esta estrategia')).toBeVisible();expect(screen.getByText('Valoración')).toBeVisible();expect(screen.getByText(/No se sustituye por una estimación/)).toBeVisible();
+  render(<StrategyFactsheet {...props}/>);expect(screen.getByText('Sin métricas de desempeño')).toBeVisible();expect(screen.getByText('Qué decide esta estrategia')).toBeVisible();expect(screen.getByText('Spread CFROI-WACC')).toBeVisible();expect(screen.getByText(/No se sustituye por una estimación/)).toBeVisible();
  });
  it('unknown strategy still exposes error without inventing a rulebook',()=>{
   render(<StrategyFactsheet {...props} strategyId="not-defined" error="Sin servicio"/>);expect(screen.getByRole('alert')).toHaveTextContent('Sin servicio');expect(screen.queryByText('Qué decide esta estrategia')).not.toBeInTheDocument();

@@ -35,7 +35,7 @@ export const CATEGORY_KEYS: readonly CategoryKey[] = [
 
 /** Etiqueta de la categoría en la caja del embudo. */
 export const CATEGORY_LABEL_ES: Record<CategoryKey, string> = {
-    value: 'Valoración',
+    value: 'Spread CFROI-WACC',
     growth: 'Crecimiento',
     profitability: 'Rentabilidad',
     cashFlow: 'Flujo de caja',
@@ -60,7 +60,7 @@ export const CATEGORY_NEUTRAL_CAUSE: Record<CategoryKey, string> = {
 
 /** Etiqueta en inglés (mismo orden y claves que la española). */
 export const CATEGORY_LABEL_EN: Record<CategoryKey, string> = {
-    value: 'Valuation',
+    value: 'CFROI-WACC spread',
     growth: 'Growth',
     profitability: 'Profitability',
     cashFlow: 'Cash flow',

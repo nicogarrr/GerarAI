@@ -57,8 +57,8 @@ export const PROPICKS_STRATEGIES: ProPickStrategy[] = [
     },
     {
         id: 'value',
-        name: 'Valor (Value)',
-        description: 'Empresas baratas frente a sus fundamentales: prima el valor y la rentabilidad con exigencia de caja y balance',
+        name: 'Calidad-valor (spread CFROI-WACC)',
+        description: 'Rentabilidad del capital por encima de su coste: prima el spread CFROI-WACC y la calidad con exigencia de caja y balance. No es valoración por múltiplos: el componente «value» del embudo mide ese spread, no lo barata que está la acción',
         categoryWeights: {
             value: 0.35,
             growth: 0.05,

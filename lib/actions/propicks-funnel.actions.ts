@@ -97,6 +97,8 @@ const esNum = (n: number) => new Intl.NumberFormat('es-ES', { maximumFractionDig
  * Escalas de categoria (0-100, deterministas, documentadas):
  *  - profitability: quality_moat_score_v2 es un recuento de criterios (0-8): se escala a 0-100 (moatChecksToScore).
  *  - value: 50 + (cfroi_approx - wacc) * 500 (spread +10% -> 100, -10% -> 0).
+ *    La UI lo etiqueta «Spread CFROI-WACC»: mide rentabilidad del capital menos su coste,
+ *    no valoracion por multiplos. Los factores observacionales (factors-v0) no entran aqui.
  *  - growth: 50 + revenue_cagr * 250 (+20% anual -> 100, -20% -> 0).
  *  - cashFlow: fcf_margin_5y * 400 (margen 25% -> 100).
  *  - momentum: 50 + momentum_12m * 100 (+50% -> 100); si el run no lo trae
