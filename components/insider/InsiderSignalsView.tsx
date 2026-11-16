@@ -398,7 +398,11 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             {visibleFilings.map((filing) => (
                                 <li key={filing.accession_number} className="rounded-lg border border-gray-800 p-3 text-sm">
                                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                        <Badge variant="outline">{filing.form}</Badge>
+                                        {typeof filing.form === 'string' && filing.form ? (
+                                            // «Form 4» como en las señales; la enmienda
+                                            // lleva su propio badge al lado, sin duplicar.
+                                            <Badge variant="outline">{ti('insider.formBadge.form', { form: filing.form })}</Badge>
+                                        ) : null}
                                         {filing.is_amendment ? <Badge>{ti('insider.filings.amendment')}</Badge> : null}
                                         <span className="font-mono text-gray-300">
                                             {filingDateText(f, filing.filing_date)}
