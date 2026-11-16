@@ -1449,6 +1449,91 @@
         "title": "Beta",
         "type": "object"
       },
+      "Block": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asof"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BlockError"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty",
+              "partial",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Block",
+        "type": "object"
+      },
+      "BlockError": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "enum": [
+              "timeout",
+              "unauthenticated",
+              "forbidden",
+              "rate_limited",
+              "unavailable",
+              "invalid_response"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "retryAfterSeconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retryafterseconds"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "BlockError",
+        "type": "object"
+      },
       "Body_ingest_document_file_api_sources_documents_ingest_file_post": {
         "properties": {
           "file": {
@@ -3564,6 +3649,30 @@
         "title": "CorporateActionInput",
         "type": "object"
       },
+      "Coverage": {
+        "additionalProperties": false,
+        "properties": {
+          "present": {
+            "title": "Present",
+            "type": "integer"
+          },
+          "required": {
+            "title": "Required",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "present",
+          "required",
+          "total"
+        ],
+        "title": "Coverage",
+        "type": "object"
+      },
       "CreatePortfolioInput": {
         "properties": {
           "base_currency": {
@@ -3695,6 +3804,180 @@
           "formula"
         ],
         "title": "CustomMetricCreate",
+        "type": "object"
+      },
+      "Datum": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asof"
+          },
+          "formulaVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formulaversion"
+          },
+          "reasonCodes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "sourceAsOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourceasof"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "missing",
+              "stale",
+              "disputed",
+              "unverified",
+              "invalid",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "Datum",
+        "type": "object"
+      },
+      "Dca": {
+        "additionalProperties": false,
+        "properties": {
+          "confirmedLevel": {
+            "$ref": "#/components/schemas/Datum"
+          },
+          "formulaVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formulaversion"
+          },
+          "level": {
+            "$ref": "#/components/schemas/Datum"
+          },
+          "periodState": {
+            "anyOf": [
+              {
+                "enum": [
+                  "confirmed",
+                  "forming"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Periodstate"
+          },
+          "priceVerified": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Priceverified"
+          },
+          "scanAsOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scanasof"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "missing",
+              "stale",
+              "disputed",
+              "unverified",
+              "invalid",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "level",
+          "confirmedLevel"
+        ],
+        "title": "Dca",
         "type": "object"
       },
       "DcaAcceptedOut": {
@@ -7015,6 +7298,34 @@
           "fiscal_year"
         ],
         "title": "EarningsWorkflowRequest",
+        "type": "object"
+      },
+      "Eligibility": {
+        "additionalProperties": false,
+        "properties": {
+          "reasonCodes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "state": {
+            "enum": [
+              "investigate",
+              "quality_waiting_price",
+              "review_data",
+              "excluded"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "title": "Eligibility",
         "type": "object"
       },
       "EmailPreferenceIn": {
@@ -11146,6 +11457,157 @@
           "confirmed"
         ],
         "title": "LinkStatusOut",
+        "type": "object"
+      },
+      "Listing": {
+        "additionalProperties": false,
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "identityEvidence": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Identityevidence",
+            "type": "array"
+          },
+          "identityReasonCodes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Identityreasoncodes",
+            "type": "array"
+          },
+          "identityStatus": {
+            "default": "unverified",
+            "enum": [
+              "ok",
+              "missing",
+              "stale",
+              "disputed",
+              "unverified",
+              "invalid",
+              "not_applicable"
+            ],
+            "title": "Identitystatus",
+            "type": "string"
+          },
+          "instrumentStatus": {
+            "default": "unknown",
+            "enum": [
+              "active",
+              "cancelled",
+              "unknown"
+            ],
+            "title": "Instrumentstatus",
+            "type": "string"
+          },
+          "issuerLegalStatus": {
+            "default": "unknown",
+            "enum": [
+              "active",
+              "liquidating",
+              "dissolved",
+              "unknown"
+            ],
+            "title": "Issuerlegalstatus",
+            "type": "string"
+          },
+          "listingId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Listingid"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "status": {
+            "default": "unknown",
+            "enum": [
+              "active",
+              "delisted",
+              "unknown"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "ticker": {
+            "title": "Ticker",
+            "type": "string"
+          },
+          "tradingStatus": {
+            "default": "unknown",
+            "enum": [
+              "trading",
+              "suspended",
+              "unknown"
+            ],
+            "title": "Tradingstatus",
+            "type": "string"
+          },
+          "validFrom": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validfrom"
+          },
+          "validTo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Validto"
+          }
+        },
+        "required": [
+          "ticker"
+        ],
+        "title": "Listing",
         "type": "object"
       },
       "LlmUsageLeg": {
@@ -18130,6 +18592,64 @@
         "title": "PushSubscriptionIn",
         "type": "object"
       },
+      "Quality": {
+        "additionalProperties": false,
+        "properties": {
+          "coverage": {
+            "$ref": "#/components/schemas/Coverage"
+          },
+          "passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Passed"
+          },
+          "policyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policyversion"
+          },
+          "reasonCodes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasoncodes",
+            "type": "array"
+          },
+          "score": {
+            "$ref": "#/components/schemas/Datum"
+          },
+          "scorePolicyVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scorepolicyversion"
+          }
+        },
+        "required": [
+          "score",
+          "coverage"
+        ],
+        "title": "Quality",
+        "type": "object"
+      },
       "QueryRequest": {
         "properties": {
           "as_of_from": {
@@ -19287,6 +19807,79 @@
           "updated_at"
         ],
         "title": "ResearchSessionOut",
+        "type": "object"
+      },
+      "ResultCoverage": {
+        "additionalProperties": false,
+        "properties": {
+          "evaluated": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evaluated"
+          },
+          "identityVerified": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Identityverified"
+          },
+          "pendingReview": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pendingreview"
+          },
+          "qualityPassed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qualitypassed"
+          },
+          "rankable": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rankable"
+          },
+          "universe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Universe"
+          }
+        },
+        "title": "ResultCoverage",
         "type": "object"
       },
       "ReviewInput": {
@@ -23648,6 +24241,35 @@
         "title": "TrackRecordHorizonOut",
         "type": "object"
       },
+      "Tracking": {
+        "additionalProperties": false,
+        "properties": {
+          "held": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Held"
+          },
+          "watched": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Watched"
+          }
+        },
+        "title": "Tracking",
+        "type": "object"
+      },
       "TransactionImportCommitRequest": {
         "properties": {
           "source_filename": {
@@ -23867,6 +24489,157 @@
         "title": "TtmQuarterOut",
         "type": "object"
       },
+      "UnifiedPick": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "title": "Asof",
+            "type": "string"
+          },
+          "dca": {
+            "$ref": "#/components/schemas/Dca"
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/Eligibility"
+          },
+          "evidenceFlags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidenceflags",
+            "type": "array"
+          },
+          "instrumentId": {
+            "title": "Instrumentid",
+            "type": "string"
+          },
+          "issuerId": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuerid"
+          },
+          "listing": {
+            "$ref": "#/components/schemas/Listing"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/Quality"
+          },
+          "reviewReasons": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Reviewreasons",
+            "type": "array"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          },
+          "tracking": {
+            "$ref": "#/components/schemas/Tracking"
+          },
+          "valuation": {
+            "$ref": "#/components/schemas/Valuation"
+          }
+        },
+        "required": [
+          "instrumentId",
+          "listing",
+          "quality",
+          "valuation",
+          "dca",
+          "tracking",
+          "eligibility",
+          "asOf"
+        ],
+        "title": "UnifiedPick",
+        "type": "object"
+      },
+      "UnifiedResult": {
+        "additionalProperties": false,
+        "properties": {
+          "asOf": {
+            "title": "Asof",
+            "type": "string"
+          },
+          "blocks": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Block"
+            },
+            "propertyNames": {
+              "enum": [
+                "quality",
+                "valuation",
+                "dca",
+                "tracking"
+              ]
+            },
+            "title": "Blocks",
+            "type": "object"
+          },
+          "coverage": {
+            "$ref": "#/components/schemas/ResultCoverage"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/UnifiedPick"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "runId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Runid"
+          },
+          "schemaVersion": {
+            "const": "propicks-unified-v1",
+            "title": "Schemaversion",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "empty",
+              "partial",
+              "error"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schemaVersion",
+          "status",
+          "asOf",
+          "coverage",
+          "blocks",
+          "items"
+        ],
+        "title": "UnifiedResult",
+        "type": "object"
+      },
       "UniversalSearchRequest": {
         "properties": {
           "collection_id": {
@@ -24048,6 +24821,45 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "Valuation": {
+        "additionalProperties": false,
+        "properties": {
+          "fcfYield": {
+            "$ref": "#/components/schemas/Datum"
+          },
+          "marginOfSafety": {
+            "$ref": "#/components/schemas/Datum"
+          },
+          "price": {
+            "$ref": "#/components/schemas/Datum"
+          },
+          "priceToBook": {
+            "$ref": "#/components/schemas/Datum"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "missing",
+              "stale",
+              "disputed",
+              "unverified",
+              "invalid",
+              "not_applicable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "price",
+          "fcfYield",
+          "priceToBook",
+          "marginOfSafety"
+        ],
+        "title": "Valuation",
         "type": "object"
       },
       "ValuationResponse": {
@@ -86296,7 +87108,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/UnifiedResult"
+                }
               }
             },
             "description": "Successful Response"
