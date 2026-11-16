@@ -26,7 +26,7 @@ def test_cold_snapshot_company_reads_are_constant(size, monkeypatch):
             seed.flush()
             fund_id, foreign_id = fund.id, foreign.id
             for index in range(size + 1):
-                company = Company(ticker=f'BUD{index:03}', name='Fixture', exchange='X', currency='EUR')
+                company = Company(ticker=f'BUD{index:03}', name='Fixture', exchange='X', currency='EUR',company_type='holding',valuation_model='unassigned')
                 seed.add(company)
                 seed.flush()
                 seed.add(Position(portfolio_id=fund_id if index < size else foreign_id,
