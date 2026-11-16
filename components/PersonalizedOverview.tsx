@@ -9,7 +9,7 @@ import {
     summarizeDcfProbe,
     type DcfScope,
 } from '@/lib/overview/dcf-candidates';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import IntentLink from '@/components/layout/IntentLink';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -314,6 +314,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
     const locale = useLocale();
     const [retryTokens, setRetryTokens] = useState<Record<SectionKey, number>>(EMPTY_RETRY_TOKENS);
     const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
+    const lastGoodPortfolio = useRef<{ summary: PortfolioSummary; fetchedAt: string } | null>(null);
     const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
     const [watchlistTotal, setWatchlistTotal] = useState(0);
     const [alerts, setAlerts] = useState<Alert[]>([]);
@@ -349,9 +350,10 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
             // usuario: otra cuenta en este navegador no ve esta cartera.
             let cachedShown = false;
             {
-                const cached = readCachedPortfolio(userId);
+                const cached = retryTokens.portfolio === 0 ? readCachedPortfolio(userId) : lastGoodPortfolio.current;
                 if (cached) {
                     cachedShown = true;
+                    lastGoodPortfolio.current = cached;
                     setPortfolioSummary(cached.summary);
                     setPortfolioStaleAt(cached.fetchedAt);
                     setPortfolioLoading(false);
@@ -369,6 +371,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
             if (!result.error && result.data) {
                 // Solo el dato real y fresco sustituye al cacheado y se guarda;
                 // un fallo nunca pisa el último dato bueno.
+                lastGoodPortfolio.current = { summary: result.data, fetchedAt: new Date().toISOString() };
                 setPortfolioSummary(result.data);
                 setPortfolioStaleAt(null);
                 writeCachedPortfolio(userId, result.data);

@@ -161,12 +161,13 @@ describe('PersonalizedOverview primera carga', () => {
         expect(screen.getByText(/Guardado de/)).toBeInTheDocument();
         await act(async () => respond('/api/home/portfolio', { data: null, error: 'ui.sectionError.generic' }));
         const card = screen.getByText('desglose 5000').closest('[data-slot="card"]') ?? screen.getByText('desglose 5000').parentElement!.parentElement!;
+        localStorage.removeItem('gerarai:home-portfolio:u1');
         getPortfolioSummary.mockRejectedValueOnce(new Error('offline'));
         fireEvent.click(within(card as HTMLElement).getByRole('button', { name: /Reintentar/ }));
         await waitFor(() => expect(getPortfolioSummary).toHaveBeenCalledWith('u1'));
         expect(screen.getByText('desglose 5000')).toBeInTheDocument();
         expect(screen.getByText(/Guardado de/)).toBeInTheDocument();
-        expect(localStorage.getItem('gerarai:home-portfolio:u1')).toBe(stored);
+        expect(localStorage.getItem('gerarai:home-portfolio:u1')).toBeNull();
     });
 
     it('account change without a cache removes prior balance before the new response', async () => {
