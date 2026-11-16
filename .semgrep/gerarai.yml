@@ -21,6 +21,7 @@
 #   llm/egress_guard.py: LLM provider endpoint; custom URLs via egress_guard
 #   llm/factory.py: LLM provider endpoint; custom URLs via egress_guard
 #   llm/free_interactive.py: LLM provider endpoint; custom URLs via egress_guard
+#   llm/hy4.py: fixed HTTPS OpenCode Go catalog; no user URL, httpx redirects disabled by default
 #   llm/jev.py: LLM provider endpoint; custom URLs via egress_guard
 #   llm/opencode_usage.py: exact https://opencode.ai/zen/go/v1 allowlist enforced before sending credentials; redirects disabled
 #   llm/thesis_go.py: LLM provider endpoint; custom URLs via egress_guard
@@ -107,6 +108,7 @@ rules:
     - /data-engine/app/llm/egress_guard.py
     - /data-engine/app/llm/factory.py
     - /data-engine/app/llm/free_interactive.py
+    - /data-engine/app/llm/hy4.py
     - /data-engine/app/llm/jev.py
     - /data-engine/app/llm/opencode_usage.py
     - /data-engine/app/llm/thesis_go.py

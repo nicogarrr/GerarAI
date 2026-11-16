@@ -2074,6 +2074,18 @@
             "title": "History",
             "type": "array"
           },
+          "model": {
+            "anyOf": [
+              {
+                "const": "hy4-flash-free",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
           "page": {
             "anyOf": [
               {

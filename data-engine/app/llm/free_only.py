@@ -38,6 +38,9 @@ def restricted(settings=None):
 
 def enforce_free_only(url, payload, settings=None):
     from app.llm.errors import ProviderDisabledError
+    from app.llm.hy4 import enforce_destination
+    if enforce_destination(url, payload):
+        return
     if not restricted(settings):
         return
     if _tenant.get() is None:

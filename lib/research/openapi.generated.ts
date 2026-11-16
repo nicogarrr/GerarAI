@@ -7877,6 +7877,8 @@ export interface components {
             enable_debate?: boolean | null;
             /** History */
             history?: components["schemas"]["ChatTurn"][];
+            /** Model */
+            model?: "hy4-flash-free" | null;
             page?: components["schemas"]["ChatPageContext"] | null;
             /** Question */
             question: string;
