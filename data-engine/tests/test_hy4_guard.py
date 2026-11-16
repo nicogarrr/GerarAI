@@ -211,10 +211,10 @@ def test_worker_stack_and_schema_existing_boundaries():
     from typing import Annotated
 
     from pydantic import TypeAdapter, ValidationError
-    from test_thesis_withhold_inferred import Row
 
     from app.api.routes.chat import _log_stuck_worker
     from app.schemas.api import AlertRuleOut, ThesisOut, not_blank
+    from tests.test_thesis_withhold_inferred import Row
     _log_stuck_worker(threading.get_ident(), 1)
     _log_stuck_worker(None, 1)
     validator = TypeAdapter(Annotated[str, not_blank(3)])
