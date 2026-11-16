@@ -5,7 +5,6 @@ un presupuesto total y, al agotarse, se sirve la base con estado honesto.
 """
 
 import asyncio
-import time
 
 import pytest
 from sqlalchemy import create_engine
@@ -49,10 +48,28 @@ async def _hang(*_args):
     return {"filings": {"recent": {}}}
 
 
+class _BudgetLoop(asyncio.SelectorEventLoop):
+    """Advance idle timer deadlines without measuring runner CPU contention."""
+
+    def __init__(self):
+        self.clock = 0.0
+        super().__init__()
+
+    def time(self):
+        return self.clock
+
+    def _run_once(self):
+        if not self._ready and self._scheduled:
+            self.clock = max(self.clock, self._scheduled[0]._when)
+        super()._run_once()
+
+
 def _timed(coro):
-    start = time.monotonic()
-    out = asyncio.run(coro)
-    return out, time.monotonic() - start
+    with asyncio.Runner(loop_factory=_BudgetLoop) as runner:
+        loop = runner.get_loop()
+        start = loop.time()
+        out = runner.run(coro)
+        return out, loop.time() - start
 
 
 def test_submissions_lentas_respetan_el_presupuesto(db, monkeypatch):
@@ -60,7 +77,7 @@ def test_submissions_lentas_respetan_el_presupuesto(db, monkeypatch):
     company = _company(db, "0000320193")
     service = CompanyEventsService(db, submissions_fetcher=_hang)
     out, elapsed = _timed(service.get_filings(company))
-    assert elapsed < 1.5
+    assert elapsed == pytest.approx(0.3)
     assert out["sec_status"] == "unavailable"
     assert out["filings"] == []
     assert out["documents"] and out["documents"][0]["source_type"] == "SEC"
@@ -72,7 +89,7 @@ def test_cik_lento_tambien_cuenta_en_el_presupuesto(db, monkeypatch):
     company = _company(db, None)
     service = CompanyEventsService(db, cik_fetcher=_hang, submissions_fetcher=_hang)
     out, elapsed = _timed(service.get_filings(company))
-    assert elapsed < 1.5
+    assert elapsed == pytest.approx(0.3)
     assert out["sec_status"] == "unavailable"
     assert out["documents"]
 
