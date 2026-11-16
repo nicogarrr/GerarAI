@@ -160,6 +160,27 @@ def test_salida_al_cierre_del_ultimo_mes_no_al_open():
     assert r.exits_log[0]["recovered"] == pytest.approx(expected, abs=0.01)
 
 
+def test_baja_inferida_es_supuesto_e_invariante_a_un_precio_futuro():
+    """Regresión independiente (auditor): la serie muerta acaba 2008-06 SIN
+    evento -> la baja se infiere en 2008-09 (3+ meses sin precio, gracia 2)
+    con la etiqueta «(supuesto)»; y añadir un precio en 2008-10 (futuro
+    respecto a la decisión) no cambia ni el exits_log ni la curva."""
+    win, dead = _winner(), _dead()
+    r = bt.simulate([win, dead], MONTHS, strategy="plano", exits={})
+    assert r.exits_log[0]["symbol"] == "DEAD"
+    assert r.exits_log[0]["month"] == "2008-09"
+    assert r.exits_log[0]["kind"] == "unknown (supuesto)"
+
+    barras = [b for b in _bars([0.01] * 46) if not (date(2008, 7, 1) <= b.day <= date(2008, 9, 30))]
+    dead_con_octubre = bt.build_series("DEAD", barras)
+    assert any(m == T0 + 9 for m in dead_con_octubre.first)  # 2008-10 existe
+    r2 = bt.simulate([win, dead_con_octubre], MONTHS, strategy="plano", exits={})
+    # PIT: en 2008-09 el precio de octubre aún no existía; la baja y toda la
+    # curva son idénticas (la posición cerrada nunca se recompra).
+    assert r2.exits_log == r.exits_log
+    assert r2.curve == r.curve
+
+
 def test_un_precio_posterior_no_cambia_el_patrimonio_previo():
     # PIT: anadir un precio en 2008-09 no puede cambiar julio.
     win = _winner()
