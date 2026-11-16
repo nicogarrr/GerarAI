@@ -10957,6 +10957,8 @@ export interface components {
              * @enum {string}
              */
             mode: "respuesta" | "analisis";
+            /** Model */
+            model?: "hy4-flash-free" | null;
             page?: components["schemas"]["ChatPageContext"] | null;
             /** Question */
             question: string;
