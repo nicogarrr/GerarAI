@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // El inicio pide sus TRES secciones rápidas en PARALELO a route handlers
@@ -61,6 +61,7 @@ describe('PersonalizedOverview primera carga', () => {
     };
 
     beforeEach(() => {
+        window.localStorage.clear();
         vi.clearAllMocks();
         pending.clear();
         // Cada sección cuelga hasta que el test la resuelve: así se fija
@@ -152,4 +153,31 @@ describe('PersonalizedOverview primera carga', () => {
         expect(await screen.findByText('Cuenta Nueva SA')).toBeInTheDocument();
         expect(screen.queryByText('Cuenta Vieja SA')).not.toBeInTheDocument();
     });
+    it('shows cached balance with an error and keeps it after a failed retry', async () => {
+        const stored = JSON.stringify({ summary, fetchedAt: '2026-11-16T01:00:00Z' });
+        localStorage.setItem('gerarai:home-portfolio:u1', stored);
+        render(<PersonalizedOverview userId="u1" />);
+        expect(await screen.findByText('desglose 5000')).toBeInTheDocument();
+        expect(screen.getByText(/Guardado de/)).toBeInTheDocument();
+        await act(async () => respond('/api/home/portfolio', { data: null, error: 'ui.sectionError.generic' }));
+        const card = screen.getByText('desglose 5000').closest('[data-slot="card"]') ?? screen.getByText('desglose 5000').parentElement!.parentElement!;
+        localStorage.removeItem('gerarai:home-portfolio:u1');
+        getPortfolioSummary.mockRejectedValueOnce(new Error('offline'));
+        fireEvent.click(within(card as HTMLElement).getByRole('button', { name: /Reintentar/ }));
+        await waitFor(() => expect(getPortfolioSummary).toHaveBeenCalledWith('u1'));
+        expect(screen.getByText('desglose 5000')).toBeInTheDocument();
+        expect(screen.getByText(/Guardado de/)).toBeInTheDocument();
+        expect(localStorage.getItem('gerarai:home-portfolio:u1')).toBeNull();
+    });
+
+    it('account change without a cache removes prior balance before the new response', async () => {
+        localStorage.setItem('gerarai:home-portfolio:u1', JSON.stringify({ summary, fetchedAt: '2026-11-16T01:00:00Z' }));
+        const ui = render(<PersonalizedOverview userId="u1" />);
+        expect(await screen.findByText('desglose 5000')).toBeInTheDocument();
+        ui.rerender(<PersonalizedOverview userId="u2" />);
+        expect(screen.queryByText('desglose 5000')).not.toBeInTheDocument();
+        expect(screen.queryByText(/Guardado de/)).not.toBeInTheDocument();
+        expect(screen.getAllByText(/Cargando/).length).toBeGreaterThan(0);
+    });
+
 });
