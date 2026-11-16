@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
+import { LocaleProvider } from '@/lib/i18n/client';
 import New13fSummary from '@/components/watchlist/New13fSummary';
 import { mapNewPositions, type WatchlistNew13f, type WatchlistNew13fItem } from '@/lib/watchlist/new-13f';
 
@@ -112,4 +113,13 @@ it('renders real zero as zero and partial/unknown values honestly',()=>{
  const p=holderPayload();p.new_positions!.count=0;p.new_positions!.top_by_shares=[];expect(render(mapNewPositions('AAPL',p))).toContain('0 nuevas');
  const v=mapNewPositions('AAPL',holderPayload());v.partial=true;v.topNew[0].valueApprox=0;expect(render(v)).toContain('parciales');
  v.countNew=null;expect(render(v)).toContain('Sin datos');
+});
+
+it.each(['es','en'] as const)('%s pluralizes zero, one, and many positions',locale=>{
+ for(const count of [0,1,2]){
+  const vm=mapNewPositions('AAPL',holderPayload());vm.countNew=count;
+  const html=renderToStaticMarkup(<LocaleProvider locale={locale}><New13fSummary data={vm}/></LocaleProvider>);
+  const noun=locale==='es'?(count===1?'nueva posición':'nuevas posiciones'):(count===1?'new position':'new positions');
+  expect(html).toContain(`${count} ${noun}`);
+ }
 });

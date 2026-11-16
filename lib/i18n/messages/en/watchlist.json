@@ -347,13 +347,14 @@
   },
   "new13f": {
     "title": "New institutional positions (13F)",
-    "countQuarter": "{count} new this quarter ({period})",
+    "countQuarter": "{count} new positions this quarter ({period})",
     "countOnly": "List unavailable: the stored snapshot predates the detail",
     "noData": "No data",
     "partial": "partial reported values",
     "sharesSuffix": "sh.",
     "topTotal": "Total of the largest: {shares} sh.",
     "valueDeclaredTitle": "Value reported at quarter close",
-    "unavailable": "New institutional positions could not be loaded."
+    "unavailable": "New institutional positions could not be loaded.",
+    "countQuarterOne": "1 new position this quarter ({period})"
   }
 }

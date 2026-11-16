@@ -347,13 +347,14 @@
   },
   "new13f": {
     "title": "Nuevas posiciones institucionales (13F)",
-    "countQuarter": "{count} nuevas este trimestre ({period})",
+    "countQuarter": "{count} nuevas posiciones este trimestre ({period})",
     "countOnly": "Lista no disponible: el snapshot guardado es anterior al detalle",
     "noData": "Sin datos",
     "partial": "valores declarados parciales",
     "sharesSuffix": "acc.",
     "topTotal": "Total de las mayores: {shares} acc.",
     "valueDeclaredTitle": "Valor declarado al cierre del trimestre",
-    "unavailable": "No se han podido cargar las nuevas posiciones institucionales."
+    "unavailable": "No se han podido cargar las nuevas posiciones institucionales.",
+    "countQuarterOne": "1 nueva posición este trimestre ({period})"
   }
 }

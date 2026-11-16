@@ -23,7 +23,7 @@ export default function New13fSummary({ data }: New13fSummaryProps) {
     return (
         <div className="min-w-0" data-testid="new-13f-summary">
             <p className="text-xs text-gray-300">
-                {t('watchlist.new13f.countQuarter', { count, period: data.period ?? NA })}
+                {t(count === 1 ? 'watchlist.new13f.countQuarterOne' : 'watchlist.new13f.countQuarter', { count, period: data.period ?? NA })}
             </p>
             {data.status === 'count_only' ? (
                 <p className="text-xs text-gray-500">{t('watchlist.new13f.countOnly')}</p>
