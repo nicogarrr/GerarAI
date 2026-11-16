@@ -58,6 +58,11 @@ def create_thesis_narrative_provider(
     válido, ``DisabledProvider`` con motivo si enabled e inválido.
     """
     settings = settings or get_settings()
+    # Explicit Hy4 selection uses the shared zero-cost transport, including
+    # worker scope. Never feed this ID to the legacy Go/cascade path.
+    if (settings.thesis_go_model or "").strip() == "hy4-flash-free":
+        from app.llm.hy4 import create_hy4_provider
+        return create_hy4_provider(settings, client)
     from app.llm.free_only import free_only_provider, restricted
     if restricted(settings):
         return free_only_provider(settings, client)
