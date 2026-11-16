@@ -1,8 +1,8 @@
 /**
  * Causas máquina del «sin DCF» del modelo a largo plazo
  * (long_term_model_service._scenario_payload → valuation_blockers).
- * Catálogo cerrado: un token desconocido devuelve null y la UI cae a
- * valuation_note en crudo; nunca se oculta la causa de un N/D.
+ * Catálogo cerrado: un token desconocido no es una clave i18n; la UI cae a
+ * valuation_note o al token en crudo; nunca se oculta la causa de un N/D.
  */
 import type { TranslationKey } from '@/lib/i18n/t';
 
@@ -15,7 +15,7 @@ export const VALUATION_BLOCKER_KEYS: Record<string, TranslationKey> = {
 };
 
 export function valuationBlockerKey(token: string): TranslationKey | null {
-  return VALUATION_BLOCKER_KEYS[token] ?? null;
+  return Object.hasOwn(VALUATION_BLOCKER_KEYS, token) ? VALUATION_BLOCKER_KEYS[token] : null;
 }
 
 type ScenarioLike = {
@@ -27,7 +27,7 @@ type ScenarioLike = {
 /**
  * Causa legible del N/D de valor/acción de un escenario, o null si hay
  * valoración o no se conoce la causa. Tokens traducidos y unidos; si algún
- * token es desconocido, la nota original del backend (nunca se oculta).
+ * token es desconocido, la nota original o el token crudo (nunca se oculta).
  */
 export function scenarioValuationCause(
   scenario: ScenarioLike,
@@ -42,7 +42,10 @@ export function scenarioValuationCause(
     });
     if (labels.every((label) => label != null)) return (labels as string[]).join(' · ');
   }
-  return scenario.valuation_note ?? null;
+  return (scenario.valuation_note?.trim() ? scenario.valuation_note : null) ?? (blockers.length ? blockers.map(token => {
+    const key = valuationBlockerKey(token);
+    return key ? ti(key) : token;
+  }).join(' · ') : null);
 }
 
 /**
