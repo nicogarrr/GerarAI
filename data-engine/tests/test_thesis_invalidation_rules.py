@@ -361,3 +361,245 @@ def test_minor_unit_listing_without_declared_unit_does_not_compare(db):
     change, info = _observe(db, company, thesis, "variacion_desde_tesis_pct")
     assert change is None
     assert info["missing"] == "unidad_precio"
+
+
+@pytest.mark.parametrize('ticker', ['ASTS', 'AAPL'])
+def test_derivation_uses_the_same_base_as_text_and_syncs_alert(db, ticker):
+    from app.services.thesis_invalidation_rules import derive_rules_from_valuation
+    from app.services.thesis_service import ThesisService
+
+    company = _company(db, ticker)
+    valuation = {'base_value': 123.45, 'current_price': 90,
+                 'reverse_dcf': {'required_revenue_growth': .12}}
+    rules = derive_rules_from_valuation(valuation)
+    assert len(rules) == 1  # no invented growth metric or threshold
+    assert rules[0]['threshold'] == 123.45
+    assert rules[0]['metric'] == 'precio'
+    assert rules[0]['operator'] == '>'
+    assert 'Derivada del criterio en texto' in rules[0]['description']
+    assert 'No comprueba persistencia' in rules[0]['description']
+    assert any('123.45' in line for line in ThesisService()._invalidation_criteria(company, valuation))
+    _thesis(db, company, rules=rules)
+    alerts = sync_thesis_rules(db, company)
+    assert len(alerts) == 1
+    _price(db, company, '124')
+    assert AlertRuleService().evaluate_all(db)[0]['status'] == 'triggered'
+
+
+@pytest.mark.parametrize('valuation', [
+    {}, {'base_value': 100}, {'current_price': 90},
+    {'base_value': 100, 'current_price': 100},
+    {'base_value': 100, 'current_price': 120},
+    {'base_value': 0, 'current_price': 1},
+    {'base_value': -10, 'current_price': -20},
+    {'base_value': 100, 'current_price': 0},
+    {'base_value': 'NaN', 'current_price': 90},
+    {'base_value': 100, 'current_price': 'Infinity'},
+    {'base_value': 'bad', 'current_price': 90},
+    {'base_value': True, 'current_price': 0.5},
+    {'base_value': '1e400', 'current_price': 90},
+    {'base_value': 100, 'current_price': '1e-400'},
+])
+def test_no_derived_rule_without_valid_observable_price_and_base(valuation):
+    from app.services.thesis_invalidation_rules import derive_rules_from_valuation
+    assert derive_rules_from_valuation(valuation) == []
+
+
+def test_rules_recalculated_but_user_override_always_wins(db):
+    from app.api.routes.thesis import InvalidationRulesRequest, set_invalidation_rules
+    from app.services.thesis_invalidation_rules import RULES_ORIGIN_KEY, rules_for_valuation
+
+    company = _company(db)
+    valuation = {'base_value': 100, 'current_price': 80}
+    rules, origin = rules_for_valuation(valuation, None)
+    assert origin == 'derived' and rules[0]['threshold'] == 100
+    thesis = _thesis(db, company, rules=rules)
+    thesis.valuation_basis = {RULES_ORIGIN_KEY: origin, 'other': 'preserved'}
+    db.commit()
+    rules, origin = rules_for_valuation({'base_value': 200, 'current_price': 80}, thesis)
+    assert origin == 'derived' and rules[0]['threshold'] == 200
+    assert rules_for_valuation({}, thesis) == ([], 'derived')
+    # Editing even a derived-looking description makes it user-owned.
+    set_invalidation_rules('POOL', InvalidationRulesRequest.model_validate({'rules': [
+        {**rules[0], 'threshold': 150},
+    ]}), db)
+    db.refresh(thesis)
+    assert thesis.valuation_basis == {RULES_ORIGIN_KEY: 'user', 'other': 'preserved'}
+    kept, origin = rules_for_valuation(valuation, thesis)
+    assert origin == 'user' and kept[0]['threshold'] == 150
+    # Clearing is an explicit opt-out, not permission to re-add derived rules.
+    set_invalidation_rules('POOL', InvalidationRulesRequest(rules=[]), db)
+    db.refresh(thesis)
+    assert rules_for_valuation(valuation, thesis) == ([], 'user')
+    # Legacy rules without provenance are treated as user-owned too.
+    thesis.valuation_basis = None
+    thesis.invalidation_rules = kept
+    assert rules_for_valuation(valuation, thesis) == (kept, 'user')
+    thesis.invalidation_rules = None
+    assert rules_for_valuation(valuation, thesis)[1] == 'derived'
+
+
+def test_generation_persists_derivation_and_manual_empty_override(db, monkeypatch):
+    from types import SimpleNamespace
+
+    from app.api.routes.thesis import InvalidationRulesRequest, set_invalidation_rules
+    from app.services import thesis_service as module
+    from app.services.red_team_service import RedTeamService
+    from app.services.thesis_evidence_service import ThesisEvidenceService
+    from app.services.thesis_graph_service import ThesisGraphService
+    from app.services.thesis_invalidation_rules import RULES_ORIGIN_KEY
+
+    _company(db)
+    service = module.ThesisService()
+    valuation = {'status': 'ok', 'publishable': True, 'current_price': 80,
+                 'base_value': 100, 'expected_value': 110, 'margin_of_safety': .2,
+                 'trace': {}}
+    monkeypatch.setattr(ThesisEvidenceService, 'collect_stored', lambda *a: {})
+    monkeypatch.setattr(module, '_prepare_thesis_experts', lambda *a, **k: None)
+    monkeypatch.setattr(module.LongTermModelService, 'build', lambda *a, **k: {})
+    monkeypatch.setattr(service.valuation_service, 'value_company', lambda *a: dict(valuation))
+    monkeypatch.setattr(service.valuation_service, 'persist_output', lambda *a, **k: None)
+    monkeypatch.setattr(module.FinancialSnapshotBuilder, 'build', lambda *a: SimpleNamespace(
+        facts={}, excluded_present=[]))
+    audit = SimpleNamespace(passed=True, source_coverage_score=100, unsupported_claims=[],
+                            weak_claims=[], data_conflicts=[], required_fixes=[], as_dict=lambda: {})
+    monkeypatch.setattr(service.auditor, 'audit', lambda **k: audit)
+    monkeypatch.setattr(service, '_build_claims', lambda *a: [])
+    monkeypatch.setattr(service, '_render_markdown', lambda *a, **k: '# Fixture')
+    monkeypatch.setattr(service, '_valuation_basis', lambda *a: {'existing': 'retained'})
+    monkeypatch.setattr(module, 'retrieve_thesis_context', lambda *a: [])
+    monkeypatch.setattr(module, 'maybe_deep_narrative', lambda *a, **k: None)
+    monkeypatch.setattr(ThesisGraphService, 'build', lambda *a, **k: None)
+    monkeypatch.setattr(RedTeamService, 'run', lambda *a, **k: None)
+    first = service._generate_atomic(db, 'POOL', force_new_version=True, stored_evidence_only=True)
+    assert first.invalidation_rules[0]['threshold'] == 100
+    assert first.valuation_basis[RULES_ORIGIN_KEY] == 'derived'
+    assert first.valuation_basis['existing'] == 'retained'
+    valuation['base_value'] = 120
+    second = service._generate_atomic(db, 'POOL', force_new_version=True, stored_evidence_only=True)
+    assert second.invalidation_rules[0]['threshold'] == 120
+    set_invalidation_rules('POOL', InvalidationRulesRequest(rules=[]), db)
+    third = service._generate_atomic(db, 'POOL', force_new_version=True, stored_evidence_only=True)
+    assert third.invalidation_rules is None
+    assert third.valuation_basis[RULES_ORIGIN_KEY] == 'user'
+
+
+def test_thesis_render_diagnostics_with_and_without_optional_sources():
+    from app.services.thesis_service import ThesisService
+
+    service = ThesisService()
+    assert service._md_cell(None) == ''
+    assert service._md_cell('a|b\nc') == 'a\\|b c'
+    for data in (None, {}, {'status': 'disabled'}):
+        assert service._consensus_markdown(data) == ''
+    for status in ('sin_consenso', 'no_comparable', 'error:fixture'):
+        assert status in service._consensus_markdown({'status': status})
+    for source in ('', 'https://example.com/fixture'):
+        out = service._consensus_markdown({'status': 'revisar', 'reason': 'fixture',
+            'consensus': {'mean': 10, 'high': 12, 'source_url': source},
+            'steps': [{'name': 'a|b', 'ours': 1, 'theirs': 2, 'effect_per_share': 3}, {}],
+            'data_rows': [None, {}, {'method': 'analyst', 'name': 'x', 'value': 1,
+                                   'source_quote': 'q|q'},
+                          {'method': 'analyst', 'input': 'y', 'value': 2}]})
+        assert 'a\\|b' in out and 'Supuestos de analista' in out
+        assert 'no bloquea' in out
+    assert service._value_drivers_markdown({'status': 'no_tenant'}) == ''
+    full = {'name': 'impulsor', 'source_url': 'https://example.com/fixture',
+            'source_quote': 'cita|cita', 'as_of': '2026-11-16',
+            'value_per_share_marginal': 0, 'model_link': 'fixture',
+            'reason_if_not_valued': 'sin tratamiento'}
+    out = service._value_drivers_markdown({'publishable': False,
+        'blocking': [{'driver_key': 'x', 'why': 'pendiente'}], 'drivers': [full, {}]})
+    assert 'Valor marginal' in out and 'cita\\|cita' in out
+    assert 'No valorado' in out and 'Recogido en el modelo' in out
+    for data in (None, {}, {'status': ''}, {'status': 'disabled'}):
+        assert service._expert_inputs_markdown(data) == ''
+    for data in ({'status': 'ok'}, {'status': 'error',
+         'recopilador': {'status': 'stored', 'stored': 2, 'firms': ['fixture']},
+         'analista': {'stored': 1}, 'errors': ['fixture']}):
+        assert 'Pipeline de expertos' in service._expert_inputs_markdown(data)
+
+
+def test_thesis_route_history_and_memo_variants(db, monkeypatch):
+    from fastapi import HTTPException
+
+    from app.api.routes import thesis as route
+    from app.models import ThesisDiff
+
+    company = _company(db)
+    first = _thesis(db, company)
+    second = _thesis(db, company, version=2)
+    assert route.thesis_history('POOL', db)['count'] == 2
+    db.add(ThesisDiff(company_id=company.id, from_version_id=first.id,
+                     to_version_id=second.id, change_summary='fixture',
+                     affected_assumptions=[], rating_changed=False))
+    db.commit()
+    assert route.thesis_history('POOL', db)['history'][0]['diff']['change_summary'] == 'fixture'
+    monkeypatch.setattr(route, 'build_memo_markdown', lambda *a, **k: '# Fixture')
+    assert route.thesis_memo('POOL', published=False, draft=True, db=db).body == b'# Fixture'
+    with pytest.raises(HTTPException) as exc:
+        route.thesis_memo('POOL', published=True, draft=False, db=db)
+    assert exc.value.status_code == 404
+    first.status = 'published'
+    db.commit()
+    assert route.thesis_memo('POOL', published=True, draft=False, db=db).body == b'# Fixture'
+    for call in (lambda: route.thesis_history('UNKNOWN', db),
+                 lambda: route.thesis_memo('UNKNOWN', published=False, draft=False, db=db),
+                 lambda: route.latest_thesis('UNKNOWN', db),
+                 lambda: route.thesis_versions('UNKNOWN', db=db)):
+        with pytest.raises(HTTPException) as exc:
+            call()
+        assert exc.value.status_code == 404
+
+
+@pytest.mark.parametrize('endpoint,method', [('thesis_graph', 'read'), ('refresh_thesis_graph', 'build')])
+def test_graph_route_success_unknown_and_safe_errors(db, monkeypatch, endpoint, method):
+    from fastapi import HTTPException
+
+    from app.api.routes import thesis as route
+
+    company = _company(db)
+    thesis = _thesis(db, company)
+    call = getattr(route, endpoint)
+    with pytest.raises(HTTPException) as exc:
+        call('UNKNOWN', db)
+    assert exc.value.status_code == 404
+    monkeypatch.setattr(route.ThesisGraphService, method, lambda *a: (thesis, [], []))
+    assert call('POOL', db)['thesis_version_id'] == thesis.id
+    for message, status in [('unknown ticker fixture', 404), ('fixture error', 400)]:
+        def fail(*a):
+            raise ValueError(message)
+        monkeypatch.setattr(route.ThesisGraphService, method, fail)
+        with pytest.raises(HTTPException) as exc:
+            call('POOL', db)
+        assert exc.value.status_code == status
+
+
+@pytest.mark.parametrize('state,expected', [('ready', 'ready'), ('unavailable', 503)])
+def test_audio_generation_started_or_unavailable(db, monkeypatch, state, expected):
+    from fastapi import HTTPException
+
+    from app.api.routes import thesis as route
+
+    monkeypatch.setattr(route, '_audio_context', lambda *a: ('fixture', 'text'))
+    monkeypatch.setattr(route.thesis_audio_service, 'status', lambda *a: 'missing')
+    monkeypatch.setattr(route.thesis_audio_service, 'start', lambda *a: state)
+    if isinstance(expected, int):
+        with pytest.raises(HTTPException) as exc:
+            route.thesis_audio_generate('POOL', version=None, db=db)
+        assert exc.value.status_code == expected
+    else:
+        assert route.thesis_audio_generate('POOL', version=None, db=db)['state'] == expected
+
+
+def test_rule_route_unknown_company_and_missing_thesis(db):
+    from fastapi import HTTPException
+
+    from app.api.routes.thesis import InvalidationRulesRequest, set_invalidation_rules
+
+    for ticker in ('UNKNOWN', 'POOL'):
+        if ticker == 'POOL':
+            _company(db)
+        with pytest.raises(HTTPException) as exc:
+            set_invalidation_rules(ticker, InvalidationRulesRequest(rules=[]), db)
+        assert exc.value.status_code == 404

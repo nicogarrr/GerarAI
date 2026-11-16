@@ -60,6 +60,11 @@ from app.services.ttm_fundamentals import FLOW_METRICS
 RULE_TYPE = "thesis_invalidation"
 TARGET_KIND = "thesis_metric"
 MAX_RULES = 20
+# La descripcion hace visible la derivacion; la procedencia se guarda
+# aparte en valuation_basis, nunca se deduce de texto editable.
+DERIVED_DESCRIPTION_PREFIX = "Derivada del criterio en texto"
+RULES_ORIGIN_KEY = "invalidation_rules_origin"
+
 # Un criterio de invalidacion se mueve despacio: como mucho un aviso al dia
 # mientras siga cumpliendose (el cooldown del evaluador existente).
 COOLDOWN_SECONDS = 86_400
@@ -211,6 +216,49 @@ def describe_rule(rule: dict[str, Any]) -> str:
 
 def _rule_name(company: Company, rule: dict[str, Any]) -> str:
     return f"{company.ticker}: invalidación de tesis · {describe_rule(rule)}"[:300]
+
+
+def derive_rules_from_valuation(valuation: dict) -> list[dict[str, Any]]:
+    """Deriva solo precio/base, medible por el evaluador actual.
+
+    Reverse DCF y moat quedan en texto: no hay metrica persistida de
+    crecimiento de ingresos ni una observacion numerica de deterioro.
+    """
+    base_dec = _parse_threshold((valuation or {}).get("base_value"))
+    price_dec = _parse_threshold((valuation or {}).get("current_price"))
+    if base_dec is None or price_dec is None or base_dec <= 0 or price_dec <= 0:
+        return []
+    if not price_dec < base_dec:
+        # Con el precio ya por encima del valor base el criterio de texto es
+        # informativo ("sin margen a este precio"), no una invalidacion a
+        # vigilar: derivarla dispararia el aviso al instante.
+        return []
+    return [
+        {
+            "metric": PRICE,
+            "operator": ">",
+            "threshold": float(base_dec),
+            "description": (
+                f"{DERIVED_DESCRIPTION_PREFIX}: el precio supera el valor "
+                "base en el ultimo cierre disponible. No comprueba persistencia."
+            ),
+        }
+    ]
+
+
+def rules_for_valuation(
+    valuation: dict, previous: ThesisVersion | None,
+) -> tuple[list[dict[str, Any]], str]:
+    """Conserva ediciones manuales, incluida la desactivacion explicita.
+
+    Reglas anteriores sin procedencia son del usuario por compatibilidad.
+    Una descripcion que parezca derivada no altera esta decision.
+    """
+    if previous is not None:
+        origin = (previous.valuation_basis or {}).get(RULES_ORIGIN_KEY)
+        if origin == "user" or (origin != "derived" and previous.invalidation_rules):
+            return list(previous.invalidation_rules or []), "user"
+    return derive_rules_from_valuation(valuation), "derived"
 
 
 def latest_thesis(db: Session, company_id: int) -> ThesisVersion | None:
