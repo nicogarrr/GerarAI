@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Calculator, ChevronDown, Filter, Play, Save } from 'lucide-react';
 
 import { MutationForm } from '@/components/forms/MutationForm';
-import { Skeleton } from '@/components/ui/skeleton';
+import { ResultsSectionSkeleton, ScreenersBodySkeleton } from '@/components/screeners/ScreenersSkeletons';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -118,23 +118,6 @@ async function ResultsSection({ query, operator, incompleteRun, requestedPage, r
         </div>
       ) : null}
       {result ? <Results page={requestedPage} pageHref={resultsPageHref} result={result} t={t} fmt={fmt} /> : null}
-    </>
-  );
-}
-
-function ScreenersBodySkeleton() {
-  return (
-    <>
-      <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-        <Skeleton className="h-5 w-56" />
-        <Skeleton className="mt-4 h-11 w-full" />
-        <Skeleton className="mt-3 h-11 w-full" />
-        <Skeleton className="mt-3 h-11 w-2/3" />
-      </section>
-      <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-        <Skeleton className="h-5 w-40" />
-        <Skeleton className="mt-4 h-24 w-full" />
-      </section>
     </>
   );
 }
@@ -264,7 +247,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
         (ad-hoc y métrica) ocupaban la pantalla antes de cualquier resultado.
       */}
       {attemptedRun && !incompleteRun ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ResultsSectionSkeleton />}>
           <ResultsSection incompleteRun={incompleteRun} operator={operator} query={query} requestedPage={requestedPage} resultsPageHref={resultsPageHref} />
         </Suspense>
       ) : null}

@@ -21,5 +21,10 @@ test('workspace y cobertura se piden en paralelo dentro de una sección en Suspe
 });
 
 test('los resultados ad-hoc llegan por streaming solo cuando hay ejecución intentada', () => {
-  assert.match(src, /\{attemptedRun && !incompleteRun \? \(\s*<Suspense fallback=\{null\}>/);
+  // CLS medido 0,271 con fallback={null} (rig qa-screeners-run-cls, 390px):
+  // la tabla se insertaba encima del cuerpo. El fallback debe ser un skeleton
+  // con altura representativa, nunca null.
+  assert.match(src, /\{attemptedRun && !incompleteRun \? \(\s*<Suspense fallback=\{<ResultsSectionSkeleton \/>\}>/);
+  assert.doesNotMatch(src, /<Suspense fallback=\{null\}>\s*\n\s*<ResultsSection/);
+  assert.match(src, /import \{ ResultsSectionSkeleton, ScreenersBodySkeleton \} from/);
 });
