@@ -9,8 +9,9 @@ from __future__ import annotations
 import json
 import uuid
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateSchema, DropSchema
 
 from app.models import Company
 from app.models.entities import InstrumentReference
@@ -24,8 +25,8 @@ def main():
                            connect_args={'options': f'-csearch_path={schema}'})
     tables = [Company.__table__, InstrumentReference.__table__, PublicSourceDocument.__table__, PublicFinancialFact.__table__]
     with engine.begin() as conn:
-        version = conn.scalar(text('select version()'))
-        conn.execute(text(f'CREATE SCHEMA {schema}'))
+        version = conn.scalar(select(func.version()))
+        conn.execute(CreateSchema(schema))
     def factory():
         Company.metadata.drop_all(engine, tables=list(reversed(tables)))
         Company.metadata.create_all(engine, tables=tables)
@@ -40,7 +41,7 @@ def main():
         print(json.dumps(report, indent=2))
     finally:
         with engine.begin() as conn:
-            conn.execute(text(f'DROP SCHEMA {schema} CASCADE'))
+            conn.execute(DropSchema(schema, cascade=True))
         engine.dispose()
 
 
