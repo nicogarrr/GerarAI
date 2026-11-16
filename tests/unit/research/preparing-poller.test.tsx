@@ -16,7 +16,7 @@ it('coalesces card copies, polls status and refreshes just once on completion',a
 });
 it('retains attempt budget across unmount and remount',async()=>{
  const first=render(<DcaPreparingRefresh ticker="BUDGET" kind="news"/>);await tick(30_000*10);first.unmount();
- render(<DcaPreparingRefresh ticker="BUDGET" kind="news"/>);await tick(30_000*30);expect(read).toHaveBeenCalledTimes(20);expect(refresh).not.toHaveBeenCalled();
+ render(<DcaPreparingRefresh ticker="BUDGET" kind="news"/>);await tick(30_000*30);expect(read).toHaveBeenCalledTimes(19);expect(refresh).not.toHaveBeenCalled();
 });
 it('pauses hidden tabs and expires by wall time',async()=>{
  vi.spyOn(document,'visibilityState','get').mockReturnValue('hidden');
@@ -33,4 +33,13 @@ it('handles rejected reads without refreshing and stops after unsubscribe',async
 });
 it('changing ticker cancels old subscription and reads the new ticker',async()=>{
  const view=render(<DcaPreparingRefresh ticker="OLD" kind="dca"/>);view.rerender(<DcaPreparingRefresh ticker="NEW" kind="dca"/>);await tick();expect(read).toHaveBeenCalledWith('NEW','dca');expect(read).toHaveBeenCalledTimes(1);
+});
+it('does not read if a suspended timer resumes past its deadline',async()=>{
+ const now=Date.now();render(<DcaPreparingRefresh ticker="SUSPENDED" kind="news"/>);
+ vi.setSystemTime(now+11*60_000);await tick();expect(read).not.toHaveBeenCalled();expect(refresh).not.toHaveBeenCalled();
+});
+it('does not refresh if a pending read settles past its deadline',async()=>{
+ let resolve!:(v:'ready')=>void;read.mockImplementation(()=>new Promise(r=>{resolve=r;}));
+ const now=Date.now();render(<DcaPreparingRefresh ticker="EXPIREDREAD" kind="dca"/>);await tick();expect(read).toHaveBeenCalledTimes(1);
+ vi.setSystemTime(now+11*60_000);await act(async()=>{resolve('ready');});expect(refresh).not.toHaveBeenCalled();await tick();expect(read).toHaveBeenCalledTimes(1);
 });

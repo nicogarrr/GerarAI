@@ -25,12 +25,14 @@ export function watchPreparing(key: string, read: () => Promise<PreparingStatus>
         if (state.timer || state.pending || state.done || !state.listeners.size || state.attempts >= MAX_ATTEMPTS || Date.now() >= state.deadline) return;
         state.timer = setTimeout(async () => {
             state.timer = undefined;
+            if (Date.now() >= state.deadline) { state.done = true; return; }
             if (document.visibilityState !== 'visible') { schedule(); return; }
             state.pending = true;
             state.attempts += 1;
             let status: PreparingStatus = 'unavailable';
             try { status = await read(); } catch { /* A failed read is not completion. */ }
             state.pending = false;
+            if (Date.now() >= state.deadline) { state.done = true; return; }
             // Respect failures/rate limits: do not manufacture a fresh retry loop.
             if (status === 'unavailable') state.done = true;
             if (status === 'ready') {
