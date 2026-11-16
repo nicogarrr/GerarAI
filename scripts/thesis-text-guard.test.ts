@@ -24,9 +24,9 @@ test('URLs y números normales no se tocan', () => {
 test('legacy internals become Spanish while URLs and numeric precision survive', async () => {
   // @ts-expect-error Explicit extension for node strip-types.
   const { cleanThesisMarkdown } = await import('../lib/research/thesis-text.ts');
-  const input = 'None unassigned preview_only fact_anchored_sensitivity 0.00031 https://news.google.com/a_b?x=None\n## 24. Análisis narrativo INFERIDO\nDuplicado';
+  const input = 'Valor: None\nunassigned preview_only fact_anchored_sensitivity 0.00031 https://news.google.com/a_b?x=None\n## 24. Análisis narrativo INFERIDO\nDuplicado';
   const out = cleanThesisMarkdown(input);
-  assert.ok(out.includes('N/D sin asignar solo vista previa sensibilidad anclada a datos 0.00031'));
+  assert.ok(out.includes('Valor: N/D\nsin asignar solo vista previa sensibilidad anclada a datos 0.00031'));
   assert.ok(out.includes('https://news.google.com/a_b?x=None'));
   assert.ok(!out.includes('Duplicado'));
 });
