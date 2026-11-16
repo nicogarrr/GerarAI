@@ -1236,6 +1236,7 @@
   },
   "terminalSection": {
     "coverage": "Coverage",
+    "coverageExplainer": "Coverage: share of the requested metrics that have data. Available: metrics with data out of those requested.",
     "available": "Available",
     "yearsLoaded": "Fiscal years loaded",
     "periodicity": "Periodicity",

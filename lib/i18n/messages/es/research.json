@@ -1236,6 +1236,7 @@
   },
   "terminalSection": {
     "coverage": "Cobertura",
+    "coverageExplainer": "Cobertura: porcentaje de las métricas pedidas que tienen datos. Disponibles: métricas con datos de las pedidas.",
     "available": "Disponibles",
     "yearsLoaded": "Ejercicios cargados",
     "periodicity": "Periodicidad",
