@@ -135,7 +135,11 @@ def score_gem(g: GemInputs) -> Gem | None:
     return Gem(g.ticker, g.name, round(score, 2), g.market_cap, reasons)
 
 
-def _latest_fcf_and_shares(db: Session, min_fiscal_year: int) -> dict[int, tuple[float, float, str]]:
+def _latest_fcf_and_shares(
+    db: Session, min_fiscal_year: int, *, company_ids: list[int] | None = None,
+) -> dict[int, tuple[float, float, str]]:
+    if company_ids == []:
+        return {}
     ranked = select(
         FinancialFact.company_id.label("cid"), FinancialFact.metric.label("metric"),
         FinancialFact.fiscal_year.label("fy"), FinancialFact.value.label("value"),
@@ -149,6 +153,7 @@ def _latest_fcf_and_shares(db: Session, min_fiscal_year: int) -> dict[int, tuple
         FinancialFact.fiscal_quarter.in_(["FY", ""]),
         FinancialFact.fiscal_year.isnot(None), FinancialFact.fiscal_year >= min_fiscal_year,
         *tenant_filters(db, FinancialFact),
+        *([FinancialFact.company_id.in_(company_ids)] if company_ids is not None else []),
     ).subquery()
     rows = db.execute(select(
         ranked.c.cid, ranked.c.metric, ranked.c.fy, ranked.c.value, ranked.c.period,
@@ -235,7 +240,8 @@ def find_gems(
         for c in db.scalars(select(Company).where(Company.id.in_(list(passed)))).all()
         if (c.currency or "").upper() == "USD"  # facts and prices share currency
     }
-    base = _latest_fcf_and_shares(db, today.year - 2)
+    if not companies:
+        return []
     # Ventana de 7 dias en SQL (anti lectura historica): un precio mas viejo
     # se descarta siempre abajo, asi que traerlo era coste puro (miles de
     # barras por empresa para quedarse con la ultima).
@@ -248,6 +254,12 @@ def find_gems(
         .order_by(MarketPrice.date.desc())
     ).all():
         prices.setdefault(p.company_id, p)
+    # Price/currency are hard eligibility gates. Apply them before the fact
+    # window, not after scanning every company's fundamentals in this tenant.
+    companies = {cid: company for cid, company in companies.items() if cid in prices}
+    if not companies:
+        return []
+    base = _latest_fcf_and_shares(db, today.year - 2, company_ids=list(companies))
     since = (today - timedelta(days=INSIDER_WINDOW_DAYS)).isoformat()
     tickers = {c.ticker for c in companies.values()}
     insider: dict[str, float] = {}
