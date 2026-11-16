@@ -69,8 +69,13 @@ def provider_reasoner(
             max_tokens=max_tokens,
             metadata={"expert_team_task": task},
         )
+        def before_retry() -> None:
+            if hy4_mode:
+                from app.llm.errors import ProviderDisabledError
+                raise ProviderDisabledError("Hy4 output rejected; automatic retry disabled")
+
         guarded = await complete_guarded(
-            llm, request, source=task, expected_language=current_language(), on_response=tally
+            llm, request, source=task, expected_language=current_language(), on_response=tally, before_retry=before_retry
         )
         return (guarded.response.text or "").strip()
 

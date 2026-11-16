@@ -98,3 +98,15 @@ def test_holds_position_empty_and_missing(monkeypatch):
     values=iter([SimpleNamespace(first=lambda:company),SimpleNamespace(all=lambda:[0,1])])
     db=SimpleNamespace(scalars=lambda statement:next(values))
     assert service.holds_position(db,5,'TEST') is True
+
+
+def test_invalid_hy4_output_does_not_hide_second_call():
+    class Invalid(Provider):
+        async def complete(self,request):
+            response=await super().complete(request)
+            return LLMResponse(Message('assistant','文化'),response.usage,response.model,self.name)
+    p=Invalid();reason=provider_reasoner(p)
+    async def run():
+        with pytest.raises(ProviderDisabledError): await reason('synthetic','fixture',100,'test')
+        with pytest.raises(ProviderDisabledError): await reason('synthetic','fixture',100,'test')
+    asyncio.run(run());assert p.calls==1
