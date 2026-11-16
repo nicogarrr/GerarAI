@@ -35,7 +35,7 @@ export function CompanyNavigation({ ticker, activeView, locale = 'es' }: { ticke
   return (
     <nav
       aria-label={t('research.companyNav.aria')}
-      className="scrollbar-hide -mx-1 flex gap-x-1 overflow-x-auto px-1 pb-px sm:gap-x-2"
+      className="scroll-affordance-x -mx-1 flex gap-x-1 overflow-x-auto px-1 pb-px sm:gap-x-2"
       data-testid="company-navigation"
     >
       <CompanyNavigationScroll />
