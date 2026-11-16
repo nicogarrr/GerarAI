@@ -109,6 +109,11 @@ class Article:
     title: str
     published: date
     text: str
+    # False cuando ni la meta del articulo ni el RSS dan fecha: published es
+    # entonces "hoy" SOLO para resolver relativos ("next year") en la lectura;
+    # store_readings no guarda nada de un articulo sin fecha verificable, para
+    # que un as_of fabricado no pise cifras reales ni finja frescura.
+    dated: bool = True
 
 
 @dataclass
@@ -434,8 +439,10 @@ async def collect(company: Any, *, known_urls: Iterable[tuple[str, str, date | N
         text = article_text(html)
         if not text:
             continue
-        published = _published_from_html(html) or day or today
-        article = Article(url=final_url or url, title=title, published=published, text=text)
+        evidenced = _published_from_html(html) or day
+        published = evidenced or today
+        article = Article(url=final_url or url, title=title, published=published, text=text,
+                          dated=evidenced is not None)
         report.articles_read += 1
         reading = read_article(article, extra_firms=extra_firms, company=company)
         if reading.estimates or reading.targets:
@@ -477,6 +484,12 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
     reporting = _reporting_currency(db, company)  # las estimaciones se comparan con los informes
     listing = (str(getattr(company, "currency", "") or "").strip().upper() or None)  # el objetivo, con el precio
     for article, reading in sorted(readings, key=lambda r: r[0].published):
+        if not article.dated:
+            # Sin fecha verificable el as_of seria "hoy" fabricado: pisaria
+            # cifras reales mas antiguas y se serviria como fresco (hallazgo
+            # del carril de auditoria, mismo vicio que provenance fetched_at).
+            skipped.append(f"{article.url}: articulo sin fecha verificable: no se guarda")
+            continue
         by_firm: dict[str, list[Estimate]] = {}
         for est in (*reading.estimates, *reading.targets):
             by_firm.setdefault(est.firm, []).append(est)
