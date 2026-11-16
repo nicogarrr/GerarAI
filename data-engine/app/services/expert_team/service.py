@@ -8,6 +8,8 @@ el debate de tesis: sin saldo no hay llamada y el experto queda en ``error``.
 
 from __future__ import annotations
 
+import asyncio
+import os
 from typing import Any
 
 from sqlalchemy import select
@@ -40,7 +42,8 @@ def provider_reasoner(
 
             llm = create_llm_provider()
         budget = BudgetController() if db is not None else None
-        if budget is not None and db is not None and not budget.can_spend(db, SPEND_PER_CALL_EUR):
+        hy4_mode = getattr(llm, "name", "") == "hy4-go-zero"
+        if budget is not None and db is not None and not budget.can_spend(db, 0 if hy4_mode else SPEND_PER_CALL_EUR):
             raise BudgetExceededError("LLM budget exhausted")
         if commit_usage and db is not None:
             # La llamada puede durar minutos. Con la transacción de la consulta de gasto abierta, Postgres corta
@@ -53,7 +56,7 @@ def provider_reasoner(
                 return
             usage = resp.usage
             model = getattr(resp, "model", None) or "unknown"
-            cost = budget.estimate_cost_eur(model, usage.input_tokens, usage.output_tokens)
+            cost = 0 if hy4_mode else budget.estimate_cost_eur(model, usage.input_tokens, usage.output_tokens)
             budget.record(db, model, task, cost, usage.total_tokens, commit=commit_usage)
             if not commit_usage:
                 # Autoflush puede estar apagado: la siguiente llamada debe ver el gasto.
@@ -66,12 +69,45 @@ def provider_reasoner(
             max_tokens=max_tokens,
             metadata={"expert_team_task": task},
         )
+        def before_retry() -> None:
+            if hy4_mode:
+                from app.llm.errors import ProviderDisabledError
+                raise ProviderDisabledError("Hy4 output rejected; automatic retry disabled")
+
         guarded = await complete_guarded(
-            llm, request, source=task, expected_language=current_language(), on_response=tally
+            llm, request, source=task, expected_language=current_language(), on_response=tally, before_retry=before_retry
         )
         return (guarded.response.text or "").strip()
 
-    return reason
+    serial = asyncio.Lock()
+    stopped = False
+    calls = 0
+
+    async def guarded_reason(system: str, user: str, max_tokens: int, task: str) -> str:
+        nonlocal stopped, calls
+        from app.llm.errors import ProviderDisabledError, ProviderHTTPError
+        hy4_mode = getattr(provider, "name", "") == "hy4-go-zero"
+        if provider is None and os.environ.get("HY4_REPLACE_DEEPSEEK") == "1":
+            from app.llm.factory import create_llm_provider
+            hy4_mode = getattr(create_llm_provider(), "name", "") == "hy4-go-zero"
+        if not hy4_mode:
+            return await reason(system, user, max_tokens, task)
+        # Shared reasoner serializes the team even when the coordinator gathers
+        # evidence concurrently. Initial rollout: at most three LLM attempts.
+        async with serial:
+            if stopped or calls >= 3:
+                raise ProviderDisabledError("Hy4 expert run stopped or bounded call cap reached")
+            calls += 1
+            try:
+                return await reason(system, user, max_tokens, task)
+            except ProviderHTTPError as exc:
+                if exc.status_code in {402, 429}:
+                    stopped = True
+                raise
+            except ProviderDisabledError:
+                stopped = True
+                raise
+    return guarded_reason
 
 
 def holds_position(db: Session, tenant_id: int | str | None, ticker: str) -> bool:
