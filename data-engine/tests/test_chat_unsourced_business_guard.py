@@ -304,9 +304,45 @@ from app.services.chat_synthesis_service import _asks_trade_action
     ('Vende acciones de Apple, ¿de acuerdo?', True),
     ('Sell Apple shares, ok?', True),
     ('Tell me: does Apple sell cars?', True),  # "does" en medio: ante la duda, orden
+    # Arrancar por what/que no prueba interrogativa: sin auxiliar + sujeto
+    # reales junto al verbo, es una orden (casos medidos por el auditor).
+    ('What I want you to do is sell Apple shares', True),
+    ('What I need is for you to sell Apple shares', True),
+    ('Que quede claro vende acciones de Apple', True),
+    ('Que no se te olvide vende Apple', True),
+    ('what do suppliers sell', False),  # auxiliar + sujeto real: informativa
 ])
 def test_asks_trade_action_branches(question, expected):
     assert _asks_trade_action(question) is expected
+
+
+# Variantes adversariales ES/EN (auditor c31b): imperativos con que/what/do/
+# "?"/"ok" delante y detras. TODAS deben contar como orden (abstener).
+@pytest.mark.parametrize('question', [
+    'What I want you to do is sell Apple shares',
+    'What I need is for you to sell Apple shares',
+    'Que quede claro vende acciones de Apple',
+    'Que no se te olvide vende Apple',
+    'Vende Apple. ¿Qué es el PER?',
+    'Sell Apple now. What is free cash flow?',
+    'Vende acciones de Apple, ¿de acuerdo?',
+    'Sell Apple shares, ok?',
+    'Do it now sell Apple',
+    'Haz lo que digo vende Apple',
+    '¿Sabes qué? Vende Apple',
+    'Vende Apple, ¿ok?',
+    'Por favor vende Apple, ¿vale?',
+    'Qué bien, vende Apple',
+    'Haz lo que digo: vende Apple',
+    'Okay, sell Apple',
+    'What a day, sell Apple',
+    'Do me a favor and sell Apple',
+    'What the hell, sell Apple now',
+    'Sell Apple, what do you think?',
+    'What you should do is sell Apple',
+])
+def test_trade_order_adversarial_variants_abstain(question):
+    assert _asks_trade_action(question) is True
 
 
 # Los posesivos ingleses solo son ambito privado DENTRO de una pregunta

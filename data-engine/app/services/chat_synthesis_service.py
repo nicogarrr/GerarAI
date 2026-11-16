@@ -312,15 +312,22 @@ _TRADE_NEGATION_RE = re.compile(
     r"(?i)\b(?:no|nunca|tampoco|jam[aá]s|sin|not|never|don'?t|do\s+not|does\s+not|without)\b"
 )
 _TRADE_NOUN_RE = re.compile(r"(?i)\b(?:de|del|para)\s+(?:la\s+|el\s+)?$")
-# Lectura interrogativa RECONOCIBLE en 3a persona, no orden: la clausula de
-# la accion EMPIEZA por que/que/what/which (pregunta sobre el sujeto:
-# "que vende Apple", "what does Apple sell"). Sin excepcion global por "?":
-# una orden en otra frase sigue siendo orden ("Vende Apple. Que es el
-# PER?"). Un do/que suelto en medio de la clausula tampoco basta: "Do it
-# now sell Apple" o "Haz lo que digo vende Apple" son ordenes. Solo
-# vende/sell (indicativo = imperativo tu); "buy"/"compra" no se exceptuan.
-# Ante la duda, la accion cuenta como orden (falla seguro).
-_TRADE_QUESTION_START_RE = re.compile(r"(?i)^\s*¿?\s*(?:qu[eé]|what|which)\b")
+# Lectura interrogativa RECONOCIBLE en 3a persona, no orden. Arrancar por
+# what/que NO prueba pregunta: "What I want you to do is sell Apple" o
+# "Que quede claro vende acciones" son ordenes. Solo cuentan los patrones
+# con sujeto/auxiliar reales dentro de la clausula de la accion:
+#   - "que vende <empresa>": el verbo sigue JUSTO despues de que/que.
+#   - "what does/do/did <empresa> sell": auxiliar + sujeto (1-2 palabras,
+#     nunca i/you/we...) antes del verbo.
+# Sin excepcion global por "?": una orden en otra frase sigue siendo orden
+# ("Vende Apple. Que es el PER?"). Solo vende/sell (indicativo = imperativo
+# tu); "buy"/"compra" no se exceptuan. Ante la duda, orden (falla seguro).
+_TRADE_QUESTION_QUE_RE = re.compile(r"(?i)^\s*¿?\s*qu[eé]\s*$")
+_TRADE_QUESTION_WHAT_RE = re.compile(
+    r"(?i)^\s*what\s+(?:does|do|did)\s+"
+    r"(?!(?:i|you|we|me|us|yo|tu|tú|nosotros)\b)"
+    r"[\wáéíóúñ'-]{2,}(?:\s+[\wáéíóúñ'-]{2,})?\s*$"
+)
 _TRADE_LIGHT_WORDS = frozenset(
     {
         "me", "te", "se", "le", "nos", "les", "lo", "que", "qué", "si", "sí",
@@ -343,10 +350,13 @@ def _asks_trade_action(question: str, action_re: re.Pattern = _TRADE_VERB_RE) ->
             (split.end() for split in _CLAUSE_SPLIT_RE.finditer(before)), default=0
         )
         clause = before[clause_start:]
-        if match.group(0).lower() in ("vende", "sell") and _TRADE_QUESTION_START_RE.match(clause):
-            # Interrogativa reconocible: la clausula de la accion empieza por
-            # que/que/what/which ("que vende Apple"). Un "?" al final del
-            # mensaje NO exceptua: la orden puede estar en otra frase.
+        if match.group(0).lower() in ("vende", "sell") and (
+            _TRADE_QUESTION_QUE_RE.match(clause) or _TRADE_QUESTION_WHAT_RE.match(clause)
+        ):
+            # Interrogativa con sujeto/auxiliar real en la clausula de la
+            # accion: "que vende Apple", "what does Apple sell". Ni un "?" al
+            # final del mensaje ni un what/que generico al inicio exceptuan:
+            # la orden puede estar disfrazada o en otra frase.
             continue
         negations = list(_TRADE_NEGATION_RE.finditer(clause))
         if not negations:
