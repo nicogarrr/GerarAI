@@ -109,3 +109,33 @@ def test_principles_list_explicit_filters(monkeypatch):
     db=SimpleNamespace(scalars=lambda statement: sql.append(str(statement)) or SimpleNamespace(all=lambda: []))
     assert route.list_principles(status='proposed',collection_id=3,limit=4,db=db)==[]
     assert 'collection_id' in sql[0] and 'status' in sql[0]
+
+
+def test_library_route_remaining_boundary_branches(monkeypatch):
+    from io import BytesIO
+    from types import SimpleNamespace
+
+    from fastapi import HTTPException, UploadFile
+    # Too-large upload fails locally, with no parsing or provider call.
+    monkeypatch.setattr(route,'MAX_DOCUMENT_BYTES',1)
+    with pytest.raises(ValueError): asyncio.run(route._read_upload_limited(UploadFile(file=BytesIO(b'xx'))))
+    async def invalid_upload():
+        return await route.upload_document(title='synthetic',document_type='invalid',collection_id=None,
+            author=None,source_url=None,publication_date=None,language='en',ticker=None,
+            file=UploadFile(file=BytesIO(b'')),db=object())
+    with pytest.raises(HTTPException) as exc: asyncio.run(invalid_upload())
+    assert exc.value.status_code==400
+    row=object()
+    db=SimpleNamespace(get=lambda cls,key:row if key==1 else None)
+    with pytest.raises(HTTPException) as exc:
+        route.action_principle(1,route.PrincipleAction(action='merge',canonical_principle_id=2),db)
+    assert exc.value.status_code==409
+    with pytest.raises(HTTPException) as exc:
+        route.revise_principle(1,route.PrincipleRevision(),db)
+    assert exc.value.status_code==400
+    class Service:
+        def revise_principle(self,*args,**kw): raise ValueError('synthetic')
+    monkeypatch.setattr(route,'KnowledgeLibraryService',Service)
+    with pytest.raises(HTTPException) as exc:
+        route.revise_principle(1,route.PrincipleRevision(principle='public fixture'),db)
+    assert exc.value.status_code==409
