@@ -75,6 +75,8 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/research/CompanyNavigationScroll.tsx':
+    'Client boundary uses refs, useEffect and MutationObserver to keep the active tab visible after client navigation.',
   'components/ai/AiAvailabilityNotice.tsx': 'Hooks de estado/efecto y actualización explícita antes de iniciar IA.',
   'components/research/DeferredAnalystPanels.tsx': 'useEffect/useState cargan analistas solo al montar el panel visible, con limpieza al cambiar de ticker',
   'components/alerts/EmailNotifications.tsx': 'useState/useEffect mantienen preferencias por usuario y onChange guarda el opt-in; useT consume el locale React',

@@ -1,0 +1,6 @@
+import {render,waitFor} from '@testing-library/react';
+import {expect,it,vi} from 'vitest';
+import {CompanyNavigationScroll} from '@/components/research/CompanyNavigationScroll';
+it('sin pestaña activa no desplaza otra; al activarla observa y al desmontar desconecta',async()=>{const scroll=vi.fn();Element.prototype.scrollIntoView=scroll;const disconnect=vi.spyOn(MutationObserver.prototype,'disconnect');const x=render(<nav><CompanyNavigationScroll/><a href="#one">One</a></nav>);expect(scroll).not.toHaveBeenCalled();const link=x.getByRole('link');link.setAttribute('aria-current','page');await waitFor(()=>expect(scroll).toHaveBeenCalledTimes(1));expect(scroll.mock.instances[0]).toBe(link);x.unmount();expect(disconnect).toHaveBeenCalled()});
+it('un nodo SVG marcado activo no se trata como elemento HTML desplazable',()=>{const scroll=vi.fn();Element.prototype.scrollIntoView=scroll;render(<nav><CompanyNavigationScroll/><svg aria-current="page"/></nav>);expect(scroll).not.toHaveBeenCalled()});
+it('montaje en fragmento sin padre elemento no registra observación ni lanza',()=>{const observe=vi.spyOn(MutationObserver.prototype,'observe');const root=document.createDocumentFragment();const x=render(<CompanyNavigationScroll/>,{container:root});expect(observe).not.toHaveBeenCalled();x.unmount()});

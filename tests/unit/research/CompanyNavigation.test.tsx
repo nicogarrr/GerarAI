@@ -35,7 +35,7 @@ describe('CompanyNavigation', () => {
   });
 
   it('oculta la barra de scroll del carril y monta el scroll de la pestaña activa', () => {
-    const { container } = render(<CompanyNavigation ticker="ASTS" activeView="seguimiento" />);
+    const { container } = render(<CompanyNavigation ticker="ASTS" activeView="changes" />);
     const nav = screen.getByTestId('company-navigation');
     // Barra oculta pero deslizable: la utilidad scrollbar-hide (globals.css)
     // quita la pista visible en WebKit/Firefox y overflow-x-auto se mantiene.
