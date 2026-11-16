@@ -8,7 +8,7 @@ export interface DeepValueItem {
     exchange: string;
     currency: string;
     sector: string | null;
-    score: number;
+    score: number | null;
     price_to_book: number;
     pb_price_date: string | null;
     pb_fiscal_year: number | null;
@@ -19,12 +19,14 @@ export interface DeepValueItem {
     finnhub_yield_indicated: number | null;
     fuentes: string[];
     metric_as_of: string | null;
+    review_reasons?: string[];
 }
 
 export interface DeepValueResult {
     estrategia: string;
     rotulo: string;
     resultados: DeepValueItem[];
+    pendientes_revision?: DeepValueItem[];
 }
 
 /**

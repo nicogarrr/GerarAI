@@ -151,7 +151,8 @@ def test_endpoint_contrato_y_rotulo():
     payload = resp.json()
     assert payload["estrategia"] == STRATEGY_ID
     assert "No es el filtro de calidad" in payload["rotulo"]
-    (row,) = payload["resultados"]
+    assert payload["resultados"] == []
+    (row,) = payload["pendientes_revision"]
     assert row["ticker"] == "EP"
     assert row["price_to_book"] == 0.7
     assert row["dividend_yield"] == 0.08

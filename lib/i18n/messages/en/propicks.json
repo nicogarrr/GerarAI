@@ -334,7 +334,15 @@
     "bookFy": "(book FY{year})",
     "priceAsOf": "price as of {date}",
     "dividendTtm": "Dividend TTM",
-    "loadError": "Couldn't load the deep value screen."
+    "loadError": "Couldn't load the deep value screen.",
+    "rankedTitle": "Screen with data suitable for scoring",
+    "reviewTitle": "Data review, outside the ranking",
+    "reviewPending": "Pending data review",
+    "reviewNote": "These rows remain visible for data review, but have no score and do not qualify for the minimum dividend filter. A special distribution, liquidation or unverified share basis is not evidence of a bargain.",
+    "reviewSplitBasis": "The share basis and dates of the P/B split adjustment need verification.",
+    "reviewPbStatus": "The P/B does not have a verified basis for scoring.",
+    "noRanked": "No candidates have data suitable for scoring.",
+    "reviewNonRecurring": "The source classifies at least one distribution as special, liquidating or a return of capital; it is not a recurring dividend."
   },
   "radar": {
     "regionGlobal": "Global",

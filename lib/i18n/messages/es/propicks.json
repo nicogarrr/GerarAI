@@ -334,7 +334,15 @@
     "bookFy": "(libros FY{year})",
     "priceAsOf": "precio al {date}",
     "dividendTtm": "Dividendo TTM",
-    "loadError": "No se pudo cargar el cribado deep value."
+    "loadError": "No se pudo cargar el cribado deep value.",
+    "rankedTitle": "Cribado con datos aptos para puntuar",
+    "reviewTitle": "Revisión de datos, fuera del ranking",
+    "reviewPending": "Pendiente de revisión de datos",
+    "reviewNote": "Estas filas siguen visibles para revisar sus datos, pero no tienen puntuación ni cumplen el filtro de dividendo mínimo. Una distribución especial, una liquidación o una base de acciones sin verificar no son una señal de ganga.",
+    "reviewSplitBasis": "Falta verificar la base de acciones y fechas del ajuste por split del P/B.",
+    "reviewPbStatus": "El P/B no tiene una base verificada para puntuar.",
+    "noRanked": "No hay candidatos con datos aptos para puntuar.",
+    "reviewNonRecurring": "La fuente clasifica al menos una distribución como especial, liquidativa o devolución de capital; no es un dividendo recurrente."
   },
   "radar": {
     "regionGlobal": "Global",

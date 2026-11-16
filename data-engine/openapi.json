@@ -5764,6 +5764,14 @@
             "title": "Estrategia",
             "type": "string"
           },
+          "pendientes_revision": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DeepValueRowOut"
+            },
+            "title": "Pendientes Revision",
+            "type": "array"
+          },
           "resultados": {
             "items": {
               "$ref": "#/components/schemas/DeepValueRowOut"
@@ -5868,9 +5876,24 @@
             "title": "Price To Book",
             "type": "number"
           },
+          "review_reasons": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Review Reasons",
+            "type": "array"
+          },
           "score": {
-            "title": "Score",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
           },
           "sector": {
             "anyOf": [

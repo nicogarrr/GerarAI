@@ -262,6 +262,8 @@ def _book_value_per_share(
         "fact_unit": eq_unit,
         "equity_source": eq_src,
         "shares_source": sh_src,
+        "shares_period": sh_period,
+        "shares_filed": sh_filed.isoformat() if sh_filed else None,
     }
 
 
@@ -294,7 +296,12 @@ def ttm_dividend_per_share(
         if not (window_start < day <= as_of):
             continue  # fuera de ventana o posterior al corte: no era conocible
         total += amount
-        used.append({"date": day.isoformat(), "amount": str(amount)})
+        item = {"date": day.isoformat(), "amount": str(amount)}
+        # Preserve explicit event classification when a source supplies it.
+        # Yahoo currently does not; never infer a special dividend from size.
+        if event.get("distribution_type") in {"liquidating", "special", "return_of_capital"}:
+            item["distribution_type"] = event["distribution_type"]
+        used.append(item)
     return total, used
 
 
@@ -477,6 +484,9 @@ def compute_valuation_metrics(
                     "split_factor": format(book["split_factor"].normalize(), "f"),
                     "equity_source": book["equity_source"],
                     "shares_source": book["shares_source"],
+                    "shares_period": book["shares_period"],
+                    "shares_filed": book["shares_filed"],
+                    "split_basis": "fact_split_factor_filed_aware",
                 },
             )
             stats[METRIC_PB] += 1
