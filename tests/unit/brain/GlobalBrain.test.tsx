@@ -581,3 +581,27 @@ describe('GlobalBrainPanel native lifecycle', () => {
         expect(currentClose).toHaveBeenCalledOnce();
     });
 });
+
+it('only sends the optional model after explicit general-chat selection and can return to default', async () => {
+ chatWithPortfolio.mockResolvedValue({success:true,message:'Respuesta',citations:[]});
+ render(<GlobalBrain userId="u1"/>);await open();
+ const select=screen.getByRole('combobox',{name:'Modelo del chat general'});
+ expect(select).toHaveValue('');
+ await act(async()=>{ask('Consulta con defecto');});
+ expect(chatWithPortfolio.mock.calls[0]).toHaveLength(4);
+ fireEvent.change(select,{target:{value:'hy4-flash-free'}});
+ await act(async()=>{ask('Consulta con HY');});
+ expect(chatWithPortfolio.mock.calls[1][4]).toBe('hy4-flash-free');
+ fireEvent.change(select,{target:{value:''}});
+ await act(async()=>{ask('Consulta defecto otra vez');});
+ expect(chatWithPortfolio.mock.calls[2]).toHaveLength(4);
+});
+
+it('does not offer the general-chat model in ticker guide or library mode', async () => {
+ render(<GlobalBrain userId="u1"/>);await open();
+ expect(screen.getByRole('combobox',{name:'Modelo del chat general'})).toBeVisible();
+ act(()=>openBrain({ticker:'ASTS'}));
+ expect(screen.queryByRole('combobox',{name:'Modelo del chat general'})).not.toBeInTheDocument();
+ act(()=>openBrain({knowledge:{scope:'library'}}));
+ expect(screen.queryByRole('combobox',{name:'Modelo del chat general'})).not.toBeInTheDocument();
+});
