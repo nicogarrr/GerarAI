@@ -58,6 +58,7 @@ export async function generateMetadata(): Promise<Metadata> {
 interface WatchlistStock extends WatchlistEntryData {
     analysis?: AnalysisStatus | null;
     monitor: WatchlistMonitorItem | null;
+    monitorSkipped?: boolean;
     /** true = la cadena de cotización agotó su presupuesto (3 s): las celdas
         sin dato lo dicen como espera, nunca como fallo de la fuente. */
     timedOut: boolean;
@@ -126,6 +127,11 @@ async function EntryRowStream({ promise, render }: { promise: Promise<SettledEnt
 async function StocksStream({ promise, render }: { promise: Promise<WatchlistStock[]>; render: (stocks: WatchlistStock[]) => ReactNode }) {
     const stocks = await promise;
     return <>{render(stocks)}</>;
+}
+
+type MonitorData = Awaited<ReturnType<typeof getWatchlistMonitor>>;
+async function MonitorStockStream({ promise, render }: { promise: Promise<MonitorData>; render: (data: MonitorData) => ReactNode }) {
+    return <>{render(await promise)}</>;
 }
 
 async function DatedValuationGrid({ stocks, promise }: { stocks: WatchlistEntryData[]; promise: Promise<DatedMap> }) {
@@ -259,7 +265,10 @@ export default async function WatchlistPage({
     const notFoundBySymbol = new Map<string, Promise<boolean>>(
         pageItems.map((item, index) => [item.symbol.trim().toUpperCase(), notFoundPromises[index]]),
     );
-    const [datedChanges, monitorData, basicsList] = await Promise.all([metricSort ? datedChangesPromise : Promise.resolve({} as DatedMap), monitorPromise, Promise.all(basicsPromises)]);
+    // Default/symbol order streams monitor-only decorations. Explicit metric
+    // order keeps the previous wait, especially earnings ordering. Basics remain
+    // a document dependency; this does not claim to remove their latency.
+    const [datedChanges, monitorData, basicsList] = await Promise.all([metricSort ? datedChangesPromise : Promise.resolve({} as DatedMap), metricSort ? monitorPromise : Promise.resolve({ items: {}, earningsStatus: 'pending' } as MonitorData), Promise.all(basicsPromises)]);
 
     // Construye la fila con la entrada ya resuelta. Precio y divisa del
     // LISTADO REAL (master), nunca del ticker desnudo: Finnhub free lo
@@ -274,6 +283,7 @@ export default async function WatchlistPage({
                 ...emptyWatchlistEntry(item.symbol, null, null),
                 analysis: item.analysis,
                 monitor: null,
+                monitorSkipped: true,
                 timedOut: false,
                 addedAt: item.addedAt
             };
@@ -372,14 +382,20 @@ export default async function WatchlistPage({
     // misma cifra que inicio y screener) y puesto frente al resto de empresas
     // valoradas: «infravalorada/sobrevalorada» (valor > precio) no anticipaba
     // nada a 12 meses; el puesto relativo sí ordenó a 24 (lib/watchlist/value-rank.ts).
-    const rankSummary = valueRankSummary(watchlistStocks.map((stock) => stock.monitor?.valuation_rank));
-    const judged = watchlistStocks.filter((stock) => valueRankKey(stock.monitor?.valuation_rank) !== null);
-    const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
-    const byEngine = judged.length - byThesis;
-    const fairValueSourceNote = [
-        byThesis > 0 ? t('watchlist.page.fairValue.byThesis', { count: byThesis }) : null,
-        byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
-    ].filter(Boolean).join(', ');
+    const rankSummaryEl = (data: MonitorData) => {
+        const stocks = metricSort ? watchlistStocks : watchlistStocks.map(stock => ({...stock, monitor: data.items[stock.symbol.trim().toUpperCase()] ?? null}));
+        const rankSummary = valueRankSummary(stocks.map((stock) => stock.monitor?.valuation_rank));
+        const judged = stocks.filter((stock) => valueRankKey(stock.monitor?.valuation_rank) !== null);
+        const byThesis = judged.filter((stock) => stock.monitor?.fair_value_source === 'tesis').length;
+        const byEngine = judged.length - byThesis;
+        const fairValueSourceNote = [
+            byThesis > 0 ? t('watchlist.page.fairValue.byThesis', { count: byThesis }) : null,
+            byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
+        ].filter(Boolean).join(', ');
+
+        return rankSummary.ranked > 0 ? <p className="text-xs text-gray-500">{t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}</p> : null;
+    };
+    const monitorEl = (render: (data: MonitorData) => ReactNode, fallback: ReactNode = null) => metricSort ? render(monitorData) : <Suspense fallback={fallback}><MonitorStockStream promise={monitorPromise} render={render} /></Suspense>;
 
     // Un único formateador para móvil y desktop: sin dato -> NA ('N/D'),
     // nunca un número interpolado sin guarda.
@@ -399,13 +415,13 @@ export default async function WatchlistPage({
     // Cuando el calendario de resultados (NASDAQ) cae, el backend devuelve
     // earningsStatus != 'ok' y todas las fechas llegan null: un N/D pelado
     // parecería «sin fecha anunciada». Se explica la causa como en el cap.
-    const earningsNote = monitorData.earningsStatus === 'unavailable'
+    const earningsNoteFor = (data: MonitorData) => data.earningsStatus === 'unavailable'
         ? t('watchlist.page.earningsUnavailable')
-        : monitorData.earningsStatus === 'partial'
+        : data.earningsStatus === 'partial'
           ? t('watchlist.page.earningsPartial')
           // Calendario guardado leído bien y sin fecha para esta empresa: es
           // «sin fecha anunciada», dicho, no un «N/D» pelado (r5-front).
-          : monitorData.earningsStatus === 'stored' || monitorData.earningsStatus === 'ok'
+          : data.earningsStatus === 'stored' || data.earningsStatus === 'ok'
             ? t('watchlist.page.earningsNone')
             : null;
     const formatPriceCell = (price: number | null, currency: string | null) =>
@@ -506,11 +522,7 @@ export default async function WatchlistPage({
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
                     </h1>
-                    {rankSummary.ranked > 0 ? (
-                        <p className="text-xs text-gray-500">
-                            {t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}
-                        </p>
-                    ) : null}
+                    {monitorEl(rankSummaryEl)}
                 </div>
                 {/* Alta directa desde la página (QA 2026-10-19: antes solo se
                     podía añadir desde la ficha research o el screener). */}
@@ -628,13 +640,16 @@ export default async function WatchlistPage({
                                                     >
                                                         {stock.symbol}
                                                     </Link>
-                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="max-w-[220px] truncate text-xs text-gray-500 xl:max-w-[150px]" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><Suspense fallback={null}><DcaBadgeStream promise={dcaPromise} symbol={stock.symbol.trim().toUpperCase()} /></Suspense>{valueRankNote(stock)}
-                                                    {notFoundBadge(stock, 'mt-1 border-amber-800/60 text-amber-300/90', 'mt-1 border-gray-700 text-gray-400')}
-                                                    {stock.monitor && stock.price !== null && stock.monitor.low_52w !== null && stock.monitor.low_52w_sessions >= 120 && stock.price <= stock.monitor.low_52w * 1.02 ? (
-                                                        <Badge variant="outline" className="ml-1 border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: stock.monitor.currency ? formatPrice(stock.monitor.low_52w, stock.monitor.currency) : formatNumber(stock.monitor.low_52w), sessions: stock.monitor.low_52w_sessions })}>
+                                                    {stock.name.trim().toUpperCase() !== stock.symbol.toUpperCase() ? <p className="max-w-[220px] truncate text-xs text-gray-500 xl:max-w-[150px]" title={stock.name}>{stock.name}</p> : null}<TrackedAnalysisStatus analysis={stock.analysis} locale={locale} /><Suspense fallback={null}><DcaBadgeStream promise={dcaPromise} symbol={stock.symbol.trim().toUpperCase()} /></Suspense>{notFoundBadge(stock, 'mt-1 border-amber-800/60 text-amber-300/90', 'mt-1 border-gray-700 text-gray-400')}
+                                                    {monitorEl(data => {
+                                                        const monitored = stock.monitorSkipped ? stock : {...stock, monitor: data.items[stock.symbol.trim().toUpperCase()] ?? null};
+                                                        return <>{valueRankNote(monitored)}
+                                                    {monitored.monitor && monitored.price !== null && monitored.monitor.low_52w !== null && monitored.monitor.low_52w_sessions >= 120 && monitored.price <= monitored.monitor.low_52w * 1.02 ? (
+                                                        <Badge variant="outline" className="ml-1 border-amber-800/60 font-normal text-amber-300/90" title={t('watchlist.page.low52Title', { price: monitored.monitor.currency ? formatPrice(monitored.monitor.low_52w, monitored.monitor.currency) : formatNumber(monitored.monitor.low_52w), sessions: monitored.monitor.low_52w_sessions })}>
                                                             {t('watchlist.page.low52')}
                                                         </Badge>
-                                                    ) : null}
+                                                    ) : null}</>;
+                                                    })}
                                                 </div>
                                             </div>
                                             {/* Acciones: «Ver análisis» visible como botón táctil debajo de xl
@@ -710,10 +725,14 @@ export default async function WatchlistPage({
                                             <span className="block text-[11px] text-gray-500 xl:hidden" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</span>
                                             <AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} />
                                         </TableCell>
-                                        <TableCell className="block font-mono text-sm text-gray-300 xl:table-cell xl:text-right" title={stock.monitor?.next_earnings_source ?? (!stock.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
+                                        {monitorEl(data => {
+                                            const monitored = stock.monitorSkipped ? stock : {...stock, monitor: data.items[stock.symbol.trim().toUpperCase()] ?? null};
+                                            const earningsNote = earningsNoteFor(data);
+                                            return (                                        <TableCell className="block font-mono text-sm text-gray-300 xl:table-cell xl:text-right" title={monitored.monitor?.next_earnings_source ?? (!monitored.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
                                             <span className="block font-sans text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.earnings')}</span>
-                                            {stock.monitor?.next_earnings_date ? formatMarketDate(stock.monitor.next_earnings_date) : NA}{!stock.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
-                                        </TableCell>
+                                            {monitored.monitor?.next_earnings_date ? formatMarketDate(monitored.monitor.next_earnings_date) : NA}{!monitored.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
+                                        </TableCell>);
+                                        }, <TableCell className="block font-mono text-sm text-gray-300 xl:table-cell xl:text-right" aria-busy="true"><span className="block font-sans text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.earnings')}</span>{NA}</TableCell>)}
 
                                     </WatchlistEntry>
                                 )))}

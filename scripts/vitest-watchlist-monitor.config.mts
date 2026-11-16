@@ -1,0 +1,3 @@
+import {fileURLToPath} from 'node:url';
+import {defineConfig} from 'vitest/config';
+export default defineConfig({resolve:{alias:{'@':fileURLToPath(new URL('..',import.meta.url)),'server-only':fileURLToPath(new URL('../tests/unit/stubs/server-only.ts',import.meta.url))}},esbuild:{jsx:'automatic'},test:{environment:'jsdom',setupFiles:['tests/unit/setup.ts'],include:['tests/unit/watchlist/*.test.tsx'],coverage:{provider:'v8',include:['app/(root)/watchlist/page.tsx'],reporter:['text','json-summary'],reportsDirectory:'coverage/watchlist-monitor',thresholds:{perFile:true,lines:85,branches:85,functions:85,statements:85}}}});
