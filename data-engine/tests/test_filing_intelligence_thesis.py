@@ -380,3 +380,50 @@ def test_trimestre_solo_en_la_etiqueta_period_ordena_como_trimestre(db):
     result = analyze_document(db, doc)
     db.commit()
     assert result["thesis_check"][0]["status"] == "crossed"
+
+
+def test_quarter_rank_y_etiqueta_ramas(db):
+    # Ramas de _quarter_from_period/_quarter_rank: sin ':', cola no trimestre,
+    # trimestre en etiqueta, anual (=5) y fiscal_quarter directo.
+    from app.services.filing_intelligence import _quarter_from_period, _quarter_rank
+
+    assert _quarter_from_period(None) is None
+    assert _quarter_from_period("FY2026") is None
+    assert _quarter_from_period("2026:H1") is None
+    assert _quarter_from_period("2026:Q4") == "Q4"
+
+    def f(quarter, period):
+        return FinancialFact(
+            tenant_id=db.info["tenant_id"],
+            company_id=db.info["company_id"],
+            metric="roic",
+            value=Decimal("0.1"),
+            unit="ratio",
+            period=period,
+            fiscal_year=2026,
+            fiscal_quarter=quarter,
+            source_type="sec",
+            filed=date(2026, 10, 1),
+        )
+
+    assert _quarter_rank(f("Q2", None)) == 2
+    assert _quarter_rank(f(None, "2026:Q3")) == 3
+    assert _quarter_rank(f(None, "FY2026")) == 5
+    assert _quarter_rank(f(None, None)) == 5
+
+
+def test_url_oficial_invalida_no_rompe(db):
+    # Rama: urlsplit ValueError -> official_document False -> insufficient_data.
+    doc = document(db, number=11)
+    doc.source_url = "https://[::1"
+    db.commit()
+    result = analyze_document(db, doc)
+    assert result["status"] == "insufficient_data"
+    assert "oficial" in result["reason"]
+
+
+def test_sin_contexto_de_tenant_error_claro(db):
+    doc = document(db, number=12)
+    db.info.pop("tenant_id")
+    with pytest.raises(ValueError, match="Tenant"):
+        analyze_document(db, doc)
