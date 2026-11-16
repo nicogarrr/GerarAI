@@ -86,6 +86,10 @@ class Filing:
     # filas que el propio 13F declara en su SUMMARYPAGE (TABLEENTRYTOTAL)
     declared_rows: int | None = None
 
+    # Reported USD value, not mark-to-market. None if any contributing row
+    # lacks a valid VALUE; partial amounts must never be presented as totals.
+    values_usd: dict[str, Decimal | None] = field(default_factory=dict)
+
     @property
     def complete(self) -> bool:
         """La tabla trae al menos la mitad de las filas que el 13F declara."""
@@ -172,6 +176,19 @@ def parse_dataset(source: str | IO[bytes], cusips: set[str], *, url: str = "") -
                 raise ValueError("Cantidad 13F negativa: cartera no verificable")
             if amount > 0:
                 filing.shares[cusip] = filing.shares.get(cusip, Decimal(0)) + amount
+                try:
+                    value = Decimal(_get(index, row, "VALUE").replace(",", ""))
+                    if not value.is_finite() or value < 0:
+                        value = None
+                except ArithmeticError:
+                    value = None
+                # SEC EDGAR Release 22.4.1, effective 2023-01-03: VALUE
+                # changed from thousands to nearest dollar. Filing date, not
+                # report period, selects that schema. Do not infer from price.
+                if value is not None and filing.filed < date(2023, 1, 3):
+                    value *= 1000
+                previous = filing.values_usd.get(cusip, Decimal(0))
+                filing.values_usd[cusip] = previous + value if previous is not None and value is not None else None
     return DatasetParse(url, filings)
 
 
@@ -186,6 +203,7 @@ class ManagerPeriod:
     shares: dict[str, Decimal]
     amendments: list[str] = field(default_factory=list)
     url: str = ""
+    values_usd: dict[str, Decimal | None] = field(default_factory=dict)
 
 
 def resolve_periods(parses: list[DatasetParse]) -> tuple[dict[date, dict[str, ManagerPeriod]], int]:
@@ -210,7 +228,7 @@ def resolve_periods(parses: list[DatasetParse]) -> tuple[dict[date, dict[str, Ma
             empty += sum(1 for it in items if it[0].form == "13F-HR")
             continue
         base, url = originals[-1]
-        current = ManagerPeriod(cik, base.manager, base.accession, base.filed, dict(base.shares), url=url)
+        current = ManagerPeriod(cik, base.manager, base.accession, base.filed, dict(base.shares), url=url, values_usd=dict(base.values_usd))
         for filing, _ in items:
             if filing.form != "13F-HR/A" or (filing.filed, filing.accession) <= (base.filed, base.accession):
                 continue
@@ -219,9 +237,13 @@ def resolve_periods(parses: list[DatasetParse]) -> tuple[dict[date, dict[str, Ma
                     ignored += 1
                     continue
                 current = ManagerPeriod(cik, filing.manager or current.manager, filing.accession, filing.filed,
-                                        dict(filing.shares), [*current.amendments, filing.accession], url=current.url)
+                                        dict(filing.shares), [*current.amendments, filing.accession], url=current.url,
+                                        values_usd=dict(filing.values_usd))
             elif filing.amendment_type.startswith("NEW HOLDINGS"):
                 for cusip, amount in filing.shares.items():
+                    previous = current.values_usd.get(cusip, Decimal(0)) if cusip not in current.shares else current.values_usd.get(cusip)
+                    addition = filing.values_usd.get(cusip)
+                    current.values_usd[cusip] = previous + addition if previous is not None and addition is not None else None
                     current.shares[cusip] = current.shares.get(cusip, Decimal(0)) + amount
                 current.amendments.append(filing.accession)
             else:

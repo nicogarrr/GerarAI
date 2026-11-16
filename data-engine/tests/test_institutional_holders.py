@@ -188,7 +188,7 @@ def test_pagina_de_la_sec_y_job_sin_cambios():
     assert [r.window_end for r in refs] == [date(2026, 8, 31), date(2026, 5, 31)]
     db = _db()
     db.add(PublicSourceDocument(company_id=1, listing_key=f"13f:2026-06-30:{APPLE}", provider=ih.PROVIDER, source_url=refs[0].url,
-                                checksum="x", fetched_at=__import__("datetime").datetime(2026, 9, 1), official=True))
+                                checksum=ih.DETAIL_VERSION + "x", fetched_at=__import__("datetime").datetime(2026, 9, 1), official=True))
     db.commit()
     calls: list[str] = []
 

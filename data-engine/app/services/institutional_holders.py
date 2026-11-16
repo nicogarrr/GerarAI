@@ -24,7 +24,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
@@ -46,6 +46,7 @@ NAMESPACE = "sec13f"
 TOTAL = "__total__"
 TOP_N = 10
 MOVERS_N = 10
+DETAIL_VERSION = "n1:"
 STATUSES = ("nuevo", "aumenta", "reduce", "igual", "vende_todo", "sin_13f_aun", "sin_13f_previo")
 LIMITATIONS = (
     "13F: solo gestores con más de 100 M$ en acciones de EE. UU.; trimestral, hasta 45 días de retraso; solo largos (sin cortos ni opciones).",
@@ -78,6 +79,8 @@ class HolderRow:
     filed: date | None
     prev_accession: str | None
     prev_filed: date | None
+    value_usd: Decimal | None = None
+    accessions: list[str] = field(default_factory=list)
 
     @property
     def change(self) -> Decimal:
@@ -110,8 +113,10 @@ def summarize(periods: dict[date, dict[str, ds.ManagerPeriod]], cusip: str, curr
             shares=cur, prev_shares=prev,
             status=_status(cur, prev, mnow is not None, prev > 0, mbefore is not None),
             accession=mnow.accession if mnow else None, filed=mnow.filed if mnow else None,
-            prev_accession=mbefore.accession if mbefore and prev > 0 else None,
-            prev_filed=mbefore.filed if mbefore and prev > 0 else None,
+            prev_accession=mbefore.accession if mbefore else None,
+            prev_filed=mbefore.filed if mbefore else None,
+            value_usd=mnow.values_usd.get(cusip) if mnow else None,
+            accessions=list(dict.fromkeys([mnow.accession, *mnow.amendments])) if mnow else [],
         ))
     holders = [r for r in rows if r.shares > 0]
     total = sum((r.shares for r in holders), Decimal(0))
@@ -127,7 +132,12 @@ def summarize(periods: dict[date, dict[str, ds.ManagerPeriod]], cusip: str, curr
     # posición con 13F en los dos (sin 13F previo / aún no son movimientos).
     buyers = sorted((r for r in rows if r.change > 0 and r.status not in ("sin_13f_aun", "sin_13f_previo")), key=lambda r: (-r.change, key(r)))[:MOVERS_N]
     sellers = sorted((r for r in rows if r.change < 0 and r.status not in ("sin_13f_aun", "sin_13f_previo")), key=lambda r: (r.change, key(r)))[:MOVERS_N]
+    new = [r for r in rows if r.status == "nuevo"]
+    valued_new = [r for r in new if r.value_usd is not None]
     return {
+        "new_by_shares": sorted(new, key=lambda r: (-r.shares, r.cik))[:TOP_N],
+        "new_by_value": sorted(valued_new, key=lambda r: (-r.value_usd, r.cik))[:TOP_N],
+        "new_value_known_count": len(valued_new),
         "current": current, "prior": prior,
         "totals": {
             "holders": len(holders),
@@ -186,17 +196,30 @@ def persist(db: Session, company: Company, summary: dict[str, Any], *, cusip: st
     add("13f.total.net_comparable", totals["net_comparable"], "shares", current, TOTAL, refs=refs, derived=True)
     for status in STATUSES:
         add(f"13f.count.{status}", totals[status], "count", current, TOTAL, refs=refs, derived=True)
+    if "new_by_shares" in summary:
+        add("13f.count.new_detail_version", 1, "count", current, TOTAL, refs=refs)
+        add("13f.count.new_value_known", summary["new_value_known_count"], "count", current, TOTAL, refs=refs)
+    roles_to_store = ("top", "buyers", "sellers", "new_by_shares", "new_by_value")
     seen: set[str] = set()
     roles: dict[str, list[str]] = {}
-    for role in ("top", "buyers", "sellers"):
-        for row in summary[role]:
+    for role in roles_to_store:
+        for row in summary.get(role, []):
             roles.setdefault(row.cik, []).append(role)
-    for role in ("top", "buyers", "sellers"):
-        for row in summary[role]:
+    for role in roles_to_store:
+        for row in summary.get(role, []):
             if row.cik in seen:
                 continue
             seen.add(row.cik)
-            tags = [f"status:{row.status}", *(f"role:{r}" for r in roles[row.cik])]
+            # New roles use their own namespace so an older reader can ignore
+            # them during rollback rather than indexing an unknown role key.
+            tags = [f"status:{row.status}",
+                    *(f"{'new_role' if r.startswith('new_') else 'role'}:{r}" for r in roles[row.cik]),
+                    *(f"value_accession:{acc}" for acc in row.accessions)]
+            if row.value_usd is not None and ("new_by_shares" in roles[row.cik] or "new_by_value" in roles[row.cik]):
+                add("13f.holder.value_usd", row.value_usd, "USD", current, _name(row),
+                    accession=row.accession, filed=row.filed, refs=tags)
+            # Old readers treat unknown metrics as current shares. Put the
+            # actual shares last so rollback still sees the correct quantity.
             add("13f.holder.shares", row.shares, "shares", current, _name(row), accession=row.accession, filed=row.filed, refs=tags)
             add("13f.holder.prev_shares", row.prev_shares, "shares", prior, _name(row), accession=row.prev_accession,
                 filed=row.prev_filed, refs=tags)
@@ -277,7 +300,9 @@ def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
         return None
     base: dict[str, Any] = {"ticker": snap.company.ticker, "name": snap.company.name, "cusip": snap.cusip,
                             "identity_source": snap.identity, "limitations": list(LIMITATIONS),
-                            "top_holders": [], "buyers": [], "sellers": []}
+                            "top_holders": [], "buyers": [], "sellers": [],
+                            "new_positions": {"status": "sin_datos", "count": None, "value_known_count": None,
+                                              "top_by_shares": [], "top_by_value": []}}
     if snap.status is not None:
         out_status: dict[str, Any] = {**base, "status": snap.status}
         if snap.reason is not None:
@@ -301,18 +326,27 @@ def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
             totals[f.metric.split(".", 2)[2] + suffix] = float(f.value)
             continue
         h = holders.setdefault(f.concept_name, {"tags": list(f.derived_from_refs or [])})
-        h["prev" if f.metric == "13f.holder.prev_shares" else "cur"] = f
+        field = {"13f.holder.prev_shares": "prev", "13f.holder.value_usd": "value"}.get(f.metric, "cur")
+        h[field] = f
     total_shares = Decimal(str(totals.get("shares", 0)))
-    out: dict[str, list[dict[str, Any]]] = {"top": [], "buyers": [], "sellers": []}
+    out: dict[str, list[dict[str, Any]]] = {key: [] for key in ("top", "buyers", "sellers", "new_by_shares", "new_by_value")}
     for concept, h in holders.items():
         cik, _, name = concept.partition("|")
         cur, prev = h.get("cur"), h.get("prev")
         status = next((t.split(":", 1)[1] for t in h["tags"] if t.startswith("status:")), "")
         row = _holder_out(cik, name, cur.value if cur else Decimal(0), prev.value if prev else Decimal(0), status, total_shares,
                           cur.accession if cur else None, cur.filed if cur else None, prev.accession if prev else None)
+        row["value_usd"] = float(h["value"].value) if h.get("value") is not None else None
+        row["value_filing_urls"] = [ds.filing_index_url(cik, tag.split(":", 1)[1])
+                                    for tag in h["tags"] if tag.startswith("value_accession:")] if row["value_usd"] is not None else []
         for tag in h["tags"]:
-            if tag.startswith("role:"):
+            if tag.startswith(("role:", "new_role:")):
                 out[tag.split(":", 1)[1]].append(row)
+    out["new_by_shares"].sort(key=lambda r: (-r["shares"], r["cik"]))
+    out["new_by_value"].sort(key=lambda r: (-r["value_usd"], r["cik"]))
+    new_detail = "new_detail_version" in totals
+    new_count = int(totals.get("nuevo", 0))
+    known_count = int(totals.get("new_value_known", 0)) if new_detail else None
     out["top"].sort(key=lambda r: (-r["shares"], r["cik"]))
     out["buyers"].sort(key=lambda r: (-r["change"], r["cik"]))
     out["sellers"].sort(key=lambda r: (r["change"], r["cik"]))
@@ -327,6 +361,12 @@ def institutional_holders(db: Session, ticker: str) -> dict[str, Any] | None:
             **{s: int(totals.get(f"{s}", 0)) for s in STATUSES},
         },
         "top_holders": out["top"], "buyers": out["buyers"], "sellers": out["sellers"],
+        "new_positions": {
+            "status": ("ok" if known_count == new_count else "valor_parcial") if new_detail else "sin_detalle",
+            "count": new_count, "value_known_count": known_count,
+            "top_by_shares": out["new_by_shares"], "top_by_value": out["new_by_value"],
+            "value_basis": "Valor USD declarado en el 13F al cierre del trimestre; no valor actual. Errores del declarante no corregidos.",
+        },
     }
 
 
@@ -357,7 +397,7 @@ def ingest_parsed(db: Session, parses: list[ds.DatasetParse], checksums: list[st
         # procesado y congelaría el reintento del refresh semanal.
         return {"status": "sin_datos", "reason": f"sin 13F válidos en el trimestre {' y '.join(missing)}",
                 "period": current.isoformat(), "prior": prior.isoformat(), "companies": 0, "filings_skipped": ignored}
-    checksum = hashlib.sha256("|".join(checksums).encode()).hexdigest()
+    checksum = DETAIL_VERSION + hashlib.sha256("|".join(checksums).encode()).hexdigest()[:61]
     stored = 0
     for cusip, company in cusips.items():
         summary = summarize(periods, cusip, current, prior)
@@ -415,7 +455,8 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
         # idempotente por empresa, CUSIP y checksum: solo se guardan las nuevas).
         company_cusip = {company.id: cusip for cusip, company in cusips.items()}
         rows = session.execute(select(PublicSourceDocument.company_id, PublicSourceDocument.listing_key).where(
-            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url)).all()
+            PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url,
+            PublicSourceDocument.checksum.startswith(DETAIL_VERSION))).all()
         processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
         if all(company.id in processed for company in cusips.values()):
             return {"status": "sin_cambios", "dataset": refs[0].url}
