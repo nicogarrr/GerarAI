@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -11,8 +12,8 @@ def test_hy4_kpi_skips_external_jev_and_records_verified_zero(monkeypatch):
     from app.services.budget import BudgetController
     seen=[]
     monkeypatch.setattr(fixture._StaticProvider,'name','hy4-go-zero')
-    async def forbidden(*args): raise AssertionError('Jev must not run for Hy4 KPI')
-    monkeypatch.setattr(jev_gates,'kpi_chunk_keep_flags',forbidden)
+    jev_spy=AsyncMock(return_value=[])
+    monkeypatch.setattr(jev_gates,'kpi_chunk_keep_flags',jev_spy)
     def can_spend(self, db, amount):
         seen.append(amount)
         return amount==0
@@ -22,6 +23,8 @@ def test_hy4_kpi_skips_external_jev_and_records_verified_zero(monkeypatch):
     candidate=fixture._extraction('La penetración alcanza el 12,5% del mercado.', '12,5')
     assert candidate.status=='pending_approval'
     assert seen==[0]
+    jev_spy.assert_not_awaited()
+    jev_spy.assert_not_called()
 
 
 @pytest.mark.parametrize('status',[429,402])
