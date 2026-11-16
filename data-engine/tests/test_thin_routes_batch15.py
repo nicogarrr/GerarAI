@@ -819,17 +819,16 @@ def test_endpoint_cache_hit_con_items_frescos_no_reprograma(monkeypatch):
     assert programado == []
 
 
-def test_endpoint_carga_fria_espera_lo_minimo_y_declara_no_disponible(monkeypatch):
-    # La espera del cold start va doblada (result() no espera de verdad, asi
-    # que la duracion real del test es cero); lo que se comprueba es el
-    # timeout exacto con el que la ruta espera al futuro.
+def test_endpoint_carga_fria_no_espera_y_declara_no_disponible(monkeypatch):
+    # Cold start conserva el contrato vacío/refreshing, sin esperar al Future.
+    # El test falla si reaparece cualquier espera, independientemente del reloj.
     monkeypatch.setattr(s, "get_settings", _settings)
     futuro = Mock()
     futuro.done.return_value = False
     futuro.result.side_effect = TimeoutError("sigue sin datos")
     monkeypatch.setattr(s, "_schedule_real_refresh", lambda v, t: futuro)
     result = s.real_time_screener(marketCapMoreThan=None, sector=None, limit=25, db=_db())
-    futuro.result.assert_called_once_with(timeout=s._COLD_START_WAIT_SECONDS)
+    futuro.result.assert_not_called()
     assert result["refreshing"] is True
     assert result["unavailable"] is True
     assert result["screener"] == []

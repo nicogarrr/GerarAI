@@ -88114,7 +88114,7 @@
     },
     "/api/screeners/real": {
       "get": {
-        "description": "Screener real con cache por par\u00e1metros y stale-while-revalidate.\n\nNunca espera un refresh de red cuando existe LKG: devuelve la respuesta al\ninstante y actualiza en segundo plano. En cold start espera como m\u00e1ximo\n50 ms para un primer resultado \u00fatil; despu\u00e9s devuelve LKG al instante y\ndeja el trabajo largo en background.\n\nEl `get_db` no es decorativo: los ratios salen de `financial_facts`, que es\nTenantOwnedMixin, as\u00ed que la respuesta depende del tenant. Sin esta\ndependencia el handler no conoc\u00eda su tenant, la clave de cach\u00e9 era global\ny un tenant recib\u00eda ratios derivados de los hechos ingeridos por otro.",
+        "description": "Screener real con cache por par\u00e1metros y stale-while-revalidate.\n\nNunca espera un refresh de red cuando existe LKG: devuelve la respuesta al\ninstante y actualiza en segundo plano. En cold start tampoco espera al\nrefresco: devuelve los datos ya publicados o vac\u00edo con refreshing=true\nmientras el trabajo sigue en background.\n\nEl `get_db` no es decorativo: los ratios salen de `financial_facts`, que es\nTenantOwnedMixin, as\u00ed que la respuesta depende del tenant. Sin esta\ndependencia el handler no conoc\u00eda su tenant, la clave de cach\u00e9 era global\ny un tenant recib\u00eda ratios derivados de los hechos ingeridos por otro.",
         "operationId": "real_time_screener_api_screeners_real_get",
         "parameters": [
           {
