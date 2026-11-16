@@ -92,6 +92,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         void import('react-markdown');
     }, []);
     const [isMaximized, setIsMaximized] = useState(false);
+    const [chatModel, setChatModel] = useState<'' | 'hy4-flash-free'>('');
     // Modo guía (asistente de research unificado): con ticker en el selector el
     // Cerebro pregunta a /api/research/assistant en vez de al chat general.
     const [author, setAuthor] = useState('');
@@ -280,7 +281,9 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             return;
         }
         try {
-            const result = await chatWithPortfolio(userMsg, userId, page, history);
+            const result = chatModel
+                ? await chatWithPortfolio(userMsg, userId, page, history, chatModel)
+                : await chatWithPortfolio(userMsg, userId, page, history);
             if (result.context) setEcho(result.context);
             if (result.success) {
                 setMessages(prev => [...prev, { role: 'assistant', content: result.message, citations: result.citations, experts: result.experts, expertsTimedOut: result.expertsTimedOut, expertSummary: result.expertSummary }]);
@@ -449,6 +452,15 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
 
             <CardFooter className="shrink-0 flex-col gap-2 p-3 border-t border-slate-800 bg-slate-900/50">
                 <AiAvailabilityNotice availability={availability} />
+                {!knowledge && !guideTicker.trim() && <label className="flex w-full min-w-0 flex-col gap-1 text-xs text-slate-300">
+                    {t('brain.panel.modelLabel')}
+                    <select aria-label={t('brain.panel.modelLabel')} value={chatModel} disabled={loading}
+                        onChange={e => setChatModel(e.target.value === 'hy4-flash-free' ? 'hy4-flash-free' : '')}
+                        className="min-h-11 w-full rounded border border-slate-700 bg-slate-950 px-3 text-base sm:text-sm">
+                        <option value="">{t('brain.panel.modelDefault')}</option>
+                        <option value="hy4-flash-free">{t('brain.panel.modelHy4')}</option>
+                    </select>
+                </label>}
                 <form
                     className="flex w-full gap-2"
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}

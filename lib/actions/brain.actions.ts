@@ -45,6 +45,7 @@ export async function chatWithPortfolio(
     userId: string,
     page?: BrainPageContext | null,
     history?: BrainHistoryTurn[] | null,
+    model?: 'hy4-flash-free',
 ) {
     const user = await requireAuthenticatedUser();
     if (userId !== user.id) {
@@ -54,6 +55,9 @@ export async function chatWithPortfolio(
     if (question.length < 3) {
         throw new ValidationError('Escribe una pregunta de al menos 3 caracteres', 'query');
     }
+    if (model !== undefined && model !== 'hy4-flash-free') {
+        throw new ValidationError('Modelo no válido', 'model');
+    }
     let response: ResearchChatResponse;
     try {
         response = await researchRequest<ResearchChatResponse>('/api/chat', {
@@ -62,7 +66,7 @@ export async function chatWithPortfolio(
             // coste medio, peso, rentabilidad) salen en ese idioma cuando el motor
             // tiene activa la generación multidioma; si no, en español como siempre.
             headers: { 'x-gerarai-language': await requestLocale() },
-            body: jsonBody({ question, scope: 'portfolio', ticker: null, page: page ?? null, history: trimBrainHistory(history) }),
+            body: jsonBody({ question, scope: 'portfolio', ticker: null, page: page ?? null, history: trimBrainHistory(history), ...(model ? { model } : {}) }),
         });
     } catch (error) {
         // Return known transport errors as data: Next hides server exception
