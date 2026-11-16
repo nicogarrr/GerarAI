@@ -282,6 +282,92 @@ _PERSONAL_RE = re.compile(
     r"|\bsu(?:s)?\s+(?:cartera|posici[oó]n(?:es)?|cuenta|inversi[oó]n(?:es)?|"
     r"acciones|rentabilidad|patrimonio|beneficios?)\b"
 )
+
+# Ordenes de compra/venta dirigidas al asistente. Una MENCION negada o
+# educativa ("no des recomendaciones de compra") no es una orden; una orden
+# real si ("compra acciones de apple"). Medido QA c31b (16-nov-2026): la
+# pregunta educativa "Explica que es el flujo de caja libre... No des
+# recomendaciones de compra" caia en abstain por el "compra" negado.
+# Reglas (en duda, la mencion cuenta como orden: falla seguro):
+# - El alcance de la negacion es su CLAUSULA: se corta en .?!;,: en las
+#   conjunciones y/pero/but/and y en las locuciones "sin embargo",
+#   "no obstante", "however", "nevertheless" (que no niegan nada).
+# - "no solo ... tambien" / "not only" no niega la accion: "solo"/"only"
+#   queda entre la negacion y la accion y fuerza el fallo seguro.
+# - "compra"/"venta" como sustantivo ("recomendaciones de compra",
+#   "puntos de venta") no es una orden.
+# - Otra palabra con peso entre la negacion y la accion ("never hesitate
+#   to buy", "no dejes de comprar") hace ambiguo el alcance: cuenta como
+#   orden.
+# Los verbos de orden se evaluan con o sin termino financiero en la pregunta;
+# los posesivos ingleses (my/your/our) solo dentro del ambito financiero,
+# porque fuera de el son conversacion ordinaria ("my name is John").
+_TRADE_VERB_RE = re.compile(r"(?i)\b(buy|sell|compra|vende|ejecuta)\b")
+_TRADE_POSSESSIVE_RE = re.compile(r"(?i)\b(my|your|our)\b")
+_CLAUSE_SPLIT_RE = re.compile(
+    r"(?i)[.?!;,:]|\by\b|\bpero\b|\bbut\b|\band\b|"
+    r"\bsin\s+embargo\b|\bno\s+obstante\b|\bhowever\b|\bnevertheless\b"
+)
+_TRADE_NEGATION_RE = re.compile(
+    r"(?i)\b(?:no|nunca|tampoco|jam[aá]s|sin|not|never|don'?t|do\s+not|does\s+not|without)\b"
+)
+_TRADE_NOUN_RE = re.compile(r"(?i)\b(?:de|del|para)\s+(?:la\s+|el\s+)?$")
+# Lectura interrogativa RECONOCIBLE en 3a persona, no orden: la clausula de
+# la accion EMPIEZA por que/que/what/which (pregunta sobre el sujeto:
+# "que vende Apple", "what does Apple sell") o la pregunta TERMINA en "?".
+# Un do/que suelto en medio de la clausula no basta: "Do it now sell Apple"
+# o "Haz lo que digo vende Apple" son ordenes. Solo vende/sell (indicativo =
+# imperativo tu); "buy"/"compra" no se exceptuan. Ante la duda, la accion
+# cuenta como orden (falla seguro).
+_TRADE_QUESTION_START_RE = re.compile(r"(?i)^\s*¿?\s*(?:qu[eé]|what|which)\b")
+_TRADE_LIGHT_WORDS = frozenset(
+    {
+        "me", "te", "se", "le", "nos", "les", "lo", "que", "qué", "si", "sí",
+        "de", "del", "la", "el", "los", "las", "un", "una", "a", "al", "en",
+        "to", "the", "an", "what",
+    }
+)
+_WORD_RE = re.compile(r"[a-záéíóúñ']+", re.IGNORECASE)
+
+
+def _asks_trade_action(question: str, action_re: re.Pattern = _TRADE_VERB_RE) -> bool:
+    """Orden real de compra/venta; una mencion negada o educativa no lo es."""
+    q = question or ""
+    for match in action_re.finditer(q):
+        before = q[: match.start()]
+        if match.group(0).lower() == "compra" and _TRADE_NOUN_RE.search(before):
+            # Sustantivo: "recomendaciones de compra", no una orden.
+            continue
+        clause_start = max(
+            (split.end() for split in _CLAUSE_SPLIT_RE.finditer(before)), default=0
+        )
+        clause = before[clause_start:]
+        if match.group(0).lower() in ("vende", "sell") and (
+            _TRADE_QUESTION_START_RE.match(clause) or q.rstrip().endswith("?")
+        ):
+            # Interrogativa reconocible: "que vende Apple" (clausula inicial)
+            # o cualquier pregunta cerrada con "?". "Do it now sell Apple" no
+            # empieza por interrogativo ni acaba en "?": es una orden.
+            continue
+        negations = list(_TRADE_NEGATION_RE.finditer(clause))
+        if not negations:
+            return True  # accion sin negacion en su clausula: orden
+        for negation in negations:
+            between = clause[negation.end() :]
+            heavy = [
+                word
+                for word in _WORD_RE.findall(between)
+                if word.lower() not in _TRADE_LIGHT_WORDS
+            ]
+            if heavy:
+                # La negacion puede gobernar esa otra palabra ("no des
+                # recomendaciones...", "never hesitate to buy"): ambiguo,
+                # falla seguro contando la accion como orden.
+                return True
+            # "no compres" directo: la negacion gobierna la accion.
+    return False
+
+
 _NUMBER_WORD_RE = re.compile(
     r"(?i)\b(cero|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|trece|"
     r"catorce|quince|veinte\w*|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|"
@@ -327,14 +413,19 @@ _FUND_RE = re.compile(r"(?i)\b(?:fondos?|etfs?|[ií]ndices?|indexad\w*)\b")
 def _general_scope(question: str) -> str:
     """Clasifica charla, concepto, conocimiento empresarial o contexto privado."""
     q = (question or "").strip()
+    # Una orden de compra/venta abstiene con o sin termino financiero en la
+    # pregunta ("No vendas Tesla, compra Apple" no lleva ningun termino de
+    # _FIN_SCOPE_RE y aun asi es una orden).
+    if _asks_trade_action(q):
+        return "abstain"
     if not _FIN_SCOPE_RE.search(q):
         return "ordinary"
     if _CONCEPT_Q_RE.fullmatch(q):
         return "concept"
-    # Datos privados y ordenes no se deducen del conocimiento del modelo.
-    if _PERSONAL_RE.search(q) or re.search(
-        r"(?i)\b(my|your|our|buy|sell|compra|vende|ejecuta)\b", q
-    ):
+    # Datos privados no se deducen del conocimiento del modelo. Los posesivos
+    # ingleses cuentan aqui, ya dentro del ambito financiero: fuera de el son
+    # conversacion ordinaria ("my name is John").
+    if _PERSONAL_RE.search(q) or _asks_trade_action(q, _TRADE_POSSESSIVE_RE):
         return "abstain"
     return "inferred"
 
