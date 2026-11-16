@@ -12,7 +12,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.core.cache import (
     PORTFOLIO_VALUATION_PREFIX,
@@ -50,6 +50,7 @@ class CachedPortfolioValuationService:
         positions = list(
             db.scalars(
                 select(Position)
+                .options(joinedload(Position.company))
                 .where(Position.portfolio_id == portfolio.id)
                 .order_by(Position.company_id)
             ).all()
