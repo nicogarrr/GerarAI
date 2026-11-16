@@ -22,6 +22,12 @@ test('production backend and default worker preserve measured CPU caps and memor
     assert.match(limits('worker'), /limits:\s*\n\s*cpus: "1\.00"\s*\n\s*memory: 4G/);
     // Carril dedicado de prices (frescura intradia 15 min sin el backlog de default).
     assert.match(limits('worker-prices'), /limits:\s*\n\s*cpus: "0\.50"\s*\n\s*memory: 512M/);
+    // worker-knowledge: 4G medido por el Piloto (16-nov-2026): e5-large carga
+    // con ru_maxrss 1,60 GiB y memory.peak 2,74 GiB; con 512M y con 1,5G el
+    // kernel mataba el worker (CONSTRAINT_MEMCG). Los limits son techos por
+    // servicio, no reservas: la suma de techos supera la RAM fisica y el
+    // presupuesto global lo refleja (ver assertGlobalMemoryBudget).
+    assert.match(limits('worker-knowledge'), /limits:\s*\n\s*cpus: "0\.50"\s*\n\s*memory: 4G/);
 });
 
 test('default worker does not overlap evidence scans', () => {
@@ -37,12 +43,18 @@ function assertGlobalMemoryBudget(compose: string): void {
     const memory = [...compose.matchAll(/^          memory: ([0-9]+)([MG])$/gm)];
     assert.ok(memory.length >= 20, 'all production service limits must be counted');
     const total = memory.reduce((sum, match) => sum + Number(match[1]) * (match[2] === 'G' ? 1024 : 1), 0);
-    assert.ok(total <= 16384, `stack memory ${total} MiB exceeds 16384 MiB`);
+    // 20480 MiB: los limits de compose son TECHOS por servicio, no reservas
+    // simultaneas. worker-knowledge subio a 4G (16-nov-2026, medido por el
+    // Piloto: memory.peak 2,74 GiB con e5-large; 512M y 1,5G morian por
+    // CONSTRAINT_MEMCG) y con el la suma de techos es 19712 MiB, por encima
+    // de los 16384 MiB fisicos de la VM. El presupuesto deja de ser "suma <=
+    // RAM fisica" y pasa a ser un tope de crecimiento sobre lo medido.
+    assert.ok(total <= 20480, `stack memory ${total} MiB exceeds 20480 MiB`);
 }
 
 test('backend reallocation preserves global memory budget and rejects old 2G', () => {
     assertGlobalMemoryBudget(source);
-    const mutant = source.replace('memory: 1472M', 'memory: 2G');
+    const mutant = source.replace('memory: 1472M', 'memory: 3G');
     assert.notEqual(mutant, source, 'negative control must mutate backend limit');
-    assert.throws(() => assertGlobalMemoryBudget(mutant), /stack memory 16704 MiB exceeds 16384 MiB/);
+    assert.throws(() => assertGlobalMemoryBudget(mutant), /stack memory 21312 MiB exceeds 20480 MiB/);
 });
