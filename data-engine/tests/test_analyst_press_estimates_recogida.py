@@ -19,15 +19,22 @@ class _Rows:
     def all(self):
         return self.rows
 
+    def first(self):
+        return self.rows[0] if self.rows else None
+
 
 class _DB:
     def __init__(self, *results):
         self.results = iter(results)
         self.statements = []
+        self.added = []
 
     def scalars(self, statement):
         self.statements.append(statement)
         return _Rows(next(self.results))
+
+    def add(self, row):
+        self.added.append(row)
 
 
 @pytest.mark.parametrize(
@@ -49,7 +56,18 @@ class _DB:
     ],
 )
 def test_marcas_de_recogida_y_frontera_tres_dias(rows, stale):
-    assert svc.press_estimates_stale(_DB(rows), CO, 1, today=TODAY) is stale
+    # Segundo result: la consulta del marcador durable en ConnectorState
+    # (sin fila -> no cambia el veredicto de las notas).
+    assert svc.press_estimates_stale(_DB(rows, [None]), CO, 1, today=TODAY) is stale
+
+
+def test_marcador_connectorstate_cubre_recogidas_vacias():
+    """Una recogida sin estimaciones tambien cuenta: la empresa no se rastrea en bucle."""
+    fresh = SimpleNamespace(date=lambda: TODAY)
+    old = SimpleNamespace(date=lambda: date(2026, 10, 1))
+    assert svc.press_estimates_stale(_DB([], [fresh]), CO, 1, today=TODAY) is False
+    assert svc.press_estimates_stale(_DB([], [old]), CO, 1, today=TODAY) is True
+    assert svc.press_estimates_stale(_DB([], [None]), CO, 1, today=TODAY) is True
 
 
 def test_refresh_filtra_urls_y_transfiere_parametros(monkeypatch):
@@ -65,6 +83,7 @@ def test_refresh_filtra_urls_y_transfiere_parametros(monkeypatch):
             news("  https://example.test/b  "),
             news(""),
         ],
+        [None],  # ConnectorState: sin marcador previo
     )
     reading = svc.ArticleReading()
     article = svc.Article("https://example.test/a", "t", TODAY, "text")
@@ -113,7 +132,9 @@ def test_refresh_filtra_urls_y_transfiere_parametros(monkeypatch):
             },
         )
     ]
-    assert len(db.statements) == 2
+    assert len(db.statements) == 3  # firmas + news + marcador ConnectorState
+    assert db.added and db.added[0].connector == svc.COLLECTOR_NAME
+    assert db.added[0].last_success_at is not None
 
 
 def test_collect_documentos_validos_vacios_y_errores(monkeypatch):

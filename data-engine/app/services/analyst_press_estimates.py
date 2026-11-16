@@ -581,9 +581,42 @@ def refresh_press_estimates(db: Any, company: Any, tenant_id: int, *, max_articl
         timeout=timeout,
     )
     saved = store_readings(db, company, tenant_id, report.readings)
+    _mark_collected(db, company, tenant_id, report)
     return {"articles_seen": report.articles_seen, "articles_read": report.articles_read,
             "with_estimates": len(report.readings), "skipped_robots": sorted(set(report.skipped_robots)),
             "failed": report.failed[:20], **saved}
+
+
+COLLECTOR_NAME = "analyst_press"
+
+
+def _mark_collected(db: Any, company: Any, tenant_id: int, report: CollectReport) -> None:
+    """Marca durable de la recogida, aunque no haya estimaciones (no hace commit).
+
+    El marcador histórico vivía en los extras de las notas de analista, que
+    solo se escriben cuando un artículo da cifras: una empresa sin prensa de
+    analistas nunca avanzaba el marcador, ``press_estimates_stale`` la daba
+    por vieja para siempre y cada propuesta SOTP reencolaba su rastreo
+    (hallazgo del carril de auditoría). ConnectorState es la casa de
+    «última pasada de un conector por empresa».
+    """
+    from sqlalchemy import select
+
+    from app.models import ConnectorState
+
+    now = datetime.now(UTC)
+    state = db.scalars(select(ConnectorState).where(
+        ConnectorState.tenant_id == tenant_id, ConnectorState.connector == COLLECTOR_NAME,
+        ConnectorState.company_id == company.id, ConnectorState.feed_url.is_(None))).first()
+    if state is None:
+        state = ConnectorState(tenant_id=tenant_id, connector=COLLECTOR_NAME, company_id=company.id,
+                               metadata_={})
+        db.add(state)
+    state.last_started_at = state.last_started_at or now
+    state.last_success_at = now
+    state.consecutive_errors = 0
+    state.metadata_ = {**(state.metadata_ or {}), "articles_seen": report.articles_seen,
+                       "articles_read": report.articles_read, "with_estimates": len(report.readings)}
 
 
 STALE_DAYS = 3
@@ -601,7 +634,17 @@ def press_estimates_stale(db: Any, company: Any, tenant_id: int, *, today: date 
         AnalystNote.note_date >= today - timedelta(days=60))).all()
     marks = [r.get("collected_on") for r in rows if isinstance(r, dict) and r.get("kind") == "analyst_press"]
     latest = max((date.fromisoformat(m) for m in marks if m), default=None)
-    return latest is None or latest < today - timedelta(days=STALE_DAYS)
+    if latest is not None and latest >= today - timedelta(days=STALE_DAYS):
+        return False
+    # Marcador durable de la recogida (también las vacías) en ConnectorState.
+    from app.models import ConnectorState
+
+    state = db.scalars(select(ConnectorState.last_success_at).where(
+        ConnectorState.tenant_id == tenant_id, ConnectorState.connector == COLLECTOR_NAME,
+        ConnectorState.company_id == company.id, ConnectorState.feed_url.is_(None))).first()
+    if state is not None and state.date() >= today - timedelta(days=STALE_DAYS):
+        return False
+    return True
 
 
 # -- alias públicos para el panel de precios objetivo -------------------------

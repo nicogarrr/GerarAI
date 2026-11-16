@@ -19,7 +19,7 @@ import pytest
 from sqlalchemy import delete, select
 
 from app.core.database import SessionLocal, init_db
-from app.models import AnalystNote, Company, Tenant
+from app.models import AnalystNote, Company, ConnectorState, Tenant
 from app.models.declared_input_value import DeclaredInputValue
 from app.services import analyst_note_service as ans
 from app.services import analyst_press_estimates as ape
@@ -206,6 +206,7 @@ def tenant_company():
     with SessionLocal() as db:
         db.execute(delete(DeclaredInputValue).where(DeclaredInputValue.company_id == ids[0]))
         db.execute(delete(AnalystNote).where(AnalystNote.ticker == ids[2]))
+        db.execute(delete(ConnectorState).where(ConnectorState.company_id == ids[0]))
         db.execute(delete(Company).where(Company.id == ids[0]))
         db.execute(delete(Tenant).where(Tenant.id == ids[1]))
         db.commit()
@@ -333,6 +334,55 @@ def _nota(tenant_id, ticker, suffix, extras, note_date=HOY):
     return AnalystNote(tenant_id=tenant_id, ticker=ticker, firm="Clear Street", firm_key="clear_street",
                        note_date=note_date, action="reiterate", source_type="news", verification="verificado",
                        dedupe_key=f"apeb-{suffix}", extras=extras)
+
+
+def _fetch_sin_articulos(url):
+    async def fetch(u):
+        if u.endswith("/robots.txt"):
+            return b"", "text/plain", u
+        return b"<rss><channel></channel></rss>", "application/xml", u
+
+    return fetch
+
+
+def test_refresh_vacia_marca_connectorstate_y_deja_de_rastrear(tenant_company, monkeypatch):
+    """Una recogida sin artículos también actualiza el marcador durable:
+    la empresa deja de reencolarse como vieja."""
+    monkeypatch.setattr(ape, "MIN_INTERVAL_S", 0)
+    company_id, tenant_id, _ = tenant_company
+    with SessionLocal() as db:
+        db.info["tenant_id"] = tenant_id
+        company = db.get(Company, company_id)
+        assert ape.press_estimates_stale(db, company, tenant_id, today=HOY) is True
+        out = ape.refresh_press_estimates(db, company, tenant_id,
+                                          fetch=_fetch_sin_articulos(None), today=HOY)
+        db.commit()
+        assert out["articles_seen"] == 0 and out["with_estimates"] == 0
+        row = db.scalars(select(ConnectorState).where(
+            ConnectorState.tenant_id == tenant_id,
+            ConnectorState.connector == ape.COLLECTOR_NAME,
+            ConnectorState.company_id == company_id)).one()
+        assert row.last_success_at is not None
+        assert row.metadata_["articles_seen"] == 0
+        assert ape.press_estimates_stale(db, company, tenant_id, today=HOY) is False
+
+
+def test_marcador_connectorstate_se_actualiza_sin_duplicar(tenant_company, monkeypatch):
+    """La segunda recogida vacía actualiza la misma fila (upsert por empresa)."""
+    monkeypatch.setattr(ape, "MIN_INTERVAL_S", 0)
+    company_id, tenant_id, _ = tenant_company
+    with SessionLocal() as db:
+        db.info["tenant_id"] = tenant_id
+        company = db.get(Company, company_id)
+        ape.refresh_press_estimates(db, company, tenant_id, fetch=_fetch_sin_articulos(None), today=HOY)
+        db.commit()
+        ape.refresh_press_estimates(db, company, tenant_id, fetch=_fetch_sin_articulos(None), today=HOY)
+        db.commit()
+        rows = db.scalars(select(ConnectorState).where(
+            ConnectorState.tenant_id == tenant_id,
+            ConnectorState.connector == ape.COLLECTOR_NAME,
+            ConnectorState.company_id == company_id)).all()
+        assert len(rows) == 1
 
 
 def test_press_estimates_stale_segun_la_marca(tenant_company):
