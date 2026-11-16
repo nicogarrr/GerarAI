@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import CashBalance, PortfolioDailySnapshot, Position
 from app.services.portfolio_fx_service import PortfolioFXService
@@ -20,7 +20,7 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
                 "latest_snapshot_date": None, "latest_pricing_coverage": None,
                 "twr_chain": {"status": "no_snapshots", "unlinked_snapshots": 0, "first_unlinked_date": None},
                 "reasons": ["no_portfolio"]}
-    positions = list(db.scalars(select(Position).where(Position.portfolio_id == portfolio.id)))
+    positions = list(db.scalars(select(Position).options(joinedload(Position.company)).where(Position.portfolio_id == portfolio.id)))
     cash = list(db.scalars(select(CashBalance)))
     # Only diagnostic columns, streamed: no historical valuation objects or
     # unrelated JSON payloads. Keep JSON truthiness in Python exactly as before.

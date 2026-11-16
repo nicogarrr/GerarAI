@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Company, Portfolio, Position
 from app.models.entities import Base
-from app.services.portfolio_quality_service import portfolio_quality
 from app.services.portfolio_fx_service import PortfolioFXService
+from app.services.portfolio_quality_service import portfolio_quality
 
 
 @pytest.mark.parametrize('size', [0, 1, 20, 60])
