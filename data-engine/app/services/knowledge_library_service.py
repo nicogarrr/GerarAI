@@ -11,12 +11,13 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy import delete, desc, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.llm import LLMProvider, LLMRequest, Message, ResponseFormat
 from app.llm.chat_provider import create_background_llm_provider
+from app.llm.errors import ProviderDisabledError
 from app.llm.json import parse_json_response
 from app.models import (
     Company,
@@ -346,6 +347,27 @@ class KnowledgeLibraryService:
         if not chunks:
             raise ValueError("Knowledge document has no chunks")
         batches = self._principle_batches(chunks)
+        hy4_mode = getattr(self.provider, "name", "") == "hy4-go-zero"
+        if hy4_mode:
+            # Durable in-progress marker survives worker time limits/restarts.
+            # A retry may not silently repeat an already admitted LLM run.
+            if (document.metadata_ or {}).get("hy4_principle_run_state") in {"in_progress", "blocked"}:
+                raise ProviderDisabledError("Hy4 extraction stopped; operator review required before retry")
+            if len(batches) > 3:
+                raise ProviderDisabledError("Hy4 extraction limited to three batches; split this document")
+            state = KnowledgeDocument.metadata_["hy4_principle_run_state"].as_string()
+            claimed = db.execute(
+                update(KnowledgeDocument)
+                .where(KnowledgeDocument.id == document.id,
+                       or_(state.is_(None), state.not_in(["in_progress", "blocked"])))
+                .values(metadata_={**(document.metadata_ or {}), "hy4_principle_run_state": "in_progress"})
+                .returning(KnowledgeDocument.id)
+                .execution_options(synchronize_session=False)
+            ).scalar_one_or_none()
+            if claimed is None:
+                raise ProviderDisabledError("Hy4 extraction already admitted; no duplicate run")
+            db.commit()
+            db.refresh(document)
         companies = {
             company.ticker.upper(): company.id for company in db.scalars(select(Company)).all()
         }
@@ -369,7 +391,7 @@ class KnowledgeLibraryService:
             # Estimacion con el tamano real del prompt (~4 caracteres por token)
             # y el max_tokens de la llamada, en vez del 0.02 plano que usan otros
             # sitios: aqui el input es de 24.000 caracteres por lote.
-            planned_cost_eur = budget.estimate_cost_eur(
+            planned_cost_eur = 0 if hy4_mode else budget.estimate_cost_eur(
                 getattr(self.provider, "name", "") or "",
                 input_tokens=len(source) // 4,
                 output_tokens=3000,
@@ -388,30 +410,38 @@ class KnowledgeLibraryService:
             # transaction" reteniendo locks. chunks, companies y document ya
             # estan materializados y expire_on_commit=False los mantiene.
             db.commit()
-            response = await self.provider.complete(
-                LLMRequest(
-                    messages=[
-                        Message(
-                            "system",
-                            get_prompt("investment_principles").text,
+            try:
+                response = await self.provider.complete(
+                    LLMRequest(
+                        messages=[
+                            Message(
+                                "system",
+                                get_prompt("investment_principles").text,
+                            ),
+                            Message("user", source),
+                        ],
+                        task="main_financial_analysis",
+                        temperature=0,
+                        max_tokens=3000,
+                        response_format=ResponseFormat.json_schema(
+                            self._principle_schema(),
+                            name="investment_principles",
+                            strict=True,
                         ),
-                        Message("user", source),
-                    ],
-                    task="main_financial_analysis",
-                    temperature=0,
-                    max_tokens=3000,
-                    response_format=ResponseFormat.json_schema(
-                        self._principle_schema(),
-                        name="investment_principles",
-                        strict=True,
-                    ),
-                    metadata={
-                        "prompt_version": PRINCIPLE_PROMPT_VERSION,
-                        "batch_index": str(batch_index),
-                        "batch_count": str(len(batches)),
-                    },
+                        metadata={
+                            "prompt_version": PRINCIPLE_PROMPT_VERSION,
+                            "batch_index": str(batch_index),
+                            "batch_count": str(len(batches)),
+                        },
+                    )
                 )
-            )
+            except Exception as exc:
+                if not hy4_mode:
+                    raise
+                # Avoid the actor's generic 429/5xx/transport retry policy.
+                document.metadata_ = {**(document.metadata_ or {}), "hy4_principle_run_state": "blocked"}
+                db.commit()
+                raise ProviderDisabledError("Hy4 extraction stopped; no automatic retry or fallback") from exc
             payload = parse_json_response(response.text)
             # Contabilidad del gasto: sin este record, ninguna de las llamadas
             # de este bucle aparecia en budget_usage, asi que el gasto real no
@@ -420,7 +450,7 @@ class KnowledgeLibraryService:
                 db,
                 response.model,
                 "investment_principles",
-                budget.estimate_cost_eur(
+                0 if hy4_mode else budget.estimate_cost_eur(
                     response.model,
                     response.usage.input_tokens,
                     response.usage.output_tokens,
@@ -457,6 +487,9 @@ class KnowledgeLibraryService:
             if progress:
                 progress(batch_index, len(batches))
 
+        if hy4_mode:
+            document.metadata_ = {**(document.metadata_ or {}), "hy4_principle_run_state": "completed"}
+            db.commit()
         contradictions = self._contradictions(created)
         return {
             "principles": created,
