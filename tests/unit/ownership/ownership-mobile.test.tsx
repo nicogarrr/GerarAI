@@ -110,3 +110,8 @@ it('keeps English mobile labels and formatted values in the single responsive ro
  expect(within(rows[1]).getByText('Shares before')).toBeInTheDocument();
  expect(within(rows[1]).getByText('Value now')).toBeInTheDocument();
 });
+
+it('keeps ownership view navigation horizontally discoverable',async()=>{
+ render(await OwnershipPage({searchParams:Promise.resolve({})}));
+ const rail=screen.getByRole('navigation');expect(rail.className).toContain('scroll-affordance-x');expect(rail.className).not.toContain('scrollbar-width:none');expect(rail.className).toContain('overflow-x-auto');
+});

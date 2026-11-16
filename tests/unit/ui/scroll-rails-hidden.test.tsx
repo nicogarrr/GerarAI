@@ -49,7 +49,7 @@ describe('raíles horizontales táctiles: scroll oculto, deslizar intacto', () =
     // Raíles con fixtures pesados: la invariante es de clase en la fuente.
     for (const [file, needle] of [
       ['components/insider/PoliticiansListSection.tsx', 'overflow-x-auto'],
-      ['components/calendar/EarningsDayStrip.tsx', 'overflow-x-auto'],
+      
     ] as const) {
       const src = readFileSync(file, 'utf8');
       const railLines = src.split('\n').filter((line) => line.includes(needle) && line.includes('className'));

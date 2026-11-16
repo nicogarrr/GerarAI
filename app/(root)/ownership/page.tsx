@@ -137,7 +137,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                 <SyncButton />
             </header>
 
-            <nav aria-label={t('ownership.page.viewsAria')} className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <nav aria-label={t('ownership.page.viewsAria')} className="flex flex-nowrap gap-2 overflow-x-auto scroll-affordance-x">
                 {VIEWS.map(([id, labelKey]) => (
                     <Link
                         aria-current={view === id ? 'page' : undefined}
@@ -158,7 +158,7 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                     title={t('ownership.page.noManagers')}
                 />
             ) : (
-                <section className="flex flex-nowrap gap-2 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <section className="flex flex-nowrap gap-2 overflow-x-auto scroll-affordance-x">
                     {managers.map((manager) => (
                         <Link
                             className={`max-w-full rounded-lg border px-3 py-2 text-sm ${manager.cik === activeCik ? 'border-teal-700 bg-teal-950/30 text-teal-200' : 'border-gray-800 bg-surface-1 text-gray-300 hover:border-gray-700'}`}
