@@ -18,7 +18,7 @@
         "build": "next build",
         "start": "next start",
         "lint": "eslint",
-        "typecheck": "node --max-old-space-size=1408 node_modules/typescript/bin/tsc --noEmit",
+        "typecheck": "node scripts/typecheck.mjs",
         "test:e2e": "playwright test",
         "test:quote-layout": "node scripts/quote-loading-layout.mjs",
         "test:e2e:flows": "E2E_UI_RUN=1 E2E_USER_FLOWS=1 playwright test e2e/user-flows --workers=1",
