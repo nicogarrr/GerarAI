@@ -3,7 +3,8 @@
 Fulfills: VAL-DATA-004 (extensión al resto de conectores gratuitos)
 Expected Behavior:
 - FRED: 500/red/no-JSON degradan; 400/404 (serie inexistente) NO degradan; éxito cierra
-- GDELT: 429 (por IP) y 5xx degradan; 400 (query inválida) NO degrada; éxito cierra
+- GDELT: 5xx/red/JSON inválido degradan; 429 (throttling por IP, con
+  Retry-After activo) y 400 (query inválida) NO degradan; éxito cierra
 - FOMC/BLS (URLs fijas): cualquier error HTTP o "200 sin iCalendar" degrada
 - ecb_history comparte la clave "ecb" del proveedor: fallo y éxito se agregan
 """
@@ -11,6 +12,7 @@ Expected Behavior:
 from __future__ import annotations
 
 import asyncio
+import time
 from datetime import date
 
 import httpx
@@ -90,14 +92,49 @@ def test_fred_exito_cierra(monkeypatch):
 # ---------- GDELT ----------
 
 
-def test_gdelt_429_degrada():
+def test_gdelt_429_no_degrada_y_retry_after_sigue_activo():
+    """Contrato nuevo: el 429 es throttling por IP, no una fuente caida.
+
+    El cliente sigue honrando Retry-After (sube tipada con la ventana real y
+    marca el bloqueo por IP del carril), pero NO degrada la salud: el breaker
+    refleja disponibilidad y una tormenta de 429 no es indisponibilidad.
+    """
     def handler(request):
         return httpx.Response(429, headers={"Retry-After": "9999"})
 
     registry = get_data_source_registry()
     before = registry.get_status("gdelt").consecutive_failures
     client = gdelt.GDELTClient(client=_client(handler), min_interval=0)
-    with pytest.raises(gdelt.GdeltRateLimited):
+    started = time.monotonic()
+    with pytest.raises(gdelt.GdeltRateLimited) as excinfo:
+        asyncio.run(client.news_search("iberdrola"))
+    assert registry.get_status("gdelt").consecutive_failures == before
+    # Retry-After sigue activo: la ventana real (9999s) sube sin truncarse y
+    # el bloqueo por IP del carril queda marcado.
+    assert excinfo.value.retry_after == 9999
+    assert gdelt.GDELTClient._blocked_until >= started + 9999
+
+
+def test_gdelt_500_degrada():
+    def handler(request):
+        return _json_response(500, "{}")
+
+    registry = get_data_source_registry()
+    before = registry.get_status("gdelt").consecutive_failures
+    client = gdelt.GDELTClient(client=_client(handler), min_interval=0)
+    with pytest.raises(httpx.HTTPStatusError):
+        asyncio.run(client.news_search("iberdrola"))
+    assert registry.get_status("gdelt").consecutive_failures == before + 1
+
+
+def test_gdelt_error_de_red_degrada():
+    def handler(request):
+        raise httpx.ConnectError("boom", request=request)
+
+    registry = get_data_source_registry()
+    before = registry.get_status("gdelt").consecutive_failures
+    client = gdelt.GDELTClient(client=_client(handler), min_interval=0)
+    with pytest.raises(httpx.ConnectError):
         asyncio.run(client.news_search("iberdrola"))
     assert registry.get_status("gdelt").consecutive_failures == before + 1
 
