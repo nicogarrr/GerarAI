@@ -402,3 +402,41 @@ def test_main_end_to_end_con_bajas_y_membresia(tmp_path):
     assert len(rep["walk_forward"]["folds"]) == 2
     assert len(rep["data_hash"]) == 64
     assert rep["unknown_exit"] == -1.0
+
+
+def test_cero_elegibles_sale_explicito_sin_datos():
+    # Regresión auditor: membership que deja la ventana sin elegibles no debe
+    # simular carteras vacías ni dividir tax_paid/invested 0: sale explícito.
+    m = px.Membership({"WIN": [(T0 + 2, None)]})  # en t0 (T0) aún no es miembro
+    out = bt.run_benchmark([_winner()], _winner(), MONTHS, portfolios=1, sizes=(1,), seed=1, membership=m)
+    assert out["status"] == "sin_datos"
+    assert out["eligible"] == 0 and out["portfolios"] == 0
+    assert out["strategies"] == {}
+    assert "no concluyente" in out["nota"]
+
+
+def test_fold_tardio_sin_elegibles_queda_marcado():
+    # Regresión auditor: un fold tardío fuera de la pertenencia queda marcado
+    # sin_datos, con métricas None, y los folds con elegibles corren normal.
+    m = px.Membership({"WIN": [(T0, T0 + 5)]})  # miembro solo hasta 2008-06
+    rep = bt.walk_forward_report(
+        [_winner()],
+        _winner(),
+        MONTHS,
+        train=3,
+        test=3,
+        portfolios=1,
+        sizes=(1,),
+        seed=1,
+        membership=m,
+        exits=None,
+        unknown_exit=-1.0,
+    )
+    folds = rep["folds"]
+    assert len(folds) == 3
+    assert folds[0].get("status") != "sin_datos" and folds[0]["eligible"] == 1
+    for f in folds[1:]:
+        assert f["status"] == "sin_datos"
+        assert f["eligible"] == 0
+        assert f["irr_diff_median"] is None
+        assert f["app_irr_median"] is None and f["plano_irr_median"] is None

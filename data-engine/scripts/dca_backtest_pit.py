@@ -573,6 +573,17 @@ def run_benchmark(
     )
     by_symbol = {s.symbol: s for s in universe}
     elig = [by_symbol[sym] for sym in elig_names]
+    if not elig:
+        # 0 elegibles en t0 (precio en t0, veredicto de t0-1, filing <= t0 o
+        # pertenencia): la ventana NO es concluyente. Explícito: sin carteras
+        # vacías (sample de 0) ni divisiones por cero en el informe.
+        return {
+            "status": "sin_datos",
+            "nota": "0 elegibles en t0 (elegibilidad PIT): ventana no concluyente; no se simularon carteras.",
+            "eligible": 0,
+            "portfolios": 0,
+            "strategies": {},
+        }
     rng = random.Random(seed)
     per: dict[str, list[Result]] = {st: [] for st in strategies}
     for size in sizes:
@@ -669,7 +680,7 @@ def unknown_exit_sensitivity(
     membership: pit_exits.Membership | None,
     exits: dict[str, pit_exits.ExitEvent] | None,
     chosen_unknown: float,
-    chosen_diff: float,
+    chosen_diff: float | None,
 ) -> dict:
     """Contrast AMBAS cotas del supuesto sobre bajas sin dato: -1.0 (inferior) y 0.0
     (superior). La ejecucion base aporta una cota si el CLI la eligio; la otra se
@@ -677,7 +688,7 @@ def unknown_exit_sensitivity(
     cota da cero y la otra no), el resultado se declara no concluyente.
     """
 
-    def _diff(unknown: float) -> float:
+    def _diff(unknown: float) -> float | None:
         if unknown == chosen_unknown:
             return chosen_diff
         res = run_benchmark(
@@ -692,22 +703,28 @@ def unknown_exit_sensitivity(
             exits=exits,
             unknown_exit=unknown,
         )
+        if res.get("status") == "sin_datos":
+            return None  # cota sin elegibles: la sensibilidad no es concluyente
         return res["app_vs_plano"]["irr_diff_median"]
 
     lower_diff = _diff(-1.0)
     upper_diff = _diff(0.0)
-    concluyente = _mismo_signo_estricto(lower_diff, upper_diff)
+    concluyente = (
+        lower_diff is not None and upper_diff is not None and _mismo_signo_estricto(lower_diff, upper_diff)
+    )
+    if lower_diff is None or upper_diff is None:
+        nota = "NO CONCLUYENTE: una cota se queda sin elegibles en la ventana (sin_datos)"
+    elif concluyente:
+        nota = "mismo signo en ambas cotas: la ventaja no depende del supuesto sobre bajas sin dato"
+    else:
+        nota = "NO CONCLUYENTE: el signo de la ventaja cambia segun el supuesto sobre bajas sin dato"
     return {
         "cota_inferior_unknown": -1.0,
         "cota_superior_unknown": 0.0,
         "irr_diff_median_cota_inferior": lower_diff,
         "irr_diff_median_cota_superior": upper_diff,
         "concluyente": concluyente,
-        "nota": (
-            "mismo signo en ambas cotas: la ventaja no depende del supuesto sobre bajas sin dato"
-            if concluyente
-            else "NO CONCLUYENTE: el signo de la ventaja cambia segun el supuesto sobre bajas sin dato"
-        ),
+        "nota": nota,
     }
 
 
@@ -740,7 +757,9 @@ def cost_sweep(
             unknown_exit=unknown_exit,
             cost=bps / 1e4,
         )
-        out[f"{bps:g}_bps"] = res["strategies"]["app"]["irr_median"]
+        out[f"{bps:g}_bps"] = (
+            None if res.get("status") == "sin_datos" else res["strategies"]["app"]["irr_median"]
+        )
     return out
 
 
@@ -778,6 +797,21 @@ def walk_forward_report(
             exits=exits,
             unknown_exit=unknown_exit,
         )
+        if res.get("status") == "sin_datos":
+            # Fold sin elegibles (p. ej. un fold tardío fuera de la
+            # pertenencia): marcado explícito, sin métricas inventadas.
+            out_folds.append(
+                {
+                    "fold": k + 1,
+                    "test_window": [month_label(te[0]), month_label(te[-1])],
+                    "eligible": 0,
+                    "status": "sin_datos",
+                    "irr_diff_median": None,
+                    "app_irr_median": None,
+                    "plano_irr_median": None,
+                }
+            )
+            continue
         app = res["strategies"]["app"]
         out_folds.append(
             {
@@ -924,7 +958,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         membership=membership,
         exits=exits,
         chosen_unknown=a.unknown_exit,
-        chosen_diff=out["app_vs_plano"]["irr_diff_median"],
+        chosen_diff=out["app_vs_plano"]["irr_diff_median"] if "app_vs_plano" in out else None,
     )
     out["costes_bps"] = cost_sweep(
         pit,
