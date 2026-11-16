@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import { CompanyNavigationScroll } from './CompanyNavigationScroll';
+
 import type { Locale } from '@/lib/i18n/locale';
 import { createTranslator } from '@/lib/i18n/translate';
 import { TABS, tabHref, tabOfView, type TabKey, type View } from '@/lib/research/research-views';
@@ -33,13 +35,14 @@ export function CompanyNavigation({ ticker, activeView, locale = 'es' }: { ticke
   return (
     <nav
       aria-label={t('research.companyNav.aria')}
-      className="-mx-1 flex gap-x-1 overflow-x-auto px-1 pb-px sm:gap-x-2"
+      className="scrollbar-hide -mx-1 flex gap-x-1 overflow-x-auto px-1 pb-px sm:gap-x-2"
       data-testid="company-navigation"
     >
+      <CompanyNavigationScroll />
       {TABS.map((tab) => (
         <Link
           aria-current={activeTab === tab.key ? 'page' : undefined}
-          className={`inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${activeTab === tab.key ? 'border-teal-300 text-gray-100' : 'border-transparent text-gray-500 hover:text-gray-200'}`}
+          className={`inline-flex min-h-[44px] shrink-0 scroll-mx-2 items-center whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition ${activeTab === tab.key ? 'border-teal-300 text-gray-100' : 'border-transparent text-gray-500 hover:text-gray-200'}`}
           href={tabHref(ticker, tab.key)}
           key={tab.key}
           // Sin prefetch: las 6 pestañas entran en viewport a la vez y cada

@@ -34,6 +34,19 @@ describe('CompanyNavigation', () => {
     }
   });
 
+  it('oculta la barra de scroll del carril y monta el scroll de la pestaña activa', () => {
+    const { container } = render(<CompanyNavigation ticker="ASTS" activeView="changes" />);
+    const nav = screen.getByTestId('company-navigation');
+    // Barra oculta pero deslizable: la utilidad scrollbar-hide (globals.css)
+    // quita la pista visible en WebKit/Firefox y overflow-x-auto se mantiene.
+    expect(nav.className).toContain('scrollbar-hide');
+    expect(nav.className).toContain('overflow-x-auto');
+    // Margen de scroll para que la activa no quede pegada al borde del carril.
+    const active = screen.getByRole('link', { name: 'Seguimiento' });
+    expect(active.className).toContain('scroll-mx-2');
+    expect(container.querySelector('[aria-hidden="true"]')).not.toBeNull();
+  });
+
   it('codifica el ticker en todos los destinos', () => {
     render(<CompanyNavigation ticker="BRK B" activeView="overview" />);
     expect(screen.getByRole('link', { name: 'Finanzas' })).toHaveAttribute('href', '/research/BRK%20B?view=finanzas');

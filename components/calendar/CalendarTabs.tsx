@@ -63,7 +63,7 @@ export function CalendarTabs() {
       ref={navRef}
       onScroll={updateMore}
       aria-label={ti('calendar.tabs.navAria')}
-      className="flex w-full min-w-0 flex-nowrap gap-0.5 overflow-x-auto border-b border-gray-800 px-2 py-2 sm:gap-1 sm:px-6"
+      className="scrollbar-hide flex w-full min-w-0 flex-nowrap gap-0.5 overflow-x-auto border-b border-gray-800 px-2 py-2 sm:gap-1 sm:px-6"
     >
       {TABS.map(([href, labelKey]) => {
         const active = href === activeHref;
