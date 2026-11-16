@@ -712,7 +712,11 @@ class ManagerHoldingIngestionService:
                 ["Comparación incompleta en algunas posiciones: consulta el aviso de cada fila."]
                 if any(row["change"] == "unknown" for row in changes) else []
             )],
-            "provenance": provenance(SOURCE, SourceKind.INTERNAL, coverage=Coverage.OK),
+            # Vista calculada sobre filings 13F almacenados: la fecha real del
+            # dato es la del ultimo sync del gestor, no el momento de la peticion.
+            "provenance": provenance(
+                SOURCE, SourceKind.INTERNAL, fetched_at=manager.synced_at, coverage=Coverage.OK
+            ),
         }
 
     @staticmethod

@@ -13107,12 +13107,15 @@ export interface components {
         /**
          * ProvenanceOut
          * @description Bloque de proveniencia estandar (app/services/provenance.py).
+         *
+         *     fetched_at es nullable: sin fecha real de descarga el bloque la declara
+         *     nula en vez de fabricar el momento de la peticion (Lote 1, hallazgo 1).
          */
         ProvenanceOut: {
             /** Coverage */
             coverage: string;
             /** Fetched At */
-            fetched_at: string;
+            fetched_at?: string | null;
             /** Note */
             note?: string | null;
             /** Source */

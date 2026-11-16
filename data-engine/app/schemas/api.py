@@ -971,12 +971,16 @@ class ValuationResponse(BaseModel):
 
 
 class ProvenanceOut(BaseModel):
-    """Bloque de proveniencia estandar (app/services/provenance.py)."""
+    """Bloque de proveniencia estandar (app/services/provenance.py).
+
+    fetched_at es nullable: sin fecha real de descarga el bloque la declara
+    nula en vez de fabricar el momento de la peticion (Lote 1, hallazgo 1).
+    """
 
     source: str
     source_kind: str
     source_url: str | None = None
-    fetched_at: str
+    fetched_at: str | None = None
     coverage: str
     note: str | None = None
 
