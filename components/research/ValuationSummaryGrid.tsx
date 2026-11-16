@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { isUnofficialSource } from '@/lib/research/source-quality';
 import { useEffect, useState } from 'react';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
 import { baseRateReach, baseRateText, reverseBaseRateMissing, healthMissingLabel, piotroskiSignalText, safetyMargin, valuationSummaryText, type HealthEvidence, type ValuationSummary } from '@/lib/research/valuation-summary';
@@ -33,7 +34,7 @@ function Evidence({ evidence }: { evidence: HealthEvidence[] }) {
   // El id interno del hecho queda en el «title» (diagnóstico), no en el texto.
   return <ul className="mt-1 space-y-1 text-xs text-gray-400">{evidence.map(f => <li key={f.fact_id} title={t('researchShared.valuationSummary.fact', { id: f.fact_id })}>
     {f.source_url.startsWith('https://') ? <a className="underline" href={f.source_url} target="_blank" rel="noopener noreferrer">{metricLabel(f.metric, locale)}: {evidenceValue(f.value, f.unit, format)}</a> : `${metricLabel(f.metric, locale)}: ${evidenceValue(f.value, f.unit, format)}`}
-    {' · '}{formatMarketDate(f.period_end)}{' · '}{f.source_type}
+    {' · '}{formatMarketDate(f.period_end)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}
   </li>)}</ul>;
 }
 

@@ -8,7 +8,7 @@ describe('visible source provenance for financial facts',()=>{
  it('shows source title, provider and publication date on cards, not only a hover tooltip',()=>{
   render(<FactCard fact={base} ticker="TEST" staleness={null}/>);
   expect(screen.getByText('Annual report 2025')).toBeVisible();
-  expect(screen.getByText(/Fuente: SEC/)).toBeVisible();
+  expect(screen.queryByText(/Fuente: SEC/)).toBeNull();
   expect(screen.getByText(/Publicado: 15 feb 2026/)).toBeVisible();
  });
  it('keeps source as plain text without a URL and never substitutes ingestion date for publication',()=>{
@@ -33,7 +33,7 @@ describe('visible source provenance for financial facts',()=>{
 
 it('keeps missing source and invalid publication honest in English, with no ingestion timestamp',()=>{
  render(<FactCard fact={{...base,source_title:null,source_type:' ',source_url:'javascript:alert(1)',source_published_at:'invalid'}} ticker="TEST" locale="en" staleness="Latest available figure: 2020, not refreshed since"/>);
- expect(screen.getByText('Source: Not available')).toBeVisible();
+ expect(screen.queryByText('Source: Not available')).toBeNull();
  expect(screen.getByText('Publication date not available')).toBeVisible();
  expect(screen.getByText(/Latest available figure/)).toBeVisible();
  expect(screen.queryByRole('link')).toBeNull();
