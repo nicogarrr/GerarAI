@@ -21,14 +21,18 @@ test("pestañas ficha 390px: carril deslizable sin barra visible y toque navega"
   expect(metrics.scrollbarWidth).toBe("none");
   expect(metrics.desborda).toBe(true);
 
-  // Nada tapa los toques: el centro de cada pestaña visible resuelve a ella.
+  // Check the center of each visible intersection, not a clipped link midpoint.
   const covered = await nav.evaluate((el) => {
     const bad: string[] = [];
+    const rail = el.getBoundingClientRect();
     for (const a of Array.from(el.querySelectorAll("a"))) {
       const r = a.getBoundingClientRect();
-      if (r.right < 0 || r.left > window.innerWidth) continue;
-      const cx = Math.min(Math.max(r.left + r.width / 2, 2), window.innerWidth - 2);
-      const hit = document.elementFromPoint(cx, r.top + r.height / 2);
+      const left = Math.max(r.left, rail.left, 0);
+      const right = Math.min(r.right, rail.right, window.innerWidth);
+      const top = Math.max(r.top, rail.top, 0);
+      const bottom = Math.min(r.bottom, rail.bottom, window.innerHeight);
+      if (right <= left || bottom <= top) continue;
+      const hit = document.elementFromPoint((left + right) / 2, (top + bottom) / 2);
       if (!(hit === a || a.contains(hit))) bad.push(a.textContent ?? "?");
     }
     return bad;
