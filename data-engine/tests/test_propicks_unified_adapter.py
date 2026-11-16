@@ -5,11 +5,14 @@ from __future__ import annotations
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base
+from app.api.routes import propicks as propicks_route
+from app.core.database import Base, get_db
 from app.models import (
     CalculatedMetric,
     Company,
@@ -207,6 +210,24 @@ def test_limit_applies_and_orders_by_score(db):
         _cand(db, run, cid, score=score)
     res = load_unified(db, as_of=AS_OF, limit=2)
     assert [i.quality.score.value for i in res.items] == [90.0, 50.0]
+
+
+def test_route_returns_contract_and_openapi_lists_it(db):
+    _co(db, 1)
+    _cand(db, _run(db), 1)
+    app = FastAPI()
+    app.include_router(propicks_route.router, prefix="/api/propicks")
+
+    def _db():
+        yield db
+
+    app.dependency_overrides[get_db] = _db
+    client = TestClient(app)
+    body = client.get("/api/propicks/unified").json()
+    assert body["schemaVersion"] == "propicks-unified-v1"
+    assert body["items"][0]["quality"]["score"]["value"] == 71.234
+    assert client.get("/api/propicks/unified", params={"limit": 0}).status_code == 422
+    assert "/api/propicks/unified" in app.openapi()["paths"]
 
 
 def test_pb_persisted_status_not_ok_is_never_ok(db):
