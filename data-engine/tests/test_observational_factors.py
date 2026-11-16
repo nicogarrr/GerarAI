@@ -10,6 +10,7 @@ from sqlalchemy import select, update
 from app.models import CalculatedMetric, FinancialFact, MarketPrice
 from app.services.propicks_funnel_service import (
     FACTOR_CONTRACT_VERSION,
+    _latest_metrics,
     _percentile_ranks,
     run_funnel,
 )
@@ -217,16 +218,63 @@ def test_as_of_corta_todas_las_entradas_de_los_factores():
         )
         _metric(db, bank, "price_to_book", "1.2")
         db.commit()
+        reference = {r.company_id: (r.score, r.passed) for r in run_funnel(db)[0]}
         results, stats = run_funnel(db, as_of=date(2020, 1, 1))
         assert results, "el embudo corre y devuelve filas aunque todo sea N/D"
+        # El score y las gates NO dependen de as_of (mapa sin corte).
+        assert {r.company_id: (r.score, r.passed) for r in results} == reference
         for r in results:
-            assert r.metrics["momentum_12_1"] is None
             assert r.metrics["factor_quality_pct"] is None
             assert r.metrics["factor_momentum_pct"] is None
             assert r.metrics["factor_value_pct"] is None
         f = stats["factors"]
         assert f["coverage"] == {"quality": 0.0, "momentum": 0.0, "value": 0.0}
         assert f["as_of"] == "2020-01-01"
+
+
+def test_mismo_periodo_elige_la_revision_disponible_en_el_corte():
+    """Regresión (auditor): misma (company, metric, period) con dos
+    revisiones — .1 creada en 2019 y .9 creada en 2026 — el corte 2020
+    devuelve .1 (la disponible), nunca .9. Sin corte gana la más reciente."""
+    with _db() as db:
+        a = _good_company(db, "DUP")
+        for version, value, created in (
+            ("dup-v1", "0.1", datetime(2019, 1, 1)),
+            ("dup-v2", "0.9", datetime(2026, 5, 1)),
+        ):
+            db.add(
+                CalculatedMetric(
+                    company_id=a.id,
+                    metric="momentum_12_1",
+                    value=Decimal(value),
+                    unit="decimal",
+                    period="FY2025",
+                    fiscal_year=2025,
+                    status="ok",
+                    definition_version=version,
+                    formula="momentum_12_1",
+                    source_fact_ids=[],
+                    calculation_trace={},
+                    confidence=Decimal("0.9"),
+                    created_at=created,
+                )
+            )
+        db.commit()
+        assert _latest_metrics(db, date(2020, 1, 1))[(a.id, "momentum_12_1")] == 0.1
+        assert _latest_metrics(db)[(a.id, "momentum_12_1")] == 0.9
+        # A nivel de embudo: el factor usa la revisión disponible en el
+        # corte (única empresa con momentum -> percentil 0,5) y el score
+        # sigue intacto.
+        reference = {r.company_id: (r.score, r.passed) for r in run_funnel(db)[0]}
+        results, stats = run_funnel(db, as_of=date(2020, 1, 1))
+        assert {r.company_id: (r.score, r.passed) for r in results} == reference
+        r = results[0]
+        assert r.metrics["factor_momentum_pct"] == 0.5
+        assert stats["factors"]["coverage"]["momentum"] == 1.0
+        # Y con un corte ANTERIOR a 2019 no hay nada disponible: N/D.
+        results18, stats18 = run_funnel(db, as_of=date(2018, 1, 1))
+        assert results18[0].metrics["factor_momentum_pct"] is None
+        assert stats18["factors"]["coverage"]["momentum"] == 0.0
 
 
 def test_earnings_yield_posterior_a_as_of_es_lookahead():

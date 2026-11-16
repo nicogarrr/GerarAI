@@ -154,7 +154,9 @@ def _latest_metrics(db: Session, as_of: date | None = None) -> dict[tuple[int, s
 
     PIT: con ``as_of`` solo entran métricas persistidas ANTES del corte
     (``created_at < as_of + 1 día``: el ``period`` es texto ("FY2025") y el
-    único "cuándo la conocíamos" fechado es created_at). Una métrica
+    único "cuándo la conocíamos" fechado es created_at), tanto al elegir el
+    periodo más reciente como al traer sus filas. De las revisiones de un
+    mismo periodo gana la más reciente DISPONIBLE en el corte. Una métrica
     calculada después del corte no existe para esa corrida: sale missing,
     nunca se usa a futuro.
     """
@@ -186,20 +188,34 @@ def _latest_metrics(db: Session, as_of: date | None = None) -> dict[tuple[int, s
             CalculatedMetric.company_id,
             CalculatedMetric.metric,
             CalculatedMetric.value,
-        ).join(
+        )
+        .join(
             latest_period,
             (CalculatedMetric.company_id == latest_period.c.company_id)
             & (CalculatedMetric.metric == latest_period.c.metric)
             & (CalculatedMetric.period == latest_period.c.max_period),
         )
-        .where(*tenant_filters(db, CalculatedMetric))
-        .order_by(CalculatedMetric.tenant_id.desc().nulls_last())
+        # El cutoff tambien aqui: un (company, metric, period) puede tener
+        # varias revisiones (definition_version distinta); sin este filtro el
+        # JOIN exterior traeria revisiones creadas DESPUES del corte.
+        .where(
+            *cutoff,
+            *tenant_filters(db, CalculatedMetric),
+        )
+        # Revision determinista: la mas reciente DISPONIBLE en el corte
+        # (created_at desc, id desc como desempate estable). La primera fila
+        # por (company, metric) gana.
+        .order_by(
+            CalculatedMetric.created_at.desc().nulls_last(),
+            CalculatedMetric.id.desc(),
+        )
     ).all()
-    return {
-        (cid, metric): float(value)
-        for cid, metric, value in rows
-        if value is not None
-    }
+    latest: dict[tuple[int, str], float] = {}
+    for cid, metric, value in rows:
+        if value is None:
+            continue
+        latest.setdefault((cid, metric), float(value))
+    return latest
 
 
 def _value_fact_inputs(
@@ -441,11 +457,17 @@ def run_funnel(
     """Evaluate every company; return ranked results (best first) + run stats.
 
     `as_of` es la fecha de corte PIT de los factores observacionales (hoy:
-    la corrida). El score no depende de ella."""
+    la corrida). El score NO depende de ella: score, gates y ranking leen el
+    mapa de métricas sin corte (idéntico a v1); solo los factores leen el
+    mapa con cutoff (created_at < as_of+1d, revisión más reciente disponible)."""
     as_of = as_of or date.today()
     started = time.monotonic()
     companies = list(db.scalars(select(Company).order_by(Company.id)).all())
-    metrics = _latest_metrics(db, as_of)
+    # Dos mapas: el score, las gates y el ranking leen SIEMPRE el mapa sin
+    # corte (idéntico a v1: el score no depende de as_of); solo los factores
+    # observacionales leen el mapa con cutoff PIT.
+    metrics = _latest_metrics(db)
+    factor_metrics = _latest_metrics(db, as_of)
     consistency = _earnings_consistency(db)
     growth = _revenue_cagr(db)
 
@@ -592,10 +614,18 @@ def run_funnel(
     # metrics y en stats["factors"], pero NO entran en SCORE_WEIGHTS ni
     # cambian score/orden/rank. Pendientes de validación PIT/OOS.
     pct_momentum = _percentile_ranks(
-        {cid: v for cid, comp in raw.items() if (v := comp.get("momentum_12_1")) is not None}
+        {
+            cid: v
+            for cid in raw
+            if (v := factor_metrics.get((cid, "momentum_12_1"))) is not None
+        }
     )
     pct_quality = _percentile_ranks(
-        {cid: v for cid, comp in raw.items() if (v := comp.get("quality_moat_score_v2")) is not None}
+        {
+            cid: v
+            for cid in raw
+            if (v := factor_metrics.get((cid, "quality_moat_score_v2"))) is not None
+        }
     )
     fin_ids = {c.id for c in companies if _is_financial(c)}
     value_inputs = _value_fact_inputs(db, [c.id for c in companies], as_of=as_of)
@@ -605,9 +635,12 @@ def run_funnel(
     pb_values = {
         cid: v
         for cid in raw
-        if cid in fin_ids and (v := metrics.get((cid, "price_to_book"))) is not None and v > 0
+        if cid in fin_ids and (v := factor_metrics.get((cid, "price_to_book"))) is not None and v > 0
     }
     pct_pb = _percentile_ranks(pb_values)
+    pct_roe_factor = _percentile_ranks(
+        {cid: v for cid in raw if (v := factor_metrics.get((cid, "roe_5y"))) is not None}
+    )
     factor_value_count = 0
     for result in results:
         cid = result.company_id
@@ -616,7 +649,7 @@ def run_funnel(
         if cid in fin_ids:
             # Financieras: P/B (invertido) + ROE, nunca EBIT/EV.
             p = pct_pb.get(cid)
-            ro = pct["roe_5y"].get(cid)
+            ro = pct_roe_factor.get(cid)
             value_pct = (0.5 * (1.0 - p) + 0.5 * ro) if (p is not None and ro is not None) else None
         else:
             value_pct = pct_value_nf.get(cid)  # null si no hay EY/FCFY: sin imputar
