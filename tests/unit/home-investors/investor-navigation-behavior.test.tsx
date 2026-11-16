@@ -1,0 +1,12 @@
+import {fireEvent,render,screen} from '@testing-library/react';
+import {expect,it,vi} from 'vitest';
+const m=vi.hoisted(()=>({path:'/inversores',push:vi.fn()}));
+vi.mock('next/navigation',()=>({useRouter:()=>({push:m.push}),usePathname:()=>m.path}));
+import {InvestorSelector} from '@/app/(root)/inversores/_components/InvestorSelector';
+import {InvestorViewSelector} from '@/app/(root)/inversores/_components/InvestorViewSelector';
+import {HubNav} from '@/app/(root)/inversores/_components/HubNav';
+import {paginate} from '@/app/(root)/inversores/_components/Pagination';
+it('selector solo navega a identidades listadas y codifica el slug',()=>{render(<InvestorSelector investors={[{slug:'name/space',name:'Gestor'}]}/>);fireEvent.change(screen.getByRole('combobox'),{target:{value:'name/space'}});expect(m.push).toHaveBeenCalledWith('/inversores/name%2Fspace');m.push.mockClear();fireEvent.change(screen.getByRole('combobox'),{target:{value:''}});expect(m.push).not.toHaveBeenCalled();});
+it('vista preserva inversor y evita scroll al cambiar, no acepta vista desconocida',()=>{render(<InvestorViewSelector slug="name/space" view="posiciones"/>);fireEvent.change(screen.getByRole('combobox'),{target:{value:'cartas'}});expect(m.push).toHaveBeenCalledWith('/inversores/name%2Fspace?vista=cartas',{scroll:false});m.push.mockClear();fireEvent.change(screen.getByRole('combobox'),{target:{value:''}});expect(m.push).not.toHaveBeenCalled();});
+it.each([['/inversores','/inversores'],['/inversores/buffett','/inversores'],['/inversores/cartas/7','/inversores/aprender'],['/ownership/changes','/ownership'],['/insider','/insider'],['/portfolio',null]])('ruta %s marca solo el destino pertinente', (path,href)=>{m.path=path;const {container}=render(<HubNav/>);const active=container.querySelectorAll('[aria-current="page"]');expect(active).toHaveLength(href?1:0);if(href)expect(active[0]).toHaveAttribute('href',href);});
+it.each(['NaN','-5','999',''])('paginación %s siempre queda dentro del rango real',pagina=>{const x=paginate([1,2,3],pagina,2);expect(x.page).toBeGreaterThanOrEqual(1);expect(x.page).toBeLessThanOrEqual(2);expect(x.items.length).toBeGreaterThan(0);expect(paginate([],pagina,2)).toEqual({page:1,total:1,items:[]});});
