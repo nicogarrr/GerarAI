@@ -254,6 +254,57 @@ def test_data_hash_cubre_spy_sec_simbolos_y_config(tmp_path):
     assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg) == base
 
 
+def test_data_hash_cubre_todos_los_candidatos_y_el_orden(tmp_path):
+    # Regresion auditor: load_universe elige el CSV de inicio mas temprano y el
+    # primer companyfacts en orden CLI; el hash debe cambiar al tocar CUALQUIER
+    # candidato (usado o no) y al permutar el orden de --px/--sec.
+    z, a = tmp_path / "z", tmp_path / "a"
+    zsec, asec = tmp_path / "zsec", tmp_path / "asec"
+    for d in (z, a, zsec, asec):
+        d.mkdir()
+    (z / "WIN.csv").write_text("Date,Close\n2006-01-03,1\n")
+    (a / "WIN.csv").write_text("Date,Close\n2005-01-03,1\n")  # inicio mas temprano: el usado
+    (zsec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {}}'))
+    (asec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"y": 2}}'))
+    syms = tmp_path / "symbols.txt"
+    syms.write_text("WIN\n")
+    cfg = {"seed": 1}
+    base = bt._data_hash([z, a], [zsec, asec], ["WIN"], syms, None, None, cfg)
+    # Tocar el candidato NO usado (z tiene inicio posterior) cambia el hash.
+    (z / "WIN.csv").write_text("Date,Close\n2006-01-03,2\n")
+    assert bt._data_hash([z, a], [zsec, asec], ["WIN"], syms, None, None, cfg) != base
+    (z / "WIN.csv").write_text("Date,Close\n2006-01-03,1\n")
+    # Tocar el companyfacts NO usado (segundo en orden CLI) cambia el hash.
+    (asec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"y": 3}}'))
+    assert bt._data_hash([z, a], [zsec, asec], ["WIN"], syms, None, None, cfg) != base
+    (asec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"y": 2}}'))
+    assert bt._data_hash([z, a], [zsec, asec], ["WIN"], syms, None, None, cfg) == base
+    # Permutar el orden de los directorios cambia el hash.
+    assert bt._data_hash([a, z], [zsec, asec], ["WIN"], syms, None, None, cfg) != base
+    assert bt._data_hash([z, a], [asec, zsec], ["WIN"], syms, None, None, cfg) != base
+
+
+def test_data_hash_cubre_la_cartera_fija(tmp_path):
+    # Regresion auditor: cambiar --fixed entre simbolos ya presentes debe
+    # cambiar el hash (cambia los resultados).
+    pxdir = tmp_path / "px"
+    pxdir.mkdir()
+    (pxdir / "WIN.csv").write_text("Date,Close\n2005-01-03,100\n")
+    (pxdir / "SPY.csv").write_text("Date,Close\n2005-01-03,20\n")
+    syms = tmp_path / "symbols.txt"
+    syms.write_text("WIN\nSPY\n")
+    fixed = tmp_path / "fixed.txt"
+    fixed.write_text("WIN\n")
+    cfg = {"seed": 1}
+    base = bt._data_hash([pxdir], [], ["WIN", "SPY"], syms, None, None, cfg, fixed=fixed)
+    fixed.write_text("SPY\n")
+    assert bt._data_hash([pxdir], [], ["WIN", "SPY"], syms, None, None, cfg, fixed=fixed) != base
+    fixed.write_text("WIN\n")
+    assert bt._data_hash([pxdir], [], ["WIN", "SPY"], syms, None, None, cfg, fixed=fixed) == base
+    # Sin --fixed no es lo mismo que con --fixed.
+    assert bt._data_hash([pxdir], [], ["WIN", "SPY"], syms, None, None, cfg) != base
+
+
 def test_misma_semilla_mismo_json():
     win, dead = _winner(), _dead()
     kw = dict(portfolios=2, sizes=(2,), seed=99)

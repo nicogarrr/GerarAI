@@ -805,27 +805,32 @@ def _data_hash(
     membership: Path | None,
     exits: Path | None,
     config: dict,
+    *,
+    fixed: Path | None = None,
 ) -> str:
-    """SHA256 de TODA la entrada: precios de cada simbolo (incluido SPY), companyfacts
-    usados, lista de simbolos, pertenencia, bajas y configuracion de la corrida.
-    Si cualquiera cambia (p. ej. el CSV de SPY), el hash cambia."""
+    """SHA256 de TODA la entrada: config, lista de simbolos, pertenencia, bajas,
+    cartera fija y, por simbolo (incluido SPY), TODOS los CSV/companyfacts
+    candidatos en ORDEN CLI (no solo el usado). load_universe elige el CSV con
+    inicio mas temprano entre los candidatos y el primer companyfacts en orden
+    CLI; hashear todos los candidatos etiquetados con su directorio garantiza
+    que cambiar cualquier candidato (usado o no) o el orden de --px/--sec
+    cambia el hash, y que la seleccion de load_universe queda cubierta.
+    """
     h = hashlib.sha256()
     h.update(json.dumps(config, sort_keys=True).encode())
     h.update(symbols_file.read_bytes())
     for sym in sorted(symbols):
-        for d in sorted(px_dirs):
+        for d in px_dirs:
             p = d / f"{sym}.csv"
             if p.exists():
-                h.update(b"px:" + sym.encode())
+                h.update(b"px:" + sym.encode() + b"@" + str(d).encode())
                 h.update(p.read_bytes())
-                break
-        for d in sorted(sec_dirs):
+        for d in sec_dirs:
             p = d / f"{sym.split('.')[0]}.json.gz"
             if p.exists():
-                h.update(b"sec:" + sym.encode())
+                h.update(b"sec:" + sym.encode() + b"@" + str(d).encode())
                 h.update(p.read_bytes())
-                break
-    for extra in (membership, exits):
+    for extra in (membership, exits, fixed):
         if extra is not None:
             h.update(extra.name.encode())
             h.update(extra.read_bytes())
@@ -965,6 +970,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             "cost_sweep_bps": a.cost_sweep_bps,
             "strategies": list(STRATEGIES),
         },
+        fixed=a.fixed,
     )
     a.out.write_text(json.dumps(out, indent=1))
     print(
