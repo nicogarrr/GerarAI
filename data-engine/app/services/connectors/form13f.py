@@ -237,8 +237,11 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
     manager" o por discrecion. La tabla guarda una fila por clave, asi que se
     SUMAN valor, acciones y votos; del resto se conserva el primer valor no
     vacio. Si faltan acciones válidas en una subfila, el total de acciones
-    queda desconocido, no como subtotal completo. Las filas sin CUSIP se
-    descartan (nunca se inventa uno).
+    queda desconocido, no como subtotal completo. La misma regla vale para el
+    valor USD y los votos: un componente ausente o ilegible en cualquier
+    subfila hace el subtotal desconocido (None), nunca un 0 silencioso que
+    dejaria el agregado por debajo del real con cara de cifra exacta. Las
+    filas sin CUSIP se descartan (nunca se inventa uno).
 
     La clave no incluye SH/PRN (acciones vs importe nominal). Si hay unidades
     incompatibles, la cantidad queda desconocida y el tipo MIXED; no se cambia
@@ -259,6 +262,14 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
             merged[key]["ssh_prnamt_type"] = unit if unit in {"SH", "PRN"} else "UNKNOWN"
             if shares is None or not shares.is_finite() or shares < 0 or unit not in {"SH", "PRN"}:
                 merged[key]["ssh_prnamt"] = None
+            # Valor y votos siguen la misma regla tambien en la primera fila:
+            # un componente ausente o ilegible queda desconocido (None), no
+            # pasa verbatim al agregado (entrada ilegible -> None, con una o
+            # varias filas).
+            for name in ("value_usd_thousands", "voting_sole", "voting_shared", "voting_none"):
+                parsed = _dec(row.get(name))
+                if parsed is None or not parsed.is_finite() or parsed < 0:
+                    merged[key][name] = None
             continue
         for name in summed:
             a, b = _dec(current.get(name)), _dec(row.get(name))
@@ -274,9 +285,17 @@ def aggregate_rows(rows: list[dict]) -> list[dict]:
                 if any(value is None or not value.is_finite() or value < 0 for value in (a, b)):
                     current[name] = None
                     continue
-            if a is None and b is None:
+            elif any(value is None or not value.is_finite() or value < 0 for value in (a, b)):
+                # Valor y votos siguen la misma regla que las acciones: un
+                # componente ausente o ilegible hace el subtotal desconocido.
+                # Antes se sumaba como 0 en silencio: el agregado persistido
+                # (ManagerHolding.value_usd_thousands) quedaba por debajo del
+                # real y se servia como cifra exacta (Lote 1, hallazgo 2).
+                if a is None and b is None:
+                    continue
+                current[name] = None
                 continue
-            current[name] = str((a or Decimal(0)) + (b or Decimal(0)))
+            current[name] = str(a + b)
         for name, value in row.items():
             if name not in summed and not current.get(name) and value:
                 current[name] = value
