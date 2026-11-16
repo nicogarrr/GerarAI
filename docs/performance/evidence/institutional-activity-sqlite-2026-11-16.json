@@ -1,0 +1,172 @@
+{
+  "method": "7 sequential cold-ORM reads per scenario; tracemalloc overhead included; fixture setup excluded",
+  "postgres_status": "not_measured",
+  "results": [
+    {
+      "managers": 500,
+      "engine": "SQLite in-memory, synthetic, NOT PostgreSQL",
+      "scenarios": [
+        {
+          "status": "all",
+          "page": 1,
+          "read_ms": [
+            112.193,
+            158.688,
+            101.433,
+            92.423,
+            92.117,
+            87.773,
+            88.069
+          ],
+          "p50_ms": 92.423,
+          "p95_ms": 158.688,
+          "peak_python_bytes": 4496465,
+          "response_bytes": 10781
+        },
+        {
+          "status": "all",
+          "page": 20,
+          "read_ms": [
+            85.369,
+            158.041,
+            92.533,
+            90.861,
+            95.102,
+            88.763,
+            89.589
+          ],
+          "p50_ms": 90.861,
+          "p95_ms": 158.041,
+          "peak_python_bytes": 4219900,
+          "response_bytes": 10524
+        },
+        {
+          "status": "reduce",
+          "page": 1,
+          "read_ms": [
+            124.83,
+            62.571,
+            62.818,
+            63.737,
+            63.371,
+            63.856,
+            68.541
+          ],
+          "p50_ms": 63.737,
+          "p95_ms": 124.83,
+          "peak_python_bytes": 3636944,
+          "response_bytes": 483
+        }
+      ],
+      "select_counts": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "stored_fact_rows": 1515,
+      "page_size": 25,
+      "measurement_note": "Fresh ORM identity map per read. tracemalloc enabled, not comparable to uninstrumented earlier samples. All stored facts read on each page. No HTTP/auth."
+    },
+    {
+      "managers": 2000,
+      "engine": "SQLite in-memory, synthetic, NOT PostgreSQL",
+      "scenarios": [
+        {
+          "status": "all",
+          "page": 1,
+          "read_ms": [
+            369.378,
+            470.258,
+            503.26,
+            457.098,
+            364.396,
+            474.4,
+            473.784
+          ],
+          "p50_ms": 470.258,
+          "p95_ms": 503.26,
+          "peak_python_bytes": 16816493,
+          "response_bytes": 11007
+        },
+        {
+          "status": "all",
+          "page": 80,
+          "read_ms": [
+            484.304,
+            398.792,
+            433.813,
+            439.867,
+            425.24,
+            373.374,
+            478.074
+          ],
+          "p50_ms": 433.813,
+          "p95_ms": 484.304,
+          "peak_python_bytes": 16733029,
+          "response_bytes": 10525
+        },
+        {
+          "status": "reduce",
+          "page": 1,
+          "read_ms": [
+            373.77,
+            279.807,
+            365.454,
+            348.675,
+            279.353,
+            383.65,
+            378.945
+          ],
+          "p50_ms": 365.454,
+          "p95_ms": 383.65,
+          "peak_python_bytes": 15319004,
+          "response_bytes": 483
+        }
+      ],
+      "select_counts": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "stored_fact_rows": 6015,
+      "page_size": 25,
+      "measurement_note": "Fresh ORM identity map per read. tracemalloc enabled, not comparable to uninstrumented earlier samples. All stored facts read on each page. No HTTP/auth."
+    }
+  ]
+}

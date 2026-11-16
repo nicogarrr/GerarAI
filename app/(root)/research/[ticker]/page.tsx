@@ -141,8 +141,10 @@ import {
   getResearchNews,
 } from '@/lib/actions/research.actions';
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
-import { getCompanyHolders, getFundHolders, getInstitutionalHolders } from '@/lib/actions/investors.actions';
+import { getCompanyHolders, getFundHolders, getInstitutionalActivity, getInstitutionalHolders } from '@/lib/actions/investors.actions';
 import { FundHoldersPanel } from '@/components/research/FundHoldersPanel';
+import { InstitutionalActivityTable } from '@/components/research/InstitutionalActivityTable';
+import type { ActivityFilter } from '@/lib/research/institutional-holders';
 import { InstitutionalHoldersPanel } from '@/components/research/InstitutionalHoldersPanel';
 import { getShareCapital } from '@/lib/actions/share-capital.actions';
 import { getDecisionLessons, getDriverAssumptions, getFinancialTerminal, getManagementCredibility } from '@/lib/actions/research-tools.actions';
@@ -203,7 +205,7 @@ const readSnapshot = cache((ticker: string) => getResearchCompanySnapshot(ticker
 
 type PageProps = {
   params: Promise<{ ticker: string }>;
-  searchParams: Promise<{ view?: string; chat?: string; pagina?: string; metrics?: string; years?: string; periodicity?: string; sotp?: string }>;
+  searchParams: Promise<{ view?: string; chat?: string; pagina?: string; ia_status?: string; ia_page?: string; metrics?: string; years?: string; periodicity?: string; sotp?: string }>;
 };
 
 
@@ -1540,7 +1542,10 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
     // Propietarios = 13F (gestores) + insiders (Form 4, SEC EDGAR, gratis).
     // Los Form 4 persistidos se leen del backend; sin red ni proveedor de
     // pago. Best-effort: cualquier fallo degrada a panel vacio honesto.
-    const [insiderFilings, participation, institutions, funds] = await Promise.all([
+    const activityFilter: ActivityFilter = ['aumenta', 'reduce', 'nuevo', 'vende_todo'].includes(query.ia_status ?? '') ? query.ia_status as ActivityFilter : 'all';
+    const activityPage = /^\d{1,8}$/.test(query.ia_page ?? '') ? Math.max(1, Number(query.ia_page)) : 1;
+    const activityQuery = new URLSearchParams(Object.entries(query).filter((entry): entry is [string, string] => typeof entry[1] === 'string'));
+    const [insiderFilings, participation, institutions, funds, activity] = await Promise.all([
       getInsiderFilings(ticker, 8).catch(() => null),
       getParticipationFilings(ticker).catch(() => null),
       // Todos los gestores 13F (no solo los superinversores): best-effort, un
@@ -1548,6 +1553,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
       getInstitutionalHolders(ticker).catch(() => null),
       // Fondos y ETF (N-PORT): mismo trato best-effort.
       getFundHolders(ticker).catch(() => null),
+      getInstitutionalActivity(ticker, activityFilter, activityPage).catch(() => null),
     ]);
     return (
       <div className="space-y-6">
@@ -1591,6 +1597,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
           </Panel>
         )}
         <InstitutionalHoldersPanel data={institutions} locale={locale} />
+        <InstitutionalActivityTable baseHref={`/research/${encodeURIComponent(ticker)}?${activityQuery}`} data={activity} locale={locale} />
         <FundHoldersPanel data={funds} locale={locale} />
         <Panel title={t('research.fichaInsidersPanel')}>
           {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (

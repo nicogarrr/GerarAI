@@ -60,3 +60,18 @@ export function pct(value: number | null, intl: string, signed = false): string 
   const text = new Intl.NumberFormat(intl, { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(Math.abs(value));
   return `${signed ? (value > 0 ? '+' : value < 0 ? '−' : '') : ''}${text} %`;
 }
+
+export type ActivityFilter = 'all' | 'aumenta' | 'reduce' | 'nuevo' | 'vende_todo';
+export interface InstitutionalActivityRow {
+  cik: string; name: string; status: InstitutionalStatus | '';
+  shares: number | null; prev_shares: number | null; change: number | null; change_pct: number | null;
+  reported_value_usd: number | null; company_ownership_pct: number | null;
+  filed: string | null; filing_url: string | null; prev_filing_url: string | null;
+}
+export interface InstitutionalActivity {
+  ticker: string; cusip: string | null; identity_source: string | null;
+  status: 'ok' | 'sin_detalle' | 'sin_datos' | 'sin_identificador' | 'sin_snapshot_vinculado';
+  period: string | null; prior_period: string | null; fetched_at: string | null; source_url?: string;
+  filter: ActivityFilter; page: number; page_size: number; total: number | null; pages: number | null;
+  rows: InstitutionalActivityRow[];
+}

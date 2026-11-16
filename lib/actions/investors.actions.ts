@@ -5,7 +5,7 @@ import { researchRequest } from '@/lib/research/client';
 import { AppError } from '@/lib/types/errors';
 
 import type { FundHolders } from '@/lib/research/fund-holders';
-import type { InstitutionalHolders } from '@/lib/research/institutional-holders';
+import type { ActivityFilter, InstitutionalActivity, InstitutionalHolders } from '@/lib/research/institutional-holders';
 import type { InvestorVideo } from '@/lib/ui/youtube-video';
 
 import type { ManagerChanges, OwnershipProvenance } from './ownership.actions';
@@ -275,4 +275,10 @@ export async function getFundHolders(ticker: string): Promise<FundHolders | null
     if (error instanceof AppError && error.code === 'RESEARCH_API_ERROR' && error.statusCode === 404) return null;
     throw error;
   }
+}
+
+/** SELECT-only persisted activity. One request per page, never per manager. */
+export async function getInstitutionalActivity(ticker: string, status: ActivityFilter = 'all', page = 1): Promise<InstitutionalActivity> {
+  const query = new URLSearchParams({ status, page: String(page), page_size: '25' });
+  return requestJson<InstitutionalActivity>(`/api/ownership/institutions/${encodeURIComponent(ticker)}/activity?${query}`);
 }

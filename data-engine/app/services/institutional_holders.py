@@ -46,7 +46,7 @@ NAMESPACE = "sec13f"
 TOTAL = "__total__"
 TOP_N = 10
 MOVERS_N = 10
-DETAIL_VERSION = "n1:"
+DETAIL_VERSION = "a1:"
 STATUSES = ("nuevo", "aumenta", "reduce", "igual", "vende_todo", "sin_13f_aun", "sin_13f_previo")
 LIMITATIONS = (
     "13F: solo gestores con más de 100 M$ en acciones de EE. UU.; trimestral, hasta 45 días de retraso; solo largos (sin cortos ni opciones).",
@@ -146,7 +146,7 @@ def summarize(periods: dict[date, dict[str, ds.ManagerPeriod]], cusip: str, curr
             "net_comparable": sum((r.change for r in comparable), Decimal(0)),
             **counts,
         },
-        "top": top, "buyers": buyers, "sellers": sellers,
+        "top": top, "buyers": buyers, "sellers": sellers, "activity": rows,
     }
 
 
@@ -199,7 +199,9 @@ def persist(db: Session, company: Company, summary: dict[str, Any], *, cusip: st
     if "new_by_shares" in summary:
         add("13f.count.new_detail_version", 1, "count", current, TOTAL, refs=refs)
         add("13f.count.new_value_known", summary["new_value_known_count"], "count", current, TOTAL, refs=refs)
-    roles_to_store = ("top", "buyers", "sellers", "new_by_shares", "new_by_value")
+    if "activity" in summary:
+        add("13f.count.activity_detail_version", 1, "count", current, TOTAL, refs=refs)
+    roles_to_store = ("top", "buyers", "sellers", "new_by_shares", "new_by_value", "activity")
     seen: set[str] = set()
     roles: dict[str, list[str]] = {}
     for role in roles_to_store:
@@ -213,9 +215,9 @@ def persist(db: Session, company: Company, summary: dict[str, Any], *, cusip: st
             # New roles use their own namespace so an older reader can ignore
             # them during rollback rather than indexing an unknown role key.
             tags = [f"status:{row.status}",
-                    *(f"{'new_role' if r.startswith('new_') else 'role'}:{r}" for r in roles[row.cik]),
+                    *("activity_role:all" if r == "activity" else f"{'new_role' if r.startswith('new_') else 'role'}:{r}" for r in roles[row.cik]),
                     *(f"value_accession:{acc}" for acc in row.accessions)]
-            if row.value_usd is not None and ("new_by_shares" in roles[row.cik] or "new_by_value" in roles[row.cik]):
+            if row.value_usd is not None:
                 add("13f.holder.value_usd", row.value_usd, "USD", current, _name(row),
                     accession=row.accession, filed=row.filed, refs=tags)
             # Old readers treat unknown metrics as current shares. Put the

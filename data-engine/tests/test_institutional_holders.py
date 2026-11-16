@@ -158,7 +158,9 @@ def test_guarda_y_lee_con_cita_por_cifra():
     again = ih.ingest_parsed(db, _parsed(), ["c2", "c1"], cusips)
     assert again["companies"] == 0  # idempotente por checksum
     assert db.query(PublicSourceDocument).count() == 1
-    assert db.query(PublicFinancialFact).filter(PublicFinancialFact.accession == "Q2-B2").count() == 1
+    assert {f.metric for f in db.query(PublicFinancialFact).filter(PublicFinancialFact.accession == "Q2-B2")} == {
+        "13f.holder.shares", "13f.holder.value_usd",
+    }  # Activity now keeps reported value for every manager, not just new positions.
 
     view = ih.institutional_holders(db, "aapl")
     assert view["status"] == "ok" and view["period"] == "2026-06-30" and view["prior_period"] == "2026-03-31"

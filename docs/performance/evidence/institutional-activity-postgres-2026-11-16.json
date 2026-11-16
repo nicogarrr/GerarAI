@@ -1,0 +1,172 @@
+{
+  "method": "7 sequential cold-ORM reads per scenario; tracemalloc overhead included; fixture setup excluded; NOT production",
+  "server_version": "PostgreSQL 14.24 (Ubuntu 14.24-0ubuntu0.22.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0, 64-bit",
+  "results": [
+    {
+      "managers": 500,
+      "engine": "PostgreSQL local disposable",
+      "scenarios": [
+        {
+          "status": "all",
+          "page": 1,
+          "read_ms": [
+            111.537,
+            173.927,
+            105.787,
+            98.013,
+            106.061,
+            99.775,
+            103.339
+          ],
+          "p50_ms": 105.787,
+          "p95_ms": 173.927,
+          "peak_python_bytes": 4454859,
+          "response_bytes": 10787
+        },
+        {
+          "status": "all",
+          "page": 20,
+          "read_ms": [
+            100.428,
+            96.874,
+            161.281,
+            107.924,
+            102.544,
+            97.507,
+            99.909
+          ],
+          "p50_ms": 100.428,
+          "p95_ms": 161.281,
+          "peak_python_bytes": 4155610,
+          "response_bytes": 10530
+        },
+        {
+          "status": "reduce",
+          "page": 1,
+          "read_ms": [
+            74.27,
+            73.537,
+            142.017,
+            73.149,
+            69.414,
+            70.304,
+            67.392
+          ],
+          "p50_ms": 73.149,
+          "p95_ms": 142.017,
+          "peak_python_bytes": 3550854,
+          "response_bytes": 489
+        }
+      ],
+      "select_counts": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "stored_fact_rows": 1515,
+      "page_size": 25,
+      "measurement_note": "Fresh ORM identity map per read. tracemalloc enabled, not comparable to uninstrumented earlier samples. All stored facts read on each page. No HTTP/auth."
+    },
+    {
+      "managers": 2000,
+      "engine": "PostgreSQL local disposable",
+      "scenarios": [
+        {
+          "status": "all",
+          "page": 1,
+          "read_ms": [
+            511.864,
+            497.664,
+            522.021,
+            443.214,
+            502.524,
+            489.357,
+            482.761
+          ],
+          "p50_ms": 497.664,
+          "p95_ms": 522.021,
+          "peak_python_bytes": 16871113,
+          "response_bytes": 11013
+        },
+        {
+          "status": "all",
+          "page": 80,
+          "read_ms": [
+            464.304,
+            543.445,
+            403.308,
+            484.668,
+            463.246,
+            476.916,
+            390.857
+          ],
+          "p50_ms": 464.304,
+          "p95_ms": 543.445,
+          "peak_python_bytes": 16915377,
+          "response_bytes": 10531
+        },
+        {
+          "status": "reduce",
+          "page": 1,
+          "read_ms": [
+            392.569,
+            375.361,
+            309.77,
+            391.696,
+            382.11,
+            308.377,
+            352.206
+          ],
+          "p50_ms": 375.361,
+          "p95_ms": 392.569,
+          "peak_python_bytes": 14548673,
+          "response_bytes": 489
+        }
+      ],
+      "select_counts": [
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4,
+        4
+      ],
+      "stored_fact_rows": 6015,
+      "page_size": 25,
+      "measurement_note": "Fresh ORM identity map per read. tracemalloc enabled, not comparable to uninstrumented earlier samples. All stored facts read on each page. No HTTP/auth."
+    }
+  ]
+}

@@ -68,7 +68,9 @@ export function InstitutionalHoldersPanel({ data, locale = DEFAULT_LOCALE }: { d
       ? t('research.institucionales.loadError')
       : data.status === 'sin_identificador'
         ? (data.identity_source ?? t('research.institucionales.noCusip'))
-        : t('research.institucionales.empty');
+        : data.status === 'sin_snapshot_vinculado'
+          ? t('research.institutionalActivity.unlinked')
+          : t('research.institucionales.empty');
     return (
       <section aria-label={t('research.institucionales.title')} className="space-y-2 rounded-lg border border-gray-800 p-4" data-testid="institucionales">
         {title}
