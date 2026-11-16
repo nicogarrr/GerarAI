@@ -1,0 +1,434 @@
+{
+  "fixture": "SQLite memory, 15 current managers, 14 comparable new positions, 2 quarters, parsed SEC ZIP fixtures",
+  "scope": "existing route function, four local SELECTs, no HTTP transport/auth/production measurement",
+  "n": 50,
+  "cold_first_ms": 3.574313000001439,
+  "p50_ms": 1.288068500002737,
+  "p95_ms": 1.5257790000191562,
+  "samples_ms": [
+    3.574313000001439,
+    1.5257790000191562,
+    1.4266620000285002,
+    1.3173750000419204,
+    1.3356860000044435,
+    1.3447190000306364,
+    1.2848700000063218,
+    1.3054309999915858,
+    1.2941109999928813,
+    1.3353789999541732,
+    1.3498160000153803,
+    1.281526000013855,
+    1.2733940000089206,
+    1.2912669999991522,
+    1.278220000017427,
+    1.263373999961459,
+    1.2353040000334659,
+    1.3514099999838436,
+    1.2585040000203662,
+    1.2273869999717135,
+    1.2947750000193992,
+    1.2504919999969388,
+    1.2530690000289724,
+    1.2962459999812381,
+    1.2684430000149405,
+    1.3167960000259882,
+    1.3210089999802221,
+    1.2592600000402854,
+    1.2514690000102746,
+    1.3046089999875221,
+    1.2397879999639372,
+    1.229394000006323,
+    1.2697050000269883,
+    1.330961999997271,
+    1.2615710000432045,
+    1.309884000022521,
+    1.270169999997961,
+    2.0220359999711945,
+    1.4748450000183766,
+    1.3428739999881145,
+    1.3450009999473878,
+    1.2735980000115887,
+    1.2633350000328392,
+    1.281394999978147,
+    1.2694810000084544,
+    1.268023000022822,
+    1.2486079999689537,
+    1.3557919999698242,
+    1.3008549999540264,
+    1.251847999981237
+  ],
+  "queries": 4,
+  "stored_fact_rows": 58,
+  "new_positions": {
+    "status": "ok",
+    "count": 14,
+    "value_known_count": 14,
+    "top_by_shares": [
+      {
+        "cik": "0000000014",
+        "name": "",
+        "shares": 14.0,
+        "prev_shares": 0.0,
+        "change": 14.0,
+        "change_pct": null,
+        "pct_of_13f": 11.666666666666666,
+        "status": "nuevo",
+        "accession": "C14",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/14/C14/C14-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/14/P14/P14-index.htm",
+        "value_usd": 860.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/14/C14/C14-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000013",
+        "name": "",
+        "shares": 13.0,
+        "prev_shares": 0.0,
+        "change": 13.0,
+        "change_pct": null,
+        "pct_of_13f": 10.833333333333334,
+        "status": "nuevo",
+        "accession": "C13",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/13/C13/C13-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/13/P13/P13-index.htm",
+        "value_usd": 870.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/13/C13/C13-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000012",
+        "name": "",
+        "shares": 12.0,
+        "prev_shares": 0.0,
+        "change": 12.0,
+        "change_pct": null,
+        "pct_of_13f": 10.0,
+        "status": "nuevo",
+        "accession": "C12",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/12/C12/C12-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/12/P12/P12-index.htm",
+        "value_usd": 880.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/12/C12/C12-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000011",
+        "name": "",
+        "shares": 11.0,
+        "prev_shares": 0.0,
+        "change": 11.0,
+        "change_pct": null,
+        "pct_of_13f": 9.166666666666666,
+        "status": "nuevo",
+        "accession": "C11",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/11/C11/C11-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/11/P11/P11-index.htm",
+        "value_usd": 890.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/11/C11/C11-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000010",
+        "name": "",
+        "shares": 10.0,
+        "prev_shares": 0.0,
+        "change": 10.0,
+        "change_pct": null,
+        "pct_of_13f": 8.333333333333334,
+        "status": "nuevo",
+        "accession": "C10",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/10/C10/C10-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/10/P10/P10-index.htm",
+        "value_usd": 900.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/10/C10/C10-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000009",
+        "name": "",
+        "shares": 9.0,
+        "prev_shares": 0.0,
+        "change": 9.0,
+        "change_pct": null,
+        "pct_of_13f": 7.5,
+        "status": "nuevo",
+        "accession": "C9",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/9/C9/C9-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/9/P9/P9-index.htm",
+        "value_usd": 910.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/9/C9/C9-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000008",
+        "name": "",
+        "shares": 8.0,
+        "prev_shares": 0.0,
+        "change": 8.0,
+        "change_pct": null,
+        "pct_of_13f": 6.666666666666667,
+        "status": "nuevo",
+        "accession": "C8",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/8/C8/C8-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/8/P8/P8-index.htm",
+        "value_usd": 920.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/8/C8/C8-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000007",
+        "name": "",
+        "shares": 7.0,
+        "prev_shares": 0.0,
+        "change": 7.0,
+        "change_pct": null,
+        "pct_of_13f": 5.833333333333333,
+        "status": "nuevo",
+        "accession": "C7",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/7/C7/C7-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/7/P7/P7-index.htm",
+        "value_usd": 930.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/7/C7/C7-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000006",
+        "name": "",
+        "shares": 6.0,
+        "prev_shares": 0.0,
+        "change": 6.0,
+        "change_pct": null,
+        "pct_of_13f": 5.0,
+        "status": "nuevo",
+        "accession": "C6",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/6/C6/C6-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/6/P6/P6-index.htm",
+        "value_usd": 940.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/6/C6/C6-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000005",
+        "name": "",
+        "shares": 5.0,
+        "prev_shares": 0.0,
+        "change": 5.0,
+        "change_pct": null,
+        "pct_of_13f": 4.166666666666667,
+        "status": "nuevo",
+        "accession": "C5",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/5/C5/C5-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/5/P5/P5-index.htm",
+        "value_usd": 950.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/5/C5/C5-index.htm"
+        ]
+      }
+    ],
+    "top_by_value": [
+      {
+        "cik": "0000000001",
+        "name": "",
+        "shares": 1.0,
+        "prev_shares": 0.0,
+        "change": 1.0,
+        "change_pct": null,
+        "pct_of_13f": 0.8333333333333334,
+        "status": "nuevo",
+        "accession": "C1",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/1/C1/C1-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/1/P1/P1-index.htm",
+        "value_usd": 990.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/1/C1/C1-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000002",
+        "name": "",
+        "shares": 2.0,
+        "prev_shares": 0.0,
+        "change": 2.0,
+        "change_pct": null,
+        "pct_of_13f": 1.6666666666666667,
+        "status": "nuevo",
+        "accession": "C2",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/2/C2/C2-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/2/P2/P2-index.htm",
+        "value_usd": 980.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/2/C2/C2-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000003",
+        "name": "",
+        "shares": 3.0,
+        "prev_shares": 0.0,
+        "change": 3.0,
+        "change_pct": null,
+        "pct_of_13f": 2.5,
+        "status": "nuevo",
+        "accession": "C3",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/3/C3/C3-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/3/P3/P3-index.htm",
+        "value_usd": 970.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/3/C3/C3-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000004",
+        "name": "",
+        "shares": 4.0,
+        "prev_shares": 0.0,
+        "change": 4.0,
+        "change_pct": null,
+        "pct_of_13f": 3.3333333333333335,
+        "status": "nuevo",
+        "accession": "C4",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/4/C4/C4-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/4/P4/P4-index.htm",
+        "value_usd": 960.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/4/C4/C4-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000005",
+        "name": "",
+        "shares": 5.0,
+        "prev_shares": 0.0,
+        "change": 5.0,
+        "change_pct": null,
+        "pct_of_13f": 4.166666666666667,
+        "status": "nuevo",
+        "accession": "C5",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/5/C5/C5-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/5/P5/P5-index.htm",
+        "value_usd": 950.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/5/C5/C5-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000006",
+        "name": "",
+        "shares": 6.0,
+        "prev_shares": 0.0,
+        "change": 6.0,
+        "change_pct": null,
+        "pct_of_13f": 5.0,
+        "status": "nuevo",
+        "accession": "C6",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/6/C6/C6-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/6/P6/P6-index.htm",
+        "value_usd": 940.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/6/C6/C6-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000007",
+        "name": "",
+        "shares": 7.0,
+        "prev_shares": 0.0,
+        "change": 7.0,
+        "change_pct": null,
+        "pct_of_13f": 5.833333333333333,
+        "status": "nuevo",
+        "accession": "C7",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/7/C7/C7-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/7/P7/P7-index.htm",
+        "value_usd": 930.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/7/C7/C7-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000008",
+        "name": "",
+        "shares": 8.0,
+        "prev_shares": 0.0,
+        "change": 8.0,
+        "change_pct": null,
+        "pct_of_13f": 6.666666666666667,
+        "status": "nuevo",
+        "accession": "C8",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/8/C8/C8-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/8/P8/P8-index.htm",
+        "value_usd": 920.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/8/C8/C8-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000009",
+        "name": "",
+        "shares": 9.0,
+        "prev_shares": 0.0,
+        "change": 9.0,
+        "change_pct": null,
+        "pct_of_13f": 7.5,
+        "status": "nuevo",
+        "accession": "C9",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/9/C9/C9-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/9/P9/P9-index.htm",
+        "value_usd": 910.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/9/C9/C9-index.htm"
+        ]
+      },
+      {
+        "cik": "0000000010",
+        "name": "",
+        "shares": 10.0,
+        "prev_shares": 0.0,
+        "change": 10.0,
+        "change_pct": null,
+        "pct_of_13f": 8.333333333333334,
+        "status": "nuevo",
+        "accession": "C10",
+        "filed": "2026-08-15",
+        "filing_url": "https://www.sec.gov/Archives/edgar/data/10/C10/C10-index.htm",
+        "prev_filing_url": "https://www.sec.gov/Archives/edgar/data/10/P10/P10-index.htm",
+        "value_usd": 900.0,
+        "value_filing_urls": [
+          "https://www.sec.gov/Archives/edgar/data/10/C10/C10-index.htm"
+        ]
+      }
+    ],
+    "value_basis": "Valor USD declarado en el 13F al cierre del trimestre; no valor actual. Errores del declarante no corregidos."
+  },
+  "network": false,
+  "llm": false
+}
