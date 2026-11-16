@@ -1,4 +1,4 @@
-"""Piezas puras del backtest PIT sin sesgo de supervivencia (sin DB, sin red, sin imports de la app).
+"""Piezas puras para ACOTAR el sesgo de supervivencia del backtest PIT (sin DB, sin red, sin imports de la app).
 
 * ``ExitEvent``/``load_exits``: altas/bajas/quiebras con retorno de salida.
 * ``Membership``: universo historico por fecha (quien estaba en el indice en el mes t).
@@ -11,13 +11,15 @@
 from __future__ import annotations
 
 import csv
+import math
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
 KINDS = ("bankruptcy", "delist_loss", "acquired", "merged", "unknown")
-# Retorno de salida por defecto SOLO cuando el CSV no trae cifra. Conservador: la baja
-# sin dato se trata como perdida total (cota inferior); la cota superior es 0.0.
+# Retorno de salida por defecto SOLO cuando el CSV no trae cifra. Es un SUPUESTO
+# (inferred=True): la simulacion lo sustituye por la cota --unknown-exit de cada
+# corrida para que las dos cotas acoten TODOS los retornos inferidos.
 DEFAULT_EXIT_RETURN = {
     "bankruptcy": -1.0,
     "delist_loss": -0.5,
@@ -33,6 +35,7 @@ class ExitEvent:
     last_month: int  # indice de mes (year*12+month-1) del ultimo cierre negociado
     kind: str
     exit_return: float  # sobre el ultimo cierre; -1.0 = pierde todo
+    inferred: bool = False  # True si exit_return salio de DEFAULT_EXIT_RETURN (supuesto)
 
 
 def _month(label: str) -> int:
@@ -50,10 +53,12 @@ def load_exits(path: Path) -> dict[str, ExitEvent]:
                 raise ValueError(f"kind desconocido {kind!r} para {row.get('symbol')}")
             raw = (row.get("exit_return") or "").strip()
             ret = float(raw) if raw else DEFAULT_EXIT_RETURN[kind]
+            if not math.isfinite(ret):
+                raise ValueError(f"exit_return no finito para {row.get('symbol')}: {raw!r}")
             if ret < -1.0:
                 raise ValueError(f"exit_return < -100 % para {row['symbol']}")
             sym = row["symbol"].strip()
-            out[sym] = ExitEvent(sym, _month(row["last_month"]), kind, ret)
+            out[sym] = ExitEvent(sym, _month(row["last_month"]), kind, ret, inferred=not raw)
     return out
 
 

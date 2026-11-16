@@ -20,21 +20,27 @@ Sin look-ahead (se comprueba en cada ejecucion; ver ``assert_no_leak``):
 * un valor solo es elegible desde su primer filing en la SEC (``filed`` de
   companyfacts) y desde que tiene precio; nunca con fechas posteriores.
 
-Sin sesgo de supervivencia (``scripts/pit_exits.py``):
+Sesgo de supervivencia ACOTADO (``scripts/pit_exits.py``), no eliminado:
 
 * la elegibilidad en ``t0`` solo mira informacion disponible EN ``t0`` (precio
   en ``t0``, veredicto de ``t0-1``, primer filing <= ``t0`` y, si se da,
   pertenencia historica al indice en ``t0``): nunca exige precios en meses
   posteriores, asi que las quiebras y adquisiciones posteriores a ``t0``
-  permanecen en el universo;
-* una posicion cuyo valor desaparece (baja real) se cierra a su retorno de
-  salida (``--exits``) o, sin dato, al supuesto conservador ``--unknown-exit``;
-  un hueco de datos con precios posteriores NO cierra la posicion, y el fin de
-  los datos tampoco (no es una quiebra);
+  permanecen en el universo. Eso era el sesgo del filtro antiguo.
+* BAJA OBSERVADA vs IMPUTADA: con ``--exits`` la baja es un evento observado
+  (fecha y retorno declarados; manda la fecha del evento). SIN evento, la baja
+  es una IMPUTACION RETROSPECTIVA: 3+ meses sin precio se tratan como baja en
+  ese momento (point-in-time: solo precios <= t; un hueco de 2 meses no cierra
+  y el fin de los datos no se distingue de una pausa). No es un hecho
+  observado y su retorno es un supuesto acotado por las dos cotas.
+* LO QUE FALTA para eliminar el sesgo del todo: un universo historico real
+  (pertenencia al indice por fecha, ``--membership``) y retornos de salida
+  observados (``--exits`` con cifra). Sin esos CSVs, el universo es la lista
+  suministrada filtrada PIT y las bajas sin cifra son supuestos etiquetados.
 * el informe contrasta ``--unknown-exit -1.0`` (cota inferior) con ``0.0``
-  (cota superior): si el signo de la ventaja de la app cambia, el resultado se
-  declara no concluyente;
-* los retornos inferidos por una baja sin dato se etiquetan como supuesto.
+  (cota superior) sobre TODA baja sin cifra (con o sin evento): si el signo de
+  la ventaja de la app cambia, el resultado se declara no concluyente;
+* los retornos inferidos se etiquetan como supuesto en ``exits_log``.
 
 Puro: sin DB ni red. Precios: CSV ``Date, Close|Adj Close[, Low]`` (cierre
 ajustado como la app). Los niveles son invariantes a la escala, asi que el ajuste
@@ -52,6 +58,7 @@ import json
 import math
 import random
 import sys
+from bisect import bisect_right
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
 from datetime import date, datetime
@@ -244,6 +251,12 @@ class Result:
     exits_log: list[dict] = field(default_factory=list)  # cierres por baja (quiebra, adquisicion...)
 
 
+def _tradable_at(ev: pit_exits.ExitEvent | None, t: int) -> bool:
+    """Tras el ultimo mes del evento, el valor ya no se puede comprar: los
+    precios posteriores de un CSV sucio no resucitan una baja."""
+    return ev is None or t <= ev.last_month
+
+
 def simulate(
     universe: Sequence[Series],
     months: Sequence[int],
@@ -281,41 +294,69 @@ def simulate(
     last_px = [math.nan] * k
     total_cash = contrib * len(months)
     exits = exits or {}
-    data_end = months[-1]
     exits_log: list[dict] = []
     turn_monthly: list[float] = []
+    sorted_months = [sorted(s.first) for s in universe]
+    closed = [False] * k  # salida ejecutada: no se recompra NUNCA (evento o inferida)
+
+    def last_known_month(i: int, t: int) -> int | None:
+        """Ultimo mes con precio CONOCIDO en t (PIT: nunca mira meses futuros)."""
+        idx = bisect_right(sorted_months[i], t) - 1
+        return sorted_months[i][idx] if idx >= 0 else None
+
+    def close_at(i: int, m: int) -> float:
+        """Cierre (ultimo close del mes) del ultimo mes negociado <= m; fallback al open."""
+        idx = bisect_right(sorted_months[i], m) - 1
+        if idx < 0:
+            return last_px[i]
+        return universe[i].last.get(sorted_months[i][idx], last_px[i])
+
     for step, t in enumerate(months):
         px = [s.first.get(t, math.nan) for s in universe]
         alive = [math.isfinite(p) for p in px]
         for i, p in enumerate(px):
             if alive[i]:
                 last_px[i] = p
-        # Bajas reales: la posicion se cierra a su valor de salida y la caja
-        # entra en el reparto normal del mes. Un hueco de datos con precios
-        # posteriores NO cierra (su last_month sigue por delante de t) y el
-        # fin de los datos tampoco (no es una quiebra).
+        # Bajas: la posicion se cierra al CIERRE del ultimo mes negociado y la
+        # caja entra en el reparto normal del mes. La decision es point-in-time:
+        # con evento manda SU last_month (ni adelantar ni retrasar); sin evento
+        # se infiere solo con precios <= t (3+ meses sin precio; un hueco de 2
+        # no cierra y el fin de los datos tampoco, porque no se sabe aun).
         month_sold = 0.0
         for i in range(k):
+            if closed[i] or shares[i] <= 0:
+                continue
             ev = exits.get(universe[i].symbol)
-            # Con evento, manda SU last_month: ni se ejecuta antes de la fecha
-            # declarada (seria mirar al futuro) ni despues por precios
-            # rezagados. Sin evento, el fin de la serie con la gracia de siempre.
-            last_m = ev.last_month if ev is not None else universe[i].last_month
-            if shares[i] > 0 and pit_exits.is_delisted(t, last_m, data_end, ev):
-                recovered = pit_exits.exit_value(shares[i], last_px[i], ev, cost=cost, unknown=unknown_exit)
-                cash += recovered
-                month_sold += shares[i] * last_px[i]
-                exits_log.append(
-                    {
-                        "symbol": universe[i].symbol,
-                        "month": month_label(t),
-                        "kind": ev.kind if ev is not None else "unknown (supuesto)",
-                        "exit_return": ev.exit_return if ev is not None else unknown_exit,
-                        "recovered": round(recovered, 2),
-                    }
-                )
-                shares[i] = 0.0
-                basis[i] = 0.0
+            last_m = ev.last_month if ev is not None else last_known_month(i, t)
+            if not pit_exits.is_delisted(t, last_m, t, ev, grace=2):
+                continue
+            px_exit = close_at(i, last_m) if last_m is not None else last_px[i]
+            if ev is not None and not ev.inferred:
+                exit_ev: pit_exits.ExitEvent | None = ev
+                kind_label = ev.kind
+            elif ev is not None:
+                # Retorno inferido (sin cifra en el CSV): supuesto acotado por la corrida.
+                exit_ev = pit_exits.ExitEvent(ev.symbol, ev.last_month, ev.kind, unknown_exit)
+                kind_label = f"{ev.kind} (supuesto)"
+            else:
+                exit_ev = None
+                kind_label = "unknown (supuesto)"
+            recovered = pit_exits.exit_value(shares[i], px_exit, exit_ev, cost=cost, unknown=unknown_exit)
+            cash += recovered
+            month_sold += shares[i] * px_exit
+            exits_log.append(
+                {
+                    "symbol": universe[i].symbol,
+                    "month": month_label(t),
+                    "kind": kind_label,
+                    "exit_return": exit_ev.exit_return if exit_ev is not None else unknown_exit,
+                    "exit_price": round(px_exit, 6),
+                    "recovered": round(recovered, 2),
+                }
+            )
+            shares[i] = 0.0
+            basis[i] = 0.0
+            closed[i] = True
         sold_value += month_sold
         flow = contrib if strategy != "buy_hold" else (total_cash if step == 0 else 0.0)
         flows.append(contrib)
@@ -328,7 +369,11 @@ def simulate(
             cash = 0.0
         elif strategy == "buy_hold":
             if step == 0:
-                live = [i for i in range(k) if alive[i]]
+                live = [
+                    i
+                    for i in range(k)
+                    if alive[i] and not closed[i] and _tradable_at(exits.get(universe[i].symbol), t)
+                ]
                 for i in live:
                     amt = cash / len(live)
                     shares[i] += amt * (1 - cost) / px[i]
@@ -337,7 +382,14 @@ def simulate(
                 cash = 0.0
         else:
             cands = []
-            live = [i for i in range(k) if alive[i] and t >= (universe[i].eligible_from or 0)]
+            live = [
+                i
+                for i in range(k)
+                if alive[i]
+                and not closed[i]
+                and t >= (universe[i].eligible_from or 0)
+                and _tradable_at(exits.get(universe[i].symbol), t)
+            ]
             for i in live:
                 s = universe[i]
                 lvl = s.level.get(t - 1) if strategy != "plano" else None
@@ -746,15 +798,31 @@ def walk_forward_report(
 
 
 def _data_hash(
-    px_dirs: Sequence[Path], symbols: Sequence[str], membership: Path | None, exits: Path | None
+    px_dirs: Sequence[Path],
+    sec_dirs: Sequence[Path],
+    symbols: Sequence[str],
+    symbols_file: Path,
+    membership: Path | None,
+    exits: Path | None,
+    config: dict,
 ) -> str:
-    """SHA256 de los datos de entrada (precios usados, pertenencia y bajas): reproducibilidad."""
+    """SHA256 de TODA la entrada: precios de cada simbolo (incluido SPY), companyfacts
+    usados, lista de simbolos, pertenencia, bajas y configuracion de la corrida.
+    Si cualquiera cambia (p. ej. el CSV de SPY), el hash cambia."""
     h = hashlib.sha256()
+    h.update(json.dumps(config, sort_keys=True).encode())
+    h.update(symbols_file.read_bytes())
     for sym in sorted(symbols):
         for d in sorted(px_dirs):
             p = d / f"{sym}.csv"
             if p.exists():
-                h.update(sym.encode())
+                h.update(b"px:" + sym.encode())
+                h.update(p.read_bytes())
+                break
+        for d in sorted(sec_dirs):
+            p = d / f"{sym.split('.')[0]}.json.gz"
+            if p.exists():
+                h.update(b"sec:" + sym.encode())
                 h.update(p.read_bytes())
                 break
     for extra in (membership, exits):
@@ -812,16 +880,18 @@ def main(argv: Sequence[str] | None = None) -> int:
     fixed_syms = [x.strip() for x in a.fixed.read_text().split() if x.strip()] if a.fixed else []
     membership = pit_exits.Membership.from_csv(a.membership) if a.membership else None
     exits = pit_exits.load_exits(a.exits) if a.exits else None
-    uni = load_universe(a.px, list(dict.fromkeys([*syms, *fixed_syms, "SPY"])), a.sec, DEFAULT_PARAMS)
+    load_syms = list(dict.fromkeys([*syms, *fixed_syms, "SPY"]))
+    uni = load_universe(a.px, load_syms, a.sec, DEFAULT_PARAMS)
     spy = next(s for s in uni if s.symbol == "SPY")
     uni = [s for s in uni if s.symbol != "SPY"]
     checked = assert_no_leak(uni, samples=a.leak_samples)
     y0, m0 = (int(x) for x in a.start.split("-"))
     y1, m1 = (int(x) for x in a.end.split("-"))
     months = list(range(y0 * 12 + m0 - 1, y1 * 12 + m1))
-    t0 = months[0]
-    # Universo PIT: con filing SEC anterior al inicio (nunca una fecha posterior).
-    pit = [s for s in uni if s.symbol in syms and s.eligible_from is not None and s.eligible_from <= t0]
+    # Universo con dato SEC; la elegibilidad la impone eligible_at en cada
+    # corrida (ventana o fold) con SU t0: un emisor que presenta a mitad de la
+    # ventana no es elegible al inicio pero si en los folds posteriores.
+    pit = [s for s in uni if s.symbol in syms and s.eligible_from is not None]
     fixed = [s for s in uni if s.symbol in fixed_syms]
     sizes = [int(x) for x in a.sizes.split(",")]
     out = run_benchmark(
@@ -876,7 +946,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         exits=exits,
         unknown_exit=a.unknown_exit,
     )
-    out["data_hash"] = _data_hash(a.px, [s.symbol for s in uni], a.membership, a.exits)
+    out["data_hash"] = _data_hash(
+        a.px,
+        a.sec,
+        load_syms,
+        a.symbols,
+        a.membership,
+        a.exits,
+        {
+            "start": a.start,
+            "end": a.end,
+            "portfolios": a.portfolios,
+            "sizes": sizes,
+            "seed": a.seed,
+            "unknown_exit": a.unknown_exit,
+            "wf_train": a.wf_train,
+            "wf_test": a.wf_test,
+            "cost_sweep_bps": a.cost_sweep_bps,
+            "strategies": list(STRATEGIES),
+        },
+    )
     a.out.write_text(json.dumps(out, indent=1))
     print(
         json.dumps({"checked_no_leak": checked, "eligible": out["eligible"], "portfolios": out["portfolios"]})

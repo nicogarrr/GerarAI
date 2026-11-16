@@ -12,6 +12,8 @@ import json
 from datetime import date
 from pathlib import Path
 
+import pytest
+
 from app.services.dca_signal_engine import DailyBar
 from scripts import dca_backtest_pit as bt
 from scripts import pit_exits as px
@@ -144,6 +146,112 @@ def test_sensibilidad_ejecuta_la_cota_que_falta_y_etiqueta_bien(monkeypatch):
     assert out["irr_diff_median_cota_inferior"] == -0.02  # de la ejecucion con -1.0
     assert out["irr_diff_median_cota_superior"] == 0.05  # la base elegida
     assert out["concluyente"] is False
+
+
+def test_salida_al_cierre_del_ultimo_mes_no_al_open():
+    # Contrato: el retorno de salida es sobre el ULTIMO CIERRE, no sobre el
+    # primer cierre (open) del mes. _bars pone open=px y close=px*(1+r).
+    win, dead = _winner(), _dead()
+    ev = px.ExitEvent("DEAD", T0 + 5, "acquired", 0.0)  # last_month 2008-06, ret 0
+    r = bt.simulate([win, dead], MONTHS, strategy="plano", exits={"DEAD": ev}, cost=0.0)
+    shares = sum(100.0 / dead.first[m] for m in range(T0, T0 + 6))
+    expected = shares * dead.last[T0 + 5]  # cierre de 2008-06, no el open
+    assert r.exits_log[0]["exit_price"] == pytest.approx(dead.last[T0 + 5])
+    assert r.exits_log[0]["recovered"] == pytest.approx(expected, abs=0.01)
+
+
+def test_un_precio_posterior_no_cambia_el_patrimonio_previo():
+    # PIT: anadir un precio en 2008-09 no puede cambiar julio.
+    win = _winner()
+    dead_a = _dead()
+    bars_b = _bars([0.01] * 42) + [DailyBar(day=date(2008, 9, 15), close=150.0)]
+    dead_b = bt.build_series("DEAD", bars_b)
+    ra = bt.simulate([win, dead_a], MONTHS, strategy="plano")
+    rb = bt.simulate([win, dead_b], MONTHS, strategy="plano")
+    assert ra.curve[:7] == rb.curve[:7]  # enero-julio identicos
+
+
+def test_evento_no_recompra_tras_la_baja():
+    # Evento en 2008-03 con CSV que sigue hasta diciembre: una sola salida
+    # (2008-04) y el valor nunca vuelve a ser comprable.
+    win = _winner()
+    dead = _series("DEAD", [0.01] * 48)  # datos hasta 2008-12
+    ev = px.ExitEvent("DEAD", T0 + 2, "bankruptcy", -1.0)
+    r = bt.simulate([win, dead], MONTHS, strategy="plano", exits={"DEAD": ev})
+    assert len(r.exits_log) == 1  # una sola salida: nunca se recompra tras la baja
+    assert r.exits_log[0]["month"] == "2008-04"
+
+
+def test_nan_o_infinito_en_exit_return_se_rechaza(tmp_path):
+    for raw in ("NaN", "nan", "inf", "-inf"):
+        f = tmp_path / "x.csv"
+        f.write_text(f"symbol,last_month,kind,exit_return\nX,2012-03,bankruptcy,{raw}\n")
+        with pytest.raises(ValueError, match="no finito"):
+            px.load_exits(f)
+
+
+def test_retorno_inferido_es_supuesto_y_varia_entre_cotas(tmp_path):
+    f = tmp_path / "x.csv"
+    f.write_text("symbol,last_month,kind,exit_return\nDEAD,2008-06,bankruptcy,\n")
+    exits = px.load_exits(f)
+    assert exits["DEAD"].inferred is True
+    win, dead = _winner(), _dead()
+    inf = bt.simulate([win, dead], MONTHS, strategy="plano", exits=exits, unknown_exit=-1.0, cost=0.0)
+    sup = bt.simulate([win, dead], MONTHS, strategy="plano", exits=exits, unknown_exit=0.0, cost=0.0)
+    assert inf.exits_log[0]["kind"] == "bankruptcy (supuesto)"
+    assert inf.exits_log[0]["recovered"] == 0.0
+    assert sup.exits_log[0]["recovered"] > 0.0  # la cota superior SI varia el supuesto
+    assert inf.irr <= sup.irr
+
+
+def test_filing_posterior_a_t0_entra_en_folds_posteriores():
+    # El universo ya no se filtra al t0 global: LATE presenta en 2008-07, asi que
+    # no es elegible en la ventana pero SI en el primer fold (test 2008-07..09).
+    win = _winner()
+    late = _series("LATE", [0.02] * 60)
+    late.eligible_from = T0 + 6
+    base = bt.run_benchmark([win, late], _winner(), MONTHS, portfolios=1, sizes=(1,), seed=1)
+    assert base["eligible"] == 1
+    wf = bt.walk_forward_report(
+        [win, late],
+        _winner(),
+        MONTHS,
+        train=6,
+        test=3,
+        portfolios=1,
+        sizes=(1,),
+        seed=1,
+        membership=None,
+        exits=None,
+        unknown_exit=-1.0,
+    )
+    assert wf["folds"][0]["test_window"][0] == "2008-07"
+    assert wf["folds"][0]["eligible"] == 2
+
+
+def test_data_hash_cubre_spy_sec_simbolos_y_config(tmp_path):
+    pxdir = tmp_path / "px"
+    secdir = tmp_path / "sec"
+    pxdir.mkdir()
+    secdir.mkdir()
+    (pxdir / "WIN.csv").write_text("Date,Close\n2005-01-03,100\n")
+    (pxdir / "SPY.csv").write_text("Date,Close\n2005-01-03,20\n")
+    (secdir / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {}}'))
+    syms = tmp_path / "symbols.txt"
+    syms.write_text("WIN\n")
+    cfg = {"seed": 1, "start": "2008-01"}
+    base = bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg)
+    # SPY distinto -> hash distinto (regresion del hallazgo del auditor).
+    (pxdir / "SPY.csv").write_text("Date,Close\n2005-01-03,2000\n")
+    assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg) != base
+    # companyfacts distinto -> hash distinto.
+    (pxdir / "SPY.csv").write_text("Date,Close\n2005-01-03,20\n")
+    (secdir / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"x": 1}}'))
+    assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg) != base
+    # config distinta -> hash distinto; entrada identica -> mismo hash.
+    (secdir / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {}}'))
+    assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, {**cfg, "seed": 2}) != base
+    assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg) == base
 
 
 def test_misma_semilla_mismo_json():
