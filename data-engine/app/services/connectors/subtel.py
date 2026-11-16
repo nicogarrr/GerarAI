@@ -7,12 +7,15 @@ from __future__ import annotations
 
 import io
 import re
+import time
 from datetime import datetime
 from html.parser import HTMLParser
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import httpx
 from pypdf import PdfReader
+
+from app.services.data_source_health import get_data_source_registry
 
 HOST = "publico.subtel.gob.cl"
 REGISTER = f"https://{HOST}/data-externa/getSolicitudes"
@@ -112,10 +115,25 @@ async def _download(client: httpx.AsyncClient, url: str) -> bytes:
         return b"".join(chunks)
 
 
+_REGISTRY_KEY = "subtel"
+
+
 async def fetch_decrees(client: httpx.AsyncClient | None = None) -> list[dict]:
     if client is None:
         async with httpx.AsyncClient(timeout=30, headers={"User-Agent": "GerarAI/1.0 official regulatory research"}) as own:
             return await fetch_decrees(own)
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        results = await _fetch_decrees(client)
+    except (httpx.HTTPError, ValueError) as exc:
+        registry.record_failure(_REGISTRY_KEY, f"{type(exc).__name__}: {str(exc)[:120]}")
+        raise
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+    return results
+
+
+async def _fetch_decrees(client: httpx.AsyncClient) -> list[dict]:
     html = (await _download(client, REGISTER_URL)).decode("utf-8")
     if "<table" not in html.lower():
         raise ValueError("Invalid SUBTEL register")

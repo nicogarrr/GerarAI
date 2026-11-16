@@ -47,6 +47,10 @@ from typing import Any
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
+
+_REGISTRY_KEY = "fca_nsm"
+
 NSM_SEARCH_URL = "https://api.data.fca.org.uk/search"
 NSM_INDEX = "nsm-search"
 NSM_ARTEFACTS_BASE = "https://data.fca.org.uk/artefacts/"
@@ -200,6 +204,8 @@ class NsmClient:
         self, lei: str, *, filing_type: str | None = ANNUAL_REPORT_TYPE, size: int = 50
     ) -> list[NsmFiling]:
         await _throttle()
+        registry = get_data_source_registry()
+        started = time.perf_counter()
         try:
             resp = await self._client.post(
                 NSM_SEARCH_URL,
@@ -210,12 +216,16 @@ class NsmClient:
             resp.raise_for_status()
             payload = resp.json()
         except (httpx.HTTPError, ValueError) as exc:
+            registry.record_failure(_REGISTRY_KEY, f"busqueda: {type(exc).__name__}")
             raise NsmError(f"busqueda NSM fallida: {type(exc).__name__}") from exc
+        registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return parse_search_hits(payload, lei=lei)
 
     async def fetch_document(self, filing: NsmFiling) -> tuple[bytes, str]:
         """(bytes, sha256) del documento depositado."""
         await _throttle()
+        registry = get_data_source_registry()
+        started = time.perf_counter()
         try:
             async with self._client.stream(
                 "GET", filing.url, headers={"User-Agent": USER_AGENT},
@@ -230,7 +240,9 @@ class NsmClient:
                         raise NsmError(f"documento mayor de {MAX_PACKAGE_BYTES // (1024 * 1024)} MB: no se descarga")
                     chunks.append(chunk)
         except httpx.HTTPError as exc:
+            registry.record_failure(_REGISTRY_KEY, f"descarga: {type(exc).__name__}")
             raise NsmError(f"descarga NSM fallida: {type(exc).__name__}") from exc
+        registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         blob = b"".join(chunks)
         return blob, hashlib.sha256(blob).hexdigest()
 

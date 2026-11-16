@@ -34,6 +34,9 @@ import httpx
 from defusedxml import ElementTree as DefusedET
 
 from app.core.config import get_settings
+from app.services.data_source_health import get_data_source_registry
+
+_REGISTRY_KEY = "house_ptr"
 
 BASE = "https://disclosures-clerk.house.gov/public_disc"
 INDEX_URL = BASE + "/financial-pdfs/{year}FD.zip"
@@ -61,12 +64,19 @@ def _headers() -> dict[str, str]:
 
 def _get(url: str, client: httpx.Client | None = None) -> bytes:
     _throttle()
-    if client is not None:
-        response = client.get(url, headers=_headers())
-    else:
-        with httpx.Client(timeout=60, headers=_headers(), follow_redirects=False) as owned:
-            response = owned.get(url)
-    response.raise_for_status()
+    registry = get_data_source_registry()
+    started = time.perf_counter()
+    try:
+        if client is not None:
+            response = client.get(url, headers=_headers())
+        else:
+            with httpx.Client(timeout=60, headers=_headers(), follow_redirects=False) as owned:
+                response = owned.get(url)
+        response.raise_for_status()
+    except httpx.HTTPError as exc:
+        registry.record_failure(_REGISTRY_KEY, f"{type(exc).__name__}")
+        raise
+    registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
     return response.content
 
 
