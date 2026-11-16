@@ -75,6 +75,7 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/research/DcaPreparingRefresh.tsx': 'useEffect and useRouter subscribe to bounded card status polling and refresh once after completion.',
   'components/research/CompanyNavigationScroll.tsx':
     'Client boundary uses refs, useEffect and MutationObserver to keep the active tab visible after client navigation.',
   'components/ai/AiAvailabilityNotice.tsx': 'Hooks de estado/efecto y actualización explícita antes de iniciar IA.',

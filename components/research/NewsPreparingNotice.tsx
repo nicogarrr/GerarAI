@@ -13,7 +13,7 @@ export async function NewsPreparingNotice({ ticker, fallback }: { ticker: string
     return (
         <p role="status" aria-live="polite" data-testid="news-preparing" className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm text-gray-400">
             {t('research.fichaNewsPreparing')}
-            <DcaPreparingRefresh />
+            <DcaPreparingRefresh ticker={ticker} kind="news" />
         </p>
     );
 }
