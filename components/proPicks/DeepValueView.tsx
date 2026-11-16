@@ -45,7 +45,6 @@ export default function DeepValueView() {
     const t = useT();
     const locale = useLocale();
     const { formatNumber, formatPercent } = useFormat();
-    const formatPb = (value: number) => `${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`;
     const [data, setData] = useState<DeepValueResult | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(false);
@@ -59,13 +58,13 @@ export default function DeepValueView() {
         if ('error' in result) setError(t('propicks.deepValue.loadError'));
         else setData(result);
         setLoading(false);
-    }, [pbMax, yieldMin]);
+    }, [pbMax, yieldMin, t]);
 
     useEffect(() => {
-        void load();
+        queueMicrotask(() => void load());
     }, [load]);
 
-    const asOf = data?.resultados.find((row) => row.metric_as_of)?.metric_as_of ?? null;
+    const asOf = [...(data?.resultados ?? []), ...(data?.pendientes_revision ?? [])].find((row) => row.metric_as_of)?.metric_as_of ?? null;
 
     return (
         <div className="space-y-4">
@@ -118,7 +117,7 @@ export default function DeepValueView() {
                 <Card className="rounded-lg border border-red-700 bg-red-900/20 p-4 text-sm text-red-400">{error}</Card>
             )}
 
-            {!error && data && data.resultados.length === 0 && (
+            {!error && data && data.resultados.length === 0 && !(data.pendientes_revision?.length) && (
                 <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-400">
                     {t('propicks.deepValue.empty')}
                 </Card>
@@ -128,16 +127,33 @@ export default function DeepValueView() {
                 <p className="text-xs text-gray-500">{t('propicks.deepValue.asOf', { date: new Date(`${asOf}T00:00:00`).toLocaleDateString(locale === 'en' ? 'en-US' : 'es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) })}</p>
             )}
 
+            {data && <DeepValueResultSections data={data} />}
+        </div>
+    );
+}
+
+
+function DeepValueCards({ items, pending = false }: { items: DeepValueItem[]; pending?: boolean }) {
+    const t = useT();
+    const { formatNumber } = useFormat();
+    const formatPb = (value: number) => value > 0 && value < 0.01
+        ? `<${formatNumber(0.01, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`
+        : `${formatNumber(value, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}x`;
+    return (
             <div className="grid gap-3 sm:grid-cols-2">
-                {data?.resultados.map((item) => (
+                {items.map((item) => (
                     <Card key={item.ticker} className="flex min-w-0 flex-col gap-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4">
                         <div className="flex items-baseline justify-between gap-2">
                             <div className="min-w-0">
                                 <span className="font-bold text-teal-300">{item.ticker}</span>{' '}
                                 <span className="truncate text-sm text-gray-300">{item.name}</span>
                             </div>
-                            <span className="flex-none text-sm font-semibold text-gray-100">{t('propicks.deepValue.points', { value: formatNumber(item.score) })}</span>
+                            {!pending && item.score !== null && <span className="flex-none text-sm font-semibold text-gray-100">{t('propicks.deepValue.points', { value: formatNumber(item.score) })}</span>}
                         </div>
+                        {pending && <p className="text-sm font-medium text-amber-300">{t('propicks.deepValue.reviewPending')}</p>}
+                        {item.review_reasons?.includes('pb_split_basis_unverified') && <p className="text-xs text-amber-300">{t('propicks.deepValue.reviewSplitBasis')}</p>}
+                        {item.review_reasons?.some((r) => r === 'pb_status_unverified' || r === 'pb_split_factor_invalid' || r === 'pb_inputs_inconsistent' || r === 'pb_price_stale_or_invalid') && <p className="text-xs text-amber-300">{t('propicks.deepValue.reviewPbStatus')}</p>}
+                        {item.review_reasons?.includes('dividend_non_recurring') && <p className="text-xs text-amber-300">{t('propicks.deepValue.reviewNonRecurring')}</p>}
                         {item.sector && <p className="text-xs text-gray-500">{item.sector} · {item.exchange}</p>}
                         <div className="grid grid-cols-2 gap-2">
                             <div>
@@ -153,6 +169,31 @@ export default function DeepValueView() {
                     </Card>
                 ))}
             </div>
-        </div>
     );
+}
+
+/** Pure result view, also used to verify the exact rendered cards offline. */
+export function DeepValueResultSections({ data }: { data: DeepValueResult }) {
+    const t = useT();
+    // Older API payloads still contain flagged rows in resultados. Quarantine
+    // them during a rolling deployment too; never display their old score.
+    const needsReview = (item: DeepValueItem) => item.score === null || Boolean(
+        item.desacuerdo_fuentes || item.yield_extremo_revisar || item.review_reasons?.length
+    );
+    const ranked = data.resultados.filter((item) => !needsReview(item));
+    const pending = [...new Map([
+        ...(data.pendientes_revision ?? []), ...data.resultados.filter(needsReview),
+    ].map((item) => [item.ticker, item])).values()];
+    return <div className="space-y-6">
+        <section data-testid="deep-value-ranked" aria-label={t('propicks.deepValue.rankedTitle')}>
+            {ranked.length > 0 && <h4 className="mb-3 font-semibold text-gray-100">{t('propicks.deepValue.rankedTitle')}</h4>}
+            {ranked.length === 0 && pending.length > 0 && <p className="text-sm text-gray-400">{t('propicks.deepValue.noRanked')}</p>}
+            <DeepValueCards items={ranked} />
+        </section>
+        {pending.length > 0 && <section data-testid="deep-value-review" aria-label={t('propicks.deepValue.reviewTitle')} className="space-y-3">
+            <h4 className="font-semibold text-amber-300">{t('propicks.deepValue.reviewTitle')}</h4>
+            <p className="text-sm text-gray-400">{t('propicks.deepValue.reviewNote')}</p>
+            <DeepValueCards items={pending} pending />
+        </section>}
+    </div>;
 }

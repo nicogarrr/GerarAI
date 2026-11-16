@@ -9055,6 +9055,11 @@ export interface components {
         DeepValueResponse: {
             /** Estrategia */
             estrategia: string;
+            /**
+             * Pendientes Revision
+             * @default []
+             */
+            pendientes_revision: components["schemas"]["DeepValueRowOut"][];
             /** Resultados */
             resultados: components["schemas"]["DeepValueRowOut"][];
             /** Rotulo */
@@ -9084,8 +9089,13 @@ export interface components {
             pb_price_date: string | null;
             /** Price To Book */
             price_to_book: number;
+            /**
+             * Review Reasons
+             * @default []
+             */
+            review_reasons: string[];
             /** Score */
-            score: number;
+            score: number | null;
             /** Sector */
             sector: string | null;
             /** Ticker */

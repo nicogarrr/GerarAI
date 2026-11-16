@@ -304,7 +304,7 @@ class DeepValueRowOut(BaseModel):
     exchange: str
     currency: str
     sector: str | None
-    score: float
+    score: float | None
     price_to_book: float
     pb_price_date: str | None
     pb_fiscal_year: int | None
@@ -315,12 +315,14 @@ class DeepValueRowOut(BaseModel):
     finnhub_yield_indicated: float | None
     fuentes: list[str]
     metric_as_of: str | None
+    review_reasons: list[str] = []
 
 
 class DeepValueResponse(BaseModel):
     estrategia: str
     rotulo: str
     resultados: list[DeepValueRowOut]
+    pendientes_revision: list[DeepValueRowOut] = []
 
 
 @router.get("/unified", response_model=None)
@@ -355,34 +357,37 @@ def deep_value(
     )
 
     rows = find_deep_value(db, pb_max=pb_max, yield_min=yield_min, limit=limit)
+    mapped = [
+        DeepValueRowOut(
+            ticker=r.ticker,
+            name=r.name,
+            exchange=r.exchange,
+            currency=r.currency,
+            sector=r.sector,
+            score=r.score,
+            price_to_book=float(r.price_to_book),
+            pb_price_date=r.pb_price_date,
+            pb_fiscal_year=r.pb_fiscal_year,
+            dividend_yield=float(r.dividend_yield) if r.dividend_yield is not None else None,
+            yield_status=r.yield_status,
+            desacuerdo_fuentes=r.desacuerdo_fuentes,
+            yield_extremo_revisar=r.yield_extremo_revisar,
+            finnhub_yield_indicated=(
+                float(r.finnhub_yield_indicated)
+                if r.finnhub_yield_indicated is not None
+                else None
+            ),
+            fuentes=r.fuentes,
+            metric_as_of=r.metric_as_of,
+            review_reasons=r.review_reasons,
+        )
+        for r in rows
+    ]
     return DeepValueResponse(
         estrategia=STRATEGY_ID,
         rotulo=STRATEGY_LABEL,
-        resultados=[
-            DeepValueRowOut(
-                ticker=r.ticker,
-                name=r.name,
-                exchange=r.exchange,
-                currency=r.currency,
-                sector=r.sector,
-                score=r.score,
-                price_to_book=float(r.price_to_book),
-                pb_price_date=r.pb_price_date,
-                pb_fiscal_year=r.pb_fiscal_year,
-                dividend_yield=float(r.dividend_yield) if r.dividend_yield is not None else None,
-                yield_status=r.yield_status,
-                desacuerdo_fuentes=r.desacuerdo_fuentes,
-                yield_extremo_revisar=r.yield_extremo_revisar,
-                finnhub_yield_indicated=(
-                    float(r.finnhub_yield_indicated)
-                    if r.finnhub_yield_indicated is not None
-                    else None
-                ),
-                fuentes=r.fuentes,
-                metric_as_of=r.metric_as_of,
-            )
-            for r in rows
-        ],
+        resultados=[row for row in mapped if not row.review_reasons],
+        pendientes_revision=[row for row in mapped if row.review_reasons],
     )
 
 
