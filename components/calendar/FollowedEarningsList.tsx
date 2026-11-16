@@ -50,9 +50,9 @@ function materialLabel(doc: MaterialDocument, ti: TiFn): string {
  *  la vez y desplazaban las filas visibles (CLS medido 0,32 en el rig, umbral 0,1). */
 export function MaterialsLineSkeleton() {
     return (
-        <p className="mt-1.5" aria-hidden="true">
+        <div className="mt-1.5" aria-hidden="true">
             <Skeleton className="h-6 w-2/3" />
-        </p>
+        </div>
     );
 }
 
