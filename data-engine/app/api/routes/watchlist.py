@@ -283,20 +283,41 @@ def watchlist_monitor(
     # las pocas companias con split en la ventana.
     from app.services.split_adjustment import split_events_by_company
 
-    for company_id, events in split_events_by_company(db, company_ids).items():
-        recent_splits = [day for day, _ratio in events if cutoff < day <= today]
-        if not recent_splits:
-            continue
-        since = max(recent_splits)
-        counts[company_id] = db.scalar(
-            select(func.count(MarketPrice.id)).where(*valid_price, MarketPrice.company_id == company_id,
-                                                     MarketPrice.date >= since)
-        ) or 0
-        lows[company_id] = db.scalars(
-            select(MarketPrice).where(*valid_price, MarketPrice.company_id == company_id,
-                                      MarketPrice.date >= since)
-            .order_by(MarketPrice.close.asc(), MarketPrice.date.asc()).limit(1)
-        ).first()
+    split_cutoffs = {
+        company_id: max(recent)
+        for company_id, events in split_events_by_company(db, company_ids).items()
+        if (recent := [day for day, _ratio in events if cutoff < day <= today])
+    }
+    if split_cutoffs:
+        # One bounded window per split company, enforced in SQL. The old loop
+        # issued two queries per company, even though all windows are known.
+        since = sa.case(split_cutoffs, value=MarketPrice.company_id)
+        split_prices = (
+            MarketPrice.company_id.in_(list(split_cutoffs)),
+            MarketPrice.close.isnot(None), MarketPrice.close > 0,
+            MarketPrice.date >= since,
+        )
+        split_counts = dict(db.execute(
+            select(MarketPrice.company_id, func.count(MarketPrice.id))
+            .where(*split_prices).group_by(MarketPrice.company_id)
+        ).all())
+        ranked = select(
+            MarketPrice.id,
+            func.row_number().over(
+                partition_by=MarketPrice.company_id,
+                order_by=(MarketPrice.close.asc(), MarketPrice.date.asc()),
+            ).label("rank"),
+        ).where(*split_prices).subquery()
+        split_lows = {row.company_id: row for row in db.scalars(
+            select(MarketPrice).join(ranked, MarketPrice.id == ranked.c.id)
+            .where(ranked.c.rank == 1)
+        ).all()}
+        for company_id in split_cutoffs:
+            counts[company_id] = split_counts.get(company_id, 0)
+            if company_id in split_lows:
+                lows[company_id] = split_lows[company_id]
+            else:
+                lows.pop(company_id, None)
     if db.get_bind().dialect.name != "postgresql" or not company_ids:
         closes = ranked_prices(MarketPrice.date.desc())
     # Valor justo ÚNICO (tesis o motor, misma precedencia que inicio y screener).
