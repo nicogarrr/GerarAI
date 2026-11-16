@@ -298,7 +298,12 @@ from app.services.chat_synthesis_service import _asks_trade_action
     ('Do it now sell Apple', True),  # "Do" imperativo, no interrogativo
     ('Haz lo que digo vende Apple', True),  # "que" relativo, no pregunta
     ('¿Qué vende Apple?', False),  # pregunta reconocible sobre el sujeto
-    ('Tell me: does Apple sell cars?', False),  # "?" cierra la pregunta
+    # Sin bypass global por "?": la orden en otra frase sigue siendo orden.
+    ('Vende Apple. ¿Qué es el PER?', True),
+    ('Sell Apple now. What is free cash flow?', True),
+    ('Vende acciones de Apple, ¿de acuerdo?', True),
+    ('Sell Apple shares, ok?', True),
+    ('Tell me: does Apple sell cars?', True),  # "does" en medio: ante la duda, orden
 ])
 def test_asks_trade_action_branches(question, expected):
     assert _asks_trade_action(question) is expected

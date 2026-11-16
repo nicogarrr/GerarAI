@@ -314,11 +314,12 @@ _TRADE_NEGATION_RE = re.compile(
 _TRADE_NOUN_RE = re.compile(r"(?i)\b(?:de|del|para)\s+(?:la\s+|el\s+)?$")
 # Lectura interrogativa RECONOCIBLE en 3a persona, no orden: la clausula de
 # la accion EMPIEZA por que/que/what/which (pregunta sobre el sujeto:
-# "que vende Apple", "what does Apple sell") o la pregunta TERMINA en "?".
-# Un do/que suelto en medio de la clausula no basta: "Do it now sell Apple"
-# o "Haz lo que digo vende Apple" son ordenes. Solo vende/sell (indicativo =
-# imperativo tu); "buy"/"compra" no se exceptuan. Ante la duda, la accion
-# cuenta como orden (falla seguro).
+# "que vende Apple", "what does Apple sell"). Sin excepcion global por "?":
+# una orden en otra frase sigue siendo orden ("Vende Apple. Que es el
+# PER?"). Un do/que suelto en medio de la clausula tampoco basta: "Do it
+# now sell Apple" o "Haz lo que digo vende Apple" son ordenes. Solo
+# vende/sell (indicativo = imperativo tu); "buy"/"compra" no se exceptuan.
+# Ante la duda, la accion cuenta como orden (falla seguro).
 _TRADE_QUESTION_START_RE = re.compile(r"(?i)^\s*¿?\s*(?:qu[eé]|what|which)\b")
 _TRADE_LIGHT_WORDS = frozenset(
     {
@@ -342,12 +343,10 @@ def _asks_trade_action(question: str, action_re: re.Pattern = _TRADE_VERB_RE) ->
             (split.end() for split in _CLAUSE_SPLIT_RE.finditer(before)), default=0
         )
         clause = before[clause_start:]
-        if match.group(0).lower() in ("vende", "sell") and (
-            _TRADE_QUESTION_START_RE.match(clause) or q.rstrip().endswith("?")
-        ):
-            # Interrogativa reconocible: "que vende Apple" (clausula inicial)
-            # o cualquier pregunta cerrada con "?". "Do it now sell Apple" no
-            # empieza por interrogativo ni acaba en "?": es una orden.
+        if match.group(0).lower() in ("vende", "sell") and _TRADE_QUESTION_START_RE.match(clause):
+            # Interrogativa reconocible: la clausula de la accion empieza por
+            # que/que/what/which ("que vende Apple"). Un "?" al final del
+            # mensaje NO exceptua: la orden puede estar en otra frase.
             continue
         negations = list(_TRADE_NEGATION_RE.finditer(clause))
         if not negations:
