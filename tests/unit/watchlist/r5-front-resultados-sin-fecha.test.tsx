@@ -93,9 +93,19 @@ const empty = (symbol: string) => full(symbol, 0, { price: null, change: null, c
 const item = (symbol: string) => ({ symbol, addedAt: new Date(0), analysis: null });
 const basic = (s: string) => ({ name: s, exchange: 'NASDAQ', currency: 'USD' });
 
+
+async function resolveMonitor(node: unknown): Promise<any> {
+  if (Array.isArray(node)) return Promise.all(node.map(resolveMonitor));
+  if (!node || typeof node !== 'object') return node;
+  const el = node as El;
+  if (typeof el.type === 'function' && el.type.name === 'MonitorStockStream') return resolveMonitor(await el.type(el.props));
+  if (!el.props) return node;
+  return {...el, props: Object.fromEntries(await Promise.all(Object.entries(el.props).map(async ([key,value]) => [key, key === 'children' || key === 'fallback' ? await resolveMonitor(value) : value])))};
+}
+
 async function render(searchParams: Record<string, string> = {}) {
   const { default: Page } = await import('@/app/(root)/watchlist/page');
-  return Page({ searchParams: Promise.resolve(searchParams) });
+  return resolveMonitor(await Page({ searchParams: Promise.resolve(searchParams) }));
 }
 
 beforeEach(() => {
@@ -116,7 +126,7 @@ describe('/watchlist: próximos resultados sin fecha', () => {
     // Una fila por empresa (tabla responsiva única, 2026-11-14).
     const rows = find(tree, 'DatedRow');
     expect(rows).toHaveLength(2);
-    const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
+    const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props).then(resolveMonitor)));
     const withNote = painted.filter((r) => rawText(r).includes('watchlist.page.earningsNone'));
     // Antes: «N/D» pelado (la nota solo existía con el calendario caído o parcial).
     expect(withNote).toHaveLength(1);
@@ -127,7 +137,7 @@ describe('/watchlist: próximos resultados sin fecha', () => {
     m.state.mockResolvedValue({ items: [item('NODATE')], unavailable: false });
     m.monitor.mockResolvedValue({ items: {}, earningsStatus: 'unavailable' });
     const tree = await render();
-    const painted = await Promise.all(find(tree, 'DatedRow').map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
+    const painted = await Promise.all(find(tree, 'DatedRow').map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props).then(resolveMonitor)));
     const visible = painted.map(rawText).join('');
     expect(visible).toContain('watchlist.page.earningsUnavailable');
     expect(visible).not.toContain('watchlist.page.earningsNone');

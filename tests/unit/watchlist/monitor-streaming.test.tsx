@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
   dated: vi.fn(),
   dca: vi.fn(),
   monitor: vi.fn(),
+  basics: vi.fn(),
 }));
 vi.mock('@/lib/actions/watchlist-new-13f.actions',()=>({getWatchlistNew13f:async()=>({items:[],unavailable:false})}));
 vi.mock('@/lib/market/dated-change', () => ({ fetchDatedChanges: m.dated }));
@@ -27,7 +28,7 @@ vi.mock('@/lib/actions/watchlist.actions', () => ({
   getWatchlistMonitor: m.monitor,
 }));
 vi.mock('@/lib/actions/market-workspace.actions', () => ({
-  getResearchCompaniesBasics: async () => ({ AAPL: { name: 'Apple', exchange: 'NASDAQ', currency: 'USD' } }),
+  getResearchCompaniesBasics: m.basics,
   getResearchCompanyBasics: async () => null,
 }));
 vi.mock('@/lib/actions/finnhub.actions', () => ({ getProfile: async () => null }));
@@ -60,6 +61,7 @@ async function renderPage() {
 
 describe('monitor latency is not document latency',()=>{
  it('returns header and initial rows while monitor remains unresolved',async()=>{
+  m.basics.mockResolvedValue({ AAPL: { name: 'Apple', exchange: 'NASDAQ', currency: 'USD' } });
   m.dated.mockResolvedValue({});m.dca.mockResolvedValue({data:null,unavailable:false});
   m.monitor.mockReturnValue(new Promise(()=>{}));
   const started=performance.now();
@@ -68,4 +70,42 @@ describe('monitor latency is not document latency',()=>{
   expect(result).not.toBe('blocked');
   expect(find(result,'MonitorStockStream').length).toBeGreaterThan(0);
  });
+ it('streams actual summary, rank, low52 and earnings once monitor resolves',async()=>{
+  m.basics.mockResolvedValue({ AAPL: { name:'Apple',currency:'USD' } });
+  m.monitor.mockResolvedValue({ items:{ AAPL:{ low_52w:100,low_52w_sessions:130,currency:'USD',next_earnings_date:'2026-12-01',next_earnings_source:'NASDAQ', valuation_rank:{quintile:1,cheaper_than_pct:90,peers:40},fair_value_source:'tesis' } },earningsStatus:'ok' });
+  const page=await renderPage();
+  const rows=find(page,'EntryRowStream');
+  const row=await (rows[0].type as Function)(rows[0].props);
+  const dated=find(row,'DatedRow');
+  const painted=await (dated[0].type as Function)(dated[0].props);
+  const pieces=[...find(page,'MonitorStockStream').slice(0,1),...find(painted,'MonitorStockStream')];
+  const resolved=await Promise.all(pieces.map(el=>(el.type as Function)(el.props)));
+  const json=JSON.stringify(resolved);
+  expect(json).toContain('watchlist.page.fairValue.summary');
+  expect(json).toContain('watchlist.page.low52');
+  expect(json).toContain('2026-12-01');
+  expect(json).toContain('NASDAQ');
+
+ });
+ it('still waits for monitor when user sorts earnings',async()=>{
+  let release!: (value: unknown)=>void;
+  m.monitor.mockReturnValue(new Promise(resolve=>{release=resolve}));
+  let returned=false;
+  const pending=WatchlistPage({searchParams:Promise.resolve({sort:'earnings'})}).then(value=>{returned=true;return value});
+  await new Promise(resolve=>setTimeout(resolve,20));
+  expect(returned).toBe(false);
+  release({items:{},earningsStatus:'stored'});
+  const page=await pending;
+  expect(find(page,'MonitorStockStream')).toHaveLength(0);
+ });
+ it('does not claim basics are streamed: unresolved master still blocks',async()=>{
+  let release!: (value: unknown)=>void;
+  m.monitor.mockResolvedValue({items:{},earningsStatus:'ok'});
+  m.basics.mockReturnValue(new Promise(resolve=>{release=resolve}));
+  let returned=false;
+  const pending=renderPage().then(value=>{returned=true;return value});
+  await new Promise(resolve=>setTimeout(resolve,20));expect(returned).toBe(false);
+  release({});await pending;
+ });
+
 });

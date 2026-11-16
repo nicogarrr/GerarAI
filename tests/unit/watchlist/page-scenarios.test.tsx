@@ -93,9 +93,19 @@ const empty = (symbol: string) => full(symbol, 0, { price: null, change: null, c
 const item = (symbol: string) => ({ symbol, addedAt: new Date(0), analysis: null });
 const basic = (s: string) => ({ name: s, exchange: 'NASDAQ', currency: 'USD' });
 
+
+async function resolveMonitor(node: unknown): Promise<any> {
+  if (Array.isArray(node)) return Promise.all(node.map(resolveMonitor));
+  if (!node || typeof node !== 'object') return node;
+  const el = node as El;
+  if (typeof el.type === 'function' && el.type.name === 'MonitorStockStream') return resolveMonitor(await el.type(el.props));
+  if (!el.props) return node;
+  return {...el, props: Object.fromEntries(await Promise.all(Object.entries(el.props).map(async ([key,value]) => [key, key === 'children' || key === 'fallback' ? await resolveMonitor(value) : value])))};
+}
+
 async function render(searchParams: Record<string, string> = {}) {
   const { default: Page } = await import('@/app/(root)/watchlist/page');
-  return Page({ searchParams: Promise.resolve(searchParams) });
+  return resolveMonitor(await Page({ searchParams: Promise.resolve(searchParams) }));
 }
 
 beforeEach(() => {
@@ -209,7 +219,7 @@ describe('/watchlist escenarios', () => {
     const streamed = await Promise.all(streams.map((s) => (s.type as (p: unknown) => Promise<unknown>)(s.props)));
     const rows = find(streamed, 'DatedRow');
     expect(rows).toHaveLength(3);
-    const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props)));
+    const painted = await Promise.all(rows.map((r) => (r.type as (p: unknown) => Promise<unknown>)(r.props).then(resolveMonitor)));
     // Ninguna etiqueta visible de proveedor junto al PER, ni en tarjeta ni en tabla.
     const visible = painted.map(rawText).join('');
     expect(visible).not.toContain('· Finnhub');
