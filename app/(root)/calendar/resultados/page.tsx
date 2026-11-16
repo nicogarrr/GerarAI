@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import BackendOffline from '@/components/system/BackendOffline';
-import { EventMaterialsLine, FollowedEarningsRow, dayHeading } from '@/components/calendar/FollowedEarningsList';
+import { EventMaterialsLine, FollowedEarningsRow, MaterialsLineSkeleton, dayHeading } from '@/components/calendar/FollowedEarningsList';
 import { getFollowedEarnings, type FollowedEarningsCalendar } from '@/lib/actions/catalysts.actions';
 import { getEarningsMaterials } from '@/lib/actions/earnings-materials.actions';
 import { HISTORY_DAYS, type EventMaterials } from '@/lib/earnings-materials';
@@ -60,7 +60,7 @@ export default async function FollowedEarningsPage() {
                         today={today}
                         materialsSlot={
                             event.date <= today ? (
-                                <Suspense fallback={null}>
+                                <Suspense fallback={<MaterialsLineSkeleton />}>
                                     <EventMaterialsLine ti={ti} f={f} promise={materialsPromise} eventKey={`${event.ticker}|${event.date}`} />
                                 </Suspense>
                             ) : null
