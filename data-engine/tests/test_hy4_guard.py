@@ -244,3 +244,18 @@ def test_only_one_admitted_request_per_process():
         hy4._admission.release()
     assert calls == []
     assert asyncio.run(run()).message.content == 'ok'
+
+
+def test_worker_call_needs_no_http_selection_and_scope_never_leaks():
+    sent=[]
+    def handler(request):
+        sent.append((request.method,hy4._selected.get()))
+        return httpx.Response(200,json=catalog() if request.method=='GET' else completion())
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            assert not hy4._selected.get()
+            result=await hy4.create_hy4_provider(settings(),client).complete(LLMRequest([Message('user','public fixture')],task='chat'))
+            assert not hy4._selected.get()
+            return result
+    assert asyncio.run(run()).message.content=='ok'
+    assert sent==[('GET',True),('POST',True)]
