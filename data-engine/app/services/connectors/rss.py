@@ -158,10 +158,17 @@ class RSSConnector:
         link = urljoin(feed_url, link) if link else None
         external_id = _child_text(entry, "guid", "id") or link
         # Publication takes precedence over modification, regardless of XML order.
+        # <updated> NO es fecha de publicación: es la última modificación del
+        # ítem. Promocionarla fabricaba frescura (un artículo de 2023 retocado
+        # hoy parecía publicado hoy; Lote 1, hallazgo 4 del carril de
+        # auditoría). Si solo hay <updated>, published_at queda None y la
+        # ingesta lo declara (date_source = ingested_at_fallback); el valor se
+        # conserva visible en metadata["updated_at"].
         published = _published_at(
             _child_text(entry, "pubdate") or _child_text(entry, "published")
-            or _child_text(entry, "date") or _child_text(entry, "updated")
+            or _child_text(entry, "date")
         )
+        updated_raw = _child_text(entry, "updated")
         author = _child_text(entry, "author", "creator")
         return ConnectorItem(
             source=feed_title or "rss",
@@ -172,5 +179,7 @@ class RSSConnector:
             ticker=ticker.upper() if ticker else None,
             item_type="news",
             external_id=external_id,
-            metadata={"feed_url": feed_url, "author": author or None},
+            metadata={"feed_url": feed_url, "author": author or None,
+                      "updated_at": (_published_at(updated_raw).isoformat()
+                                     if updated_raw and _published_at(updated_raw) else None)},
         )

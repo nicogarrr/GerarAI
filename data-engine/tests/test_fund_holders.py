@@ -124,9 +124,11 @@ def test_job_descarga_solo_si_hay_fichero_nuevo():
 
     db = _db()
     out = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
-    assert out["status"] == "ok" and out["companies"] == 1 and calls == [nport.DATASETS_PAGE, URL]
+    # Pagina + HEAD del ETag del ZIP vigente + descarga del ZIP.
+    assert out["status"] == "ok" and out["companies"] == 1 and calls == [nport.DATASETS_PAGE, URL, URL]
     again = fh.refresh_fund_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
-    assert again["status"] == "sin_cambios" and calls[-1] == nport.DATASETS_PAGE
+    # Sin cambios: pagina + HEAD, sin segunda descarga.
+    assert again["status"] == "sin_cambios" and calls[-2:] == [nport.DATASETS_PAGE, URL]
     assert db.query(PublicSourceDocument).filter(PublicSourceDocument.provider == fh.PROVIDER).count() == 1
     assert isinstance(db.query(PublicSourceDocument).first().fetched_at, datetime)
     assert date(2026, 6, 30)

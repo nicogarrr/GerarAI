@@ -19,9 +19,17 @@ def test_publication_date_wins_independent_of_xml_order(dates):
     assert result.items[0].published_at.isoformat() == '2026-10-01T09:00:00+00:00'
 
 
-def test_updated_remains_fallback_when_publication_absent():
+def test_updated_is_not_publication_when_publication_absent():
+    """<updated> es fecha de modificación, no de publicación: no se promociona.
+
+    Contrato nuevo (Lote 1, hallazgo 4): con solo <updated>, published_at
+    queda None y la ingesta declara date_source=ingested_at_fallback, igual
+    que GDELT con su seendate. El valor de <updated> se conserva visible en
+    metadata["updated_at"] en vez de fingir frescura.
+    """
     result = _poll(b'<feed><entry><title>Update</title><updated>2026-11-13T10:00:00Z</updated></entry></feed>')
-    assert result.items[0].published_at.isoformat() == '2026-11-13T10:00:00+00:00'
+    assert result.items[0].published_at is None
+    assert result.items[0].metadata["updated_at"] == '2026-11-13T10:00:00+00:00'
 
 
 def _poll(body):

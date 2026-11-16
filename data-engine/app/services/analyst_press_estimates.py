@@ -109,6 +109,11 @@ class Article:
     title: str
     published: date
     text: str
+    # False cuando ni la meta del articulo ni el RSS dan fecha: published es
+    # entonces "hoy" SOLO para resolver relativos ("next year") en la lectura;
+    # store_readings no guarda nada de un articulo sin fecha verificable, para
+    # que un as_of fabricado no pise cifras reales ni finja frescura.
+    dated: bool = True
 
 
 @dataclass
@@ -434,8 +439,10 @@ async def collect(company: Any, *, known_urls: Iterable[tuple[str, str, date | N
         text = article_text(html)
         if not text:
             continue
-        published = _published_from_html(html) or day or today
-        article = Article(url=final_url or url, title=title, published=published, text=text)
+        evidenced = _published_from_html(html) or day
+        published = evidenced or today
+        article = Article(url=final_url or url, title=title, published=published, text=text,
+                          dated=evidenced is not None)
         report.articles_read += 1
         reading = read_article(article, extra_firms=extra_firms, company=company)
         if reading.estimates or reading.targets:
@@ -477,6 +484,12 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
     reporting = _reporting_currency(db, company)  # las estimaciones se comparan con los informes
     listing = (str(getattr(company, "currency", "") or "").strip().upper() or None)  # el objetivo, con el precio
     for article, reading in sorted(readings, key=lambda r: r[0].published):
+        if not article.dated:
+            # Sin fecha verificable el as_of seria "hoy" fabricado: pisaria
+            # cifras reales mas antiguas y se serviria como fresco (hallazgo
+            # del carril de auditoria, mismo vicio que provenance fetched_at).
+            skipped.append(f"{article.url}: articulo sin fecha verificable: no se guarda")
+            continue
         by_firm: dict[str, list[Estimate]] = {}
         for est in (*reading.estimates, *reading.targets):
             by_firm.setdefault(est.firm, []).append(est)
@@ -568,9 +581,42 @@ def refresh_press_estimates(db: Any, company: Any, tenant_id: int, *, max_articl
         timeout=timeout,
     )
     saved = store_readings(db, company, tenant_id, report.readings)
+    _mark_collected(db, company, tenant_id, report)
     return {"articles_seen": report.articles_seen, "articles_read": report.articles_read,
             "with_estimates": len(report.readings), "skipped_robots": sorted(set(report.skipped_robots)),
             "failed": report.failed[:20], **saved}
+
+
+COLLECTOR_NAME = "analyst_press"
+
+
+def _mark_collected(db: Any, company: Any, tenant_id: int, report: CollectReport) -> None:
+    """Marca durable de la recogida, aunque no haya estimaciones (no hace commit).
+
+    El marcador histórico vivía en los extras de las notas de analista, que
+    solo se escriben cuando un artículo da cifras: una empresa sin prensa de
+    analistas nunca avanzaba el marcador, ``press_estimates_stale`` la daba
+    por vieja para siempre y cada propuesta SOTP reencolaba su rastreo
+    (hallazgo del carril de auditoría). ConnectorState es la casa de
+    «última pasada de un conector por empresa».
+    """
+    from sqlalchemy import select
+
+    from app.models import ConnectorState
+
+    now = datetime.now(UTC)
+    state = db.scalars(select(ConnectorState).where(
+        ConnectorState.tenant_id == tenant_id, ConnectorState.connector == COLLECTOR_NAME,
+        ConnectorState.company_id == company.id, ConnectorState.feed_url.is_(None))).first()
+    if state is None:
+        state = ConnectorState(tenant_id=tenant_id, connector=COLLECTOR_NAME, company_id=company.id,
+                               metadata_={})
+        db.add(state)
+    state.last_started_at = state.last_started_at or now
+    state.last_success_at = now
+    state.consecutive_errors = 0
+    state.metadata_ = {**(state.metadata_ or {}), "articles_seen": report.articles_seen,
+                       "articles_read": report.articles_read, "with_estimates": len(report.readings)}
 
 
 STALE_DAYS = 3
@@ -588,7 +634,17 @@ def press_estimates_stale(db: Any, company: Any, tenant_id: int, *, today: date 
         AnalystNote.note_date >= today - timedelta(days=60))).all()
     marks = [r.get("collected_on") for r in rows if isinstance(r, dict) and r.get("kind") == "analyst_press"]
     latest = max((date.fromisoformat(m) for m in marks if m), default=None)
-    return latest is None or latest < today - timedelta(days=STALE_DAYS)
+    if latest is not None and latest >= today - timedelta(days=STALE_DAYS):
+        return False
+    # Marcador durable de la recogida (también las vacías) en ConnectorState.
+    from app.models import ConnectorState
+
+    state = db.scalars(select(ConnectorState.last_success_at).where(
+        ConnectorState.tenant_id == tenant_id, ConnectorState.connector == COLLECTOR_NAME,
+        ConnectorState.company_id == company.id, ConnectorState.feed_url.is_(None))).first()
+    if state is not None and state.date() >= today - timedelta(days=STALE_DAYS):
+        return False
+    return True
 
 
 # -- alias públicos para el panel de precios objetivo -------------------------

@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -32,7 +33,10 @@ from decimal import Decimal, InvalidOperation
 
 import httpx
 
+from app.services.data_source_health import get_data_source_registry
 from app.services.public_fetch import fetch_public_url_async
+
+_REGISTRY_KEY = "official_fx"
 
 NBG_URL = "https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/?date={day}"
 CBC_DAILY_URL = "https://www.cbc.gov.tw/en/lp-700-2.html"
@@ -170,6 +174,7 @@ async def fetch_official_quotes(
             continue
         found: list[OfficialQuote] = []
         reasons: list[str] = []
+        started = time.perf_counter()
         attempts: list[tuple[str, Callable[[str, str], list[OfficialQuote]]]]
         if feed == "nbg":
             attempts = [(NBG_URL.format(day=on.isoformat()), lambda text, u: parse_nbg(text, url=u))]
@@ -189,6 +194,10 @@ async def fetch_official_quotes(
                 break
             reasons.append(f"{url}: sin tipo con fecha <= {on.isoformat()}")
         if not found:
+            # Todas las vias de la fuente fallaron para esta divisa: degrada.
+            get_data_source_registry().record_failure(
+                _REGISTRY_KEY, f"{feed.upper()}: {'; '.join(reasons)[:160]}"
+            )
             errors.append({"currency": currency, "provider": feed.upper(), "reason": "; ".join(reasons)})
             continue
         # Un tipo por divisa de referencia: el más reciente.
@@ -197,6 +206,9 @@ async def fetch_official_quotes(
             if quote.per not in latest or quote.rate_date > latest[quote.per].rate_date:
                 latest[quote.per] = quote
         quotes.extend(latest.values())
+        get_data_source_registry().record_success(
+            _REGISTRY_KEY, (time.perf_counter() - started) * 1000
+        )
     return quotes, errors
 
 

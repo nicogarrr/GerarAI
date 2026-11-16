@@ -242,6 +242,41 @@ class DataSourceHealthRegistry:
                 is_primary=False,
                 fallback_source=None,
             ),
+            "subtel": DataSourceStatus(
+                name="SUBTEL Chile (registro de decretos)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "fca_nsm": DataSourceStatus(
+                name="FCA NSM (National Storage Mechanism)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "companies_house": DataSourceStatus(
+                name="Companies House (UK)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "official_fx": DataSourceStatus(
+                name="Tipos de cambio oficiales (NBG Georgia, CBC Taiwán)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "house_ptr": DataSourceStatus(
+                name="US House PTR (clerk.house.gov)",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "form13f_dataset": DataSourceStatus(
+                name="SEC 13F bulk dataset",
+                is_primary=False,
+                fallback_source=None,
+            ),
+            "form_nport_dataset": DataSourceStatus(
+                name="SEC N-PORT bulk dataset",
+                is_primary=False,
+                fallback_source=None,
+            ),
         }
 
     def get_status(self, source_key: str) -> DataSourceStatus:

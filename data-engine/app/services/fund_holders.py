@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import tempfile
+import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
@@ -25,10 +26,18 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
-from app.models.entities import Company
+from app.models.entities import Company, ConnectorState
 from app.models.public_market_data import PublicFinancialFact, PublicSourceDocument
 from app.services.connectors import form_nport_dataset as nport
-from app.services.institutional_holders import linked_cusip_snapshot, universe_cusips
+from app.services.data_source_health import get_data_source_registry
+from app.services.institutional_holders import (
+    _head_etag,
+    _save_etag,
+    linked_cusip_snapshot,
+    universe_cusips,
+)
+
+_REGISTRY_KEY = "form_nport_dataset"
 
 logger = logging.getLogger("gerarai.fund_holders")
 
@@ -201,11 +210,14 @@ def refresh_fund_holders(db: Session | None = None, client: httpx.Client | None 
     session = db or SessionLocal()
     http = client or httpx.Client(timeout=300, follow_redirects=True, headers={"User-Agent": get_settings().sec_user_agent})
     path = None
+    registry = get_data_source_registry()
+    started = time.perf_counter()
     try:
         page = http.get(nport.DATASETS_PAGE)
         page.raise_for_status()
         refs = nport.list_datasets(page.text)
         if not refs:
+            registry.record_failure(_REGISTRY_KEY, "la pagina de la SEC no lista ficheros N-PORT")
             return {"status": "sin_datos", "reason": "la página de la SEC no lista ficheros N-PORT"}
         ref = refs[0]
         cusips = universe_cusips(session)
@@ -222,18 +234,36 @@ def refresh_fund_holders(db: Session | None = None, client: httpx.Client | None 
         rows = session.execute(select(PublicSourceDocument.company_id, PublicSourceDocument.listing_key).where(
             PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == ref.url)).all()
         processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
-        if all(company.id in processed for company in cusips.values()):
+        # El salto no vale solo por URL: si la SEC republica el mismo ZIP con
+        # contenido corregido (otro ETag), hay que recalcular.
+        head_etag = _head_etag(http, ref.url)
+        state = session.scalars(select(ConnectorState).where(
+            ConnectorState.connector == _REGISTRY_KEY,
+            ConnectorState.company_id.is_(None),
+            ConnectorState.feed_url == ref.url)).first()
+        etag_changed = bool(state is not None and state.etag and head_etag and state.etag != head_etag)
+        if not etag_changed and all(company.id in processed for company in cusips.values()):
+            registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
             return {"status": "sin_cambios", "dataset": ref.url}
         digest = hashlib.sha256()
         handle = tempfile.NamedTemporaryFile(prefix="secnport_", suffix=".zip", delete=False)  # noqa: SIM115 - se borra al final
         path = handle.name
         with handle, http.stream("GET", ref.url) as resp:
             resp.raise_for_status()
+            etag = resp.headers.get("etag")
             for chunk in resp.iter_bytes(1 << 20):
                 digest.update(chunk)
                 handle.write(chunk)
-        return ingest_reports(session, nport.parse_dataset(path, set(cusips)), ref, digest.hexdigest(), cusips)
+        result = ingest_reports(session, nport.parse_dataset(path, set(cusips)), ref, digest.hexdigest(), cusips)
+        if result.get("status") != "ok":
+            # Dataset ilegible: no se afirma salud ni se fija el ETag.
+            registry.record_failure(_REGISTRY_KEY, f"dataset ilegible: {result.get('reason', '')[:120]}")
+            return result
+        _save_etag(session, _REGISTRY_KEY, ref.url, state, etag or head_etag)
+        registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
+        return result
     except Exception as exc:  # noqa: BLE001 - job programado
+        registry.record_failure(_REGISTRY_KEY, type(exc).__name__)
         logger.warning("fund_holders refresh fallo: %s", redact_secrets(str(exc)))
         session.rollback()
         return {"status": "error", "error": redact_secrets(str(exc))[:300]}

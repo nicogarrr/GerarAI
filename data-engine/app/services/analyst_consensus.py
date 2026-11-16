@@ -29,7 +29,7 @@ from __future__ import annotations
 import statistics
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 MIN_SAMPLES_PER_FIRM = 3
@@ -37,6 +37,12 @@ MIN_BACKTEST_YEARS = 3
 ERROR_FLOOR = 0.02
 RULE_ID = "precision_inversa_mediana_v1 (prerregistrada 8-nov-2026)"
 CONSENSUS_FIRM = "Consenso (prensa)"
+# Frescura de la mediana vigente: una estimacion mas vieja que la ventana no
+# entra en low/median/high de un año aun sin reportar; se lista aparte como
+# caducada. Misma ventana que el consenso de precios objetivo
+# (analyst_history_service.CONSENSUS_WINDOW_DAYS) para no tener dos varas de
+# medir la frescura de analistas.
+ESTIMATE_WINDOW_DAYS = 365
 
 
 @dataclass(frozen=True)
@@ -53,14 +59,27 @@ def _median(values: Sequence[float]) -> float | None:
     return float(statistics.median(values)) if values else None
 
 
+def _close_of(year: int, year_ends: Mapping[int, date] | None) -> date:
+    """Cierre real del año fiscal; 31-dic solo cuando no se conoce el cierre."""
+    return (year_ends or {}).get(year) or date(year, 12, 31)
+
+
 def firm_errors(history: Sequence[FirmEstimate], actuals: Mapping[int, float], *,
-                metric: str = "revenue") -> dict[str, list[tuple[int, float]]]:
-    """Errores relativos por firma: la última estimación publicada antes del cierre de cada año."""
+                metric: str = "revenue",
+                year_ends: Mapping[int, date] | None = None) -> dict[str, list[tuple[int, float]]]:
+    """Errores relativos por firma: la última estimación publicada antes del cierre de cada año.
+
+    El cierre es el real del año fiscal (``year_ends``, de los hechos SEC/ESEF
+    que alimentan ``actuals``): con el 31-dic a secas, una firma que estima
+    DESPUÉS del cierre real de un ejercicio no natural (MSFT jun, WMT/NVDA
+    ene) colaba una estimación a toro pasado como «previsión» y maquillaba su
+    precisión (Lote 2, hallazgo 1 del carril de auditoría).
+    """
     best: dict[tuple[str, int], FirmEstimate] = {}
     for est in history:
         if est.metric != metric or est.firm == CONSENSUS_FIRM or est.year not in actuals:
             continue
-        if est.as_of > date(est.year, 12, 31):
+        if est.as_of > _close_of(est.year, year_ends):
             continue  # publicada después del cierre: no es una previsión
         key = (est.firm, est.year)
         if key not in best or est.as_of > best[key].as_of:
@@ -97,16 +116,17 @@ def _weighted_median(pairs: Sequence[tuple[float, float]]) -> float | None:
     return pairs[-1][0]
 
 
-def backtest(history: Sequence[FirmEstimate], actuals: Mapping[int, float], *, metric: str = "revenue") -> dict[str, Any]:
+def backtest(history: Sequence[FirmEstimate], actuals: Mapping[int, float], *, metric: str = "revenue",
+             year_ends: Mapping[int, date] | None = None) -> dict[str, Any]:
     """Mediana simple frente a la ponderada por precisión, dejando fuera cada año evaluado."""
-    errors = firm_errors(history, actuals, metric=metric)
+    errors = firm_errors(history, actuals, metric=metric, year_ends=year_ends)
     years = sorted({y for samples in errors.values() for y, _ in samples})
     rows: list[dict[str, Any]] = []
     for year in years:
         latest: dict[str, FirmEstimate] = {}
         for est in history:
             if (est.metric == metric and est.year == year and est.firm != CONSENSUS_FIRM
-                    and est.as_of <= date(year, 12, 31)
+                    and est.as_of <= _close_of(year, year_ends)
                     and (est.firm not in latest or est.as_of > latest[est.firm].as_of)):
                 latest[est.firm] = est
         if len(latest) < 2:
@@ -130,11 +150,21 @@ def backtest(history: Sequence[FirmEstimate], actuals: Mapping[int, float], *, m
             "simple_median_error": simple_err, "weighted_median_error": weighted_err, "rows": rows}
 
 
-def aggregate(history: Sequence[FirmEstimate], actuals: Mapping[int, float] | None = None) -> list[dict[str, Any]]:
-    """Por (métrica, año): estimación vigente de cada firma, agregados, revisiones y ponderación."""
+def aggregate(history: Sequence[FirmEstimate], actuals: Mapping[int, float] | None = None, *,
+              year_ends: Mapping[int, date] | None = None,
+              today: date | None = None) -> list[dict[str, Any]]:
+    """Por (métrica, año): estimación vigente de cada firma, agregados, revisiones y ponderación.
+
+    Para años AÚN sin reportar y con ``today`` informado, la mediana solo
+    cuenta estimaciones frescas (``ESTIMATE_WINDOW_DAYS``): la última de cada
+    firma entraba en la mediana sin importar su edad y una cifra fosilizada se
+    publicaba como consenso vigente (Lote 2, hallazgo 2). Las caducadas se
+    listan en ``stale_firms`` con su fecha, fuera del agregado. Años ya
+    reportados: histórico completo, sin filtro.
+    """
     actuals = actuals or {}
-    errors = firm_errors(history, actuals)
-    check = backtest(history, actuals)
+    errors = firm_errors(history, actuals, year_ends=year_ends)
+    check = backtest(history, actuals, year_ends=year_ends)
     out: list[dict[str, Any]] = []
     keys = sorted({(e.metric, e.year) for e in history})
     for metric, year in keys:
@@ -148,11 +178,19 @@ def aggregate(history: Sequence[FirmEstimate], actuals: Mapping[int, float] | No
                                   "from_date": prev.as_of.isoformat(), "to_date": est.as_of.isoformat()})
             latest[est.firm] = est
         firms = {f: e for f, e in latest.items() if f != CONSENSUS_FIRM}
+        stale: dict[str, FirmEstimate] = {}
+        if today is not None and year not in actuals:
+            cutoff = today - timedelta(days=ESTIMATE_WINDOW_DAYS)
+            stale = {f: e for f, e in firms.items() if e.as_of < cutoff}
+            firms = {f: e for f, e in firms.items() if e.as_of >= cutoff}
         values = [e.value for e in firms.values()]
         item: dict[str, Any] = {
             "metric": metric, "year": year, "firms": [
                 {"firm": f, "value_millions": e.value, "as_of": e.as_of.isoformat(), "url": e.url}
                 for f, e in sorted(firms.items(), key=lambda kv: kv[1].value)],
+            "stale_firms": [
+                {"firm": f, "value_millions": e.value, "as_of": e.as_of.isoformat(), "url": e.url}
+                for f, e in sorted(stale.items(), key=lambda kv: kv[1].value)],
             "n_firms": len(values), "low": min(values) if values else None, "median": _median(values),
             "high": max(values) if values else None, "revisions": revisions,
             "press_consensus": ({"value_millions": latest[CONSENSUS_FIRM].value,
@@ -201,15 +239,33 @@ def history_for(db: Any, company: Any, tenant_id: int) -> list[FirmEstimate]:
 
 def reported_revenue(db: Any, company: Any) -> dict[int, float]:
     """Ingresos anuales reportados (SEC/ESEF), en millones, por año fiscal."""
+    return {year: value for year, (value, _end) in _revenue_facts(db, company).items()}
+
+
+def revenue_year_ends(db: Any, company: Any) -> dict[int, date]:
+    """Fecha real de cierre de cada año fiscal con ingresos reportados.
+
+    La etiqueta del año fiscal no dice cuándo cierra: FY2025 de MSFT cierra el
+    30-jun-2025. El periodo de los hechos (``<cierre>:FY``) sí lo dice.
+    """
+    return {year: end for year, (_value, end) in _revenue_facts(db, company).items()}
+
+
+def _revenue_facts(db: Any, company: Any) -> dict[int, tuple[float, date]]:
+    """year fiscal -> (ingresos en millones, cierre real) desde los hechos SEC/ESEF."""
     from sqlalchemy import select
 
     from app.models import FinancialFact
 
-    out: dict[int, float] = {}
+    out: dict[int, tuple[float, date]] = {}
     for row in db.scalars(select(FinancialFact).where(FinancialFact.company_id == company.id,
                                                       FinancialFact.metric == "revenue",
                                                       FinancialFact.period.like("%:FY"))).all():
         year = row.fiscal_year or int(str(row.period)[:4])
+        try:
+            end = date.fromisoformat(str(row.period).split(":")[0])
+        except ValueError:
+            end = date(int(year), 12, 31)
         if row.value is not None:
-            out[int(year)] = float(row.value) / 1e6
+            out[int(year)] = (float(row.value) / 1e6, end)
     return out
