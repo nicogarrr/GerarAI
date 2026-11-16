@@ -4,9 +4,10 @@ const runUiE2E = process.env.E2E_UI_RUN === "1";
 // Skip before the page fixture launches: the API-only job has no browser.
 test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
 
+test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
 // Verifica geometría real del carril a 390px y navegación por toque.
 test("pestañas ficha 390px: carril deslizable sin barra visible y toque navega", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/research/UBER");
   const nav = page.getByTestId("company-navigation");
   await expect(nav).toBeVisible();
