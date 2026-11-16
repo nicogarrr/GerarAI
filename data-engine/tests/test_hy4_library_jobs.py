@@ -74,3 +74,21 @@ def test_non_hy4_provider_failure_retains_existing_retry_class(db_tenant,monkeyp
     monkeypatch.setattr(provider,'complete',fail)
     with pytest.raises(ProviderHTTPError):asyncio.run(service.extract_principle_batches(db,doc))
     assert not doc.metadata_
+
+
+def test_atomic_admission_rejects_stale_document_view(db_tenant,monkeypatch):
+    from sqlalchemy import update
+
+    from app.models import KnowledgeDocument
+    db,doc,provider,service=setup_doc(db_tenant,monkeypatch)
+    execute=db.execute
+    raced=False
+    def race(statement,*args,**kwargs):
+        nonlocal raced
+        if getattr(statement,'is_update',False) and not raced:
+            raced=True
+            execute(update(KnowledgeDocument).where(KnowledgeDocument.id==doc.id).values(metadata_={'hy4_principle_run_state':'in_progress'}).execution_options(synchronize_session=False))
+        return execute(statement,*args,**kwargs)
+    monkeypatch.setattr(db,'execute',race)
+    with pytest.raises(ProviderDisabledError,match='duplicate'):asyncio.run(service.extract_principle_batches(db,doc))
+    assert not provider.requests

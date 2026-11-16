@@ -11,7 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import delete, desc, func, select, update
+from sqlalchemy import delete, desc, func, or_, select, update
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -355,8 +355,19 @@ class KnowledgeLibraryService:
                 raise ProviderDisabledError("Hy4 extraction stopped; operator review required before retry")
             if len(batches) > 3:
                 raise ProviderDisabledError("Hy4 extraction limited to three batches; split this document")
-            document.metadata_ = {**(document.metadata_ or {}), "hy4_principle_run_state": "in_progress"}
+            state = KnowledgeDocument.metadata_["hy4_principle_run_state"].as_string()
+            claimed = db.execute(
+                update(KnowledgeDocument)
+                .where(KnowledgeDocument.id == document.id,
+                       or_(state.is_(None), state.not_in(["in_progress", "blocked"])))
+                .values(metadata_={**(document.metadata_ or {}), "hy4_principle_run_state": "in_progress"})
+                .returning(KnowledgeDocument.id)
+                .execution_options(synchronize_session=False)
+            ).scalar_one_or_none()
+            if claimed is None:
+                raise ProviderDisabledError("Hy4 extraction already admitted; no duplicate run")
             db.commit()
+            db.refresh(document)
         companies = {
             company.ticker.upper(): company.id for company in db.scalars(select(Company)).all()
         }

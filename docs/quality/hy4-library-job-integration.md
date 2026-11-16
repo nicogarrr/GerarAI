@@ -9,7 +9,7 @@ No se usa otro modelo ni una llamada auxiliar de reparacion.
 - Llamadas secuenciales. Presupuesto y registro 0 para Hy4, condicionado
   al guard compartido que valida catalogo, destino y factura real cero.
 - Marcador persistente metadata_.hy4_principle_run_state antes de la primera
-  llamada. In_progress o blocked impiden repetir el run en reentregas de
+  llamada, mediante UPDATE condicional atomico. In_progress o blocked impiden repetir el run en reentregas de
   Dramatiq, reinicios o clics manuales. No hay limpieza automatica.
 - Ante cualquier Exception del provider Hy4, persiste blocked y lanza
   ProviderDisabledError, no la clase transitoria que reintenta el actor.
@@ -21,7 +21,7 @@ No se usa otro modelo ni una llamada auxiliar de reparacion.
   de fragmentos, duplicados y reglas numericas no cambia. Un fallo posterior
   puede conservar propuestas de lotes ya terminados; no equivale a completitud.
 
-64 tests pasan. service.py 93,37% lineas (352/377), 95,61% ramas (109/114).
+65 tests pasan. service.py 356/381 lineas, 111/116 ramas.
 Ruff verde; pyright 0 errores y 2 avisos rowcount en lineas fuera del cambio.
 Sin inferencia real ni despliegue. Auditor sobre SHA exacto y gates de CI
 siguen siendo obligatorios.
