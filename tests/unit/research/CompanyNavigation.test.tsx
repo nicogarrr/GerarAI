@@ -34,12 +34,12 @@ describe('CompanyNavigation', () => {
     }
   });
 
-  it('oculta la barra de scroll del carril y monta el scroll de la pestaña activa', () => {
+  it('muestra la pista de scroll del carril y monta el scroll de la pestaña activa', () => {
     const { container } = render(<CompanyNavigation ticker="ASTS" activeView="changes" />);
     const nav = screen.getByTestId('company-navigation');
-    // Barra oculta pero deslizable: la utilidad scrollbar-hide (globals.css)
-    // quita la pista visible en WebKit/Firefox y overflow-x-auto se mantiene.
-    expect(nav.className).toContain('scrollbar-hide');
+    // Barra visible y deslizable: la utilidad scroll-affordance-x (globals.css)
+    // conserva pista visible en WebKit/Firefox y overflow-x-auto se mantiene.
+    expect(nav.className).toContain('scroll-affordance-x');
     expect(nav.className).toContain('overflow-x-auto');
     // Margen de scroll para que la activa no quede pegada al borde del carril.
     const active = screen.getByRole('link', { name: 'Seguimiento' });

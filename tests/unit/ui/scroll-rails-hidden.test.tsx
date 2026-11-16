@@ -31,11 +31,11 @@ describe('raíles horizontales táctiles: scroll oculto, deslizar intacto', () =
     expect(rail.className).toContain('scrollbar-hide');
   });
 
-  it('CalendarTabs: el nav de pestañas oculta la barra', () => {
+  it('CalendarTabs: el nav de pestañas muestra pista de overflow', () => {
     render(<CalendarTabs />);
     const rail = screen.getByRole('navigation');
     expect(rail.className).toContain('overflow-x-auto');
-    expect(rail.className).toContain('scrollbar-hide');
+    expect(rail.className).toContain('scroll-affordance-x');
   });
 
   it('HelpTabs: la tablist oculta la barra', () => {
@@ -45,16 +45,16 @@ describe('raíles horizontales táctiles: scroll oculto, deslizar intacto', () =
     expect(rail.className).toContain('scrollbar-hide');
   });
 
-  it('PoliticiansListSection y EarningsDayStrip declaran scrollbar-hide en sus raíles', () => {
+  it('los filtros de políticos muestran pista y EarningsDayStrip conserva su contrato', () => {
     // Raíles con fixtures pesados: la invariante es de clase en la fuente.
-    for (const [file, needle] of [
-      ['components/insider/PoliticiansListSection.tsx', 'overflow-x-auto'],
-      ['components/calendar/EarningsDayStrip.tsx', 'overflow-x-auto'],
+    for (const [file, needle, expected] of [
+      ['components/insider/PoliticiansListSection.tsx', 'overflow-x-auto', 'scroll-affordance-x'],
+      ['components/calendar/EarningsDayStrip.tsx', 'overflow-x-auto', 'scrollbar-hide'],
     ] as const) {
       const src = readFileSync(file, 'utf8');
       const railLines = src.split('\n').filter((line) => line.includes(needle) && line.includes('className'));
       expect(railLines.length).toBeGreaterThan(0);
-      for (const line of railLines) expect(line).toContain('scrollbar-hide');
+      for (const line of railLines) expect(line).toContain(expected);
     }
   });
 });
