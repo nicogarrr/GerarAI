@@ -14,3 +14,13 @@ Actual React component and lightweight-charts library rendered in local Vite
 fixture, synthetic60-day history/target. Captured390 and1440 Chrome, inspected
 pixels: mobile target percentage and price readable without long title;
 desktop full title remains. No production data or full Next route claim.
+
+## Auditor coverage follow-up
+
+Reproduced82.55%branches with lockfile Vitest5.1.0 and matching coverage-v8
+5.1.0. Added real behavior cases for autoscale provider bounds/null/missing
+range, failed remote range retry, since-buy Max history, falling and flat
+price/SMA structures and null-volume/currency presentation. No production
+implementation changes.31tests pass, full source97.95%lines91.47%branches
+(93.02%statements90.16%functions) on5.1.0. Previous3.2.7 measurement is not the
+release gate; these5.1.0 numbers supersede it. Captures remain unchanged.

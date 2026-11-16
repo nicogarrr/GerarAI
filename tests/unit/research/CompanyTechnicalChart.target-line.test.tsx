@@ -9,6 +9,9 @@ import { LocaleProvider } from '@/lib/i18n/client';
 // También se vigila que nada global pise el formato de cada serie (bug de #4472: «99,10 US$»).
 type PriceLineOpts = { price: number; title: string; color: string; axisLabelColor?: string; axisLabelVisible?: boolean };
 const captured = vi.hoisted(() => ({
+    autoscale: [] as Array<(original:()=>unknown)=>unknown>,
+    events: [] as Array<Record<string,unknown>>,
+    firstBuyDate: null as string|null,
     chart: null as null | Record<string, unknown>,
     series: [] as Array<{ kind: string; opts: Record<string, unknown>; pane?: number }>,
     priceLines: [] as PriceLineOpts[],
@@ -18,12 +21,13 @@ const captured = vi.hoisted(() => ({
 const remoteHistory = vi.hoisted(()=>vi.fn());
 vi.mock('@/lib/actions/company-chart.actions', () => ({ getCompanyChartHistory: remoteHistory }));
 vi.mock('@/lib/actions/price-events.actions', () => ({
-    getChartEvents: vi.fn(async () => ({ events: [], averageCost: null, firstBuyDate: null, target: captured.target, targetCurrency: 'USD' })),
+    getChartEvents: vi.fn(async () => ({ events: captured.events, averageCost: null, firstBuyDate: captured.firstBuyDate, target: captured.target, targetCurrency: 'USD' })),
 }));
 vi.mock('lightweight-charts', () => {
     const stub = (): unknown => new Proxy({}, { get: (_t, key) => (key === 'then' ? undefined : vi.fn(() => stub())) });
     const seriesStub = (kind: string): unknown => new Proxy({}, { get: (_t, key) => {
         if (key === 'then') return undefined;
+        if (key === 'applyOptions') return (opts:Record<string,unknown>)=>{if(opts.autoscaleInfoProvider)captured.autoscale.push(opts.autoscaleInfoProvider as never)};
         if (key === 'setData') return (rows: unknown[]) => { captured.data[kind] = rows; };
         if (key === 'createPriceLine') return (opts: PriceLineOpts) => { captured.priceLines.push(opts); return stub(); };
         return vi.fn(() => stub());
@@ -174,4 +178,35 @@ it('handles empty chart and missing distance without fabricating a title',async(
  expect(targetPriceLine(100,0,((key:string)=>key) as never,{formatNumber:String}).axisLabelColor).toBeUndefined();
  render(<CompanyTechnicalChart snapshot={{...snapshot,history:[],currency:null}}/>);
  expect(screen.getByTestId('technical-price-canvas')).toBeInTheDocument();
+});
+
+it('keeps target inside autoscale range and handles absent original bounds',async()=>{
+ captured.autoscale=[];captured.target=241.5;
+ render(<CompanyTechnicalChart snapshot={snapshot}/>);
+ await waitFor(()=>expect(captured.autoscale.length).toBeGreaterThan(0));
+ const provider=captured.autoscale.at(-1)!;
+ expect(provider(()=>null)).toBeNull();expect(provider(()=>({}))).toEqual({});
+ const scaled=provider(()=>({priceRange:{minValue:150,maxValue:170}})) as {priceRange:{maxValue:number}};
+ expect(scaled.priceRange.maxValue).toBeGreaterThanOrEqual(241.5);
+});
+it('retries a failed range and supports since-buy toggle on max history',async()=>{
+ captured.firstBuyDate='2026-10-01';
+ remoteHistory.mockRejectedValueOnce(new Error('offline')).mockResolvedValue({bars:history,currency:'USD',source:'fixture'});
+ const view=render(<CompanyTechnicalChart snapshot={snapshot}/>);
+ try{
+  fireEvent.click(screen.getByRole('button',{name:'5A'}));
+  await waitFor(()=>expect(screen.getByRole('alert')).toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button',{name:'5A'}));
+  await waitFor(()=>expect(screen.queryByRole('alert')).toBeNull());
+  const since=await screen.findByRole('button',{name:/Desde.*compra/i});
+  fireEvent.click(since);
+  await waitFor(()=>expect(remoteHistory).toHaveBeenCalledWith('AAPL','Máx'));
+  await waitFor(()=>expect(since).toHaveAttribute('aria-pressed','true'));
+  fireEvent.click(since);
+ }finally{captured.firstBuyDate=null;view.unmount()}
+});
+it.each(['falling','flat'] as const)('renders %s price structure without assuming rising SMA',async(mode)=>{
+ const custom=history.map((bar,index)=>({...bar,close:mode==='flat'?100:200-index,open:mode==='flat'?100:201-index,high:mode==='flat'?101:202-index,low:mode==='flat'?99:199-index,volume:index%2?null:1000}));
+ render(<CompanyTechnicalChart snapshot={{...snapshot,currency:null,history:custom}}/>);
+ expect(screen.getByTestId('technical-reading')).toBeInTheDocument();
 });
