@@ -51,6 +51,10 @@ def enforce_free_only(url, payload, settings=None):
 
 def free_only_provider(settings, client=None):
     """Only platform free, no BYOK, user overrides, fallback or paid helper."""
+    from app.llm.hy4 import replacement_provider
+    promoted = replacement_provider(settings, client, model=FREE_MODEL)
+    if promoted is not None:
+        return promoted
     from app.llm.adapters import DisabledProvider
     if _tenant.get() is None:
         return DisabledProvider('llm_free_only_verified_tenant_required')
