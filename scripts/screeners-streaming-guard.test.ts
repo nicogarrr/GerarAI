@@ -26,5 +26,5 @@ test('los resultados ad-hoc llegan por streaming solo cuando hay ejecución inte
   // con altura representativa, nunca null.
   assert.match(src, /\{attemptedRun && !incompleteRun \? \(\s*<Suspense fallback=\{<ResultsSectionSkeleton \/>\}>/);
   assert.doesNotMatch(src, /<Suspense fallback=\{null\}>\s*\n\s*<ResultsSection/);
-  assert.match(src, /function ResultsSectionSkeleton\(\)/);
+  assert.match(src, /import \{ ResultsSectionSkeleton, ScreenersBodySkeleton \} from/);
 });
