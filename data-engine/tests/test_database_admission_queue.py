@@ -241,3 +241,57 @@ def test_global_pending_cap_applies_across_different_tenants():
                 await pending
         assert gate.pending == gate.active == 0
     asyncio.run(scenario())
+
+
+def test_new_tenant_cannot_overtake_eligible_waiter_between_polls(monkeypatch):
+    from types import SimpleNamespace
+
+    from app.core import db_admission as admission
+
+    async def scenario():
+        gate = AdmissionGate(1, 1)
+        order = []
+        polls = asyncio.Queue()
+
+        async def paused_poll(delay):
+            resume = asyncio.Event()
+            polls.put_nowait(resume)
+            await resume.wait()
+
+        # Replace only the gate's sleep, not asyncio's shared module. A waiter
+        # remains parked until the test explicitly permits its next poll.
+        monkeypatch.setattr(admission, 'asyncio', SimpleNamespace(sleep=paused_poll))
+
+        async def request(tenant):
+            async with gate.slot(tenant):
+                order.append(tenant)
+
+        tasks = []
+        try:
+            async with gate.slot('holder'):
+                waiter = asyncio.create_task(request('older'))
+                tasks.append(waiter)
+                older_poll = await polls.get()
+                assert gate.pending == gate.active == 1
+            assert gate.active == 0 and gate.pending == 1
+            newcomer = asyncio.create_task(request('new-tenant'))
+            tasks.append(newcomer)
+            # Run newcomer before allowing the eligible older waiter to poll.
+            # Without the anti-overtaking condition it finishes immediately.
+            await settle()
+            assert order == [], 'new tenant overtook an already eligible waiter'
+            assert gate.active == 0 and gate.pending == 2
+            newer_poll = polls.get_nowait()
+            older_poll.set()
+            await waiter
+            assert order == ['older']
+            newer_poll.set()
+            await newcomer
+            assert order == ['older', 'new-tenant']
+        finally:
+            for task in tasks:
+                task.cancel()  # harmless for a task already completed
+            await asyncio.gather(*tasks, return_exceptions=True)
+        assert gate.active == gate.pending == 0 and gate.tenants == {}
+
+    asyncio.run(scenario())
