@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import CompanyTechnicalChart from '@/components/research/CompanyTechnicalChart';
 import type { CompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
@@ -15,7 +15,8 @@ const captured = vi.hoisted(() => ({
     data: {} as Record<string, unknown[]>,
     target: 241.5 as number | null,
 }));
-vi.mock('@/lib/actions/company-chart.actions', () => ({ getCompanyChartHistory: vi.fn() }));
+const remoteHistory = vi.hoisted(()=>vi.fn());
+vi.mock('@/lib/actions/company-chart.actions', () => ({ getCompanyChartHistory: remoteHistory }));
 vi.mock('@/lib/actions/price-events.actions', () => ({
     getChartEvents: vi.fn(async () => ({ events: [], averageCost: null, firstBuyDate: null, target: captured.target, targetCurrency: 'USD' })),
 }));
@@ -137,4 +138,40 @@ describe('CompanyTechnicalChart: línea del objetivo con su % y sin panel del in
         expect(nb(targetLine()!.title)).toBe('Analyst target · +50.00%');
         expect(targetLine()!.axisLabelColor).toBe('#22c55e');
     });
+});
+
+it('uses distance only when actual chart container is narrow',async()=>{
+ const original=globalThis.ResizeObserver;
+ let resize: ResizeObserverCallback = ()=>{};
+ globalThis.ResizeObserver=class {constructor(cb: ResizeObserverCallback){resize=cb}observe(){}unobserve(){}disconnect(){}} as typeof ResizeObserver;
+ try{
+  captured.target=241.5;
+  const {unmount}=render(<CompanyTechnicalChart snapshot={snapshot}/>);
+  await waitFor(()=>expect(targetLine()).toBeDefined());
+  await act(async()=>resize([{contentRect:{width:358}} as ResizeObserverEntry],{} as ResizeObserver));
+  await waitFor(()=>expect(nb(targetLine()!.title)).toBe('+50,00 %'));
+  expect(targetLine()!.price).toBe(241.5);expect(targetLine()!.axisLabelVisible).toBe(true);
+  await act(async()=>resize([{contentRect:{width:900}} as ResizeObserverEntry],{} as ResizeObserver));
+  await waitFor(()=>expect(nb(targetLine()!.title)).toBe('Objetivo analistas · +50,00 %'));
+  unmount();
+ }finally{globalThis.ResizeObserver=original}
+});
+
+it('loads remote hourly ranges and handles a failed remote range',async()=>{
+ remoteHistory.mockResolvedValue({bars:history,currency:'USD',source:'fixture',status:'available'});
+ render(<CompanyTechnicalChart snapshot={snapshot}/>);
+ fireEvent.click(screen.getByRole('button',{name:'1D'}));
+ await waitFor(()=>expect(remoteHistory).toHaveBeenCalled());
+ expect(screen.getByRole('button',{name:'1D'})).toHaveAttribute('aria-pressed','true');
+ remoteHistory.mockRejectedValue(new Error('fixture offline'));
+ fireEvent.click(screen.getByRole('button',{name:'5D'}));
+ await waitFor(()=>expect(remoteHistory).toHaveBeenCalledWith('AAPL','5D'));
+ await act(async()=>{await Promise.resolve()});
+});
+it('handles empty chart and missing distance without fabricating a title',async()=>{
+ const {targetPriceLine}=await import('@/components/research/CompanyTechnicalChart');
+ expect(targetPriceLine(100,null,((key:string)=>key) as never,{formatNumber:String})).toMatchObject({price:100,narrowLabel:''});
+ expect(targetPriceLine(100,0,((key:string)=>key) as never,{formatNumber:String}).axisLabelColor).toBeUndefined();
+ render(<CompanyTechnicalChart snapshot={{...snapshot,history:[],currency:null}}/>);
+ expect(screen.getByTestId('technical-price-canvas')).toBeInTheDocument();
 });
