@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { LocaleProvider } from '@/lib/i18n/client';
 import { createTranslator } from '@/lib/i18n/translate';
@@ -34,8 +34,8 @@ describe('historical rates are not invented', () => {
     it('distinguishes unavailable, unavailable-with-reason, missing percentages and measured cells', () => {
         const ui = render(<DcaHitRatesCard data={null} ti={ti} locale="en" />); expect(screen.queryByRole('table')).not.toBeInTheDocument();
         ui.rerender(<DcaHitRatesCard data={{ ...rates, available: false, reason: 'Fixture no history' }} ti={ti} locale="en" />); expect(screen.getByText('Fixture no history')).toBeInTheDocument();
-        ui.rerender(<DcaHitRatesCard data={rates} ti={ti} locale="en" />); expect(screen.getByRole('table')).toBeInTheDocument(); expect(screen.getByText(/60.*%/)).toBeInTheDocument(); expect(screen.getByText('—')).toBeInTheDocument(); expect(screen.getByText(/n=5/)).toHaveTextContent(/12.*%/);
-        ui.rerender(<DcaHitRatesCard data={rates} compact scope="range" ti={ti} locale="en" />); expect(screen.queryByText(/n=5/)).not.toBeInTheDocument(); expect(screen.getByText(/24.*range/i)).toBeInTheDocument();
+        ui.rerender(<DcaHitRatesCard data={rates} ti={ti} locale="en" />); expect(screen.getByRole('table')).toBeInTheDocument(); const [measured, missing] = screen.getAllByRole('cell'); expect(measured).toHaveTextContent(/60.*%/); expect(measured).toHaveTextContent(/5 cases/); expect(measured).toHaveTextContent(/average.*12.*%/i); expect(missing).toHaveTextContent('—'); expect(missing).not.toHaveTextContent(/cases|average/i); expect(screen.getByTestId('dca-hit-rates-takeaway-2x')).toHaveTextContent(/60.*%.*5 cases/);
+        ui.rerender(<DcaHitRatesCard data={rates} compact scope="range" ti={ti} locale="en" />); expect(within(screen.getByRole('table')).queryByText(/5 cases/)).not.toBeInTheDocument(); expect(screen.queryByTestId('dca-hit-rates-takeaway-2x')).not.toBeInTheDocument(); expect(screen.getByText(/24.*range/i)).toBeInTheDocument();
     });
     it.each([0, 1, 3])('declares completed visits=%s, the open visit and excluded gaps separately', completed => {
         const zone_visits = { available: true, reason: null, levels: [2,3,4], months_completed: 24, first_period: null, last_period: null, completed_visits: completed, avg_months: completed ? 2.5 : null, max_months: 4, visits: [], open_visit_months: 3, excluded_gap_visits: completed === 1 ? 1 : 2, params_version: null };
@@ -75,7 +75,7 @@ describe('partial historical results and enabled settings', () => {
     it('keeps uncolored rows and missing periods neutral, omits unavailable visits and missing return averages', () => {
         const data = { ...rates, first_period: null, last_period: null, rows: [{ ...rates.rows[0], color: null, cells: [{ horizon_months: 3, months: 5, pct_higher: 0, avg_return: null }] }], zone_visits: { available: false, reason: 'partial' } as DcaHitRates['zone_visits'] };
         const ui = render(<DcaHitRatesCard data={data} ti={ti} locale="en" />);
-        expect(screen.queryByText(/2024-01/)).not.toBeInTheDocument(); expect(screen.queryByTestId('dca-zone-visits')).not.toBeInTheDocument(); expect(screen.getByText('n=5')).not.toHaveTextContent(/average/i); expect(screen.getByRole('rowheader').querySelector('span')).toHaveStyle({ backgroundColor: '#374151' });
+        expect(screen.queryByText(/2024-01/)).not.toBeInTheDocument(); expect(screen.queryByTestId('dca-zone-visits')).not.toBeInTheDocument(); const measured = screen.getByRole('cell'); expect(measured).toHaveTextContent(/0.*%/); expect(measured).toHaveTextContent('5 cases'); expect(measured).not.toHaveTextContent(/average/i); expect(screen.getByRole('rowheader').querySelector('span')).toHaveStyle({ backgroundColor: '#374151' });
         ui.rerender(<DcaHitRatesCard data={{ ...data, available: false, reason: null }} ti={ti} locale="en" />); expect(screen.queryByRole('table')).not.toBeInTheDocument();
         ui.rerender(<DcaHitRatesCard data={{ ...data, zone_visits: { available: true, completed_visits: 2, avg_months: null, open_visit_months: 0 } as DcaHitRates['zone_visits'] }} ti={ti} locale="en" />); expect(screen.getByTestId('dca-zone-visits')).not.toHaveTextContent(/open visit/i);
     });
