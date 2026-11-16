@@ -15,6 +15,7 @@ from __future__ import annotations
 import heapq
 from pathlib import Path
 
+import pytest
 import yaml
 
 COMPOSE_PATH = Path(__file__).resolve().parents[2] / "docker-compose.prod.yml"
@@ -122,13 +123,11 @@ def test_workers_de_proveedor_en_compose():
     for nombre in ("worker", "worker-externa", "worker-gdelt"):
         comando = compose["services"][nombre]["command"]
         assert "finnhub" not in comando and '"yahoo"' not in comando, nombre
-    # Presupuesto de memoria intacto (techo 16 GiB, host 24 GB).
-    total = 0
-    for svc in compose["services"].values():
-        memoria = str(svc["deploy"]["resources"]["limits"]["memory"])
-        valor = float(memoria.rstrip("MG"))
-        total += int(valor * 1024) if memoria.endswith("G") else int(valor)
-    assert total <= 16384, f"los limites suman {total} MiB"
+    # Techo 20480 MiB frente a host23972; margen3492, no garantia de capacidad.
+    _assert_memory_budget(compose)
+    compose["services"]["backend"]["deploy"]["resources"]["limits"]["memory"] = "3G"
+    with pytest.raises(AssertionError, match="20480"):
+        _assert_memory_budget(compose)
 
 
 def _simula(colas: dict[str, int], trabajos: list[tuple[str, float]]) -> float:
@@ -157,3 +156,15 @@ def test_ab_aislamiento_carril_dedicado():
     assert dedicado <= 3.0
     print(f"\nA/B modelo: cortos terminan en {dedicado:.1f}s dedicado "
           f"vs {compartido:.1f}s compartido ({compartido / dedicado:.0f}x)")
+
+
+def _assert_memory_budget(compose):
+    """Presupuesto fijo, no derivado de la suma ni del tamaño del mutante."""
+    total = 0
+    for name, service in compose["services"].items():
+        limits = service.get("deploy", {}).get("resources", {}).get("limits", {})
+        assert "memory" in limits, f"{name} sin limite de memoria"
+        memory = str(limits["memory"])
+        value = float(memory.rstrip("MG"))
+        total += int(value * 1024) if memory.endswith("G") else int(value)
+    assert total <= 20480, f"los limites suman {total} MiB (>20480 MiB)"

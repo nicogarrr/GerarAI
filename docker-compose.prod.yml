@@ -964,6 +964,9 @@ services:
     restart: unless-stopped
     # RAG de conocimiento profesional (#924): Docling pica CPU/RAM, asi que la
     # cola knowledge va en worker dedicado de 1 proceso / 1 hilo (no compartir).
+    # Memoria medida por el Piloto (16-nov-2026): e5-large carga con
+    # ru_maxrss 1,60 GiB y memory.peak 2,74 GiB; con 512M y con 1,5G el
+    # kernel mataba el worker (CONSTRAINT_MEMCG). 4G ya aplicado en runtime.
     command: ["dramatiq", "app.workers.dramatiq_app", "--processes", "1", "--threads", "1", "-Q", "knowledge"]
     environment:
       <<: [*app-env, *worker-db-env]
@@ -1011,7 +1014,7 @@ services:
       resources:
         limits:
           cpus: "0.50"
-          memory: 512M
+          memory: 4G
 
   # Carril "documents" (process_document / process_document_structured):
   # descarga + extraccion + embeddings de documentos. 5-nov-2026: 677 docs de

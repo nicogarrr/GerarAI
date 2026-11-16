@@ -3,6 +3,7 @@
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 
@@ -156,19 +157,15 @@ def test_scheduler_receives_retention_and_storage_configuration():
 
 
 def test_memory_limits_fit_the_24gb_vm_with_host_reserve():
-    """24 GB host verified 2026-10-30; reserve at least 8 GiB outside this stack.
+    """Techo 20480 MiB frente a host medido de 23972; margen 3492.
 
-    Old 10 GiB ceiling described the replaced 12 GB host and contradicted the
-    documented 24 GB deployment. Keep a bounded 16 GiB stack ceiling rather
-    than deriving the budget from the configured limits themselves.
+    La suma de limites no garantiza capacidad bajo carga simultanea.
     """
     compose = _load_compose()
-    total = 0
-    for name, service in compose["services"].items():
-        limit = service.get("deploy", {}).get("resources", {}).get("limits", {})
-        assert "memory" in limit, f"{name} sin limite de memoria"
-        total += _memory_mib(limit["memory"])
-    assert total <= 16384, f"los limites suman {total} MiB (> 16 GiB; host reserve < 8 GiB)"
+    _assert_memory_budget(compose)
+    compose["services"]["backend"]["deploy"]["resources"]["limits"]["memory"] = "3G"
+    with pytest.raises(AssertionError, match="20480"):
+        _assert_memory_budget(compose)
 
 
 def test_every_service_has_cpu_limits_and_rotated_logs():
@@ -339,3 +336,15 @@ def test_retired_minio_cannot_be_recreated_by_production_compose():
 def test_kpi_worker_can_select_zero_euro_deterministic_mode_without_llm_free_only_change():
     env = _service_env(_load_compose(), "worker-kpis")
     assert env["KPI_EXTRACTION_MODE"] == "${KPI_EXTRACTION_MODE:-auto}"
+
+
+def _assert_memory_budget(compose):
+    """Presupuesto fijo, no derivado de la suma ni del tamaño del mutante."""
+    total = 0
+    for name, service in compose["services"].items():
+        limits = service.get("deploy", {}).get("resources", {}).get("limits", {})
+        assert "memory" in limits, f"{name} sin limite de memoria"
+        memory = str(limits["memory"])
+        value = float(memory.rstrip("MG"))
+        total += int(value * 1024) if memory.endswith("G") else int(value)
+    assert total <= 20480, f"los limites suman {total} MiB (>20480 MiB)"
