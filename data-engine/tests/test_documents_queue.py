@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 COMPOSE_PATH = Path(__file__).resolve().parents[2] / "docker-compose.prod.yml"
@@ -84,11 +85,21 @@ def test_worker_default_usa_los_modelos_horneados_de_la_imagen():
 
 
 def test_presupuesto_de_memoria_del_stack_intacto():
-    """Techo 16 GiB (host 24 GB), mismo invariante que test_externa_queue."""
+    """Techo 20480 MiB; host 23972 MiB, margen 3492 MiB."""
     compose = yaml.load(COMPOSE_PATH.read_text(), Loader=_ComposeLoader)
+    _assert_memory_budget(compose)
+    compose["services"]["backend"]["deploy"]["resources"]["limits"]["memory"] = "3G"
+    with pytest.raises(AssertionError, match="20480"):
+        _assert_memory_budget(compose)
+
+
+def _assert_memory_budget(compose):
+    """Presupuesto fijo, no derivado de la suma ni del tamaño del mutante."""
     total = 0
-    for svc in compose["services"].values():
-        memoria = str(svc["deploy"]["resources"]["limits"]["memory"])
-        valor = float(memoria.rstrip("MG"))
-        total += int(valor * 1024) if memoria.endswith("G") else int(valor)
-    assert total <= 16384, f"los limites suman {total} MiB"
+    for name, service in compose["services"].items():
+        limits = service.get("deploy", {}).get("resources", {}).get("limits", {})
+        assert "memory" in limits, f"{name} sin limite de memoria"
+        memory = str(limits["memory"])
+        value = float(memory.rstrip("MG"))
+        total += int(value * 1024) if memory.endswith("G") else int(value)
+    assert total <= 20480, f"los limites suman {total} MiB (>20480 MiB)"

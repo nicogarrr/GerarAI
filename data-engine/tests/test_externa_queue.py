@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 COMPOSE_PATH = Path(__file__).resolve().parents[2] / "docker-compose.prod.yml"
@@ -60,13 +61,11 @@ def test_worker_externa_consume_la_cola_con_claves_de_fuente():
     # El worker general NO consume externa: el aislamiento del carril es real.
     general = compose["services"]["worker"]["command"]
     assert "externa" not in general
-    # Presupuesto de memoria del stack intacto (techo 16 GiB, host 24 GB).
-    total = 0
-    for svc in compose["services"].values():
-        memoria = str(svc["deploy"]["resources"]["limits"]["memory"])
-        valor = float(memoria.rstrip("MG"))
-        total += int(valor * 1024) if memoria.endswith("G") else int(valor)
-    assert total <= 16384, f"los limites suman {total} MiB"
+    # Techo 20480 MiB frente a host23972; margen3492, no garantia de capacidad.
+    _assert_memory_budget(compose)
+    compose["services"]["backend"]["deploy"]["resources"]["limits"]["memory"] = "3G"
+    with pytest.raises(AssertionError, match="20480"):
+        _assert_memory_budget(compose)
 
 
 def test_refresh_valuation_metrics_tiene_time_limit_acotado():
@@ -86,3 +85,15 @@ def test_worker_externa_sin_prefetch_extra():
     env = compose["services"]["worker-externa"]["environment"]
     assert env["dramatiq_queue_prefetch"] == "1"
     assert env["dramatiq_delay_queue_prefetch"] == "1"
+
+
+def _assert_memory_budget(compose):
+    """Presupuesto fijo, no derivado de la suma ni del tamaño del mutante."""
+    total = 0
+    for name, service in compose["services"].items():
+        limits = service.get("deploy", {}).get("resources", {}).get("limits", {})
+        assert "memory" in limits, f"{name} sin limite de memoria"
+        memory = str(limits["memory"])
+        value = float(memory.rstrip("MG"))
+        total += int(value * 1024) if memory.endswith("G") else int(value)
+    assert total <= 20480, f"los limites suman {total} MiB (>20480 MiB)"
