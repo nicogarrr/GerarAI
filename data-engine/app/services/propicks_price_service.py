@@ -37,9 +37,13 @@ from app.services.us_market_session import (
 )
 from app.valuation.currency import SUFFIX_QUOTE_UNIT, listing_quote_unit, normalize_currency
 
-# Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): 126/252
-# eran dias de bolsa y salian como ~4 y ~8 meses etiquetados 6m/12m.
+# Dias de CALENDARIO (momentum_from_series resta timedelta(days=...)): las
+# ventanas reales son 182 y 365; 126/252 eran dias de bolsa y salian como
+# ~4 y ~8 meses etiquetados 6m/12m.
 MOMENTUM_WINDOWS: dict[str, int] = {"momentum_6m": 182, "momentum_12m": 365}
+# Momentum 12-1 (factor clasico): de t-365d a t-30d, se salta el ultimo mes.
+MOMENTUM_12_1_DAYS = 365
+MOMENTUM_12_1_SKIP_DAYS = 30
 MIN_BARS_6M = 60   # ventanas minimas honestas (~3 meses de barras)
 MIN_BARS_12M = 200
 METRIC_VERSION = "v1"
@@ -413,6 +417,41 @@ def momentum_from_series(series: Sequence[tuple[date, Decimal]], days: int) -> D
     return (last_px - past_px) / past_px
 
 
+def momentum_12_1_from_series(
+    series: Sequence[tuple[date, Decimal]],
+    *,
+    days: int = MOMENTUM_12_1_DAYS,
+    skip_days: int = MOMENTUM_12_1_SKIP_DAYS,
+) -> Decimal | None:
+    """Momentum 12-1: adj_close(t-`skip_days`)/adj_close(t-`days`) - 1.
+
+    Se salta el ultimo mes (reversión a corto plazo, Jegadeesh-Titman). Ambos
+    puntos con la tolerancia de +-20 dias de momentum_from_series; None si
+    falta algun punto, si la serie es corta o si algun precio es <= 0.
+    `series` ordenada ascendente y ya acotada a date <= as_of por el llamador.
+    """
+    if len(series) < 2:
+        return None
+    last_day = series[-1][0]
+    end_target = last_day - timedelta(days=skip_days)
+    end_past = [(d, p) for d, p in series if d <= end_target]
+    if not end_past:
+        return None
+    end_day, end_px = end_past[-1]
+    if abs((end_day - end_target).days) > 20:
+        return None
+    start_target = last_day - timedelta(days=days)
+    start_past = [(d, p) for d, p in series if d <= start_target]
+    if not start_past:
+        return None
+    start_day, start_px = start_past[-1]
+    if abs((start_day - start_target).days) > 20:
+        return None
+    if start_px <= 0 or end_px <= 0:
+        return None
+    return (end_px - start_px) / start_px
+
+
 def compute_momentum_metrics(
     db: Session,
     companies: Sequence[Company],
@@ -434,7 +473,7 @@ def compute_momentum_metrics(
     asi que acotar no cambia ningun resultado.
     """
     tenant_id = db.info.get("tenant_id")
-    stats = {"momentum_6m": 0, "momentum_12m": 0, "skipped": 0}
+    stats = {"momentum_6m": 0, "momentum_12m": 0, "momentum_12_1": 0, "skipped": 0}
     if not companies:
         return stats
 
@@ -483,7 +522,7 @@ def compute_momentum_metrics(
             select(CalculatedMetric).where(
                 CalculatedMetric.tenant_id == tenant_id,
                 CalculatedMetric.company_id.in_([c.id for c in eligible]),
-                CalculatedMetric.metric.in_(MOMENTUM_WINDOWS),
+                CalculatedMetric.metric.in_([*MOMENTUM_WINDOWS, "momentum_12_1"]),
                 CalculatedMetric.period == as_of.isoformat(),
                 CalculatedMetric.definition_version == METRIC_VERSION,
             )
@@ -532,6 +571,44 @@ def compute_momentum_metrics(
                     )
                 )
             stats[metric] += 1
+        # Momentum 12-1 (factor observacional): misma serie y minimos de 12m.
+        if n_bars >= MIN_BARS_12M:
+            m121 = momentum_12_1_from_series(series)
+            if m121 is not None:
+                trace121 = {
+                    "window_days": MOMENTUM_12_1_DAYS,
+                    "skip_days": MOMENTUM_12_1_SKIP_DAYS,
+                    "as_of": as_of.isoformat(),
+                    "last_bar_date": series[-1][0].isoformat(),
+                }
+                row = existing.get((company.id, "momentum_12_1"))
+                if row is not None:
+                    row.value = m121
+                    row.calculation_trace = trace121
+                else:
+                    db.add(
+                        CalculatedMetric(
+                            tenant_id=tenant_id,
+                            company_id=company.id,
+                            metric="momentum_12_1",
+                            value=m121,
+                            unit="decimal",
+                            period=as_of.isoformat(),
+                            fiscal_year=as_of.year,
+                            status="ok",
+                            definition_version=METRIC_VERSION,
+                            formula=(
+                                f"adj_close(t-{MOMENTUM_12_1_SKIP_DAYS}d)/"
+                                f"adj_close(t-{MOMENTUM_12_1_DAYS}d) - 1 sobre "
+                                "market_prices (yfinance)"
+                            ),
+                            numerator=None,
+                            denominator=None,
+                            source_fact_ids=[],
+                            calculation_trace=trace121,
+                        )
+                    )
+                stats["momentum_12_1"] += 1
     db.flush()
     return stats
 

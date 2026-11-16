@@ -350,6 +350,10 @@ export default async function MetodologiaPage() {
             <strong className="text-gray-200">{t('landing.metodologia.funnel.v1Strong')}</strong>{' '}
             {t('landing.metodologia.funnel.v1Rest')}
           </p>
+          <p>
+            <strong className="text-gray-200">{t('landing.metodologia.funnel.factorsStrong')}</strong>{' '}
+            {t('landing.metodologia.funnel.factorsRest')}
+          </p>
         </div>
       </section>
 

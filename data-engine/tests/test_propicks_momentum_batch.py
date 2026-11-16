@@ -64,7 +64,7 @@ def test_momentum_batch_uses_constant_queries():
     finally:
         event.remove(engine, "before_cursor_execute", _count)
     # 300 barras: historia suficiente para 6m, no para 12m (sin punto a -365d).
-    assert stats == {"momentum_6m": 6, "momentum_12m": 0, "skipped": 0}
+    assert stats == {"momentum_6m": 6, "momentum_12m": 0, "momentum_12_1": 0, "skipped": 0}
     assert len(statements) <= 3, f"{len(statements)} consultas para 6 empresas"
 
 
@@ -92,7 +92,7 @@ def test_momentum_skips_sparse_and_short_histories():
     short = _seed(db, "SHT", start, 30)
     as_of = start + timedelta(days=260)
     stats = compute_momentum_metrics(db, [stale, short], as_of=as_of)
-    assert stats == {"momentum_6m": 0, "momentum_12m": 0, "skipped": 1}
+    assert stats == {"momentum_6m": 0, "momentum_12m": 0, "momentum_12_1": 0, "skipped": 1}
     assert _metric(db, stale.id, "momentum_6m") is None
     assert _metric(db, short.id, "momentum_6m") is None
 
