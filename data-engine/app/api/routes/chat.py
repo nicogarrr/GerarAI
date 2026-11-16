@@ -76,6 +76,22 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
         # seguir un rato y no debe compartir la sesion que get_db va a cerrar.
         with SessionLocal(bind=worker_bind) as worker_db:
             worker_db.info.update(tenant_info)
+            if payload.model:
+                from app.llm.errors import ProviderDisabledError
+                from app.llm.hy4 import NOTICE, blocked, create_hy4_provider, selection_scope
+                try:
+                    with selection_scope(True):
+                        provider = create_hy4_provider(get_settings())
+                        result = run_from_any_context(ChatService(provider=provider).answer(
+                            worker_db, payload.question, payload.scope, payload.ticker,
+                            enable_debate=False, use_jev=False, page=payload.page, history=payload.history,
+                        ))
+                        if blocked():
+                            raise ProviderDisabledError(NOTICE)
+                        return result
+                except ProviderDisabledError:
+                    return ChatResponse(answer=NOTICE, sources=[], model=payload.model, confidence=0,
+                        llm_trace={"path": "hy4_blocked", "fallback": False, "fallback_reason": "hy4_zero_cost_unverified"})
             return run_from_any_context(
                 ChatService().answer(
                     worker_db,

@@ -693,6 +693,7 @@ class ChatTurn(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    model: Literal["hy4-flash-free"] | None = None
     question: str = Field(min_length=3)
     scope: str = "portfolio"
     ticker: str | None = None
