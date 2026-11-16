@@ -12,8 +12,8 @@ function Nav({ active }: { active: 'resumen' | 'seguimiento' }) {
   return (
     <nav data-testid="company-navigation" className="scrollbar-hide overflow-x-auto">
       <CompanyNavigationScroll />
-      <a aria-current={active === 'resumen' ? 'page' : undefined} href="/research/UBER">Resumen</a>
-      <a aria-current={active === 'seguimiento' ? 'page' : undefined} href="/research/UBER?view=seguimiento">Seguimiento</a>
+      <a aria-current={active === 'resumen' ? 'page' : undefined} href="#summary">Resumen</a>
+      <a aria-current={active === 'seguimiento' ? 'page' : undefined} href="#follow-up">Seguimiento</a>
     </nav>
   );
 }
