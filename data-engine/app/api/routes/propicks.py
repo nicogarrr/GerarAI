@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models import Company, MarketPrice, ProPickCandidate, ProPickRun
+from app.schemas.propicks_unified import UnifiedResult
 from app.services.propicks_funnel_service import execute_run, run_funnel
 from app.services.propicks_gems_service import find_gems
 
@@ -320,6 +321,20 @@ class DeepValueResponse(BaseModel):
     estrategia: str
     rotulo: str
     resultados: list[DeepValueRowOut]
+
+
+@router.get("/unified", response_model=None)
+def unified(
+    limit: int = Query(default=200, ge=1, le=500),
+    db: Session = Depends(get_db),
+) -> UnifiedResult:
+    """Contrato único propicks-unified-v1 (calidad, valoración, DCA, seguimiento).
+
+    Lectura por tenant; ausencia = null con estado, nunca 0. Identidad
+    provisional (company:{id}, unverified) hasta que exista resolver."""
+    from app.services.propicks_unified_adapter import load_unified
+
+    return load_unified(db, as_of=date.today(), limit=limit)
 
 
 @router.get("/deep-value", response_model=DeepValueResponse)
