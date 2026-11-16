@@ -25,6 +25,8 @@ import { peNdNote } from '@/lib/watchlist/pe-nd-reason';
 import { WATCHLIST_ROW_BUDGET_MS } from '@/lib/watchlist/read-budget';
 import { MARKET_CAP_GAP_REASONS, marketCapGapReason, type MarketCapGapReason } from '@/lib/watchlist/market-cap-gap';
 import { emptyWatchlistEntry } from '@/lib/watchlist/entry-fallback';
+import New13fSection from '@/components/watchlist/New13fSection';
+import { getWatchlistNew13f } from '@/lib/actions/watchlist-new-13f.actions';
 import DcaSignalsPanel from '@/components/watchlist/DcaSignalsPanel';
 import { getDcaSignals } from '@/lib/actions/dca-signals.actions';
 import { getPortfolioFxContext } from '@/lib/actions/portfolio.actions';
@@ -145,6 +147,7 @@ export default async function WatchlistPage({
     // userId para el alta de «Registrar compra» (misma sesión cacheada por
     // petición que usan las acciones de esta página).
     const { id: userId } = await requireAuthenticatedUser();
+    const new13fPromise = getWatchlistNew13f();
     // Idioma elegido en Ajustes: textos y formatos (fechas, números) por locale.
     const [t, locale] = await Promise.all([getT(), getLocale()]);
     const { formatMarketCap, formatMarketDate, formatNumber, formatPercent, formatPrice, na: NA } = await getFormat();
@@ -726,6 +729,7 @@ export default async function WatchlistPage({
             <Suspense fallback={null}>
                 <DcaPanelStream promise={dcaPromise} ti={t} locale={locale} />
             </Suspense>
+            <Suspense fallback={null}><New13fSection promise={new13fPromise} t={t} /></Suspense>
         {metricSort ? (
             <ValuationSummaryGrid quotes={watchlistStocks.map(s => ({ symbol: s.symbol, price: s.price, currency: s.currency }))} />
         ) : (

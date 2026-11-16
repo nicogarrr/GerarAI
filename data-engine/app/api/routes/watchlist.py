@@ -970,6 +970,41 @@ def list_dca_signals(db: Session = Depends(get_db)) -> dict:
     return _dca_signals_payload(db)
 
 
+class WatchlistNew13fItemOut(BaseModel):
+    ticker: str
+    status: str
+    reason: str | None = None
+    period: str | None = None
+    new_positions: dict | None = None
+
+
+class WatchlistNew13fOut(BaseModel):
+    items: list[WatchlistNew13fItemOut]
+
+
+@router.get("/new-13f", response_model=WatchlistNew13fOut)
+def watchlist_new_13f(db: Session = Depends(get_db)) -> dict:
+    """Nuevas posiciones institucionales (13F) de cada empresa de la watchlist
+    del tenant firmado: cuantas son nuevas este trimestre y las mayores.
+    Lectura de datos ya guardados (sin red). Sin snapshot -> sin_datos con
+    motivo; nunca se inventa una lista."""
+    from app.services.institutional_holders import institutional_holders
+
+    items = []
+    for item in db.scalars(
+        select(WatchItem).where(*tenant_filters(db, WatchItem)).order_by(WatchItem.symbol)
+    ):
+        result = institutional_holders(db, item.symbol)
+        if result is None:
+            items.append({"ticker": item.symbol, "status": "sin_datos", "reason": "empresa_desconocida",
+                          "period": None, "new_positions": None})
+            continue
+        items.append({"ticker": result["ticker"], "status": result.get("status", "sin_datos"),
+                      "reason": result.get("reason"), "period": result.get("period"),
+                      "new_positions": result.get("new_positions")})
+    return {"items": items}
+
+
 @router.put("/{symbol}/dca-alert-min-level", response_model=DcaMinLevelOut)
 def set_dca_alert_min_level(symbol: str, payload: DcaMinLevelIn, db: Session = Depends(get_db)) -> dict:
     """Ajusta el nivel minimo de aviso DCA de un ticker (null = global, 0 = apagado)."""

@@ -167,6 +167,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
   'components/watchlist/DcaWatchCardToggle.tsx': 'useState, useTransition, jsx-onClick',
   'components/research/SotpAgentsButton.tsx': 'useState, useEffect, useRef, useTransition, useRouter, jsx-onClick (sigue el trabajo de los agentes)',
   'components/watchlist/DcaLevelBadge.tsx': 'useState, useRef, jsx-onClick, jsx-onPointerDown, jsx-onOpenChange (el toque abre el detalle del nivel DCA en el móvil)',
+  'components/watchlist/New13fSummary.tsx': 'useT, useFormat (textos y formatos por locale en el resumen 13F de la watchlist)',
   'components/proPicks/DcaBacktestPanel.tsx': 'useState, useTransition, jsx-onSubmit, jsx-onChange',
   'app/(root)/inversores/_components/HubNav.tsx': 'usePathname',
   'app/(root)/inversores/_components/PaginationNav.tsx': 'useT',
