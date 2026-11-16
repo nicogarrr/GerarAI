@@ -375,7 +375,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                     </div>
                     <Link
                         href="/portfolio"
-                        className="text-sm font-semibold text-teal-300 hover:text-teal-200"
+                        className="inline-flex min-h-11 items-center px-3 text-sm font-semibold text-teal-300 hover:text-teal-200"
                     >
                         {t('risk.positions.viewPortfolio')}
                     </Link>
