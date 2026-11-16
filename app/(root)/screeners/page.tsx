@@ -122,18 +122,87 @@ async function ResultsSection({ query, operator, incompleteRun, requestedPage, r
   );
 }
 
+// Skeleton de los resultados ad-hoc. En móvil cada fila de Results es una
+// tarjeta en bloque (~150px), no una fila fina: con fallback={null} el rig
+// qa-screeners-run-cls medía CLS 0,271 (390px, 10 resultados); 3 tarjetas
+// fieles (~550px) lo bajan a 0,079. El número de resultados real varía
+// (0-25/página): 3 tarjetas es el compromiso medido entre reservar de menos
+// (salto al llegar) y de más (salto al colapsar con pocos resultados).
+function ResultsSectionSkeleton() {
+  return (
+    <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+      <Skeleton className="h-6 w-32" />
+      {[0, 1, 2].map((i) => (
+        <div className="mt-3 rounded-xl border border-gray-800 bg-gray-900/40 p-4" key={i}>
+          <Skeleton className="h-3 w-16" />
+          <Skeleton className="mt-1 h-4 w-20" />
+          <Skeleton className="mt-1 h-3 w-36" />
+          <Skeleton className="mt-2 h-3 w-16" />
+          <Skeleton className="mt-1 h-3 w-40" />
+          <Skeleton className="mt-2 h-3 w-16" />
+          <Skeleton className="mt-1 h-3.5 w-12" />
+        </div>
+      ))}
+    </section>
+  );
+}
+
+// Espejo de la estructura real de WorkspaceSections (5 bloques): formulario
+// ad-hoc, filtros guardados, los dos <details> cerrados y métricas activas.
+// El skeleton viejo (2 secciones bajas) medía CLS 0,146 al intercambiarse
+// (rig qa-screeners-cls, 390px); con alturas representativas baja a ~0,02.
+// Las tarjetas de filtros/métricas varían con los datos: se reserva el caso
+// habitual (2+2) y el resto queda como desplazamiento residual pequeño.
 function ScreenersBodySkeleton() {
   return (
     <>
       <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-        <Skeleton className="h-5 w-56" />
+        <Skeleton className="mb-4 h-6 w-44" />
+        <Skeleton className="h-11 w-full" />
         <Skeleton className="mt-4 h-11 w-full" />
-        <Skeleton className="mt-3 h-11 w-full" />
-        <Skeleton className="mt-3 h-11 w-2/3" />
+        <Skeleton className="mt-4 h-11 w-full" />
+        <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+          <Skeleton className="h-11 w-full" />
+          <Skeleton className="h-11 w-32" />
+        </div>
       </section>
       <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
-        <Skeleton className="h-5 w-40" />
-        <Skeleton className="mt-4 h-24 w-full" />
+        <Skeleton className="h-6 w-40" />
+        <div className="mt-4 grid gap-3">
+          {[0, 1].map((i) => (
+            <div className="rounded-lg border border-gray-800 bg-black/30 p-4" key={i}>
+              <div className="flex items-start gap-3">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-36" />
+                  <Skeleton className="mt-2 h-3 w-56" />
+                </div>
+                <Skeleton className="h-9 w-24" />
+              </div>
+              <Skeleton className="mt-3 h-5 w-28" />
+            </div>
+          ))}
+        </div>
+      </section>
+      <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+        <Skeleton className="my-2.5 h-6 w-52" />
+      </section>
+      <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+        <Skeleton className="my-2.5 h-6 w-64" />
+      </section>
+      <section aria-hidden="true" className="rounded-xl border border-gray-800 bg-surface-1 p-5">
+        <Skeleton className="h-6 w-36" />
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {[0, 1].map((i) => (
+            <div className="rounded-lg border border-gray-800 bg-black/30 p-4" key={i}>
+              <div className="flex items-center justify-between gap-3">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-5 w-8" />
+              </div>
+              <Skeleton className="mt-3 h-4 w-44" />
+              <Skeleton className="mt-2 h-3 w-32" />
+            </div>
+          ))}
+        </div>
       </section>
     </>
   );
@@ -264,7 +333,7 @@ export default async function ScreenersPage({ searchParams }: PageProps) {
         (ad-hoc y métrica) ocupaban la pantalla antes de cualquier resultado.
       */}
       {attemptedRun && !incompleteRun ? (
-        <Suspense fallback={null}>
+        <Suspense fallback={<ResultsSectionSkeleton />}>
           <ResultsSection incompleteRun={incompleteRun} operator={operator} query={query} requestedPage={requestedPage} resultsPageHref={resultsPageHref} />
         </Suspense>
       ) : null}
