@@ -60,3 +60,17 @@ export function eightKReason(reason: string | null | undefined, locale: Locale):
   if (locale !== 'en' || !reason) return reason;
   return Object.hasOwn(REASONS_EN, reason) ? REASONS_EN[reason] : reason;
 }
+
+/**
+ * Etiqueta legible para un apartado «matching» del digest 8-K. Pintar el
+ * código SEC a pelo («2.02») exige conocerse la taxonomía de memoria; el
+ * título sale del propio digest (el backend lo manda en castellano) y, en
+ * inglés, de la tabla oficial SEC aunque el apartado no tenga detalle en
+ * items. Código sin título conocido: el código crudo, nunca inventado.
+ */
+export function eightKMatchingLabel(code: string, items: ReadonlyArray<{ code: string; title: string }>, locale: Locale): string {
+  const known = items.find((item) => item.code === code);
+  if (known) return `Item ${code} · ${eightKItemTitle(known, locale)}`;
+  if (locale === 'en' && Object.hasOwn(ITEM_TITLES_EN, code)) return `Item ${code} · ${ITEM_TITLES_EN[code]}`;
+  return code;
+}
