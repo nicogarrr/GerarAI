@@ -101,7 +101,8 @@
       "batterySupply": "suministro de baterías",
       "autonomyRegulation": "regulación de conducción autónoma",
       "label": "Auto / energía / opcionalidad"
-    }
+    },
+    "positiveTerminalFcf": "flujo de caja libre terminal positivo"
   },
   "missingMetricLabels": {
     "netDebtAtTargetValue": "deuda neta en la fecha del valor objetivo",

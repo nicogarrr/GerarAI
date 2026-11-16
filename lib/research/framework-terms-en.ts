@@ -3,7 +3,6 @@
  * claves ya son inglés: frameworkTerm las humaniza (guiones bajos -> espacios).
  */
 export const FRAMEWORK_TERMS_EN: Record<string, string> = {
-    positive_terminal_fcf: 'positive terminal free cash flow',
     non_negative_fcf_margin: 'non-negative free cash flow margin',
     normalized_fcf_or_fcf_margin: 'normalized free cash flow or free cash flow margin',
     standard_dcf: 'free cash flow DCF',

@@ -15,6 +15,7 @@ import { createTranslator } from '../i18n/translate.ts';
  *  y no puede crecer. seed/ingesta dejan el stub sin motor («unassigned»):
  *  la ficha mostraba el slug crudo. */
 const FRAMEWORK_TERMS_I18N: Record<string, TranslationKey> = {
+    positive_terminal_fcf: 'researchShared.frameworkTerms.positiveTerminalFcf',
     unassigned: 'researchShared.frameworkTerms.unassigned',
     deliveries: 'researchShared.frameworkTerms.autoEnergy.deliveries',
     storage: 'researchShared.frameworkTerms.autoEnergy.storage',
@@ -61,7 +62,6 @@ function esFrameworkLabel(key: string): string | null {
 }
 
 export const FRAMEWORK_TERMS: Record<string, string> = {
-    positive_terminal_fcf: 'flujo de caja libre terminal positivo',
     non_negative_fcf_margin: 'margen de flujo de caja libre no negativo',
     normalized_fcf_or_fcf_margin: 'flujo de caja libre normalizado o margen de flujo de caja libre',
     standard_dcf: 'DCF de flujo de caja libre',
