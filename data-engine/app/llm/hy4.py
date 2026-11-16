@@ -65,7 +65,10 @@ class Hy4Provider(GoSubscriptionChatProvider):
         if not _admission.acquire(blocking=False):
             raise ProviderDisabledError('Hy4 ocupado; no se ha usado otro modelo.')
         try:
-            return await self._complete_guarded(request, model)
+            # Workers have no HTTP scope. Apply the destination/model guard
+            # ONLY to this admitted provider call, never unrelated work.
+            with selection_scope(True):
+                return await self._complete_guarded(request, model)
         finally:
             _admission.release()
 
