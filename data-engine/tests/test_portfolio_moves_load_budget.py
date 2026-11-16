@@ -35,6 +35,14 @@ def test_digest_caps_history_before_orm_materialization(size):
                                        source='example.com', url=f'https://example.com/{index}/{minute}',
                                        metadata_={'connector':'gdelt'}))
             seed.commit()
+            # More recent foreign-tenant articles must be filtered before rank.
+            seed.info['tenant_id'] = 'foreign'
+            for minute in range(40, 50):
+                seed.add(NewsEvent(company_id=company.id, tenant_id='foreign',
+                                   date=datetime(2026, 9, 24, 8, minute, tzinfo=UTC), title='PRIVATE',
+                                   source='foreign.invalid', url=f'https://foreign.invalid/{minute}',
+                                   metadata_={'connector':'gdelt'}))
+            seed.commit()
         loaded = {'MarketPrice': 0, 'NewsEvent': 0}
         statements = []
         def count_load(_session, instance):
