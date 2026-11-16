@@ -72,4 +72,14 @@ describe('InstitutionalHoldersPanel', () => {
     render(<InstitutionalHoldersPanel data={zero} locale="en" />);
     expect(screen.getByRole('status')).toHaveTextContent(/does not appear in the Jun 30, 2026 13F filings/);
   });
+  it('distinguishes unlinked identity and missing percentages without inventing deltas', () => {
+    const { rerender } = render(<InstitutionalHoldersPanel data={{ ...data, status: 'sin_snapshot_vinculado' }} />);
+    expect(screen.getByRole('status')).toHaveTextContent(/identificador actual/);
+    rerender(<InstitutionalHoldersPanel data={{ ...data, status: 'sin_identificador', identity_source: 'Conflicto de CUSIP' }} />);
+    expect(screen.getByRole('status')).toHaveTextContent('Conflicto de CUSIP');
+    rerender(<InstitutionalHoldersPanel data={{ ...data, source: undefined, period: undefined, prior_period: undefined, buyers: [], sellers: [], top_holders: [holder({ filing_url: null, prev_filing_url: null, change_pct: null, pct_of_13f: null, shares: 0, prev_shares: 0, status: '' })] }} />);
+    expect(screen.getByText('Alpha')).not.toHaveAttribute('href');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
 });

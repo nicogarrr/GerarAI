@@ -1,6 +1,8 @@
 """Institutional ownership endpoints (SEC Form 13F, reviewed managers only,
 y SC 13D/13G de titulares >5% ya ingeridos)."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -80,6 +82,23 @@ def institutional_holders_route(ticker: str, db: Session = Depends(get_db)) -> d
     from app.services.institutional_holders import institutional_holders
 
     result = institutional_holders(db, ticker)
+    if result is None:
+        raise HTTPException(status_code=404, detail="company not found")
+    return result
+
+
+@router.get("/institutions/{ticker}/activity")
+def institutional_activity_route(
+    ticker: str,
+    status: Literal["all", "aumenta", "reduce", "nuevo", "vende_todo"] = "all",
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=25, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Stored activity only. Never refresh, recalculate or enqueue from GET."""
+    from app.services.institutional_activity import institutional_activity
+
+    result = institutional_activity(db, ticker, status=status, page=page, page_size=page_size)
     if result is None:
         raise HTTPException(status_code=404, detail="company not found")
     return result

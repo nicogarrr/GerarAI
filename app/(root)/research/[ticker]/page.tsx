@@ -143,6 +143,7 @@ import {
 import { getCompanyMarketSnapshot } from '@/lib/actions/market-workspace.actions';
 import { getCompanyHolders, getFundHolders, getInstitutionalHolders } from '@/lib/actions/investors.actions';
 import { FundHoldersPanel } from '@/components/research/FundHoldersPanel';
+import { InstitutionalActivitySection } from '@/components/research/InstitutionalActivitySection';
 import { InstitutionalHoldersPanel } from '@/components/research/InstitutionalHoldersPanel';
 import { getShareCapital } from '@/lib/actions/share-capital.actions';
 import { getDecisionLessons, getDriverAssumptions, getFinancialTerminal, getManagementCredibility } from '@/lib/actions/research-tools.actions';
@@ -203,7 +204,7 @@ const readSnapshot = cache((ticker: string) => getResearchCompanySnapshot(ticker
 
 type PageProps = {
   params: Promise<{ ticker: string }>;
-  searchParams: Promise<{ view?: string; chat?: string; pagina?: string; metrics?: string; years?: string; periodicity?: string; sotp?: string }>;
+  searchParams: Promise<{ view?: string; chat?: string; pagina?: string; ia_status?: string; ia_page?: string; metrics?: string; years?: string; periodicity?: string; sotp?: string }>;
 };
 
 
@@ -1591,6 +1592,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
           </Panel>
         )}
         <InstitutionalHoldersPanel data={institutions} locale={locale} />
+        <InstitutionalActivitySection ticker={ticker} query={query} locale={locale} />
         <FundHoldersPanel data={funds} locale={locale} />
         <Panel title={t('research.fichaInsidersPanel')}>
           {insiderFilings === null || insiderFilings.status !== 'ok' || insiderFilings.filings.length === 0 ? (
