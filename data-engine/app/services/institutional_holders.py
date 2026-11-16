@@ -35,7 +35,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
-from app.models.entities import Company, InstrumentReference
+from app.models.entities import Company, ConnectorState, InstrumentReference
 from app.models.public_market_data import PublicFinancialFact, PublicSourceDocument
 from app.services.connectors import form13f_dataset as ds
 from app.services.data_source_health import get_data_source_registry
@@ -417,15 +417,39 @@ def ingest_parsed(db: Session, parses: list[ds.DatasetParse], checksums: list[st
             "filings_skipped": ignored}
 
 
-def _download(http: httpx.Client, url: str) -> tuple[str, str]:
+def _download(http: httpx.Client, url: str) -> tuple[str, str, str | None]:
     digest = hashlib.sha256()
     handle = tempfile.NamedTemporaryFile(prefix="sec13f_", suffix=".zip", delete=False)  # noqa: SIM115 - se borra al final
     with handle, http.stream("GET", url) as resp:
         resp.raise_for_status()
+        etag = resp.headers.get("etag")
         for chunk in resp.iter_bytes(1 << 20):
             digest.update(chunk)
             handle.write(chunk)
-    return handle.name, digest.hexdigest()
+    return handle.name, digest.hexdigest(), etag
+
+
+def _head_etag(http: httpx.Client, url: str) -> str | None:
+    """ETag del ZIP por HEAD; None si la SEC no lo sirve (no bloquea el salto)."""
+    try:
+        resp = http.head(url)
+    except httpx.HTTPError:
+        return None
+    if resp.status_code >= 400:
+        return None
+    return resp.headers.get("etag")
+
+
+def _save_etag(session: Session, connector: str, url: str, state: ConnectorState | None, etag: str | None) -> None:
+    """Persiste el ETag del ZIP procesado (fila global, sin tenant) para que una
+    republicacion del mismo URL con contenido corregido fuerce recalculo."""
+    if state is None:
+        state = ConnectorState(connector=connector, feed_url=url, metadata_={})
+        session.add(state)
+    if etag:
+        state.etag = etag
+    state.last_success_at = datetime.now(UTC)
+    session.commit()
 
 
 def refresh_institutional_holders(db: Session | None = None, client: httpx.Client | None = None) -> dict[str, Any]:
@@ -467,21 +491,32 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
             PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url,
             PublicSourceDocument.checksum.startswith(DETAIL_VERSION))).all()
         processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
-        if all(company.id in processed for company in cusips.values()):
+        # El salto no vale solo por URL: si la SEC republica el mismo ZIP con
+        # contenido corregido (otro ETag), hay que recalcular aunque todas las
+        # empresas tengan documento de ese URL.
+        head_etag = _head_etag(http, refs[0].url)
+        state = session.scalars(select(ConnectorState).where(
+            ConnectorState.connector == _REGISTRY_KEY,
+            ConnectorState.company_id.is_(None),
+            ConnectorState.feed_url == refs[0].url)).first()
+        etag_changed = bool(state is not None and state.etag and head_etag and state.etag != head_etag)
+        if not etag_changed and all(company.id in processed for company in cusips.values()):
             registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
             return {"status": "sin_cambios", "dataset": refs[0].url}
-        parses, checksums = [], []
+        parses, checksums, etags = [], [], []
         for ref in refs:
-            path, checksum = _download(http, ref.url)
+            path, checksum, etag = _download(http, ref.url)
             paths.append(path)
             parses.append(ds.parse_dataset(path, set(cusips), url=ref.url))
             checksums.append(checksum)
+            etags.append(etag)
         result = ingest_parsed(session, parses, checksums, cusips)
         if result.get("status") != "ok":
-            # Dataset ilegible (parseador roto o cabeceras cambiadas), no una
-            # ausencia observada: no se afirma salud; la próxima pasada reintenta.
+            # Dataset ilegible (parseador roto o cabeceras cambiadas): no se
+            # afirma salud ni se fija el ETag — la próxima pasada reintenta.
             registry.record_failure(_REGISTRY_KEY, f"dataset ilegible: {result.get('reason', '')[:120]}")
             return result
+        _save_etag(session, _REGISTRY_KEY, refs[0].url, state, etags[0] or head_etag)
         registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return result
     except Exception as exc:  # noqa: BLE001 - job programado: se informa, no se cae

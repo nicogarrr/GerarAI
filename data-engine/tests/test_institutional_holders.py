@@ -200,7 +200,8 @@ def test_pagina_de_la_sec_y_job_sin_cambios():
 
     out = ih.refresh_institutional_holders(db, httpx.Client(transport=httpx.MockTransport(handler)))
     assert out["status"] == "sin_cambios"
-    assert calls == [ds.DATASETS_PAGE]  # no descarga los ZIP si ya está
+    # Pagina + HEAD del ETag del ZIP vigente; no descarga los ZIP si ya esta.
+    assert calls == [ds.DATASETS_PAGE, refs[0].url]
 
 
 def test_job_descarga_y_calcula():

@@ -26,11 +26,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import redact_secrets
-from app.models.entities import Company
+from app.models.entities import Company, ConnectorState
 from app.models.public_market_data import PublicFinancialFact, PublicSourceDocument
 from app.services.connectors import form_nport_dataset as nport
 from app.services.data_source_health import get_data_source_registry
-from app.services.institutional_holders import linked_cusip_snapshot, universe_cusips
+from app.services.institutional_holders import (
+    _head_etag,
+    _save_etag,
+    linked_cusip_snapshot,
+    universe_cusips,
+)
 
 _REGISTRY_KEY = "form_nport_dataset"
 
@@ -229,7 +234,15 @@ def refresh_fund_holders(db: Session | None = None, client: httpx.Client | None 
         rows = session.execute(select(PublicSourceDocument.company_id, PublicSourceDocument.listing_key).where(
             PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == ref.url)).all()
         processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
-        if all(company.id in processed for company in cusips.values()):
+        # El salto no vale solo por URL: si la SEC republica el mismo ZIP con
+        # contenido corregido (otro ETag), hay que recalcular.
+        head_etag = _head_etag(http, ref.url)
+        state = session.scalars(select(ConnectorState).where(
+            ConnectorState.connector == _REGISTRY_KEY,
+            ConnectorState.company_id.is_(None),
+            ConnectorState.feed_url == ref.url)).first()
+        etag_changed = bool(state is not None and state.etag and head_etag and state.etag != head_etag)
+        if not etag_changed and all(company.id in processed for company in cusips.values()):
             registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
             return {"status": "sin_cambios", "dataset": ref.url}
         digest = hashlib.sha256()
@@ -237,15 +250,16 @@ def refresh_fund_holders(db: Session | None = None, client: httpx.Client | None 
         path = handle.name
         with handle, http.stream("GET", ref.url) as resp:
             resp.raise_for_status()
+            etag = resp.headers.get("etag")
             for chunk in resp.iter_bytes(1 << 20):
                 digest.update(chunk)
                 handle.write(chunk)
         result = ingest_reports(session, nport.parse_dataset(path, set(cusips)), ref, digest.hexdigest(), cusips)
         if result.get("status") != "ok":
-            # Dataset ilegible (parseador roto o cabeceras cambiadas), no una
-            # ausencia observada: no se afirma salud; la próxima pasada reintenta.
+            # Dataset ilegible: no se afirma salud ni se fija el ETag.
             registry.record_failure(_REGISTRY_KEY, f"dataset ilegible: {result.get('reason', '')[:120]}")
             return result
+        _save_etag(session, _REGISTRY_KEY, ref.url, state, etag or head_etag)
         registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return result
     except Exception as exc:  # noqa: BLE001 - job programado
