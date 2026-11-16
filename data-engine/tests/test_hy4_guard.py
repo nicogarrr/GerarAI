@@ -155,3 +155,24 @@ def test_chat_route_wires_selection_without_debate_or_jev(monkeypatch, selected,
         assert seen[0][0] is None and not seen[0][2]
     assert result.answer == (hy4.NOTICE if trip_guard else 'ok')
     assert not hy4._selected.get()
+
+
+def test_breaker_opened_while_catalog_waits_prevents_post():
+    calls = []
+    async def handler(request):
+        calls.append(request.method)
+        # Reproduce another request tripping during our catalog await.
+        try:
+            hy4.trip()
+        except ProviderDisabledError:
+            pass
+        await asyncio.sleep(0)
+        return httpx.Response(200, json=catalog())
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            with hy4.selection_scope(True):
+                provider = hy4.create_hy4_provider(settings(), client)
+                await provider.complete(LLMRequest([Message('user', 'synthetic')], task='chat'))
+    with pytest.raises(ProviderDisabledError):
+        asyncio.run(run())
+    assert calls == ['GET']

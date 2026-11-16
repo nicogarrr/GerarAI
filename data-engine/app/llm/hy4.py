@@ -6,6 +6,7 @@ import math
 import threading
 from contextlib import contextmanager
 from contextvars import ContextVar
+from typing import NoReturn
 
 import httpx
 
@@ -33,7 +34,7 @@ def selection_scope(enabled):
 
 def enforce_destination(url, payload):
     if _selected.get():
-        if str(url) != BASE+'/chat/completions' or payload.get('model') != MODEL:
+        if blocked() or str(url) != BASE+'/chat/completions' or payload.get('model') != MODEL:
             raise ProviderDisabledError(NOTICE)
         return True
     return False
@@ -48,7 +49,7 @@ def blocked():
         return _blocked
 
 
-def trip():
+def trip() -> NoReturn:
     global _blocked
     with _lock:
         _blocked = True
@@ -81,6 +82,10 @@ class Hy4Provider(GoSubscriptionChatProvider):
         except Exception:
             # No stale catalog or guessed-free suffix is an authorization.
             trip()
+        # Another request may have tripped while this catalog GET awaited.
+        # Never let an earlier successful preflight reopen the circuit.
+        if blocked():
+            raise ProviderDisabledError(NOTICE)
         return await super()._complete(request, model)
 
     def _response_json(self, response):
