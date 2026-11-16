@@ -344,5 +344,16 @@
       "stale": "datos desactualizados"
     },
     "whyOfficial": "La señal oficial (avisos y plan) es la mensual; semana, trimestre y año son la misma fórmula sobre cierres de ese periodo, como contexto. Histórico, no predice."
+  },
+  "new13f": {
+    "title": "Nuevas posiciones institucionales (13F)",
+    "countQuarter": "{count} nuevas este trimestre ({period})",
+    "countOnly": "Lista no disponible: el snapshot guardado es anterior al detalle",
+    "noData": "Sin datos",
+    "partial": "valores declarados parciales",
+    "sharesSuffix": "acc.",
+    "topTotal": "Total de las mayores: {shares} acc.",
+    "valueDeclaredTitle": "Valor declarado al cierre del trimestre",
+    "unavailable": "No se han podido cargar las nuevas posiciones institucionales."
   }
 }

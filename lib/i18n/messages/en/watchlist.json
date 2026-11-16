@@ -344,5 +344,16 @@
       "stale": "stale data"
     },
     "whyOfficial": "The official signal (alerts and plan) is the monthly one; week, quarter and year apply the same formula to closes of that period, as context. Historical, not a prediction."
+  },
+  "new13f": {
+    "title": "New institutional positions (13F)",
+    "countQuarter": "{count} new this quarter ({period})",
+    "countOnly": "List unavailable: the stored snapshot predates the detail",
+    "noData": "No data",
+    "partial": "partial reported values",
+    "sharesSuffix": "sh.",
+    "topTotal": "Total of the largest: {shares} sh.",
+    "valueDeclaredTitle": "Value reported at quarter close",
+    "unavailable": "New institutional positions could not be loaded."
   }
 }
