@@ -298,7 +298,6 @@ _FINNHUB_MAX_CALLS_PER_WINDOW = 55
 _finnhub_call_times: list[float] = []
 _REAL_REQUEST_TIMEOUT_SECONDS = 1.0
 _RETRY_DELAY_SECONDS = 0.05
-_COLD_START_WAIT_SECONDS = 0.05
 
 # symbol -> {"at": monotonic, "data": {...}}
 _real_profile_cache: dict[str, dict] = {}
@@ -855,13 +854,6 @@ def _schedule_real_refresh(vendor: str, tenant_id: int | None = None):
         _real_refresh_futures[tenant_id] = future
         _real_refresh_last_attempt[tenant_id] = now
         return future
-
-
-def active_vendor_allows_cold_wait(vendor: str, settings) -> bool:
-    """Sólo espera cold-start cuando no hay una llamada Finnhub real que hacer."""
-    if vendor != "finnhub":
-        return True
-    return not bool(settings.finnhub_api_key)
 
 
 @router.get("/real", response_model=ScreenerRealOut)
