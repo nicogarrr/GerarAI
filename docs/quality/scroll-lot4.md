@@ -1,14 +1,11 @@
-# Ownership and home day rails
+# Ownership view and manager rails
 
-Existing scroll-affordance-x replaces hidden scrollbar rules only. No labels,
-links, event selection or day calculations changed. Each component has a direct
-rendered DOM assertion. 82 focused tests pass. EarningsDayStrip100/100 lines/
-branches; ownership page97.76/96.11. ownership-en.test.tsx is excluded from this
-focused config because it imports auth/nodemailer absent in local test deps;
-no claim that the full ownership suite ran. Repository CI remains required.
+Only ownership page is changed. Both view nav and manager chip rail use the
+existing scroll-affordance-x pattern. Direct component DOM test asserts both.
+EarningsDayStrip removed from this lot after parent requested preserving the
+intentional hidden-scrollbar contract; its component and shared guard test
+are identical to base. The earlier screenshot includes EarningsDayStrip from
+superseded SHA9a297c03 and must not be treated as final evidence.
 
-390x844 screenshot uses actual rendered components, fixture values, Tailwind
-and existing affordance CSS. Inspected labels/cards stay single line and clip
-inside rails. Chrome headless overlay scrollbars are not conspicuous in pixels;
-computed scroll cue does not prove discoverability on Safari. Pilot should
-check horizontal interaction and cues on the whole production page.
+Focused config measures ownership page in full and excludes ownership-en
+because of local auth import setup; CI full suite remains required.

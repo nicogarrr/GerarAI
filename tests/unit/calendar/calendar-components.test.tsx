@@ -460,10 +460,3 @@ describe('SubscriptionManager', () => {
     });
 });
 void waitFor;
-
-it('shows a scroll cue on the home earnings day rail',async()=>{
- getFollowedEarnings.mockResolvedValue({days:[],unavailable:false});
- const tree=await EarningsDayStrip();
- const {container}=render(tree);
- const rail=container.querySelector('.scroll-affordance-x');expect(rail).not.toBeNull();expect(rail?.className).toContain('overflow-x-auto');expect(rail?.className).not.toContain('scrollbar-hide');
-});

@@ -113,5 +113,7 @@ it('keeps English mobile labels and formatted values in the single responsive ro
 
 it('keeps ownership view navigation horizontally discoverable',async()=>{
  render(await OwnershipPage({searchParams:Promise.resolve({})}));
- const rail=screen.getByRole('navigation');expect(rail.className).toContain('scroll-affordance-x');expect(rail.className).not.toContain('scrollbar-width:none');expect(rail.className).toContain('overflow-x-auto');
+ const rails=[screen.getByRole('navigation'),screen.getByRole('link',{name:'Fixture Fund'}).parentElement!];
+ expect(new Set(rails).size).toBe(2);
+ for(const rail of rails){expect(rail.className).toContain('scroll-affordance-x');expect(rail.className).not.toContain('scrollbar-width:none');expect(rail.className).toContain('overflow-x-auto');}
 });
