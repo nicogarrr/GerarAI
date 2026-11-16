@@ -123,19 +123,34 @@ def _facts_query(tenant: int, company_id: int, name: str):
     return query
 
 
+def _quarter_from_period(period: str | None) -> str | None:
+    """Trimestre declarado solo en la etiqueta (``2026:Q3``) sin fiscal_quarter."""
+    if not period or ":" not in period:
+        return None
+    tail = period.rsplit(":", 1)[-1].strip().upper()
+    return tail if tail in QUARTER_LABELS else None
+
+
 def _quarter_rank(fact: FinancialFact) -> int:
+    """1-4 para Q1-Q4 (de fiscal_quarter o de la etiqueta period); 5 para un
+    anual sin trimestre: es CIERRE de ejercicio, posterior a Q4. Un anual no
+    puede ordenar por debajo de los trimestres de su mismo ejercicio."""
     q = fact.fiscal_quarter
-    return QUARTER_LABELS.index(q) + 1 if q in QUARTER_LABELS else 0
+    if q not in QUARTER_LABELS:
+        q = _quarter_from_period(fact.period)
+    return QUARTER_LABELS.index(q) + 1 if q in QUARTER_LABELS else 5
 
 
 def _period_key(fact: FinancialFact) -> tuple:
-    """Orden explícito de periodo: (ejercicio, trimestre, etiqueta de periodo).
+    """Cronología explícita del periodo: (ejercicio, trimestre con anual=5).
 
     Un ratio/balance del Q3 2026 es dato NUEVO frente al Q1 2026 del mismo
-    ejercicio; la comparación por año solo los trataba como reingesta. Los
-    flujos trimestrales ya están excluidos en ``_facts_query`` (umbral anual).
+    ejercicio, y el anual FY2026 es posterior a su Q3. La etiqueta de periodo
+    NO ordena (nada de cronología lexicográfica FY2026 vs 2026:Qn): dos
+    etiquetas con la misma clave son el mismo periodo (reingesta). Los flujos
+    trimestrales ya están excluidos en ``_facts_query`` (umbral anual).
     """
-    return (fact.fiscal_year or 0, _quarter_rank(fact), fact.period or "")
+    return (fact.fiscal_year or 0, _quarter_rank(fact))
 
 
 def _latest(facts: Sequence[FinancialFact]) -> FinancialFact | None:

@@ -343,3 +343,40 @@ def test_documento_sin_fecha_de_publicacion(db):
     result = analyze_document(db, doc)
     db.commit()
     assert result["source"]["published_at"] is None
+
+
+def test_anual_es_posterior_a_los_trimestres_de_su_ejercicio(db):
+    # Regresión auditor: previo ROIC 2026 Q3=0,10 y filing con FY2026 anual
+    # =0,02, criterio <0,08: el anual es cierre de ejercicio (posterior a Q3),
+    # debe evaluarse y cruzar; antes ordenaba como trimestre 0 -> missing.
+    thesis(db, [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08}])
+    fact(db, "roic", 0.10, year=2026, quarter="Q3", period="2026:Q3")
+    doc = document(db, number=2)
+    fact(db, "roic", 0.02, year=2026, doc_id=doc.id)  # anual FY2026
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"][0]["status"] == "crossed"
+    alert = db.scalar(select(ResearchAlert))
+    assert alert.severity == "high"
+
+
+def test_ano_siguiente_es_posterior_al_anual_previo(db):
+    thesis(db, [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08}])
+    fact(db, "roic", 0.10, year=2025)  # anual FY2025
+    doc = document(db, number=2)
+    fact(db, "roic", 0.02, year=2026, quarter="Q1", period="2026:Q1", doc_id=doc.id)
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"][0]["status"] == "crossed"
+
+
+def test_trimestre_solo_en_la_etiqueta_period_ordena_como_trimestre(db):
+    # fiscal_quarter NULL pero la etiqueta dice Q3: vale como Q3; el anual del
+    # mismo ejercicio sigue siendo posterior.
+    thesis(db, [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08}])
+    fact(db, "roic", 0.10, year=2026, period="2026:Q3")  # quarter NULL, etiqueta Q3
+    doc = document(db, number=2)
+    fact(db, "roic", 0.02, year=2026, doc_id=doc.id)  # anual FY2026
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"][0]["status"] == "crossed"
