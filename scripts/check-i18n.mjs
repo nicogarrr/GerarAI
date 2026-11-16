@@ -272,7 +272,6 @@ const KNOWN_ORPHANS = {
   'screener.screenersTitle': 'copy de screeners preservada del trabajo D1 (en pausa); sus consumidores aterrizan con ese trabajo',
   'screener.listMetaDescription': 'copy de screeners preservada del trabajo D1 (en pausa); sus consumidores aterrizan con ese trabajo',
   'screener.resultsTitle': 'copy de screeners preservada del trabajo D1 (en pausa); sus consumidores aterrizan con ese trabajo',
-  'screener.rankingBadge': 'copy de screeners preservada del trabajo D1 (en pausa); sus consumidores aterrizan con ese trabajo',
   'screener.resultsTableCaption': 'copy de screeners preservada del trabajo D1 (en pausa); sus consumidores aterrizan con ese trabajo',
   'screener.colMatch': 'copy de screeners preservada del trabajo D1 (en pausa); sus consumidores aterrizan con ese trabajo',
   'screener.colLatestData': 'copy de screeners preservada del trabajo D1 (en pausa); sus consumidores aterrizan con ese trabajo',
