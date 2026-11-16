@@ -170,7 +170,7 @@
       "v1Strong": "Lo que v1 NO incluye todavía:",
       "v1Rest": "la valoración (FCF yield / earnings yield) y el momentum aún no entran en el embudo v1: las series de precios solo se guardan para el top-N de cada ejecución, no para todo el universo. Cada ejecución se guarda completa, con los candidatos descartados y sus motivos, así que el histórico y las entradas y salidas son auditables.",
       "factorsStrong": "Factores observacionales (factors-v0):",
-      "factorsRest": " la métrica momentum_12_1 y los percentiles factor_quality / factor_momentum / factor_value (spread CFROI-WACC aproximado frente a P/B y ROE en financieras) se calculan y se devuelven en stats del embudo SOLO para observación: no entran en el score ni en los pesos, no cambian el ranking y están pendientes de validación PIT/OOS. La etiqueta «Spread CFROI-WACC» describe con más precisión lo que mide el componente «value»: rentabilidad del capital menos su coste, no valoración por múltiplos."
+      "factorsRest": " la métrica momentum_12_1 y los percentiles factor_quality (percentil empírico del universo de la métrica de calidad quality_moat_score_v2), factor_momentum (percentil de momentum_12_1) y factor_value (no financieras: percentil de earnings yield / FCF yield; financieras: 0,5·(1−percentil P/B) + 0,5·percentil ROE) se calculan y se devuelven en los stats del embudo SOLO para observación: no entran en el score ni en los pesos, no cambian el ranking y están pendientes de validación PIT/OOS. Aparte, la categoría «value» del score se etiqueta ahora «Spread CFROI-WACC» porque eso es lo que mide: rentabilidad del capital menos su coste, no valoración por múltiplos."
     },
     "moat": {
       "title": "Marco de calidad (MOAT)",

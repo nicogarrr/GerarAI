@@ -1,11 +1,11 @@
 """Factores observacionales (factors-v0): momentum 12-1 y percentiles
 quality/momentum/value. Nada de esto entra en SCORE_WEIGHTS ni en el orden."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from app.models import CalculatedMetric, FinancialFact, MarketPrice
 from app.services.propicks_funnel_service import (
@@ -29,6 +29,13 @@ from tests.test_propicks_funnel import (
 
 def _series(days=420, start=date(2024, 1, 1), price_fn=lambda i: Decimal(100 + i)):
     return [(start + timedelta(days=i), Decimal(str(price_fn(i)))) for i in range(days)]
+
+
+def _pin_metrics_created_at(db, when: datetime = datetime(2026, 3, 1)) -> None:
+    """Fija cuándo se conocieron las métricas: el cutoff PIT (created_at)
+    debe poder incluirlas/excluirlas de forma determinista en tests."""
+    db.execute(update(CalculatedMetric).values(created_at=when))
+    db.commit()
 
 
 # --- momentum_12_1_from_series ---------------------------------------------
@@ -141,10 +148,12 @@ def test_factores_no_cambian_score_ni_orden():
     with _db() as db:
         a = _good_company(db, "GOODA")
         b = _good_company(db, "GOODB", overrides={"roic": "0.30"})
+        _pin_metrics_created_at(db)
         before = {r.company_id: (r.score, r.passed) for r in run_funnel(db)[0]}
         # Añadir momentum_12_1 y un earnings yield PIT válido no mueve nada.
         _metric(db, a, "momentum_12_1", "0.25")
         _metric(db, b, "momentum_12_1", "0.10")
+        _pin_metrics_created_at(db)
         db.add(
             FinancialFact(
                 company_id=a.id,
@@ -165,9 +174,13 @@ def test_factores_no_cambian_score_ni_orden():
         fa = next(r for r in results if r.company_id == a.id)
         assert fa.metrics["factor_momentum_pct"] == 1.0  # mayor momentum de los dos
         assert fa.metrics["factor_value_pct"] == 0.5  # única con EY: percentil 0,5
-        assert fa.metrics["factor_quality_pct"] == pytest.approx(fa.score / 100.0)
         fb = next(r for r in results if r.company_id == b.id)
         assert fb.metrics["factor_value_pct"] is None  # sin EY/FCFY: sin imputar
+        # quality = percentil empírico del moat del universo (empate -> 0,5),
+        # NO el score normalizado (score/100 sería 0,375/0,625 aquí).
+        assert fa.metrics["factor_quality_pct"] == 0.5
+        assert fb.metrics["factor_quality_pct"] == 0.5
+        assert fa.metrics["factor_quality_pct"] != pytest.approx(fa.score / 100.0)
         f = stats["factors"]
         assert f["version"] == FACTOR_CONTRACT_VERSION
         assert f["factors"] == ["quality", "momentum", "value"]
@@ -187,6 +200,33 @@ def test_financieras_value_pb_mas_roe_nunca_ebit_ev():
         (r,), stats = run_funnel(db)
         assert r.metrics["factor_value_pct"] is not None  # P/B invertido + ROE
         assert stats["factors"]["coverage"]["value"] == 1.0
+
+
+def test_as_of_corta_todas_las_entradas_de_los_factores():
+    """Regresión (auditor): run_funnel(as_of=2020-01-01) con métricas
+    persistidas en 2026 no usa nada posterior al corte: momentum_12_1,
+    P/B, ROE y moat quedan fuera (created_at >= corte) y los factores
+    salen None con cobertura 0 — N/D honesto, sin LookAheadError porque
+    tampoco hay FinancialFact de valoración posterior."""
+    with _db() as db:
+        a = _good_company(db, "PITA")
+        _metric(db, a, "momentum_12_1", "0.25")
+        bank = _good_company(
+            db, "PITB", sector="Financials",
+            overrides={"roic": "0.01", "cfroi_approx": "0.01", "roe_5y": "0.15"},
+        )
+        _metric(db, bank, "price_to_book", "1.2")
+        db.commit()
+        results, stats = run_funnel(db, as_of=date(2020, 1, 1))
+        assert results, "el embudo corre y devuelve filas aunque todo sea N/D"
+        for r in results:
+            assert r.metrics["momentum_12_1"] is None
+            assert r.metrics["factor_quality_pct"] is None
+            assert r.metrics["factor_momentum_pct"] is None
+            assert r.metrics["factor_value_pct"] is None
+        f = stats["factors"]
+        assert f["coverage"] == {"quality": 0.0, "momentum": 0.0, "value": 0.0}
+        assert f["as_of"] == "2020-01-01"
 
 
 def test_earnings_yield_posterior_a_as_of_es_lookahead():

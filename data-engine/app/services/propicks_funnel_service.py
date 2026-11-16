@@ -88,7 +88,11 @@ FUNNEL_VERSION = "propicks-funnel-v1"
 
 # Factores observacionales (contrato factors-v0): se calculan y se muestran,
 # pero NO entran en SCORE_WEIGHTS ni cambian el ranking. Pendientes de
-# validación PIT/OOS antes de ponderar nada.
+# validación PIT/OOS antes de ponderar nada. Definición fiel de cada uno:
+#   quality  = percentil empírico del universo de quality_moat_score_v2.
+#   momentum = percentil empírico del universo de momentum_12_1.
+#   value    = no financieras: percentil de earnings yield / FCF yield;
+#              financieras: 0,5·(1−percentil P/B) + 0,5·percentil ROE.
 FACTOR_CONTRACT_VERSION = "factors-v0-observational"
 # Inputs de valoración del factor value: earnings yield / FCF yield como
 # FinancialFact (hoy no existen persistidos: value=null, cobertura 0, sin
@@ -139,7 +143,7 @@ class FunnelResult:
     components: dict[str, float | None] = field(default_factory=dict)
 
 
-def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
+def _latest_metrics(db: Session, as_of: date | None = None) -> dict[tuple[int, str], float]:
     """Latest stored value per (company, metric) across the metrics we read.
 
     ProPicks runs per tenant: CalculatedMetric/FinancialFact are
@@ -147,10 +151,21 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
     global market-data table to read here, so the old include_all_tenants
     bypass (which mixed other tenants' rows into the funnel) is gone;
     MarketPrice/Company remain global and need no tenant predicate.
+
+    PIT: con ``as_of`` solo entran métricas persistidas ANTES del corte
+    (``created_at < as_of + 1 día``: el ``period`` es texto ("FY2025") y el
+    único "cuándo la conocíamos" fechado es created_at). Una métrica
+    calculada después del corte no existe para esa corrida: sale missing,
+    nunca se usa a futuro.
     """
     wanted = (
         set(COVERAGE_METRICS)
         | {"wacc", LEVERAGE_METRIC, "fcf_conversion", "momentum_12m", "momentum_12_1", "price_to_book"}
+    )
+    cutoff = (
+        [CalculatedMetric.created_at < as_of + timedelta(days=1)]
+        if as_of is not None
+        else []
     )
     latest_period = (
         select(
@@ -160,6 +175,7 @@ def _latest_metrics(db: Session) -> dict[tuple[int, str], float]:
         )
         .where(
             CalculatedMetric.metric.in_(wanted),
+            *cutoff,
             *tenant_filters(db, CalculatedMetric),
         )
         .group_by(CalculatedMetric.company_id, CalculatedMetric.metric)
@@ -429,7 +445,7 @@ def run_funnel(
     as_of = as_of or date.today()
     started = time.monotonic()
     companies = list(db.scalars(select(Company).order_by(Company.id)).all())
-    metrics = _latest_metrics(db)
+    metrics = _latest_metrics(db, as_of)
     consistency = _earnings_consistency(db)
     growth = _revenue_cagr(db)
 
@@ -578,6 +594,9 @@ def run_funnel(
     pct_momentum = _percentile_ranks(
         {cid: v for cid, comp in raw.items() if (v := comp.get("momentum_12_1")) is not None}
     )
+    pct_quality = _percentile_ranks(
+        {cid: v for cid, comp in raw.items() if (v := comp.get("quality_moat_score_v2")) is not None}
+    )
     fin_ids = {c.id for c in companies if _is_financial(c)}
     value_inputs = _value_fact_inputs(db, [c.id for c in companies], as_of=as_of)
     pct_value_nf = _percentile_ranks(
@@ -603,9 +622,9 @@ def run_funnel(
             value_pct = pct_value_nf.get(cid)  # null si no hay EY/FCFY: sin imputar
         if value_pct is not None:
             factor_value_count += 1
-        result.metrics["factor_quality_pct"] = (
-            result.score / 100.0 if result.score is not None else None
-        )
+        # Percentil empírico del universo de la métrica de calidad (moat):
+        # no es el score normalizado ni lo usa; el score no se toca.
+        result.metrics["factor_quality_pct"] = pct_quality.get(cid)
         result.metrics["factor_momentum_pct"] = pct_momentum.get(cid)
         result.metrics["factor_value_pct"] = value_pct
 
