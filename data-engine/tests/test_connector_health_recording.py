@@ -10,11 +10,11 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
-from decimal import Decimal
 import pytest
 
 from app.services.connectors import fca_nsm, house_ptr, official_fx, subtel

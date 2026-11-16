@@ -8,12 +8,11 @@ ETag (HEAD falla o no lo sirve) se conserva el comportamiento anterior.
 from __future__ import annotations
 
 import httpx
-import pytest
+from sqlalchemy import select
 
 from app.models.entities import ConnectorState
 from app.services import fund_holders as fh
 from app.services import institutional_holders as ih
-from sqlalchemy import select
 from tests import test_institutional_holders as tih
 
 _HTML_13F = ('<a href="/files/a/01mar2026-31may2026_form13f.zip">x</a>'

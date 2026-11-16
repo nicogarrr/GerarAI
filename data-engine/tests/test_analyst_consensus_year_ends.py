@@ -14,7 +14,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete, select
+from sqlalchemy import delete
 
 from app.core.database import SessionLocal, init_db
 from app.models import Company, FinancialFact, Tenant
