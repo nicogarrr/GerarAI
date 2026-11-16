@@ -7674,6 +7674,29 @@ export interface components {
             /** Value */
             value: number;
         };
+        /** Block */
+        Block: {
+            /** Asof */
+            asOf?: string | null;
+            error?: components["schemas"]["BlockError"] | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "empty" | "partial" | "error";
+        };
+        /** BlockError */
+        BlockError: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "timeout" | "unauthenticated" | "forbidden" | "rate_limited" | "unavailable" | "invalid_response";
+            /** Reference */
+            reference?: string | null;
+            /** Retryafterseconds */
+            retryAfterSeconds?: number | null;
+        };
         /** Body_ingest_document_file_api_sources_documents_ingest_file_post */
         Body_ingest_document_file_api_sources_documents_ingest_file_post: {
             /** File */
@@ -8420,6 +8443,15 @@ export interface components {
             /** Ticker */
             ticker: string;
         };
+        /** Coverage */
+        Coverage: {
+            /** Present */
+            present: number;
+            /** Required */
+            required: number;
+            /** Total */
+            total: number;
+        };
         /** CreatePortfolioInput */
         CreatePortfolioInput: {
             /**
@@ -8474,6 +8506,47 @@ export interface components {
              * @default decimal
              */
             unit: string;
+        };
+        /** Datum */
+        Datum: {
+            /** Asof */
+            asOf?: string | null;
+            /** Formulaversion */
+            formulaVersion?: string | null;
+            /**
+             * Reasoncodes
+             * @default []
+             */
+            reasonCodes: string[];
+            /** Sourceasof */
+            sourceAsOf?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "missing" | "stale" | "disputed" | "unverified" | "invalid" | "not_applicable";
+            /** Unit */
+            unit?: string | null;
+            /** Value */
+            value?: number | string | boolean | null;
+        };
+        /** Dca */
+        Dca: {
+            confirmedLevel: components["schemas"]["Datum"];
+            /** Formulaversion */
+            formulaVersion?: string | null;
+            level: components["schemas"]["Datum"];
+            /** Periodstate */
+            periodState?: ("confirmed" | "forming") | null;
+            /** Priceverified */
+            priceVerified?: boolean | null;
+            /** Scanasof */
+            scanAsOf?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "missing" | "stale" | "disputed" | "unverified" | "invalid" | "not_applicable";
         };
         /** DcaAcceptedOut */
         DcaAcceptedOut: {
@@ -9549,6 +9622,19 @@ export interface components {
              * @default false
              */
             force_new_thesis: boolean;
+        };
+        /** Eligibility */
+        Eligibility: {
+            /**
+             * Reasoncodes
+             * @default []
+             */
+            reasonCodes: string[];
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "investigate" | "quality_waiting_price" | "review_data" | "excluded";
         };
         /** EmailPreferenceIn */
         EmailPreferenceIn: {
@@ -10896,6 +10982,63 @@ export interface components {
             chat_id: string | null;
             /** Confirmed */
             confirmed: boolean;
+        };
+        /** Listing */
+        Listing: {
+            /** Currency */
+            currency?: string | null;
+            /** Exchange */
+            exchange?: string | null;
+            /**
+             * Identityevidence
+             * @default []
+             */
+            identityEvidence: string[];
+            /**
+             * Identityreasoncodes
+             * @default []
+             */
+            identityReasonCodes: string[];
+            /**
+             * Identitystatus
+             * @default unverified
+             * @enum {string}
+             */
+            identityStatus: "ok" | "missing" | "stale" | "disputed" | "unverified" | "invalid" | "not_applicable";
+            /**
+             * Instrumentstatus
+             * @default unknown
+             * @enum {string}
+             */
+            instrumentStatus: "active" | "cancelled" | "unknown";
+            /**
+             * Issuerlegalstatus
+             * @default unknown
+             * @enum {string}
+             */
+            issuerLegalStatus: "active" | "liquidating" | "dissolved" | "unknown";
+            /** Listingid */
+            listingId?: string | null;
+            /** Name */
+            name?: string | null;
+            /**
+             * Status
+             * @default unknown
+             * @enum {string}
+             */
+            status: "active" | "delisted" | "unknown";
+            /** Ticker */
+            ticker: string;
+            /**
+             * Tradingstatus
+             * @default unknown
+             * @enum {string}
+             */
+            tradingStatus: "trading" | "suspended" | "unknown";
+            /** Validfrom */
+            validFrom?: string | null;
+            /** Validto */
+            validTo?: string | null;
         };
         /** LlmUsageLeg */
         LlmUsageLeg: {
@@ -13076,6 +13219,22 @@ export interface components {
             /** User Agent */
             user_agent?: string | null;
         };
+        /** Quality */
+        Quality: {
+            coverage: components["schemas"]["Coverage"];
+            /** Passed */
+            passed?: boolean | null;
+            /** Policyversion */
+            policyVersion?: string | null;
+            /**
+             * Reasoncodes
+             * @default []
+             */
+            reasonCodes: string[];
+            score: components["schemas"]["Datum"];
+            /** Scorepolicyversion */
+            scorePolicyVersion?: string | null;
+        };
         /** QueryRequest */
         QueryRequest: {
             /** As Of From */
@@ -13433,6 +13592,21 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+        };
+        /** ResultCoverage */
+        ResultCoverage: {
+            /** Evaluated */
+            evaluated?: number | null;
+            /** Identityverified */
+            identityVerified?: number | null;
+            /** Pendingreview */
+            pendingReview?: number | null;
+            /** Qualitypassed */
+            qualityPassed?: number | null;
+            /** Rankable */
+            rankable?: number | null;
+            /** Universe */
+            universe?: number | null;
         };
         /** ReviewInput */
         ReviewInput: {
@@ -14803,6 +14977,13 @@ export interface components {
             /** Touched Rate */
             touched_rate?: number | null;
         };
+        /** Tracking */
+        Tracking: {
+            /** Held */
+            held?: boolean | null;
+            /** Watched */
+            watched?: boolean | null;
+        };
         /** TransactionImportCommitRequest */
         TransactionImportCommitRequest: {
             /** Source Filename */
@@ -14877,6 +15058,57 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** UnifiedPick */
+        UnifiedPick: {
+            /** Asof */
+            asOf: string;
+            dca: components["schemas"]["Dca"];
+            eligibility: components["schemas"]["Eligibility"];
+            /**
+             * Evidenceflags
+             * @default []
+             */
+            evidenceFlags: string[];
+            /** Instrumentid */
+            instrumentId: string;
+            /** Issuerid */
+            issuerId?: string | null;
+            listing: components["schemas"]["Listing"];
+            quality: components["schemas"]["Quality"];
+            /**
+             * Reviewreasons
+             * @default []
+             */
+            reviewReasons: string[];
+            /** Runid */
+            runId?: number | null;
+            tracking: components["schemas"]["Tracking"];
+            valuation: components["schemas"]["Valuation"];
+        };
+        /** UnifiedResult */
+        UnifiedResult: {
+            /** Asof */
+            asOf: string;
+            /** Blocks */
+            blocks: {
+                [key: string]: components["schemas"]["Block"];
+            };
+            coverage: components["schemas"]["ResultCoverage"];
+            /** Items */
+            items: components["schemas"]["UnifiedPick"][];
+            /** Runid */
+            runId?: number | null;
+            /**
+             * Schemaversion
+             * @constant
+             */
+            schemaVersion: "propicks-unified-v1";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "empty" | "partial" | "error";
+        };
         /** UniversalSearchRequest */
         UniversalSearchRequest: {
             /** Collection Id */
@@ -14937,6 +15169,18 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** Valuation */
+        Valuation: {
+            fcfYield: components["schemas"]["Datum"];
+            marginOfSafety: components["schemas"]["Datum"];
+            price: components["schemas"]["Datum"];
+            priceToBook: components["schemas"]["Datum"];
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "missing" | "stale" | "disputed" | "unverified" | "invalid" | "not_applicable";
         };
         /** ValuationResponse */
         ValuationResponse: {
@@ -28165,7 +28409,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": unknown;
+                    "application/json": components["schemas"]["UnifiedResult"];
                 };
             };
             /** @description Validation Error */

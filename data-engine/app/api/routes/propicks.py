@@ -323,7 +323,7 @@ class DeepValueResponse(BaseModel):
     resultados: list[DeepValueRowOut]
 
 
-@router.get("/unified", response_model=None)
+@router.get("/unified", response_model=UnifiedResult)
 def unified(
     limit: int = Query(default=200, ge=1, le=500),
     db: Session = Depends(get_db),
