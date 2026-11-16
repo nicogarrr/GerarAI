@@ -322,3 +322,46 @@ def test_non_cyclical_company_unchanged(db):
     company = _seed(db, "SOFT", OIL, industry="Software", sector="Technology")
     result = _value(db, company)
     assert result["trace"].get("cyclical_midcycle") is None
+
+
+def test_fallo_historial_es_visible_sin_exponer_texto_de_excepcion(monkeypatch, caplog):
+    from types import SimpleNamespace
+
+    from app.valuation import normalized_fcf
+    from app.valuation.cyclical_midcycle import cyclical_midcycle
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("dato privado que no debe salir")
+
+    monkeypatch.setattr(normalized_fcf, "fy_history", boom)
+    context = SimpleNamespace(company=SimpleNamespace(
+        id=42, industry="Oil & Gas E&P", valuation_model="standard_dcf"
+    ), db=None, as_of=None)
+    with caplog.at_level("WARNING", logger="app.valuation.cyclical_midcycle"):
+        result = cyclical_midcycle(context)
+    assert result["applied"] is False
+    assert result["years_used"] == 0
+    assert result["periods"] == []
+    assert result["error_type"] == "RuntimeError"
+    assert "no se pudo leer" in result["reason"]
+    assert "company_id=42" in caplog.text
+    assert "error_type=RuntimeError" in caplog.text
+    assert "dato privado" not in caplog.text
+    assert "dato privado" not in repr(result)
+
+
+def test_historial_vacio_no_se_confunde_con_error(monkeypatch, caplog):
+    from types import SimpleNamespace
+
+    from app.valuation import normalized_fcf
+    from app.valuation.cyclical_midcycle import cyclical_midcycle
+
+    monkeypatch.setattr(normalized_fcf, "fy_history", lambda *args, **kwargs: {})
+    context = SimpleNamespace(company=SimpleNamespace(
+        id=42, industry="Oil & Gas E&P", valuation_model="standard_dcf"
+    ), db=None, as_of=None)
+    result = cyclical_midcycle(context)
+    assert result["applied"] is False
+    assert "solo hay 0 ejercicios" in result["reason"]
+    assert "error_type" not in result
+    assert not caplog.records

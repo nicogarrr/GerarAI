@@ -30,8 +30,11 @@ Reglas (generales, sin listas de tickers):
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 # Industrias cíclicas, como expresiones sobre el texto de industria (en
 # minúsculas) de los proveedores que hay en prod: financedatabase («Oil, Gas &
@@ -166,8 +169,15 @@ def cyclical_midcycle(context) -> dict[str, Any] | None:
         result = midcycle_fcf_margin(
             getattr(context, "db", None), context.company.id, getattr(context, "as_of", None)
         )
-    except Exception:  # noqa: BLE001 - sin historial, comportamiento anterior
+    except Exception as exc:  # noqa: BLE001 - la traza distingue un fallo de un historial vacio
+        error_type = type(exc).__name__
+        logger.warning(
+            "No se pudo leer historial ciclico company_id=%s error_type=%s",
+            context.company.id,
+            error_type,
+        )
         result = {
+            "error_type": error_type,
             "applied": False,
             "years_used": 0,
             "periods": [],
