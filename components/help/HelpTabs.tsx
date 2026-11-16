@@ -61,7 +61,7 @@ export default function HelpTabs() {
         <TabsList
           tabIndex={0}
           aria-label={t('help.tabsAria')}
-          className="mb-8 flex h-auto w-max min-w-full snap-x gap-1 overflow-x-auto border border-gray-700 bg-gray-800 pb-2 text-gray-400 sm:inline-flex sm:h-9 sm:w-auto sm:overflow-visible sm:pb-[3px]"
+          className="scrollbar-hide mb-8 flex h-auto w-max min-w-full snap-x gap-1 overflow-x-auto border border-gray-700 bg-gray-800 pb-2 text-gray-400 sm:inline-flex sm:h-9 sm:w-auto sm:overflow-visible sm:pb-[3px]"
         >
           <TabsTrigger
             value="faq"

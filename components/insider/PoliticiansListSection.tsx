@@ -112,13 +112,13 @@ export function PoliticiansListSection({ view, locale = DEFAULT_LOCALE }: { view
         <p className="mt-1 text-sm text-gray-400">{t('insider.politicians.intro')}</p>
       </header>
       <div aria-label={t('insider.politicians.search')} className="flex flex-col gap-3">
-        <div aria-label={t('insider.politicians.chamber')} className="flex flex-nowrap gap-2 overflow-x-auto" role="group">
+        <div aria-label={t('insider.politicians.chamber')} className="scrollbar-hide flex flex-nowrap gap-2 overflow-x-auto" role="group">
           {CHAMBERS.map((c) => <Pill active={camara === c} key={c} to={politiciansHref(current, { camara: c })}>{t(CHAMBER_KEYS[c])}</Pill>)}
         </div>
-        <div aria-label={t('insider.politicians.party')} className="flex flex-nowrap gap-2 overflow-x-auto" role="group">
+        <div aria-label={t('insider.politicians.party')} className="scrollbar-hide flex flex-nowrap gap-2 overflow-x-auto" role="group">
           {PARTIES.map((p) => <Pill active={partido === p} key={p} to={politiciansHref(current, { partido: p })}>{t(PARTY_KEYS[p])}</Pill>)}
         </div>
-        <div aria-label={t('insider.politicians.sort')} className="flex flex-nowrap gap-2 overflow-x-auto" role="group">
+        <div aria-label={t('insider.politicians.sort')} className="scrollbar-hide flex flex-nowrap gap-2 overflow-x-auto" role="group">
           {SORTS.map((s) => <Pill active={orden === s} key={s} to={politiciansHref(current, { orden: s })}>{t(SORT_KEYS[s])}</Pill>)}
         </div>
         <form action={`/insider#${POLITICIANS_ANCHOR}`} className="flex gap-2" method="get">

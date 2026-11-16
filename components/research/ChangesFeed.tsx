@@ -157,7 +157,7 @@ export function ChangesFeed({ ticker, changes, reviews, alerts }: {
   );
   return (
     <Panel title={t('research.changesFeed.title')}>
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t('research.changesFeed.filterAria')}>
+      <div className="scrollbar-hide mb-3 flex gap-2 overflow-x-auto pb-1" role="group" aria-label={t('research.changesFeed.filterAria')}>
         {chip('all', t('research.changesFeed.filterAll'))}{chip('reviews', t('research.changesFeed.filterReviews'))}{chip('alerts', t('research.changesFeed.filterAlerts'))}
       </div>
       {view.items.length ? (
