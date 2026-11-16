@@ -15,8 +15,11 @@ from app.services.connectors.global_pacing import GlobalPacer
 from app.services.data_source_health import get_data_source_registry
 
 # Clave de este proveedor en el registry de salud de fuentes. El 429 de GDELT
-# es POR IP (afecta a todo el carril), asi que SI degrada la fuente; un 400
-# es una query invalida (nivel de consulta, no de fuente) y NO degrada.
+# es throttling por IP, no una fuente caida: el cliente ya honra Retry-After
+# (inline acotado, ventana por IP en clase/Redis y reencolado dramatiq con la
+# ventana real), asi que NO degrada la salud de la fuente (medido en prod:
+# rachas de 3-16 429 abrian el breaker con la fuente sana). Un 400 es una
+# query invalida (nivel de consulta, no de fuente) y tampoco degrada.
 REGISTRY_KEY = "gdelt"
 
 
@@ -240,7 +243,8 @@ class GDELTClient:
                 registry.record_failure(REGISTRY_KEY, f"error de red: {type(exc).__name__}")
                 raise
             if response.status_code == 429:
-                registry.record_failure(REGISTRY_KEY, "HTTP 429: rate limit por IP")
+                # Throttling, no fallo de la fuente: no se registra en salud.
+                # La ventana la gestiona el circuito 429 por IP de mas abajo.
                 raw_retry_after = self._raw_retry_after(response)
                 # El 429 es POR IP: la ventana la respetan TODOS los jobs del
                 # carril, no solo este mensaje.
