@@ -12,8 +12,6 @@ import json
 from datetime import date
 from pathlib import Path
 
-import pytest
-
 from app.services.dca_signal_engine import DailyBar
 from scripts import dca_backtest_pit as bt
 from scripts import pit_exits as px
@@ -86,13 +84,66 @@ def test_elegibilidad_no_depende_de_precios_posteriores():
 
 
 def test_hueco_de_dos_meses_no_cierra_la_posicion():
-    bars = [b for b in _bars([0.01] * 60) if not (
-        date(2008, 3, 1) <= b.day <= date(2008, 4, 30)
-    )]
+    bars = [b for b in _bars([0.01] * 60) if not (date(2008, 3, 1) <= b.day <= date(2008, 4, 30))]
     gap = bt.build_series("GAP", bars)
     assert T0 + 2 not in gap.first and T0 + 3 not in gap.first  # hueco 2008-03/04
     r = bt.simulate([_winner(), gap], MONTHS, strategy="plano", exits={})
     assert r.exits_log == []
+
+
+def test_evento_posterior_a_los_precios_no_se_adelanta():
+    # Datos hasta 2008-06 pero evento con last_month 2008-10: salir en julio
+    # aplicaria 3 meses antes un dato que aun no existia (mirar al futuro).
+    win, dead = _winner(), _dead()
+    ev = px.ExitEvent("DEAD", T0 + 9, "acquired", 0.1)  # last_month 2008-10
+    r = bt.simulate([win, dead], MONTHS, strategy="plano", exits={"DEAD": ev})
+    assert r.exits_log[0]["month"] == "2008-11"
+    assert all(e["month"] != "2008-07" for e in r.exits_log)
+
+
+def test_evento_anterior_a_los_precios_manda_sobre_la_serie():
+    # Evento con last_month 2008-03 aunque haya precios hasta 2008-06: la salida
+    # es en 2008-04, no en 2008-07 (la fecha del evento es el dato).
+    win, dead = _winner(), _dead()
+    ev = px.ExitEvent("DEAD", T0 + 2, "bankruptcy", -1.0)  # last_month 2008-03
+    r = bt.simulate([win, dead], MONTHS, strategy="plano", exits={"DEAD": ev})
+    assert r.exits_log[0]["month"] == "2008-04"
+
+
+def test_signo_estricto_cero_no_es_concluyente_contra_signo():
+    assert bt._mismo_signo_estricto(0.05, 0.01)
+    assert bt._mismo_signo_estricto(0.0, 0.0)
+    assert not bt._mismo_signo_estricto(0.0, 0.05)
+    assert not bt._mismo_signo_estricto(0.0, -0.05)
+    assert not bt._mismo_signo_estricto(-0.02, 0.05)
+
+
+def test_sensibilidad_ejecuta_la_cota_que_falta_y_etiqueta_bien(monkeypatch):
+    # Base ejecutada con --unknown-exit 0.0: la cota inferior (-1.0) NO puede
+    # heredar el diff de la superior (regresion del hallazgo del auditor).
+    calls = []
+
+    def fake_run(universe, spy, months, **kw):
+        calls.append(kw.get("unknown_exit"))
+        return {"app_vs_plano": {"irr_diff_median": -0.02}}
+
+    monkeypatch.setattr(bt, "run_benchmark", fake_run)
+    out = bt.unknown_exit_sensitivity(
+        [],
+        None,
+        MONTHS,
+        portfolios=1,
+        sizes=(1,),
+        seed=1,
+        membership=None,
+        exits=None,
+        chosen_unknown=0.0,
+        chosen_diff=0.05,
+    )
+    assert calls == [-1.0]  # solo ejecuta la cota que falta
+    assert out["irr_diff_median_cota_inferior"] == -0.02  # de la ejecucion con -1.0
+    assert out["irr_diff_median_cota_superior"] == 0.05  # la base elegida
+    assert out["concluyente"] is False
 
 
 def test_misma_semilla_mismo_json():
@@ -150,28 +201,37 @@ def test_main_end_to_end_con_bajas_y_membresia(tmp_path):
     for sym in ("WIN", "DEAD", "SPY"):
         _write_sec(secdir / f"{sym}.json.gz")
     (tmp_path / "symbols.txt").write_text("WIN\nDEAD\n")
-    (tmp_path / "membership.csv").write_text(
-        "symbol,start,end\nWIN,2005-01,\nDEAD,2005-01,2008-06\n"
-    )
-    (tmp_path / "exits.csv").write_text(
-        "symbol,last_month,kind,exit_return\nDEAD,2008-06,bankruptcy,\n"
-    )
+    (tmp_path / "membership.csv").write_text("symbol,start,end\nWIN,2005-01,\nDEAD,2005-01,2008-06\n")
+    (tmp_path / "exits.csv").write_text("symbol,last_month,kind,exit_return\nDEAD,2008-06,bankruptcy,\n")
     out = tmp_path / "out.json"
     rc = bt.main(
         [
-            "--px", str(pxdir),
-            "--sec", str(secdir),
-            "--symbols", str(tmp_path / "symbols.txt"),
-            "--start", "2008-01",
-            "--end", "2008-12",
-            "--portfolios", "2",
-            "--sizes", "2",
-            "--leak-samples", "5",
-            "--membership", str(tmp_path / "membership.csv"),
-            "--exits", str(tmp_path / "exits.csv"),
-            "--wf-train", "6",
-            "--wf-test", "3",
-            "--out", str(out),
+            "--px",
+            str(pxdir),
+            "--sec",
+            str(secdir),
+            "--symbols",
+            str(tmp_path / "symbols.txt"),
+            "--start",
+            "2008-01",
+            "--end",
+            "2008-12",
+            "--portfolios",
+            "2",
+            "--sizes",
+            "2",
+            "--leak-samples",
+            "5",
+            "--membership",
+            str(tmp_path / "membership.csv"),
+            "--exits",
+            str(tmp_path / "exits.csv"),
+            "--wf-train",
+            "6",
+            "--wf-test",
+            "3",
+            "--out",
+            str(out),
         ]
     )
     assert rc == 0

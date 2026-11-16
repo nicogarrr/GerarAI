@@ -296,10 +296,12 @@ def simulate(
         # fin de los datos tampoco (no es una quiebra).
         month_sold = 0.0
         for i in range(k):
-            if shares[i] > 0 and pit_exits.is_delisted(
-                t, universe[i].last_month, data_end, exits.get(universe[i].symbol)
-            ):
-                ev = exits.get(universe[i].symbol)
+            ev = exits.get(universe[i].symbol)
+            # Con evento, manda SU last_month: ni se ejecuta antes de la fecha
+            # declarada (seria mirar al futuro) ni despues por precios
+            # rezagados. Sin evento, el fin de la serie con la gracia de siempre.
+            last_m = ev.last_month if ev is not None else universe[i].last_month
+            if shares[i] > 0 and pit_exits.is_delisted(t, last_m, data_end, ev):
                 recovered = pit_exits.exit_value(shares[i], last_px[i], ev, cost=cost, unknown=unknown_exit)
                 cash += recovered
                 month_sold += shares[i] * last_px[i]
@@ -598,6 +600,12 @@ def run_benchmark(
     return out
 
 
+def _mismo_signo_estricto(a: float, b: float) -> bool:
+    """Mismo signo estricto: 0 solo es concluyente contra 0 (un cero frente a un
+    signo distinto no acota nada: puede ser ausencia de efecto o de datos)."""
+    return (a > 0) == (b > 0) and (a < 0) == (b < 0)
+
+
 def unknown_exit_sensitivity(
     universe: Sequence[Series],
     spy: Series,
@@ -608,32 +616,40 @@ def unknown_exit_sensitivity(
     seed: int,
     membership: pit_exits.Membership | None,
     exits: dict[str, pit_exits.ExitEvent] | None,
-    base_diff: float,
+    chosen_unknown: float,
+    chosen_diff: float,
 ) -> dict:
-    """Cota superior de las bajas sin dato (unknown=0.0) frente a la inferior (-1.0).
-
-    Si el signo de la ventaja de la app cambia entre ambas cotas, el resultado
-    depende de un supuesto sobre bajas sin dato y se declara no concluyente.
+    """Contrast AMBAS cotas del supuesto sobre bajas sin dato: -1.0 (inferior) y 0.0
+    (superior). La ejecucion base aporta una cota si el CLI la eligio; la otra se
+    ejecuta aqui. Si el signo de la ventaja de la app cambia entre cotas (o una
+    cota da cero y la otra no), el resultado se declara no concluyente.
     """
-    alt = run_benchmark(
-        universe,
-        spy,
-        months,
-        portfolios=portfolios,
-        sizes=sizes,
-        seed=seed,
-        strategies=("app", "plano"),
-        membership=membership,
-        exits=exits,
-        unknown_exit=0.0,
-    )
-    alt_diff = alt["app_vs_plano"]["irr_diff_median"]
-    concluyente = (base_diff > 0) == (alt_diff > 0) or base_diff == 0
+
+    def _diff(unknown: float) -> float:
+        if unknown == chosen_unknown:
+            return chosen_diff
+        res = run_benchmark(
+            universe,
+            spy,
+            months,
+            portfolios=portfolios,
+            sizes=sizes,
+            seed=seed,
+            strategies=("app", "plano"),
+            membership=membership,
+            exits=exits,
+            unknown_exit=unknown,
+        )
+        return res["app_vs_plano"]["irr_diff_median"]
+
+    lower_diff = _diff(-1.0)
+    upper_diff = _diff(0.0)
+    concluyente = _mismo_signo_estricto(lower_diff, upper_diff)
     return {
         "cota_inferior_unknown": -1.0,
         "cota_superior_unknown": 0.0,
-        "irr_diff_median_cota_inferior": base_diff,
-        "irr_diff_median_cota_superior": alt_diff,
+        "irr_diff_median_cota_inferior": lower_diff,
+        "irr_diff_median_cota_superior": upper_diff,
         "concluyente": concluyente,
         "nota": (
             "mismo signo en ambas cotas: la ventaja no depende del supuesto sobre bajas sin dato"
@@ -832,7 +848,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         seed=a.seed,
         membership=membership,
         exits=exits,
-        base_diff=out["app_vs_plano"]["irr_diff_median"],
+        chosen_unknown=a.unknown_exit,
+        chosen_diff=out["app_vs_plano"]["irr_diff_median"],
     )
     out["costes_bps"] = cost_sweep(
         pit,
