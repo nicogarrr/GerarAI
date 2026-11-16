@@ -75,11 +75,11 @@ describe('monitor latency is not document latency',()=>{
   m.monitor.mockResolvedValue({ items:{ AAPL:{ low_52w:100,low_52w_sessions:130,currency:'USD',next_earnings_date:'2026-12-01',next_earnings_source:'NASDAQ', valuation_rank:{quintile:1,cheaper_than_pct:90,peers:40},fair_value_source:'tesis' } },earningsStatus:'ok' });
   const page=await renderPage();
   const rows=find(page,'EntryRowStream');
-  const row=await (rows[0].type as Function)(rows[0].props);
+  const row=await (rows[0].type as (props: unknown) => Promise<unknown>)(rows[0].props);
   const dated=find(row,'DatedRow');
-  const painted=await (dated[0].type as Function)(dated[0].props);
+  const painted=await (dated[0].type as (props: unknown) => Promise<unknown>)(dated[0].props);
   const pieces=[...find(page,'MonitorStockStream').slice(0,1),...find(painted,'MonitorStockStream')];
-  const resolved=await Promise.all(pieces.map(el=>(el.type as Function)(el.props)));
+  const resolved=await Promise.all(pieces.map(el=>(el.type as (props: unknown) => Promise<unknown>)(el.props)));
   const json=JSON.stringify(resolved);
   expect(json).toContain('watchlist.page.fairValue.summary');
   expect(json).toContain('watchlist.page.low52');
