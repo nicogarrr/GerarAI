@@ -17,7 +17,7 @@ import logging
 from datetime import date
 
 from app.valuation.cyclical_midcycle import cyclical_midcycle
-from app.valuation.dcf_fcff import DCFInputs, run_dcf
+from app.valuation.dcf_fcff import DCFInputs, TerminalFCFNotPositiveError, run_dcf
 from app.valuation.engines.base import (
     MODEL_VERSION,
     NET_DEBT_REQUIRED_REASON,
@@ -559,29 +559,43 @@ class StandardDCFEngine(ValuationEngine):
         )
         scenario_results = {}
         for scenario in scenarios:
-            result = _run_scenario(
-                plan,
-                revenue=revenue,
-                assumptions=scenario.assumptions,
-                base_margin=margin,
-                net_debt=net_debt,
-                shares=shares,
-                minority_interest=minority_interest,
-                preferred_stock=preferred_stock,
-            )
-            scenario_results[scenario.name] = {
-                "definition": scenario_definition_trace(scenario),
-                "value_per_share": result.value_per_share,
-                "trace": result.trace,
-            }
+            definition = scenario_definition_trace(scenario)
+            try:
+                result = _run_scenario(
+                    plan,
+                    revenue=revenue,
+                    assumptions=scenario.assumptions,
+                    base_margin=margin,
+                    net_debt=net_debt,
+                    shares=shares,
+                    minority_interest=minority_interest,
+                    preferred_stock=preferred_stock,
+                )
+            except TerminalFCFNotPositiveError:
+                scenario_results[scenario.name] = {
+                    "definition": definition,
+                    "value_per_share": None,
+                    "trace": {"missing_inputs": ["positive_terminal_fcf"]},
+                }
+            else:
+                scenario_results[scenario.name] = {
+                    "definition": definition,
+                    "value_per_share": result.value_per_share,
+                    "trace": result.trace,
+                }
 
-        # El esperado se pondera con los valores BRUTOS (un bear negativo
-        # cuenta): excluirlo inflaría el esperado y rompería bear <= base.
-        weighted = probability_weighted_value(
-            [
-                Scenario(name, data["definition"]["probability"], data["value_per_share"])
-                for name, data in scenario_results.items()
-            ]
+        # No se inventa un cero ni se reponderan los caminos restantes cuando
+        # Gordon no es valido. Los valores negativos por deuda SI conservan
+        # su peso: su FCF terminal es positivo y el puente equity es valido.
+        incomplete = any(data["value_per_share"] is None for data in scenario_results.values())
+        weighted = (
+            {"expected_value": None, "trace": {"reason": "positive_terminal_fcf", "complete": False}}
+            if incomplete else probability_weighted_value(
+                [
+                    Scenario(name, data["definition"]["probability"], data["value_per_share"])
+                    for name, data in scenario_results.items()
+                ]
+            )
         )
 
         # Convención d2656966: un valor por acción <= 0 no es publicable; el
@@ -592,8 +606,12 @@ class StandardDCFEngine(ValuationEngine):
             raw_value = data["value_per_share"]
             if raw_value is not None and raw_value > 0:
                 continue
-            note = _scenario_nd_note(
-                scenario.name, raw_value, float(scenario.assumptions["fcf_margin"])
+            note = (
+                f"Escenario {_SCENARIO_LABEL_ES.get(scenario.name, scenario.name)}: "
+                "FCF terminal no positivo; la perpetuidad de Gordon no es valida: N/D."
+                if raw_value is None else _scenario_nd_note(
+                    scenario.name, raw_value, float(scenario.assumptions["fcf_margin"])
+                )
             )
             scenario_notes[scenario.name] = note
             data["value_per_share_raw"] = raw_value
@@ -669,7 +687,13 @@ class StandardDCFEngine(ValuationEngine):
         bear = scenario_results["bear"]["value_per_share"]
         base = scenario_results["base"]["value_per_share"]
         bull = scenario_results["bull"]["value_per_share"]
-        if expected_raw > 0:
+        if expected_raw is None:
+            expected = None
+            scenario_notes["expected"] = (
+                "Valor esperado N/D: falta un escenario con FCF terminal positivo. "
+                "No se sustituyen los caminos invalidos por cero ni se reponderan los restantes."
+            )
+        elif expected_raw > 0:
             expected: float | None = expected_raw
         else:
             # Mismo criterio que en los escenarios: un esperado <= 0 es N/D

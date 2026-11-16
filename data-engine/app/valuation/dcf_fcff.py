@@ -66,6 +66,13 @@ class WaccNotAboveTerminalGrowthError(ValueError):
         super().__init__("wacc must be greater than terminal_growth")
 
 
+class TerminalFCFNotPositiveError(ValueError):
+    """El flujo terminal no sostiene una perpetuidad de Gordon positiva."""
+
+    def __init__(self, message: str = "terminal fcf must be positive") -> None:
+        super().__init__(message)
+
+
 def run_dcf(inputs: DCFInputs) -> DCFResult:
     if inputs.shares_outstanding <= 0:
         raise ValueError("shares_outstanding must be positive")
@@ -99,6 +106,8 @@ def run_dcf(inputs: DCFInputs) -> DCFResult:
         )
 
     terminal_fcf = forecast[-1]["fcf"] * (1 + inputs.terminal_growth)
+    if terminal_fcf <= 0:
+        raise TerminalFCFNotPositiveError()
     terminal_value = terminal_fcf / (inputs.wacc - inputs.terminal_growth)
     pv_terminal_value = terminal_value / ((1 + inputs.wacc) ** inputs.years)
     enterprise_value = present_value + pv_terminal_value
@@ -183,11 +192,13 @@ def run_dcf_margin_convergence(inputs: ConvergenceDCFInputs) -> DCFResult:
         )
 
     if forecast[-1]["fcf"] <= 0:
-        raise ValueError(
+        raise TerminalFCFNotPositiveError(
             "converged fcf must be positive: the terminal year still burns cash"
         )
 
     terminal_fcf = forecast[-1]["fcf"] * (1 + inputs.terminal_growth)
+    if terminal_fcf <= 0:
+        raise TerminalFCFNotPositiveError()
     terminal_value = terminal_fcf / (inputs.wacc - inputs.terminal_growth)
     pv_terminal_value = terminal_value / ((1 + inputs.wacc) ** inputs.years)
     enterprise_value = present_value + pv_terminal_value

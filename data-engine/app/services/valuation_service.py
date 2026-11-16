@@ -26,7 +26,7 @@ from app.valuation.currency import (
     scale_per_share_outputs,
     to_major_units,
 )
-from app.valuation.dcf_fcff import WaccNotAboveTerminalGrowthError
+from app.valuation.dcf_fcff import TerminalFCFNotPositiveError, WaccNotAboveTerminalGrowthError
 from app.valuation.engines import resolve, resolve_engine_key
 from app.valuation.engines.base import (
     MODEL_VERSION,
@@ -795,6 +795,20 @@ class ValuationService:
             # never reach them labelled as a final valuation.
             try:
                 result = apply_publication_blockers(engine.value(context))
+            except TerminalFCFNotPositiveError:
+                logger.warning(
+                    "DCF no valido (FCF terminal <= 0) company_id=%s engine=%s",
+                    getattr(company, "id", None),
+                    context.engine_key,
+                )
+                result = insufficient_from_context(
+                    context,
+                    missing=["positive_terminal_fcf"],
+                    reason=(
+                        "El FCF terminal debe ser positivo para sostener una perpetuidad "
+                        "de Gordon; este camino DCF no es valido."
+                    ),
+                )
             except WaccNotAboveTerminalGrowthError:
                 # Red de seguridad para CUALQUIER motor: WACC <= g es una
                 # condición de los datos, no un fallo. El camino DCF queda

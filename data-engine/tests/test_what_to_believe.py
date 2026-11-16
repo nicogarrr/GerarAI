@@ -101,7 +101,10 @@ def test_limite_inferior_respeta_el_crecimiento_terminal():
 
 
 def test_fcf_negativo_no_da_wacc_implicito():
-    paths = dcf_paths_from_trace(_flat_trace(fcf_margin=-0.05))
+    # Traza historica invalida: el guard actual ya no permite crearla.
+    trace = _flat_trace()
+    trace["inputs"]["fcf_margin"] = -0.05
+    paths = dcf_paths_from_trace(trace)
     assert paths is not None
     assert solve_implied_wacc(paths, 10.0)["status"] == "not_available"
 
