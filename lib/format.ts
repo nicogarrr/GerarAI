@@ -179,6 +179,13 @@ function formatCurrencyParts(value: number, currency: string, options: Intl.Numb
   // como en formatNumber; quien pida otro signDisplay lo conserva.
   options = { signDisplay: 'negative', ...options };
   if (!isPence(currency)) {
+    // Legacy rows can have an empty or malformed code. Keep the page usable.
+    if (!/^[a-z]{3}$/i.test(currency.trim())) {
+      return new Intl.NumberFormat(intlLocale(locale), {
+        minimumFractionDigits: 2, ...options, style: 'decimal',
+      }).format(value);
+    }
+    currency = currency.trim();
     return new Intl.NumberFormat(intlLocale(locale), { ...options, style: 'currency', currency }).format(value);
   }
   return new Intl.NumberFormat(intlLocale(locale), { ...options, style: 'currency', currency: 'GBP' })
