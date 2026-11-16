@@ -1,0 +1,13 @@
+import {render,screen} from '@testing-library/react';
+import {expect,it,vi} from 'vitest';
+vi.mock('next/headers',()=>({cookies:async()=>({get:()=>({value:'es'})})}));
+vi.mock('@/app/(root)/inversores/_components/HubNav',()=>({HubNav:()=> <nav>Investor tabs</nav>}));
+import Learn,{generateMetadata as learnMeta} from '@/app/(root)/inversores/aprender/page';
+import Channels,{generateMetadata as channelsMeta} from '@/app/(root)/inversores/canales/page';
+import Layout from '@/app/(root)/inversores/layout';
+import {InvestorAvatar} from '@/app/(root)/inversores/_components/Avatar';
+import {channelSourceLabel,channelNoteLabel} from '@/app/(root)/inversores/canales/channels';
+it('aprender conserva ambos destinos y metadata',async()=>{render(await Learn());expect(screen.getByRole('link',{name:/Conceptos/})).toHaveAttribute('href','/inversores/conceptos');expect(screen.getByRole('link',{name:/Canales/})).toHaveAttribute('href','/inversores/canales');expect(await learnMeta()).toHaveProperty('description')});
+it('canales separa idiomas y muestra fuente y notas sin certificar los no verificados',async()=>{render(await Channels());expect(screen.getByRole('link',{name:'Ben Felix'})).toHaveAttribute('href','https://www.youtube.com/@benfelixcsi');expect(screen.getByRole('link',{name:/Aprender/})).toHaveAttribute('href','/inversores/aprender');expect(document.body.textContent).toContain('no verificado');expect(await channelsMeta()).toHaveProperty('title');expect(channelSourceLabel('desconocida','en')).toBe('desconocida');expect(channelSourceLabel('Verificado en YouTube, 2026-10-11','en')).toBe('Checked on YouTube, 2026-10-11');expect(channelNoteLabel('Economía','en')).toBe('Economics');expect(channelNoteLabel('sin traducir','en')).toBe('sin traducir');expect(channelNoteLabel('Economía')).toBe('Economía')});
+it('layout mantiene hijos y navegación compartida',()=>{render(<Layout><p>Child page</p></Layout>);expect(screen.getByRole('navigation')).toHaveTextContent('Investor tabs');expect(screen.getByText('Child page')).toBeInTheDocument()});
+it('avatar foto conserva licencia, fallback sin slug ni foto usa iniciales y tamaño',async()=>{const photo=await InvestorAvatar({name:'Warren Buffett',slug:'buffett',size:'lg'});expect(photo.props.photoSrc).toBe('/investors/buffett.jpg');expect(photo.props.photoTitle).toContain('Public domain');expect(photo.props.className).toContain('size-16');const fallback=await InvestorAvatar({name:'Sin foto'});expect(fallback.props.photoSrc).toBeUndefined();expect(fallback.props.photoTitle).toBeUndefined();expect(fallback.props.className).toContain('size-11');const unknown=await InvestorAvatar({name:'Otro',slug:'unknown'});expect(unknown.props.name).toBe('Otro');expect(unknown.props.photoSrc).toBeUndefined()});

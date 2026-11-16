@@ -1,0 +1,9 @@
+import {act,render,screen,waitFor} from '@testing-library/react';
+import {afterEach,beforeEach,expect,it,vi} from 'vitest';
+const load=vi.hoisted(()=>vi.fn());
+vi.mock('@/lib/actions/home-attention.actions',()=>({getHomeAttention:load}));
+import HomeAttention from '@/components/HomeAttention';
+beforeEach(()=>vi.resetAllMocks());afterEach(()=>vi.useRealTimers());
+it('DCA solo cartera confirmado y dirección desconocida mantienen destinos y contexto',async()=>{load.mockResolvedValue({thesis:{unavailable:false,items:[{id:1,symbol:'BRK/B',summary:'Cambio',direction:'new',createdAt:'2026-01-01'}]},dca:{unavailable:false,items:[{id:'dca1',symbol:'AAPL',level:2,threshold:2,signalDate:'2026-01-01',forming:false,inPortfolio:true}]}});render(<HomeAttention/>);expect(await screen.findByText('AAPL')).toBeInTheDocument();expect(screen.getByRole('link',{name:/BRK\/B/})).toHaveAttribute('href','/research/BRK%2FB?view=changes#thesis-change-1');});
+it('fallo solo DCA no oculta tesis y no se anuncia fallo total',async()=>{load.mockResolvedValue({thesis:{unavailable:false,items:[]},dca:{unavailable:true,items:[]}});render(<HomeAttention/>);expect(await screen.findByRole('button',{name:'Reintentar'})).toBeInTheDocument();expect(screen.queryByText(/los cambios de tesis ni los niveles DCA/)).toBeNull();});
+it.each([false,true])('respuesta tardía tras desmontar no modifica estado: error=%s',async fails=>{let resolve!:(v:unknown)=>void,reject!:(e:Error)=>void;load.mockImplementation(()=>new Promise((r,j)=>{resolve=r;reject=j}));const x=render(<HomeAttention/>);await waitFor(()=>expect(load).toHaveBeenCalledTimes(1));x.unmount();await act(async()=>{if(fails)reject(new Error('offline'));else resolve({thesis:{unavailable:false,items:[]},dca:{unavailable:false,items:[]}});});expect(screen.queryByRole('status')).toBeNull();});

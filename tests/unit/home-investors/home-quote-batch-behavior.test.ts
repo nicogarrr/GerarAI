@@ -1,0 +1,14 @@
+import {beforeEach,expect,it,vi} from 'vitest';
+const m=vi.hoisted(()=>({state:vi.fn(),entry:vi.fn(),batch:vi.fn(),basics:vi.fn(),dated:vi.fn(),screener:vi.fn(),fair:vi.fn(),request:vi.fn(),probe:vi.fn()}));
+vi.mock('@/lib/actions/watchlist.actions',()=>({getWatchlistEntryData:m.entry,getWatchlistState:m.state}));
+vi.mock('@/lib/actions/market-workspace.actions',()=>({getResearchCompaniesBasics:m.batch,getResearchCompanyBasics:m.basics}));
+vi.mock('@/lib/market/dated-change',()=>({fetchDatedChanges:m.dated}));
+vi.mock('@/lib/actions/screener.actions',()=>({getFairValueReading:m.fair,getScreenerStocksReal:m.screener}));
+vi.mock('@/lib/research/client',()=>({researchRequest:m.request}));
+vi.mock('@/lib/market/probe-quote',()=>({probeQuoteFromBackend:m.probe}));
+import {getHomeOpportunities,getHomeWatchlistPreview} from '@/lib/actions/home-overview.actions';
+beforeEach(()=>{vi.resetAllMocks();m.state.mockResolvedValue({unavailable:false,items:[]});m.batch.mockResolvedValue({});m.dated.mockResolvedValue({});m.screener.mockResolvedValue([]);});
+it('sin candidatas no consulta cotizaciones ni DCF',async()=>{expect(await getHomeOpportunities({marketCapMoreThan:0,limit:10,candidateLimit:6})).toEqual([]);expect(m.request).not.toHaveBeenCalled();expect(m.fair).not.toHaveBeenCalled();});
+it('lote válido evita cadena por símbolo, lote parcial solo pide fallback de la ausente',async()=>{m.screener.mockResolvedValue([{symbol:'A',has_fundamentals:true},{symbol:'B',has_fundamentals:true}]);m.request.mockResolvedValue({quotes:{A:{price:100},BAD:null}});m.probe.mockImplementation(x=>x?{price:100,currency:'USD'}:null);m.entry.mockResolvedValue({price:null,currency:'EUR'});m.fair.mockResolvedValue({value:120,publishable:false,label:'Motor',asOf:null});const result=await getHomeOpportunities({marketCapMoreThan:0,limit:10,candidateLimit:6});expect(m.entry.mock.calls).toEqual([['B']]);expect(result[0].opportunity).toMatchObject({price:100,currency:'USD',orientation:true});expect(result[1]).toEqual({evaluated:false,opportunity:null});});
+it('lote vacío mantiene fallback por candidata sin declarar precios inventados',async()=>{m.screener.mockResolvedValue([{symbol:'A',has_fundamentals:true}]);m.request.mockResolvedValue(null);m.entry.mockResolvedValue({price:0,currency:'USD'});m.fair.mockResolvedValue(null);expect(await getHomeOpportunities({marketCapMoreThan:0,limit:10,candidateLimit:6})).toEqual([{evaluated:false,opportunity:null}]);});
+it('master ausente en agregado no fuerza lectura duplicada y cierre datado usa ticker como último nombre',async()=>{m.state.mockResolvedValue({unavailable:false,items:[{symbol:'A'}]});m.entry.mockResolvedValue(null);m.dated.mockResolvedValue({A:{price:10,currency:'USD',date:'2026-01-01',changePercent:0}});expect((await getHomeWatchlistPreview(1)).items[0]).toMatchObject({symbol:'A',name:'A',price:10,changePercent:0});expect(m.basics).not.toHaveBeenCalled();});
