@@ -462,5 +462,81 @@
     "aria": "Strategy",
     "placeholder": "Select strategy",
     "noData": "Data missing"
+  },
+  "unifiedStates": {
+    "states": {
+      "empty": "There is no saved selection to display.",
+      "partial": "Some data could not be completed. Check the notices in each block.",
+      "error": "These data could not be loaded.",
+      "stale": "Old data. They have not been updated.",
+      "retained": "The last loaded data are shown; they have not been updated."
+    },
+    "reasons": {
+      "delisted": "The stock is no longer listed.",
+      "instrument_cancelled": "The share has been cancelled.",
+      "trading_suspended": "Trading is suspended.",
+      "quality_failed": "Does not meet the quality criteria for this selection.",
+      "sector_model_required": "This sector needs a different assessment.",
+      "quality_funnel_not_passed": "Does not pass the quality filter.",
+      "leverage_missing_or_high": "Debt is unverified or above the limit.",
+      "fundamentals_stale_or_missing": "Recent financial data are missing.",
+      "fcf_periods_not_comparable": "Cash flow periods cannot be compared.",
+      "fcf_not_positive_and_growing": "Cash flow does not meet the positive and growing criterion.",
+      "liquidity_missing_or_low": "Liquidity is unverified or below the minimum.",
+      "market_cap_missing_or_low": "Market capitalisation is unverified or below the minimum.",
+      "identity_disputed": "Data disagree on the company identity.",
+      "identity_invalid": "The company identity could not be validated.",
+      "identity_unverified": "Company identity awaiting verification.",
+      "valuation_stale": "Valuation uses old data.",
+      "valuation_disputed": "Some valuation data disagree.",
+      "valuation_invalid": "Valuation could not be validated.",
+      "quality_score_stale": "The quality score uses old data.",
+      "quality_score_disputed": "Some quality data disagree.",
+      "quality_score_invalid": "The quality score could not be validated.",
+      "quality_unknown": "No quality assessment is available.",
+      "price_missing": "No price is available.",
+      "extreme_value": "Extreme value: review needed.",
+      "stale": "Old data.",
+      "non_finite": "A valid value could not be calculated.",
+      "block_error": "This block could not be loaded."
+    },
+    "eligibility": {
+      "investigate": "For research",
+      "quality_waiting_price": "Quality assessed; price missing",
+      "review_data": "Review data",
+      "excluded": "Outside this selection"
+    },
+    "errors": {
+      "timeout": "The query took too long. You can retry.",
+      "unauthenticated": "Your session has expired. Sign in again.",
+      "forbidden": "You do not have permission to view these data.",
+      "rate_limited": "Too many queries. Wait before retrying.",
+      "unavailable": "The service is unavailable. You can retry later.",
+      "invalid_response": "The response could not be validated."
+    },
+    "unknownReason": "A data item is awaiting verification.",
+    "missing": "Not available",
+    "asOf": "Data as of: {date}",
+    "retryAfter": "You can retry in {seconds} s."
+  },
+  "unified": {
+    "heading": "Quality at a good price",
+    "subheading": "The business first. Then the price. One file per instrument.",
+    "colQuality": "Quality",
+    "colValuation": "Price / valuation",
+    "colDca": "DCA signal",
+    "qualityPassed": "Passes the filter",
+    "qualityNotPassed": "Does not pass the filter",
+    "valuationValid": "Valid data",
+    "dcaConfirmed": "Confirmed",
+    "dcaForming": "Forming",
+    "outOfMainTitle": "Outside the main selection",
+    "outOfMainNote": "Data review and candidates without enough evidence. Not presented as bargains.",
+    "openFile": "Open file",
+    "trackingTitle": "Tracking",
+    "trackingSubtitle": "No automatic buys, sells or rebalancing.",
+    "trackingFollow": "Being tracked",
+    "trackingWait": "On your watchlist",
+    "reviewThesis": "Review thesis"
   }
 }
