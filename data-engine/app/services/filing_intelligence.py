@@ -220,12 +220,31 @@ def analyze_document(db: Session, document: Document) -> dict:
     meta = document.metadata_ or {}
     result = {"version": VERSION, "source": _citation(document)}
     if not chunks:
-        if company:
-            _alert(db, company, document, {"source": _citation(document)}, event_type="new_filing")
+        # El hecho estructurado no depende del texto: la tesis se evalúa
+        # también sin chunks; un criterio cruzado eleva la alerta igual que
+        # con texto, y reason queda en metadata.
         result["status"] = "insufficient_data"
         result["reason"] = "Sin texto completo disponible dentro del límite de análisis."
+        thesis = (
+            db.scalar(
+                select(ThesisVersion)
+                .where(
+                    ThesisVersion.tenant_id == tenant,
+                    ThesisVersion.company_id == document.company_id,
+                )
+                .order_by(desc(ThesisVersion.version))
+                .limit(1)
+            )
+            if company
+            else None
+        )
+        result["thesis_check"] = (
+            _thesis_check(db, tenant, document, company, thesis) if company and thesis else []
+        )
         document.metadata_ = {**meta, KEY: result}
         db.flush()
+        if company:
+            _alert(db, company, document, result, event_type="new_filing")
         return result
     form = meta.get("form")
     if form == "8-K" or (str(form).startswith("EX-99") and meta.get("parent_form") == "8-K"):

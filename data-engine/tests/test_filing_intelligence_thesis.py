@@ -208,3 +208,40 @@ def test_no_thesis_no_check(db):
     result = analyze_document(db, doc)
     assert result["thesis_check"] == []
     assert result["thesis_version_id"] is None
+
+
+def test_sin_chunks_el_hecho_estructurado_evalua_la_tesis(db):
+    # Regresión auditor: un filing sin chunks pero con FinancialFact propio que
+    # cruza la tesis debe alertar en high igual que uno con texto; reason se
+    # conserva en metadata.
+    thesis(
+        db,
+        [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08, "description": "roic bajo mínimo"}],
+    )
+    doc = document(db, text=None, number=3)
+    fact(db, "roic", 0.06, year=2026, doc_id=doc.id)
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["status"] == "insufficient_data"
+    assert "texto" in result["reason"]
+    assert result["thesis_check"][0]["status"] == "crossed"
+    alert = db.scalar(select(ResearchAlert))
+    assert alert.severity == "high"
+    assert alert.alert_type == "thesis_invalidation_filing"
+    assert alert.metadata_["reason"] == result["reason"]
+
+
+def test_sin_chunks_sin_cruce_alerta_media_como_antes(db):
+    thesis(
+        db,
+        [{"metric": "metrica:roic", "operator": "<", "threshold": 0.08, "description": "roic bajo mínimo"}],
+    )
+    doc = document(db, text=None, number=4)
+    fact(db, "roic", 0.12, year=2026, doc_id=doc.id)  # no cruza
+    result = analyze_document(db, doc)
+    db.commit()
+    assert result["thesis_check"][0]["status"] != "crossed"
+    alert = db.scalar(select(ResearchAlert))
+    assert alert.severity == "medium"
+    assert alert.alert_type == "new_filing"
+    assert alert.metadata_["reason"] == result["reason"]
