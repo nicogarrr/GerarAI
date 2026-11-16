@@ -43,3 +43,11 @@ describe('LongTermModelPanel · N/D con causa', () => {
         expect(html).not.toContain('no calculable');
     });
 });
+
+it('keeps an unknown long cause inside both responsive presentations',()=>{
+ const token='future_machine_reason_missing_verified_terminal_cash_flow_and_diluted_share_count';
+ const model={...MODELO_SIN_VALORACION,scenarios:{base:{...MODELO_SIN_VALORACION.scenarios.base,valuation_blockers:[token],valuation_note:null}}};
+ const html=renderToStaticMarkup(<LongTermModelPanel model={model}/>);
+ expect(html.match(/overflow-wrap:anywhere/g)).toHaveLength(2);
+ expect(html.match(new RegExp(token,'g'))).toHaveLength(2);
+});
