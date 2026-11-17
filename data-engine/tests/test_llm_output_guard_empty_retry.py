@@ -20,6 +20,10 @@ class _Resp:
     text = "Hola, el flujo de caja libre es el efectivo que queda tras invertir."
 
 
+class _Bad:
+    text = "El flujo de caja libre es 这是一个测试 y queda tras invertir."
+
+
 class _Provider:
     name = "hy4-go-zero"
 
@@ -104,3 +108,48 @@ def test_motivo_del_fallo_vacio_se_dice_claro():
     assert "vacía" in es and "empty" in en
     # un ProviderResponseError generico NO se etiqueta como vacio
     assert _model_down_kind(ProviderResponseError("x"), "provider_or_guard_failure") != "empty"
+
+
+def _count_before_retry():
+    seen = []
+    return seen, lambda: seen.append(1)
+
+
+def test_vacio_y_luego_valida_cuenta_las_dos_llamadas():
+    provider = _Provider([ProviderEmptyResponseError("hy4 empty"), _Resp()])
+    out = _run(provider, retry_empty_once=True)
+    assert (out.calls, out.retried, out.discarded) == (2, True, [])
+    assert out.calls == provider.calls
+
+
+def test_sin_reintento_cuenta_una_llamada():
+    provider = _Provider([_Resp()])
+    out = _run(provider, retry_empty_once=True)
+    assert (out.calls, out.retried) == (1, False)
+    assert provider.calls == 1
+
+
+def test_rechazada_por_guard_y_luego_valida_cuenta_dos():
+    provider = _Provider([_Bad(), _Resp()])
+    out = _run(provider)
+    assert (out.calls, out.retried, len(out.discarded)) == (2, True, 1)
+    assert out.calls == provider.calls
+
+
+def test_vacio_y_luego_rechazada_no_hace_tercera_llamada():
+    provider = _Provider([ProviderEmptyResponseError("hy4 empty"), _Bad(), _Resp()])
+    seen, before = _count_before_retry()
+    with pytest.raises(guard.LLMOutputRejected) as info:
+        _run(provider, retry_empty_once=True, before_retry=before)
+    assert provider.calls == 2
+    assert info.value.calls == 2
+    assert len(info.value.discarded) == 1 and isinstance(info.value.discarded[0], _Bad)
+    assert len(seen) == 1  # solo el reintento por vacio pasa por before_retry
+
+
+def test_rechazada_dos_veces_sin_vacio_sigue_igual():
+    provider = _Provider([_Bad(), _Bad(), _Resp()])
+    with pytest.raises(guard.LLMOutputRejected) as info:
+        _run(provider)
+    assert provider.calls == 2 and info.value.calls == 2
+    assert len(info.value.discarded) == 2
