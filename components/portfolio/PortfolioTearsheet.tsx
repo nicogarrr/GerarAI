@@ -48,11 +48,15 @@ export default function PortfolioTearsheet({ tearsheet }: Props) {
                 <CardTitle className="text-lg text-gray-100">{ti('portfolio.tearsheetExtra.title')}</CardTitle>
             </CardHeader>
             <CardContent>
-                <div className="grid grid-cols-3 gap-4">
+                {/* A 390px el valor real "-100,00 %" no cabe con text-2xl en
+                    tres columnas (medido 17-nov-2026 en dev: "-13,46 %" y
+                    "56,47 %" se tocaban). Escala gradual como PortfolioSummary
+                    y hueco/padding reducidos solo bajo sm. */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-4">
                     {items.map((item) => (
-                        <div key={item.label} className="text-center p-3 bg-gray-900/50 rounded-lg">
+                        <div key={item.label} className="text-center p-2 sm:p-3 bg-gray-900/50 rounded-lg">
                             <item.icon className={`h-6 w-6 mx-auto mb-2 ${item.color}`} />
-                            <div className="text-2xl font-bold text-gray-100">{item.value}</div>
+                            <div className="text-base min-[420px]:text-lg sm:text-2xl font-bold tracking-tight break-words text-gray-100">{item.value}</div>
                             <div className="text-xs text-gray-400">{item.label}</div>
                         </div>
                     ))}
