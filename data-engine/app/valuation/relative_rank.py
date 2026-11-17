@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import math
 from bisect import bisect_left, bisect_right
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable, Mapping, Sequence
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -158,7 +158,9 @@ def engine_peer_ratios(db: Session) -> dict[int, float]:
         .join(Company, Company.id == ValuationModel.company_id)
         .where(ranked.c.rank == 1, ValuationModel.status != "insufficient_data")
     )
-    rows = db.execute(statement).all()
+    # PG returns four fields (one JSON array); SQLite returns nine scalars.
+    # Normalize the typed Result rows before flattening the PG-only array.
+    rows: Sequence[tuple[Any, ...]] = db.execute(statement).tuples().all()
     if db.get_bind().dialect.name == "postgresql":
         rows = [(company_id, status, *inputs, currency)
                 for company_id, status, inputs, currency in rows]

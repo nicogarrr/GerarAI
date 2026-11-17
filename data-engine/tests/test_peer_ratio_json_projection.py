@@ -331,3 +331,19 @@ def test_peer_projection_model_matches_online_column_and_is_deferred(db):
         assert "peer_rank_inputs" in statements[-1]
     finally:
         event.remove(session.get_bind(), "before_cursor_execute", record)
+
+
+def test_dialect_row_shapes_preserve_each_company_and_currency(db):
+    session, _ = db
+    usd = _company(session, "ROW_USD", "USD")
+    eur = _company(session, "ROW_EUR", "EUR")
+    pence = _company(session, "ROW_GBX", "GBX")
+    _output(session, usd, {"expected_value": 150, "current_price": 100})
+    _output(session, eur, {"listed_share_values": {"expected": 240},
+                           "adr_ratio": 8, "current_price": 100})
+    _output(session, pence, {"expected_value": 999, "current_price": 100})
+    session.commit()
+    session.info["tenant_id"] = 2
+    expected = {usd.id: 1.5, eur.id: 2.4}
+    assert engine_peer_ratios(session) == _legacy_ratios(session) == expected
+    assert engine_peer_ratios(session) == expected
