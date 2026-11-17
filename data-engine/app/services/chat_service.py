@@ -933,12 +933,15 @@ _TYPO_SKIP_WORDS = frozenset({
 _CAPABILITIES_RE = re.compile(
     r"(?i)^\s*[¿¡]?\s*(?:"
     r"qu[eé]\s+(?:puedes|puede|sabes)\s+hacer|"
-    r"(?:en\s+)?qu[eé]\s+(?:me\s+)?puedes\s+ayudar|"
-    r"c[oó]mo\s+(?:es\s+que\s+)?(?:me\s+)?puedes\s+ayudar|"
+    r"(?:en\s+)?qu[eé]\s+(?:me\s+)?puedes\s+ayudar(?:me)?|"
+    r"c[oó]mo\s+(?:es\s+que\s+)?(?:me\s+)?puedes\s+ayudar(?:me)?|"
     r"qu[eé]\s+(?:eres|es\s+esto)|qui[eé]n\s+eres|para\s+qu[eé]\s+sirves|"
     r"qu[eé]\s+es\s+(?:gerarai|cavaai|esta\s+(?:app|aplicaci[oó]n))|"
     r"what can you do|who are you"
     r")"
+    # Coletilla temporal o de lugar: "¿en qué me puedes ayudar hoy?".
+    r"(?:\s+(?:hoy|ahora(?:\s+mismo)?|aqu[ií]|por\s+aqu[ií]|"
+    r"en\s+(?:esta\s+)?(?:app|aplicaci[oó]n)|exactamente))?"
     # Preguntas gemelas: "quien eres y que puedes hacer" (en cualquier orden).
     r"(?:\s+y\s+(?:qu[eé]\s+(?:puedes|sabes)\s+hacer|qui[eé]n\s+eres))*"
     r"\s*[?!.]*\s*$"
