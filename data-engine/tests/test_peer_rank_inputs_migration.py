@@ -199,3 +199,29 @@ def test_pg_rejects_conflicting_stored_design(pg, monkeypatch):
         with pytest.raises(DBAPIError, match="not the online design"):
             migration.upgrade()
         tx.rollback()
+
+
+def test_pg_admin_backfill_spans_tenants_without_changing_sources(pg, monkeypatch):
+    """Global maintenance must fill both tenants, never copy between them."""
+    migration = _migration()
+    with pg.begin() as conn:
+        conn.execute(text('ALTER TABLE valuation_outputs ADD COLUMN tenant_id integer'))
+        conn.execute(text("UPDATE valuation_outputs SET tenant_id=CASE WHEN id % 2=0 THEN 5 ELSE 2 END, output_payload=json_build_object('expected_value',id*100,'current_price',100)"))
+        before = conn.execute(text('SELECT id, tenant_id, output_payload FROM valuation_outputs ORDER BY id')).all()
+        _bind(monkeypatch, migration, conn)
+        migration.upgrade()
+    touched = []
+    while True:
+        with pg.begin() as conn:
+            batch = backfill_batch(conn, 2)
+            touched.extend(batch)
+        if not batch:
+            break
+    assert sorted(touched) == [1, 2, 3, 4, 5]
+    with pg.begin() as conn:
+        assert conn.execute(text('SELECT id, tenant_id, output_payload FROM valuation_outputs ORDER BY id')).all() == before
+        rows = conn.execute(text('SELECT id, tenant_id, peer_rank_inputs FROM valuation_outputs ORDER BY id')).all()
+        assert {tenant for _, tenant, _ in rows} == {2, 5}
+        for row_id, tenant, inputs in rows:
+            assert inputs == [None, None, None, row_id * 100, None, 100]
+        assert backfill_batch(conn, 2) == []
