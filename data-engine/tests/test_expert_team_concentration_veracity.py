@@ -62,6 +62,7 @@ def test_weight_ignores_and_declares_position_missing_fx(db):
     assert out.data["weight_pct"] == 40.0
     assert out.data["positions_count"] == 3
     assert out.data["positions_excluded_missing_fx"] == 1
+    assert out.data["weight_basis"] == "valued_positions_only"
 
 
 def test_weight_is_unknown_not_zero_when_own_position_missing_fx(db):
@@ -72,6 +73,7 @@ def test_weight_is_unknown_not_zero_when_own_position_missing_fx(db):
     assert out.data["ticker"] == "CGEO.L"
     assert out.data["weight_pct"] is None
     assert out.data["positions_excluded_missing_fx"] == 1
+    assert out.data["weight_basis"] == "valued_positions_only"
 
 
 def test_weight_zero_is_real_when_company_not_held(db):
@@ -84,6 +86,18 @@ def test_weight_zero_is_real_when_company_not_held(db):
     assert out.data["weight_pct"] == 0.0
 
 
+def test_weight_basis_all_positions_when_nothing_excluded(db):
+    # Sin posiciones sin FX la base es la cartera completa.
+    session = db
+    gel = session.query(Company).filter_by(ticker="CGEO.L").one()
+    session.query(Position).filter_by(company_id=gel.id).delete()
+    session.commit()
+    out = _weight(db, "MSFT")
+    assert out.data["weight_pct"] == 40.0
+    assert out.data["positions_excluded_missing_fx"] == 0
+    assert out.data["weight_basis"] == "all_positions"
+
+
 def test_weight_sums_all_portfolios_of_the_company(db):
     # Dos filas de la misma empresa (dos carteras) con valor en base: suman.
     session = db
@@ -94,3 +108,23 @@ def test_weight_sums_all_portfolios_of_the_company(db):
     out = _weight(db, "MSFT")
     assert out.data["weight_pct"] == 50.0
     assert out.data["positions_excluded_missing_fx"] == 1
+
+
+def test_toolspec_description_declares_valued_positions_basis(db):
+    # La descripción que ve el planificador no puede decir solo "peso en la
+    # cartera": declara la base valorada y el contador de excluidas.
+    description = build_tools(db, today=TODAY)["portfolio_concentration"].description
+    assert "posiciones valoradas" in description
+    assert "positions_excluded_missing_fx" in description
+
+
+def test_risk_prompt_instructs_weight_basis_honesty():
+    # El prompt del experto de riesgo cita el campo y prohíbe presentar el
+    # peso parcial como el de toda la cartera (ES y EN).
+    from app.services import prompt_registry
+
+    definition = prompt_registry.PROMPTS["expert_risk"]
+    assert "weight_basis" in definition.text and "valued_positions_only" in definition.text
+    assert "toda la cartera" in definition.text
+    assert "weight_basis" in definition.text_en and "valued_positions_only" in definition.text_en
+    assert "whole portfolio" in definition.text_en

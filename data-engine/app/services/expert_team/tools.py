@@ -226,7 +226,11 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
             source={"table": "positions", "date": _day(today or local_today()), "url": "/portfolio"},
             data={"ticker": company.ticker, "weight_pct": weight,
                   "positions_count": len(positions),
-                  "positions_excluded_missing_fx": len(excluded_ids)},
+                  "positions_excluded_missing_fx": len(excluded_ids),
+                  # Base del denominador: con exclusiones el peso es entre las
+                  # posiciones VALORADAS, no de toda la cartera; el experto
+                  # debe decirlo y no presentarlo como peso total.
+                  "weight_basis": "valued_positions_only" if excluded_ids else "all_positions"},
         )
 
     def news_events(ctx: RunContext) -> list[ToolOutput]:
@@ -333,7 +337,9 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
         ("financial_facts", financial_facts, "Hechos financieros reportados (SEC/ESEF), 2 últimos ejercicios"),
         ("valuation_engine", valuation_engine, "Motor de valoración y última versión de tesis"),
         ("risk_events", risk_events, "Eventos de riesgo registrados de la empresa"),
-        ("portfolio_concentration", portfolio_concentration, "Peso de la empresa en la cartera del usuario"),
+        ("portfolio_concentration", portfolio_concentration,
+         "Peso de la empresa entre las posiciones valoradas de la cartera del usuario "
+         "(weight_basis lo declara; positions_excluded_missing_fx cuenta las excluidas por falta de tipo de cambio)"),
         ("news_events", news_events, "Noticias de los últimos 90 días con materialidad"),
         ("user_position", user_position, "Posición del usuario en la empresa"),
         ("irpf_savings_bands", irpf_savings_bands, "Tramos de la base del ahorro del IRPF del año"),
