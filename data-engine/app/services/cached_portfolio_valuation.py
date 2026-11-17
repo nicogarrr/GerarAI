@@ -29,6 +29,21 @@ from app.models import Position
 logger = logging.getLogger(__name__)
 
 
+def _position_value_base(
+    position: Position, value_native: Decimal, base_currency: str
+) -> Decimal | None:
+    """Valor de la posicion en divisa base; ``None`` si no se conoce el tipo.
+
+    Misma divisa que la base: el nativo (tipo 1). Otra divisa: solo el
+    ``market_value_base`` que dejo el ledger (``None`` cuando falta el tipo
+    de cambio); nunca se improvisa una conversion con el valor nativo.
+    """
+    if (position.currency or "").upper() == base_currency:
+        return value_native
+    return position.market_value_base
+
+
+
 class CachedPortfolioValuationService:
     """Service for cached portfolio valuation queries."""
     
@@ -38,15 +53,24 @@ class CachedPortfolioValuationService:
         category="portfolio_valuation",
         extract_tenant=_extract_tenant_from_db,
     )
-    def get_portfolio_snapshot(self, db: Session, as_of: date | None = None) -> dict[str, Any]:
-        """Obtiene snapshot de cartera con cache de 10 minutos."""
+    def get_portfolio_snapshot(self, db: Session) -> dict[str, Any]:
+        """Snapshot de cartera con cache de 10 minutos, valorado en divisa base.
+
+        Antes aceptaba ``as_of`` y lo devolvia como ``snapshot_date`` mientras
+        valoraba con las posiciones ACTUALES: una etiqueta de fecha que el
+        dato no tenia. Y sumaba ``quantity * market_price`` en divisa NATIVA
+        de cada posicion mezclando divisas bajo la etiqueta ``base_currency``.
+        Ahora cada posicion lleva su valor nativo y su valor en base, y el
+        total solo se publica si TODAS las posiciones tienen valor en base
+        (una posicion sin tipo de cambio no vale 0 en la suma: falta, y se
+        declara en ``positions_missing_base_value``).
+        """
         from app.services.portfolio_fx_service import PortfolioFXService
-        
-        snapshot_date = as_of or date.today()
+
         fx_service = PortfolioFXService()
         portfolio = fx_service.ensure_portfolio(db)
-        
-        # Obtener posiciones
+        base_currency = (portfolio.base_currency or "").upper()
+
         positions = list(
             db.scalars(
                 select(Position)
@@ -55,30 +79,38 @@ class CachedPortfolioValuationService:
                 .order_by(Position.company_id)
             ).all()
         )
-        
-        # Calcular valor total
+
         total_value = Decimal("0")
-        positions_data = []
-        
+        positions_data: list[dict[str, Any]] = []
+        missing_base_value: list[str] = []
+
         for position in positions:
-            value = position.quantity * position.market_price
-            total_value += value
-            
+            value_native = position.quantity * position.market_price
+            symbol = position.company.ticker if position.company else None
+            value_base = _position_value_base(position, value_native, base_currency)
+            if value_base is None:
+                missing_base_value.append(symbol or str(position.company_id))
+            else:
+                total_value += value_base
             positions_data.append({
                 "company_id": position.company_id,
-                "symbol": position.company.ticker if position.company else None,
+                "symbol": symbol,
                 "quantity": float(position.quantity),
                 "market_price": float(position.market_price),
                 "currency": position.currency,
-                "value": float(value),
+                "value": float(value_native),
+                "value_base": float(value_base) if value_base is not None else None,
                 "as_of": position.as_of.isoformat(),
             })
-        
+
+        complete = not missing_base_value
         return {
-            "snapshot_date": snapshot_date.isoformat(),
+            "generated_at": date.today().isoformat(),
             "portfolio_id": portfolio.id,
             "base_currency": portfolio.base_currency,
-            "total_value": float(total_value),
+            "total_value": float(total_value) if complete else None,
+            "total_value_complete": complete,
+            "positions_missing_base_value": sorted(missing_base_value),
             "positions": positions_data,
             "positions_count": len(positions_data),
         }
@@ -103,13 +135,26 @@ class CachedPortfolioValuationService:
             ).all()
         )
         
-        total_value = sum(p.quantity * p.market_price for p in positions)
-        
+        base_currency = (portfolio.base_currency or "").upper()
+        total_value = Decimal("0")
+        missing_base_value: list[str] = []
+        for position in positions:
+            value_base = _position_value_base(
+                position, position.quantity * position.market_price, base_currency
+            )
+            if value_base is None:
+                missing_base_value.append(str(position.company_id))
+            else:
+                total_value += value_base
+        complete = not missing_base_value
+
         return {
             "portfolio_id": portfolio.id,
             "positions_count": len(positions),
-            "total_value": float(total_value),
-            "currencies": list({p.currency for p in positions}),
+            "total_value": float(total_value) if complete else None,
+            "total_value_complete": complete,
+            "positions_missing_base_value": sorted(missing_base_value),
+            "currencies": sorted({p.currency for p in positions}),
         }
     
     @cached(
