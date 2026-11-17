@@ -23,7 +23,7 @@ export default function BrainChatModelForm() {
                 aria-label={t('settings.llm.chatModelLabel')}
                 value={model}
                 onChange={(e) => choose(e.target.value)}
-                className="min-h-11 w-64 max-w-full rounded border border-gray-700 bg-gray-950 px-3 text-sm text-gray-200"
+                className="min-h-11 w-64 max-w-full rounded border border-gray-700 bg-gray-950 px-3 text-base sm:text-sm text-gray-200"
             >
                 <option value="">{t('settings.llm.chatModelDefault')}</option>
                 <option value="hy4-flash-free">{t('settings.llm.chatModelHy4')}</option>
