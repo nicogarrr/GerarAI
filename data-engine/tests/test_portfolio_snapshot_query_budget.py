@@ -52,7 +52,7 @@ def test_cold_snapshot_company_reads_are_constant(size, monkeypatch):
             monkeypatch.setattr(PortfolioFXService, 'ensure_portfolio',
                                 lambda self, session: SimpleNamespace(id=fund_id, base_currency='EUR'))
             service = CachedPortfolioValuationService()
-            result = service.get_portfolio_snapshot.__wrapped__(service, db, as_of=date(2026, 11, 16))
+            result = service.get_portfolio_snapshot.__wrapped__(service, db)
         print(f'size={size} queries={len(queries)} ORM={loaded}')
         assert result['positions_count'] == size
         assert result['total_value'] == size * 30
