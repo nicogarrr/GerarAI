@@ -35,11 +35,71 @@ def test_menciones_desconocidas(question, expected):
     assert unknown_ticker_mentions(question, KNOWN) == expected
 
 
+@pytest.mark.parametrize(
+    "question,expected",
+    [
+        # Regresion c31b (17-nov-2026): el saludo de QA trataba «QA» como ticker.
+        (
+            "Hola, ¿qué tal? Soy una prueba sintética de QA en Audit. "
+            "Contesta en español, sin datos de otras cuentas.",
+            [],
+        ),
+        ("Esto es una prueba de QA", []),
+        ("OK, gracias", []),
+        ("Tengo una duda sobre la IA en EE.UU.", []),
+        ("EL mercado sube", []),
+        ("Revisa la UI y el UX", []),
+        # Con contexto de empresa, un ticker corto desconocido sigue avisando.
+        ("¿qué opinas de ZM?", ["ZM"]),
+        ("¿Qué opina la carta de Numantia sobre AST SpaceMobile?", ["AST"]),
+        ("háblame sobre ZM", ["ZM"]),
+        ("¿qué opinas de ZM? ¿y qué opinas de ZM?", ["ZM"]),  # repetido: una sola vez
+        ("precio de ZM", ["ZM"]),
+        ("¿cuánto vale $ZM?", ["ZM"]),
+        ("acciones de ZM", ["ZM"]),
+        ("ticker ZM", ["ZM"]),
+        ("¿Está barata PLTR?", ["PLTR"]),
+        ("hola, ¿qué opinas de XYZQ?", ["XYZQ"]),
+        ("tesis de ZZ.L", ["ZZ.L"]),
+        ("¿qué opinas de KO?", []),
+        # Distintivo de la regla de contexto: sin cue de empresa, 1-3 letras no avisan...
+        ("ZM sube un 5%", []),
+        ("Hoy ZM y XY se mueven", []),
+        # ...y con cue si (espejo del anterior).
+        ("¿qué opinas de ZM?", ["ZM"]),
+        # Distintivo de las siglas: aunque haya cue, una sigla conocida no es ticker.
+        ("¿qué opinas de QA?", []),
+        ("precio de UI", []),
+    ],
+)
+def test_siglas_y_palabras_cortas_no_son_tickers(question, expected):
+    assert unknown_ticker_mentions(question, KNOWN + ["KO"]) == expected
+
+
 def test_respuesta_sugiere_parecido_y_no_inventa():
     answer = unknown_ticker_answer(["TSLAA"], KNOWN)
     assert "No tengo «TSLAA» entre las empresas de GerarAI" in answer
     assert "¿quizá TSLA en vez de TSLAA?" in answer
     assert "/research/TSLAA" in answer
+
+
+def test_nombre_de_empresa_conocida_se_ignora_por_tramo():
+    question = "¿Qué opina la carta de Numantia sobre AST SpaceMobile?"
+    start = question.index("AST")
+    assert unknown_ticker_mentions(question, ["ASTS"], ignore_spans=[(start, start + 3)]) == []
+    # un tramo que no cubre el token no lo oculta
+    assert unknown_ticker_mentions(question, ["ASTS"], ignore_spans=[(0, 5)]) == ["AST"]
+
+
+def test_sin_minusculas_no_hay_menciones():
+    assert unknown_ticker_mentions("", KNOWN) == []
+    assert unknown_ticker_mentions(None, KNOWN) == []
+
+
+def test_respuesta_varios_tickers_en_plural_y_uno_con_parecido():
+    answer = unknown_ticker_answer(["TSLAA", "QQQQ"], KNOWN)
+    assert "«TSLAA», «QQQQ»" in answer and "puedo opinar sobre ellos" in answer
+    assert "¿quizá TSLA en vez de TSLAA?" in answer and "QQQQ?" not in answer
 
 
 class _BoomProvider:
@@ -69,7 +129,6 @@ def db():
         )
         session.commit()
         yield session
-
 
 def test_chat_ticker_inexistente_no_pasa_por_el_llm(db):
     service = ChatService(provider=_BoomProvider())  # type: ignore[arg-type]

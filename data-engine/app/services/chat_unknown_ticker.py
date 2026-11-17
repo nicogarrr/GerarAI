@@ -15,7 +15,21 @@ from collections.abc import Iterable
 
 # Siglas habituales en una pregunta de inversión que NO son tickers.
 _ACRONYMS = frozenset(
-    ["IA", "AI", "PER", "PEG", "EPS", "BPA", "ROE", "ROA", "ROIC", "ROCE", "FCF", "DCF", "EV", "EBIT", "EBITDA", "ETF", "ETFS", "IPO", "OPA", "OPV", "CEO", "CFO", "CTO", "ADR", "ADRS", "ADS", "IRPF", "IVA", "PIB", "IPC", "BCE", "FED", "SEC", "FMP", "IBKR", "USD", "EUR", "GBP", "GBX", "JPY", "CNY", "HKD", "CHF", "CAD", "AUD", "EEUU", "EE", "UU", "UE", "USA", "UK", "TIR", "VAN", "WACC", "CAPEX", "OPEX", "SBC", "TTM", "YTD", "FY", "LTM", "DCA", "NAV", "PE", "PB", "PS", "MOS", "NYSE", "NASDAQ", "LSE", "BME", "IBEX", "MSCI", "LLM", "API", "PDF", "URL", "XIRR", "TWR", "CAGR", "OK", "SA", "SL", "AG", "NV", "PLC", "INC", "LTD", "CORP", "Q1", "Q2", "Q3", "Q4", "H1", "H2", "GAAP", "IFRS", "KPI", "KPIS", "ARPU", "SAAS", "IT", "TAM", "SAM", "SOM", "MOAT", "FCFF", "FCFE", "DDM", "SOTP", "RSI", "MACD", "SMA", "EMA", "VIX", "ESG"]
+    ["IA", "AI", "PER", "PEG", "EPS", "BPA", "ROE", "ROA", "ROIC", "ROCE", "FCF", "DCF", "EV", "EBIT", "EBITDA", "ETF", "ETFS", "IPO", "OPA", "OPV", "CEO", "CFO", "CTO", "ADR", "ADRS", "ADS", "IRPF", "IVA", "PIB", "IPC", "BCE", "FED", "SEC", "FMP", "IBKR", "USD", "EUR", "GBP", "GBX", "JPY", "CNY", "HKD", "CHF", "CAD", "AUD", "EEUU", "EE", "UU", "UE", "USA", "UK", "TIR", "VAN", "WACC", "CAPEX", "OPEX", "SBC", "TTM", "YTD", "FY", "LTM", "DCA", "NAV", "PE", "PB", "PS", "MOS", "NYSE", "NASDAQ", "LSE", "BME", "IBEX", "MSCI", "LLM", "API", "PDF", "URL", "XIRR", "TWR", "CAGR", "OK", "SA", "SL", "AG", "NV", "PLC", "INC", "LTD", "CORP", "Q1", "Q2", "Q3", "Q4", "H1", "H2", "GAAP", "IFRS", "KPI", "KPIS", "ARPU", "SAAS", "IT", "TAM", "SAM", "SOM", "MOAT", "FCFF", "FCFE", "DDM", "SOTP", "RSI", "MACD", "SMA", "EMA", "VIX", "ESG", "QA", "UI", "UX", "TV", "PC", "SMS", "FAQ", "VS", "AM", "PM", "TBD", "EL", "LA", "LO", "LE", "LOS", "LAS", "UN", "UNA", "DE", "EN", "SI", "NO", "TU", "MI", "SU", "SE", "ME", "TE", "QUE", "POR", "CON", "SIN", "MAS", "MUY"]
+)
+
+# Los tickers de 1-3 letras («KO», «ZM», «F») chocan con siglas y palabras
+# sueltas en mayúsculas («QA», «UI», «EL»). Si no están en el maestro solo se
+# dan por «ticker desconocido» cuando algo en la pregunta los presenta como
+# empresa: «$ZM», «ticker ZM», «acciones de ZM», «opinas de ZM», «precio de
+# ZM»… Con 4 o más letras o con sufijo de mercado no hace falta ese contexto.
+_SHORT_TICKER_MAX_LEN = 3
+_COMPANY_CUE_BEFORE_RE = re.compile(
+    r"(?:\$|\b(?:ticker|acci[oó]n(?:es)?(?:\s+de)?|empresa|compa[nñ][ií]a|"
+    r"opinas?\s+(?:de|sobre)|sobre|piensas\s+(?:de|sobre)|opini[oó]n\s+(?:de|sobre)|"
+    r"precio\s+de|cotizaci[oó]n\s+de|valoraci[oó]n\s+de|tesis\s+de|"
+    r"an[aá]lisis\s+de|comprar|vender|compara(?:r)?|vs\.?)\s*)$",
+    re.IGNORECASE,
 )
 
 # Algo con forma de ticker escrito en mayúsculas: 2-6 caracteres (letra
@@ -46,6 +60,12 @@ def unknown_ticker_mentions(
         base = token.split(".")[0]
         if token in known or base in _ACRONYMS or token in _ACRONYMS:
             continue
+        if (
+            token == base
+            and len(base) <= _SHORT_TICKER_MAX_LEN
+            and not _COMPANY_CUE_BEFORE_RE.search(text[: match.start(1)])
+        ):
+            continue  # sigla o palabra suelta, no un ticker presentado como empresa
         if token not in out:
             out.append(token)
     return out
