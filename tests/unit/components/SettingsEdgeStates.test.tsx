@@ -24,6 +24,33 @@ async function show(locale: 'es' | 'en') {
     return (view.container.textContent ?? '').replace(/\s+/g, ' ');
 }
 
+describe('Ajustes: estados de datos', () => {
+    beforeEach(() => {
+        window.matchMedia ??= ((query: string) => ({
+            matches: false, media: query, onchange: null, addListener: vi.fn(), removeListener: vi.fn(),
+            addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn(),
+        })) as never;
+    });
+
+    it('sin datos del backend: cada seccion muestra el aviso, y la preferencia local del chat general sigue disponible', async () => {
+        const ui = await SettingsContent({ dca: null, declarant: null, llm: null, llmUsage: null, currency: null, ibkr: null } as never);
+        const view = render(<LocaleProvider locale="es">{ui}</LocaleProvider>);
+        const text = (view.container.textContent ?? '').replace(/\s+/g, ' ');
+        expect(text).toContain('No disponible ahora.');
+        // Preferencia local del navegador: no depende de la config del servidor.
+        expect(text).toContain('Modelo del chat general');
+    });
+
+    it('con LLM de tenant la seccion describe la configuracion con clave propia', async () => {
+        const ui = await SettingsContent({
+            dca: null, declarant: null, llmUsage: null, currency: null, ibkr: null,
+            llm: { ...FRESH['/api/settings/llm'], source: 'tenant' },
+        } as never);
+        const view = render(<LocaleProvider locale="es">{ui}</LocaleProvider>);
+        expect(view.container.textContent ?? '').toContain('Configuración con tu clave API.');
+    });
+});
+
 describe('Ajustes de una cuenta nueva (datos reales del backend)', () => {
     beforeEach(() => {
         vi.clearAllMocks();

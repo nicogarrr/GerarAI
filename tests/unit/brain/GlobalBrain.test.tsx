@@ -40,6 +40,7 @@ import { renderToString } from 'react-dom/server';
 import { EARLY_OPEN_CAPTURE_JS } from '@/lib/early-open';
 import { GlobalBrain } from '@/components/brain/GlobalBrain';
 import { OPEN_BRAIN_PENDING_KEY, openBrain } from '@/lib/brain/open-brain';
+import { BRAIN_CHAT_MODEL_KEY } from '@/lib/brain/chat-model';
 import { brainStorageKey } from '@/lib/brain/conversation';
 
 const KEY = brainStorageKey('u1');
@@ -62,6 +63,7 @@ beforeEach(() => {
     askKnowledge.mockReset();
     askResearchAssistantAction.mockReset();
     window.sessionStorage.clear();
+    window.localStorage.clear();
 });
 afterEach(() => {
     vi.useRealTimers();
@@ -582,24 +584,22 @@ describe('GlobalBrainPanel native lifecycle', () => {
     });
 });
 
-it('only sends the optional model after explicit general-chat selection and can return to default', async () => {
+it('sends the model chosen in Settings (local preference) on the next open, default without it', async () => {
  chatWithPortfolio.mockResolvedValue({success:true,message:'Respuesta',citations:[]});
- render(<GlobalBrain userId="u1"/>);await open();
- const select=screen.getByRole('combobox',{name:'Modelo del chat general'});
- expect(select).toHaveValue('');
- await act(async()=>{ask('Consulta con defecto');});
- expect(chatWithPortfolio.mock.calls[0]).toHaveLength(4);
- fireEvent.change(select,{target:{value:'hy4-flash-free'}});
+ window.localStorage.setItem(BRAIN_CHAT_MODEL_KEY,'hy4-flash-free');
+ const view=render(<GlobalBrain userId="u1"/>);await open();
  await act(async()=>{ask('Consulta con HY');});
- expect(chatWithPortfolio.mock.calls[1][4]).toBe('hy4-flash-free');
- fireEvent.change(select,{target:{value:''}});
- await act(async()=>{ask('Consulta defecto otra vez');});
- expect(chatWithPortfolio.mock.calls[2]).toHaveLength(4);
+ expect(chatWithPortfolio.mock.calls[0][4]).toBe('hy4-flash-free');
+ view.unmount();
+ window.localStorage.removeItem(BRAIN_CHAT_MODEL_KEY);
+ render(<GlobalBrain userId="u1"/>);await open();
+ await act(async()=>{ask('Consulta con defecto');});
+ expect(chatWithPortfolio.mock.calls[1]).toHaveLength(4);
 });
 
-it('does not offer the general-chat model in ticker guide or library mode', async () => {
+it('does not offer a model combobox inside the panel (it lives in Settings)', async () => {
  render(<GlobalBrain userId="u1"/>);await open();
- expect(screen.getByRole('combobox',{name:'Modelo del chat general'})).toBeVisible();
+ expect(screen.queryByRole('combobox',{name:'Modelo del chat general'})).not.toBeInTheDocument();
  act(()=>openBrain({ticker:'ASTS'}));
  expect(screen.queryByRole('combobox',{name:'Modelo del chat general'})).not.toBeInTheDocument();
  act(()=>openBrain({knowledge:{scope:'library'}}));

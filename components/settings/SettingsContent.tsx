@@ -8,6 +8,7 @@ import type { IBKRConnection } from '@/lib/actions/ibkr-settings.actions';
 import SettingsSection from '@/components/settings/SettingsSection';
 import BaseCurrencyForm from '@/components/settings/BaseCurrencyForm';
 import LlmSettingsForm from '@/components/settings/LlmSettingsForm';
+import BrainChatModelForm from '@/components/settings/BrainChatModelForm';
 import LlmUsagePanel from '@/components/settings/LlmUsagePanel';
 import TaxDeclarantForm from '@/components/settings/TaxDeclarantForm';
 import { Panel } from '@/components/ui/panel';
@@ -69,6 +70,9 @@ export default async function SettingsContent({ declarant, llm, llmUsage, curren
       >
         {llm ? <LlmSettingsForm initial={llm} /> : unavailable}
         {llmUsage ? <div className="mt-4"><LlmUsagePanel usage={llmUsage} /></div> : null}
+        {/* Preferencia local del navegador: no depende de la config LLM del
+            servidor, por eso se muestra siempre (producto, 17-nov-2026). */}
+        <div className="mt-4 border-t border-gray-800 pt-4"><BrainChatModelForm /></div>
       </SettingsSection>
       <SettingsSection
         description={t('settings.tax.description')}
