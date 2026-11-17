@@ -5,7 +5,7 @@ import struct
 import zipfile
 import zlib
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import datetime
 from html.parser import HTMLParser
 from io import BytesIO
 from pathlib import Path
@@ -305,7 +305,12 @@ class DocumentIngestionService:
             source_type=source_type,
             source_url=source_url,
             storage_uri=storage_uri,
-            published_at=published_at or datetime.now(UTC),
+            # Sin fecha declarada por la fuente, published_at queda None:
+            # estampar now() convertia la fecha de subida en fecha de
+            # publicacion y los contextos de expertos (recopilador, sotp,
+            # analyst_blend, thesis) la presentaban como "date" del
+            # documento (un informe de 2019 subido hoy parecia de hoy).
+            published_at=published_at,
             checksum=checksum,
             metadata_={
                 **{key: value for key, value in (filing_metadata or {}).items()
@@ -341,7 +346,8 @@ class DocumentIngestionService:
         evidence = build_ingestion_evidence(
             tenant_id=db.info.get("tenant_id"), document_id=f"document:{document.id}",
             checksum=checksum, source_type=source_type, chunks=chunks, url=source_url,
-            # Do not turn the existing fetched-at fallback into a publication date.
+            # Sin fecha declarada, published_on queda None: nunca se
+            # fabrica una fecha de publicacion.
             published_on=published_at.date() if published_at else None,
         )
         document.metadata_ = {**document.metadata_, "evidence_contract": evidence}
