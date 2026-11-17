@@ -311,6 +311,19 @@ _CLAUSE_SPLIT_RE = re.compile(
 _TRADE_NEGATION_RE = re.compile(
     r"(?i)\b(?:no|nunca|tampoco|jam[aá]s|sin|not|never|don'?t|do\s+not|does\s+not|without)\b"
 )
+# Enunciado de ejercicio contable: "supon que una empresa compra una maquina",
+# "si la sociedad vende un activo". Solo cuenta si TODA la clausula previa al
+# verbo es [marcador de supuesto] + determinante + sujeto nominal: la empresa
+# es sujeto del enunciado, no complemento de una orden ("para la empresa compra
+# Apple", "comprar para mi empresa" siguen siendo ordenes). Ante la duda, orden.
+_TRADE_HYPOTHETICAL_SUBJECT_RE = re.compile(
+    r"(?i)^\s*¿?\s*"
+    r"(?:(?:sup[oó]n(?:\s+que)?|supongamos(?:\s+que)?|imagina(?:\s+que)?|ejercicio|"
+    r"caso(?:\s+pr[aá]ctico)?|enunciado|si|cuando|qu[eé]\s+pasa\s+si)\s*)?"
+    r"(?:la|una|el|un)\s+"
+    r"(?:empresa|sociedad|compa[nñ][ií]a|sl|sa|cliente|proveedor|fabricante|comercio|"
+    r"tienda|negocio|aut[oó]nomo)\s*$"
+)
 _TRADE_NOUN_RE = re.compile(r"(?i)\b(?:de|del|para)\s+(?:la\s+|el\s+)?$")
 # Lectura interrogativa RECONOCIBLE en 3a persona, no orden. Arrancar por
 # what/que NO prueba pregunta: "What I want you to do is sell Apple" o
@@ -350,6 +363,8 @@ def _asks_trade_action(question: str, action_re: re.Pattern = _TRADE_VERB_RE) ->
             (split.end() for split in _CLAUSE_SPLIT_RE.finditer(before)), default=0
         )
         clause = before[clause_start:]
+        if _TRADE_HYPOTHETICAL_SUBJECT_RE.match(clause):
+            continue  # enunciado hipotetico con sujeto nominal: no es orden
         if match.group(0).lower() in ("vende", "sell") and (
             _TRADE_QUESTION_QUE_RE.match(clause) or _TRADE_QUESTION_WHAT_RE.match(clause)
         ):
