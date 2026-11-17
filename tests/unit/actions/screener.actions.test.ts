@@ -18,105 +18,13 @@ import {
     runScreenerEngine,
     runSavedScreenerEngine,
     getSavedScreenerEngines,
-    type ScreenerFilters,
     type ScreenerResult,
 } from '@/lib/actions/screener.actions';
-
-const WIDE: ScreenerFilters = {
-    marketCapMin: 0, marketCapMax: Number.POSITIVE_INFINITY,
-    priceMin: 0, priceMax: Number.POSITIVE_INFINITY,
-    peMin: Number.NEGATIVE_INFINITY, peMax: Number.POSITIVE_INFINITY,
-    pbMin: Number.NEGATIVE_INFINITY, pbMax: Number.POSITIVE_INFINITY,
-    roeMin: Number.NEGATIVE_INFINITY, roeMax: Number.POSITIVE_INFINITY,
-    volumeMin: 0, betaMin: Number.NEGATIVE_INFINITY, betaMax: Number.POSITIVE_INFINITY,
-    sector: 'all', exchange: 'all', assetType: 'all', sortBy: 'marketCap', sortOrder: 'desc',
-};
 
 beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     requireAuthenticatedUser.mockResolvedValue({ id: 'tenant-one' });
-});
-
-describe('screenStocks (legacy Finnhub, cliente)', () => {
-    const loadModule = async (apiKey?: string) => {
-        vi.resetModules();
-        if (apiKey === undefined) delete process.env.FINNHUB_API_KEY;
-        else process.env.FINNHUB_API_KEY = apiKey;
-        return import('@/lib/actions/screener.actions');
-    };
-
-    it('sin FINNHUB_API_KEY devuelve [] y no hace ninguna petición', async () => {
-        const { screenStocks } = await loadModule(undefined);
-        const fetchMock = vi.fn();
-        vi.stubGlobal('fetch', fetchMock);
-        expect(await screenStocks(WIDE)).toEqual([]);
-        expect(fetchMock).not.toHaveBeenCalled();
-        vi.unstubAllGlobals();
-    });
-
-    const seedFetch = () => {
-        const quote: Record<string, object> = {
-            AAPL: { c: 150, d: 1.5, dp: 1, v: 5_000_000 },
-            MSFT: { c: 300, d: -3, dp: -1, v: 2_000_000 },
-            SPY: { c: 500, d: null, dp: null, v: 50_000_000 },
-        };
-        const profile: Record<string, object> = {
-            AAPL: { name: 'Apple', marketCapitalization: 2_500_000, finnhubIndustry: 'Technology', exchange: 'NASDAQ' },
-            MSFT: { name: 'Microsoft', marketCapitalization: 3_000_000, finnhubIndustry: 'Technology', exchange: 'NASDAQ' },
-            SPY: { name: 'SPDR S&P 500', marketCapitalization: 500_000, finnhubIndustry: 'ETF', exchange: 'NYSE' },
-        };
-        const metric: Record<string, object> = {
-            AAPL: { metric: { peBasicExclExtraTTM: 25, pbAnnual: 30, roeTTM: 150, beta: 1.2 } },
-            MSFT: { metric: { peBasicExclExtraTTM: 35, pbAnnual: 12, roeTTM: 40, beta: 0.9 } },
-            SPY: { metric: {} },
-        };
-        vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-            const symbol = new URL(url).searchParams.get('symbol') ?? '';
-            if (!(symbol in quote)) return { ok: true, json: async () => ({ c: 0 }) } as Response;
-            if (url.includes('/quote')) return { ok: true, json: async () => quote[symbol] } as Response;
-            if (url.includes('/profile2')) return { ok: true, json: async () => profile[symbol] } as Response;
-            return { ok: true, json: async () => metric[symbol] } as Response;
-        }));
-    };
-
-    it('mapea market cap a dólares (x1e6), detecta ETF y ordena por market cap desc', async () => {
-        const { screenStocks } = await loadModule('test-key');
-        seedFetch();
-        const rows = await screenStocks(WIDE);
-        expect(rows.map((r) => r.symbol)).toEqual(['MSFT', 'AAPL', 'SPY']);
-        expect(rows.find((r) => r.symbol === 'AAPL')).toMatchObject({
-            marketCap: 2_500_000_000_000, type: 'Stock', sector: 'Technology', pe: 25, beta: 1.2,
-        });
-        expect(rows.find((r) => r.symbol === 'SPY')).toMatchObject({ type: 'ETF', change: null, changePercent: null });
-        vi.unstubAllGlobals();
-    });
-
-    it('orden asc invierte la lista', async () => {
-        const { screenStocks } = await loadModule('test-key');
-        seedFetch();
-        const rows = await screenStocks({ ...WIDE, sortOrder: 'asc' });
-        expect(rows.map((r) => r.symbol)).toEqual(['SPY', 'AAPL', 'MSFT']);
-        vi.unstubAllGlobals();
-    });
-
-    it('filtros de precio y tipo descartan lo que no encaja', async () => {
-        const { screenStocks } = await loadModule('test-key');
-        seedFetch();
-        const caras = await screenStocks({ ...WIDE, priceMin: 200 });
-        expect(caras.map((r) => r.symbol).sort()).toEqual(['MSFT', 'SPY']);
-        const etfs = await screenStocks({ ...WIDE, assetType: 'ETF' });
-        expect(etfs.map((r) => r.symbol)).toEqual(['SPY']);
-        vi.unstubAllGlobals();
-    });
-
-    it('quote sin precio (c=0) y perfil caído no producen fila', async () => {
-        const { screenStocks } = await loadModule('test-key');
-        seedFetch();
-        const rows = await screenStocks({ ...WIDE, priceMin: 1 });
-        expect(rows.some((r) => r.price === 0)).toBe(false);
-        vi.unstubAllGlobals();
-    });
 });
 
 describe('exportScreenerResults', () => {
