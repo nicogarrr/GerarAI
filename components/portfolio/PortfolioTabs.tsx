@@ -1,7 +1,7 @@
 'use client';
 
 import { useT, useFormat } from '@/lib/i18n/client';
-import { useState, useMemo } from 'react';
+import { memo, use, useState, useMemo, Suspense, type ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useActiveTabVisible } from './use-active-tab-visible';
@@ -55,19 +55,129 @@ import type { PortfolioTransaction } from '@/lib/actions/portfolio.actions';
 import type { TransactionFilters } from '@/lib/portfolio/transaction-filters';
 
 
+export type PortfolioScoresValue = { quality: number | null; growth: number | null; value: number | null; dividend: number | null; cagr3y: number | null; history?: PortfolioPerformanceHistory };
+export type PortfolioTransactionPageValue = { items: PortfolioTransaction[]; total: number; offset: number; filters?: TransactionFilters };
+
+// Lecturas tolerantes: llegan como promesas ya lanzadas en el servidor, cada
+// una con su error resuelto a mensaje (la página no rechaza nunca). El
+// resumen pinta con la lectura esencial (summary) y cada panel desenvuelve la
+// suya con use() dentro de su <Suspense>: un módulo lento retrasa solo su
+// panel, no la página (medido en prod 17-nov-2026: TTFB 0,3 s pero primer
+// contenido a los 9,6 s cuando todo se esperaba a la vez).
+export type PortfolioStream<T> = Promise<{ value: T; error: string | null }>;
+
 type Props = {
     summary: PortfolioSummaryType;
-    transactions: PortfolioTransaction[];
-    transactionPage?: { total: number; offset: number; filters?: TransactionFilters };
-    scores: { quality: number | null; growth: number | null; value: number | null; dividend: number | null; cagr3y: number | null; history?: PortfolioPerformanceHistory };
-    tearsheet: PortfolioTearsheetType | null;
-    forecast: PortfolioForecastType | null;
-    dividends: PortfolioDividendProjection | null;
+    transactions: PortfolioStream<PortfolioTransactionPageValue>;
+    scores: PortfolioStream<PortfolioScoresValue>;
+    tearsheet: PortfolioStream<PortfolioTearsheetType | null>;
+    forecast: PortfolioStream<PortfolioForecastType | null>;
+    dividends: PortfolioStream<PortfolioDividendProjection | null>;
     userId: string;
-    partialMessage?: string | null;
-    /** Error de lectura de movimientos: la pestaña pinta aviso, no el vacío normal. */
-    transactionsError?: string | null;
+    partialMessage?: Promise<string | null>;
 };
+
+// Desenvuelve una lectura tolerante dentro de un <Suspense> (mismo patrón que
+// el cierre datado de watchlist): render recibe el resultado ya resuelto.
+function Stream<T>({ promise, render }: { promise: Promise<T>; render: (value: T) => ReactNode }) {
+    return <>{render(use(promise))}</>;
+}
+
+// El tearsheet va memoizado: cambiar el periodo del gráfico repinta solo el
+// gráfico, y use() devuelve siempre el mismo objeto ya resuelto, así que el
+// memo se salta el repintado igual que el useMemo anterior (contrato cubierto
+// por tests/unit/components/PortfolioTabs.render.test.tsx).
+const TearsheetStreamPanel = memo(function TearsheetStreamPanel({ result }: { result: { value: PortfolioTearsheetType | null } }) {
+    return <PortfolioTearsheet tearsheet={result.value} />;
+});
+
+const NAV_PERIODS = ['1S', '1M', '3M', '6M', 'YTD', '1A', 'Todo'] as const;
+type NavPeriodData = Record<string, { date: string; value: number }[]>;
+
+function useNavPeriods(history: PortfolioPerformanceHistory | undefined): NavPeriodData {
+    const f = useFormat();
+    return useMemo(() => Object.fromEntries(
+        NAV_PERIODS.map(period => [
+            period,
+            windowNav(history?.dates ?? [], history?.nav ?? [], period)
+                .filter(point => Number.isFinite(point.value) && Number.isFinite(Date.parse(point.date)))
+                .map(point => ({ date: f.formatDate(point.date, { day: '2-digit', month: 'short' }), value: point.value })),
+        ]),
+    ), [history, f]);
+}
+
+// Reserva exacta de la botonera de periodos: los 7 botones reales, inertes e
+// invisibles, para que la franja ocupe lo mismo con y sin datos (a 390px la
+// botonera ocupa dos filas; reservar una sola franja desplazaba el gráfico).
+const NavPeriodButtonsFallback = () => {
+    const ti = useT();
+    return (
+        <div className="invisible flex w-full flex-wrap gap-1 sm:w-auto" aria-hidden="true">
+            {NAV_PERIODS.map((period) => (
+                <button key={period} type="button" tabIndex={-1} disabled
+                    className="min-h-[44px] min-w-11 flex-1 px-1 py-2 text-xs rounded sm:flex-none sm:px-2 sm:py-1 text-gray-500">
+                    {period === 'Todo' ? ti('portfolio.tabs.periodAll') : period}
+                </button>
+            ))}
+        </div>
+    );
+};
+
+// Botonera de periodos del gráfico NAV: espera solo a la lectura de factores.
+// Mientras llega, el fallback reserva la misma franja para que su aparición
+// no desplace el gráfico.
+function NavPeriodButtons({ promise, chartPeriod, setChartPeriod }: { promise: Props['scores']; chartPeriod: string; setChartPeriod: (period: string) => void }) {
+    const ti = useT();
+    const { value: scores } = use(promise);
+    const periodData = useNavPeriods(scores.history);
+    const effectivePeriod = periodData[chartPeriod].length >= 2 ? chartPeriod : 'Todo';
+    if (periodData.Todo.length < 2) return null;
+    return (
+        <div className="flex w-full flex-wrap gap-1 sm:w-auto" role="group" aria-label={ti('portfolio.tabs.chartPeriodAria')}>
+            {NAV_PERIODS.map((period) => (
+                <button
+                    key={period}
+                    onClick={() => setChartPeriod(period)}
+                    disabled={periodData[period].length < 2}
+                    aria-pressed={effectivePeriod === period}
+                    className={`min-h-[44px] min-w-11 flex-1 px-1 py-2 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed sm:flex-none sm:px-2 sm:py-1 ${effectivePeriod === period
+                            ? 'bg-gray-700 text-white'
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                        }`}
+                >
+                    {period === 'Todo' ? ti('portfolio.tabs.periodAll') : period}
+                </button>
+            ))}
+        </div>
+    );
+}
+
+// Cuerpo del gráfico NAV + aviso de reconstrucción TWR: la caja h-[200px] se
+// reserva entera en el fallback, así el pintado en dos tiempos no mueve nada.
+function NavChartBody({ promise, chartPeriod, totalGain, baseCurrency }: { promise: Props['scores']; chartPeriod: string; totalGain: number; baseCurrency: string }) {
+    const ti = useT();
+    const f = useFormat();
+    const { value: scores } = use(promise);
+    const periodData = useNavPeriods(scores.history);
+    const effectivePeriod = periodData[chartPeriod].length >= 2 ? chartPeriod : 'Todo';
+    const chartData = periodData[effectivePeriod];
+    return (<>
+        <div className="h-[200px]">
+            {chartData.length < 2 ? (
+                <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-800 text-sm text-gray-500">
+                    {ti('portfolio.tabs.noChart')}
+                </div>
+            ) : (
+            <PortfolioNavChart data={chartData} positive={totalGain >= 0} currency={baseCurrency} />
+            )}
+        </div>
+        {chartData.length >= 2 && scores.history?.rebuild_reset_date ? (
+            <p className="mt-2 text-xs text-amber-300/90" data-testid="twr-rebuild-reset">
+                {ti('portfolio.tabs.rebuildReset', { date: f.formatDate(scores.history.rebuild_reset_date, { day: '2-digit', month: 'short', year: 'numeric' }) })}
+            </p>
+        ) : null}
+    </>);
+}
 
 // F137: la pestaña vive en la URL (?tab=). Antes el estado nacía fijo en
 // 'resumen' y el parámetro se ignoraba tras la hidratación: un enlace a
@@ -85,7 +195,7 @@ function normalizeTab(value: string | null): PortfolioTab {
     return (VALID_TABS as readonly string[]).includes(value ?? '') ? (value as PortfolioTab) : 'resumen';
 }
 
-export default function PortfolioTabs({ summary, transactions, transactionPage, transactionsError, scores, tearsheet, forecast, dividends, userId, partialMessage }: Props) {
+export default function PortfolioTabs({ summary, transactions, scores, tearsheet, forecast, dividends, userId, partialMessage }: Props) {
     const ti = useT();
     const f = useFormat();
     const searchParams = useSearchParams();
@@ -120,17 +230,6 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
     };
     const [chartPeriod, setChartPeriod] = useState('1M');
 
-    const periodData = useMemo(() => Object.fromEntries(
-        ['1S', '1M', '3M', '6M', 'YTD', '1A', 'Todo'].map(period => [
-            period,
-            windowNav(scores.history?.dates ?? [], scores.history?.nav ?? [], period)
-                .filter(point => Number.isFinite(point.value) && Number.isFinite(Date.parse(point.date)))
-                .map(point => ({ date: f.formatDate(point.date, { day: '2-digit', month: 'short' }), value: point.value })),
-        ]),
-    ), [scores.history, f]);
-    const effectivePeriod = periodData[chartPeriod].length >= 2 ? chartPeriod : 'Todo';
-    const chartData = periodData[effectivePeriod];
-    const hasDrawableHistory = periodData.Todo.length >= 2;
     // Cambiar el periodo del gráfico solo cambia el panel del gráfico. Las
     // métricas, el donut de distribución y el tearsheet no dependen del
     // periodo: con sus elementos memoizados React se los salta en vez de
@@ -148,7 +247,6 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
             baseCurrency={summary.baseCurrency}
         />
     ), [summary.holdings, summary.cash, summary.baseCurrency]);
-    const tearsheetPanel = useMemo(() => <PortfolioTearsheet tearsheet={tearsheet} />, [tearsheet]);
     return (
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-[1600px] flex-col overflow-x-clip">
                 {/* Header */}
@@ -174,9 +272,13 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                 </div>
 
                 {partialMessage ? (
-                    <div className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-                        {ti('portfolio.tabs.partialNotice', { message: partialMessage })}
-                    </div>
+                    <Suspense fallback={null}>
+                        <Stream promise={partialMessage} render={(message) => message ? (
+                            <div className="mb-4 rounded-lg border border-amber-900/60 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
+                                {ti('portfolio.tabs.partialNotice', { message })}
+                            </div>
+                        ) : null} />
+                    </Suspense>
                 ) : null}
 
                 {/* Tabs Navigation */}
@@ -241,22 +343,9 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                         <div className="bg-[#111111] border border-gray-800 rounded-2xl p-4 sm:p-6">
                             <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
                                 <h2 className="text-gray-400 text-sm font-medium">{ti('portfolio.tabs.chartTitle')}</h2>
-                                {hasDrawableHistory ? <div className="flex w-full flex-wrap gap-1 sm:w-auto" role="group" aria-label={ti('portfolio.tabs.chartPeriodAria')}>
-                                    {['1S', '1M', '3M', '6M', 'YTD', '1A', 'Todo'].map((period) => (
-                                        <button
-                                            key={period}
-                                            onClick={() => setChartPeriod(period)}
-                                            disabled={periodData[period].length < 2}
-                                            aria-pressed={effectivePeriod === period}
-                                            className={`min-h-[44px] min-w-11 flex-1 px-1 py-2 text-xs rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed sm:flex-none sm:px-2 sm:py-1 ${effectivePeriod === period
-                                                    ? 'bg-gray-700 text-white'
-                                                    : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
-                                                }`}
-                                        >
-                                            {period === 'Todo' ? ti('portfolio.tabs.periodAll') : period}
-                                        </button>
-                                    ))}
-                                </div> : null}
+                                <Suspense fallback={<NavPeriodButtonsFallback />}>
+                                    <NavPeriodButtons promise={scores} chartPeriod={chartPeriod} setChartPeriod={setChartPeriod} />
+                                </Suspense>
                             </div>
 
                             <div className="mb-4">
@@ -293,21 +382,10 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                                 )}
                             </div>
 
-                            {/* Gráfico de área */}
-                            <div className="h-[200px]">
-                                {chartData.length < 2 ? (
-                                    <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-gray-800 text-sm text-gray-500">
-                                        {ti('portfolio.tabs.noChart')}
-                                    </div>
-                                ) : (
-                                <PortfolioNavChart data={chartData} positive={summary.totalGain >= 0} currency={summary.baseCurrency} />
-                                )}
-                            </div>
-                            {chartData.length >= 2 && scores.history?.rebuild_reset_date ? (
-                                <p className="mt-2 text-xs text-amber-300/90" data-testid="twr-rebuild-reset">
-                                    {ti('portfolio.tabs.rebuildReset', { date: f.formatDate(scores.history.rebuild_reset_date, { day: '2-digit', month: 'short', year: 'numeric' }) })}
-                                </p>
-                            ) : null}
+                            {/* Gráfico de área + aviso de reconstrucción */}
+                            <Suspense fallback={<div className="h-[200px]"><NavChartLoading /></div>}>
+                                <NavChartBody promise={scores} chartPeriod={chartPeriod} totalGain={summary.totalGain} baseCurrency={summary.baseCurrency} />
+                            </Suspense>
                         </div>
 
                         {/* Panel Derecho: Pie Chart Completo */}
@@ -316,7 +394,9 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
 
                     {/* Tearsheet: Sharpe, drawdown, win rate */}
                     <div className="mt-6">
-                        {tearsheetPanel}
+                        <Suspense fallback={<TabFallback />}>
+                            <Stream promise={tearsheet} render={(result) => <TearsheetStreamPanel result={result} />} />
+                        </Suspense>
                     </div>
                     {/* Salida cruzada a las otras dos páginas de riesgo: el
                         resumen es pesos y precio; el riesgo medido está en
@@ -342,23 +422,27 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                 <TabsContent value="prevision" className="mt-0">
                     <SavingsProjection />
                     <h2 className="mb-3 text-lg font-semibold text-gray-100">{ti('portfolio.tabs.forecastTitle')}</h2>
-                    {forecast ? (
-                        <PortfolioForecast forecast={forecast} ti={ti} f={f} />
-                    ) : (
-                        <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-                            {ti('portfolio.tabs.forecastError')}
-                        </p>
-                    )}
+                    <Suspense fallback={<TabFallback />}>
+                        <Stream promise={forecast} render={(result) => result.value ? (
+                            <PortfolioForecast forecast={result.value} ti={ti} f={f} />
+                        ) : (
+                            <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
+                                {ti('portfolio.tabs.forecastError')}
+                            </p>
+                        )} />
+                    </Suspense>
                 </TabsContent>
 
                 <TabsContent value="dividendos" className="mt-0">
-                    {dividends ? (
-                        <PortfolioDividends projection={dividends} userId={userId} ti={ti} f={f} />
-                    ) : (
-                        <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
-                            {ti('portfolio.tabs.dividendsError')}
-                        </p>
-                    )}
+                    <Suspense fallback={<TabFallback />}>
+                        <Stream promise={dividends} render={(result) => result.value ? (
+                            <PortfolioDividends projection={result.value} userId={userId} ti={ti} f={f} />
+                        ) : (
+                            <p className="rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200" role="status">
+                                {ti('portfolio.tabs.dividendsError')}
+                            </p>
+                        )} />
+                    </Suspense>
                 </TabsContent>
 
                 <TabsContent value="posiciones" className="mt-0">
@@ -368,13 +452,21 @@ export default function PortfolioTabs({ summary, transactions, transactionPage, 
                 {/* Tab: Movimientos */}
                 <TabsContent value="movimientos" className="mt-0">
                     <div className="max-w-4xl">
-                        <PortfolioTransactions transactions={transactions} userId={userId} page={transactionPage} error={transactionsError} />
+                        <Suspense fallback={<TabFallback />}>
+                            <Stream promise={transactions} render={(result) => (
+                                <PortfolioTransactions transactions={result.value.items} userId={userId}
+                                    page={{ total: result.value.total, offset: result.value.offset, filters: result.value.filters }}
+                                    error={result.error} />
+                            )} />
+                        </Suspense>
                     </div>
                 </TabsContent>
 
                 {/* Tab: factores calculados */}
                 <TabsContent value="estrategia" className="mt-0">
-                    <PortfolioScores scores={scores} />
+                    <Suspense fallback={<TabFallback />}>
+                        <Stream promise={scores} render={(result) => <PortfolioScores scores={result.value} />} />
+                    </Suspense>
                 </TabsContent>
 
             </Tabs>

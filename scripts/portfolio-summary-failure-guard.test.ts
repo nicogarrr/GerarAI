@@ -5,14 +5,21 @@ import test from 'node:test';
 const page = readFileSync('app/(root)/portfolio/page.tsx', 'utf8');
 
 test('a failed portfolio summary degrades to a retry notice instead of throwing (HTTP 500)', () => {
-  const block = page.slice(page.indexOf('if (!summaryResult.value)'), page.indexOf('result = ['));
+  const start = page.indexOf('if (!summaryResult.value)');
+  const success = page.indexOf('} else {', start);
+  assert.ok(start >= 0 && success > start, 'summary failure/success branches exist');
+  const block = page.slice(start, success);
   assert.match(block, /isAuthError\(summaryResult\.cause\)/);
   assert.doesNotMatch(block, /throw /);
-  // Sin resumen no se asigna result; el aviso se pinta FUERA del try/catch
-  // (react-hooks/error-boundaries: nada de JSX dentro de try).
-  const afterCatch = page.slice(page.indexOf('} catch (error) {'));
-  assert.match(afterCatch, /if \(!result\) \{\s*return <BackendOffline/);
-  const tryBlock = page.slice(page.indexOf('const [summaryResult'), page.indexOf('} catch (error) {'));
+  // Sin resumen no se asignan summary ni tolerant; el aviso queda fuera del try.
+  assert.doesNotMatch(block, /summary = summaryResult\.value|tolerant =/);
+  const catchStart = page.indexOf('} catch (error) {', success);
+  assert.ok(catchStart > success, 'outer data-loading catch exists');
+  const afterCatch = page.slice(catchStart);
+  assert.match(afterCatch, /if \(!summary \|\| !tolerant\) \{\s*return <BackendOffline/);
+  const tryStart = page.indexOf('const summaryPromise');
+  assert.ok(tryStart >= 0 && catchStart > tryStart, 'summary loading stays in try');
+  const tryBlock = page.slice(tryStart, catchStart);
   assert.doesNotMatch(tryBlock, /<BackendOffline/);
 });
 

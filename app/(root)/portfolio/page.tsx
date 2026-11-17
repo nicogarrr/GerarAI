@@ -40,34 +40,43 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
     return redirectToSignIn();
   }
 
-  let result: [
-    Awaited<ReturnType<typeof getPortfolioSummary>>,
-    Awaited<ReturnType<typeof getPortfolioTransactionPage>>,
-    Awaited<ReturnType<typeof getPortfolioScores>>,
-    Awaited<ReturnType<typeof getPortfolioTearsheet>>,
-    Awaited<ReturnType<typeof getPortfolioForecast>> | null,
-    Awaited<ReturnType<typeof getPortfolioDividendProjection>> | null,
-  ] | null = null;
-  let partialMessage: string | null = null;
-  let transactionsError: string | null = null;
+  let summary: Awaited<ReturnType<typeof getPortfolioSummary>> | null = null;
+  let tolerant: {
+    transactions: Promise<{ value: Awaited<ReturnType<typeof getPortfolioTransactionPage>>; error: string | null }>;
+    scores: Promise<{ value: Awaited<ReturnType<typeof getPortfolioScores>>; error: string | null }>;
+    tearsheet: Promise<{ value: Awaited<ReturnType<typeof getPortfolioTearsheet>>; error: string | null }>;
+    forecast: Promise<{ value: Awaited<ReturnType<typeof getPortfolioForecast>> | null; error: string | null }>;
+    dividends: Promise<{ value: Awaited<ReturnType<typeof getPortfolioDividendProjection>> | null; error: string | null }>;
+    partialMessage: Promise<string | null>;
+  } | null = null;
   try {
-    // Cada lectura va con su propio catch para que un módulo lento no
-    // oculte el resto de la cartera. Summary/positions son esenciales; scores,
-    // transactions y tearsheet son lecturas tolerantes a falta de historial.
-    const [summaryResult, transactionsResult, scoresResult, tearsheetResult, forecastResult, dividendsResult] = await Promise.all([
-      getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadSummaryFailed'), cause: error as unknown })),
-      getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadTransactionsFailed') })),
-      // Un fallo al pedir los factores no son cinco ceros: son cinco fatores
-      // desconocidos, y la UI los pinta como "no disponible" en vez de
-      // "0,00", que es lo que se veia cuando el backend no respondia.
-      getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadScoresFailed') })),
-      getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadTearsheetFailed') })),
-      // La previsión es lectura tolerante: un fallo deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadForecastFailed') })),
-      // La proyección de dividendos también es lectura tolerante: un fallo
-      // deja la pestaña con aviso, nunca rompe la página.
-      getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadDividendsFailed') })),
-    ]);
+    // Cada lectura va con su propio catch para que un fallo no oculte el
+    // resto de la cartera. Summary es la única lectura esencial y la única
+    // que se espera aquí: las demás viajan como promesas y cada panel las
+    // desenvuelve con use() dentro de su <Suspense>, así un módulo lento
+    // retrasa solo su panel y no el primer pintado (medido en prod
+    // 17-nov-2026: TTFB 0,3 s pero primer contenido a los 9,6 s cuando la
+    // página esperaba a todas a la vez).
+    const summaryPromise = getPortfolioSummary(userId).then((value) => ({ value, error: null as string | null, cause: null as unknown })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadSummaryFailed'), cause: error as unknown }));
+    const transactionsPromise = getPortfolioTransactionPage(userId, offset, transactionFilters).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { items: [], total: 0, offset, filters: transactionFilters } as Awaited<ReturnType<typeof getPortfolioTransactionPage>>, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadTransactionsFailed') }));
+    // Un fallo al pedir los factores no son cinco ceros: son cinco fatores
+    // desconocidos, y la UI los pinta como "no disponible" en vez de
+    // "0,00", que es lo que se veia cuando el backend no respondia.
+    const scoresPromise = getPortfolioScores(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: { quality: null, growth: null, value: null, dividend: null, cagr3y: null }, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadScoresFailed') }));
+    const tearsheetPromise = getPortfolioTearsheet(userId).then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadTearsheetFailed') }));
+    // La previsión es lectura tolerante: un fallo deja la pestaña con aviso, nunca rompe la página.
+    const forecastPromise = getPortfolioForecast().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadForecastFailed') }));
+    // La proyección de dividendos también es lectura tolerante: un fallo
+    // deja la pestaña con aviso, nunca rompe la página.
+    const dividendsPromise = getPortfolioDividendProjection().then((value) => ({ value, error: null as string | null })).catch((error) => ({ value: null, error: error instanceof Error ? backendMessage(error.message, locale) : ti('portfolio.page.loadDividendsFailed') }));
+    // El aviso de lectura parcial también se calcula sin bloquear: aparece
+    // solo cuando alguna lectura tolerante ha fallado.
+    const partialMessagePromise = Promise.all([transactionsPromise, scoresPromise, tearsheetPromise]).then(([transactionsResult, scoresResult, tearsheetResult]) => {
+      const secondaryErrors = [transactionsResult.error, scoresResult.error, tearsheetResult.error]
+        .filter((error): error is string => Boolean(error));
+      return secondaryErrors.length ? ti('portfolio.page.partialPrefix', { errors: [...new Set(secondaryErrors.map((error) => ti(sectionErrorKey(new Error(error)))))].join(' · ') }) : null;
+    });
+    const summaryResult = await summaryPromise;
     if (!summaryResult.value) {
       // Antes se reconstruia un Error plano desde el mensaje: perdia code y
       // statusCode, nada se reconocia como "no disponible" y cualquier fallo
@@ -77,11 +86,15 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
       if (isAuthError(summaryResult.cause)) return redirectToSignIn();
       console.error('[portfolio] summary failed, rendering retry notice', summaryResult.cause);
     } else {
-      result = [summaryResult.value, transactionsResult.value, scoresResult.value, tearsheetResult.value, forecastResult.value, dividendsResult.value];
-      transactionsError = transactionsResult.error;
-      const secondaryErrors = [transactionsResult.error, scoresResult.error, tearsheetResult.error]
-        .filter((error): error is string => Boolean(error));
-      partialMessage = secondaryErrors.length ? ti('portfolio.page.partialPrefix', { errors: [...new Set(secondaryErrors.map((error) => ti(sectionErrorKey(new Error(error)))))].join(' · ') }) : null;
+      summary = summaryResult.value;
+      tolerant = {
+        transactions: transactionsPromise,
+        scores: scoresPromise,
+        tearsheet: tearsheetPromise,
+        forecast: forecastPromise,
+        dividends: dividendsPromise,
+        partialMessage: partialMessagePromise,
+      };
     }
   } catch (error) {
     if (!isBackendUnavailableError(error)) throw error;
@@ -89,24 +102,21 @@ export default async function PortfolioPage({ searchParams }: { searchParams: Pr
   // El JSX se construye FUERA del try/catch (react-hooks/error-boundaries):
   // sin resumen —backend caído o lectura esencial fallida— se pinta el aviso
   // con Reintentar.
-  if (!result) {
+  if (!summary || !tolerant) {
     return <BackendOffline feature={ti('portfolio.page.featureName')} retryHref="/portfolio" />;
   }
-  const [summary, transactions, scores, tearsheet, forecast, dividends] = result;
 
   return (
     <>
     <PortfolioTabs
       summary={summary}
-      transactions={transactions.items}
-      transactionPage={{ total: transactions.total, offset: transactions.offset, filters: transactions.filters }}
-      transactionsError={transactionsError}
-      scores={scores}
-      tearsheet={tearsheet}
-      forecast={forecast}
-      dividends={dividends}
+      transactions={tolerant.transactions}
+      scores={tolerant.scores}
+      tearsheet={tolerant.tearsheet}
+      forecast={tolerant.forecast}
+      dividends={tolerant.dividends}
       userId={userId}
-      partialMessage={partialMessage}
+      partialMessage={tolerant.partialMessage}
     />
     <ValuationSummaryGrid quotes={summary.holdings.map(h => ({ symbol: h.symbol, price: h.currentPrice, currency: h.nativeCurrency }))} />
     </>
