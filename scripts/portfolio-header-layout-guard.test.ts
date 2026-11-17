@@ -35,12 +35,15 @@ test('F336: «Añadir inversión» envuelve su texto a 360px en vez de recortars
 
 test('F337: donut y leyenda apilan en móvil en vez de recortar la leyenda', () => {
     // La fila pie 250px + leyenda min-w-140px = 390px > ancho útil a 360-390.
-    assert.match(allocation, /flex-1 flex flex-col items-center justify-center gap-6 sm:flex-row sm:justify-between/);
+    assert.match(allocation, /flex-1 flex flex-col items-center justify-center gap-6/);
     assert.match(allocation, /h-\[200px\] w-\[200px\] flex-shrink-0 sm:h-\[250px\] sm:w-\[250px\]/);
+    assert.doesNotMatch(allocation, /sm:flex-row sm:justify-between/);
+    // La reserva del FAB solo aplica desde md: a 360px la leyenda usa todo el ancho.
+    assert.doesNotMatch(allocation, /sm:w-auto sm:min-w-\[160px\]/);
     // PC (11 oct): la leyenda se salía de la tarjeta y los porcentajes
     // quedaban cortados. En sm+ la tarjeta crece (sin scroll) y el pct va
     // con flex-shrink-0 + whitespace-nowrap: nunca clippado.
-    assert.match(allocation, /max-h-\[250px\] w-full min-w-0 space-y-3 overflow-y-auto sm:max-h-none sm:w-auto sm:min-w-\[160px\] sm:max-w-\[260px\] sm:overflow-visible/);
+    assert.match(allocation, /max-h-\[250px\] w-full min-w-0 space-y-3 overflow-y-auto sm:max-h-none sm:overflow-visible md:pr-24/);
     assert.match(allocation, /flex-shrink-0 whitespace-nowrap text-sm text-gray-400 tabular-nums/);
 });
 
