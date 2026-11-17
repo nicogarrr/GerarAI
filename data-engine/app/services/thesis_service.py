@@ -797,6 +797,56 @@ def _apply_value_driver_warning(valuation: dict, check: dict) -> None:
         valuation["publication_warnings"] = warnings
 
 
+# Dos hechos reportados de revenue del mismo periodo que difieren mas de este
+# factor no pueden respaldar una afirmacion (CPT FY2025: 12,97 MUSD vs 1.573,5
+# MUSD para el mismo 2025-12-31:FY). Avisar, nunca ocultar.
+REVENUE_SERIES_CONFLICT_RATIO = 2.0
+
+
+def _revenue_series_conflict(
+    db: Session, company_id: int, payload: dict
+) -> dict | None:
+    """Conflicto de serie en revenue: otro hecho reportado del MISMO periodo
+    difiere mas de REVENUE_SERIES_CONFLICT_RATIO.
+
+    Caso real (CPT FY2025, medido por el Piloto en prod): la tesis marcaba
+    «respaldada / 1 prueba: ingresos 12,97 MUSD» (partida residual de
+    RevenueFromContract...) mientras la vista de finanzas mostraba 1.573,5
+    MUSD (ingreso de arrendador) para el mismo 2025-12-31:FY. Una cifra que
+    no concilia con la serie no puede salir «respaldada»: avisa (la cifra y
+    la conflictiva quedan visibles en metadata), no oculta.
+    """
+    if payload.get("predicate") != "revenue" or not payload.get("source_id"):
+        return None
+    period = payload.get("period")
+    value = payload.get("object")
+    if not period or not isinstance(value, (int, float)) or not value:
+        return None
+    others = db.scalars(
+        select(FinancialFact).where(
+            FinancialFact.company_id == company_id,
+            FinancialFact.metric == "revenue",
+            FinancialFact.period == str(period),
+            FinancialFact.is_reported.is_(True),
+        )
+    ).all()
+    claim_abs = abs(float(value))
+    for other in others:
+        other_abs = abs(float(other.value))
+        if not other_abs or other_abs == claim_abs:
+            continue  # el propio hecho del claim u otro con la misma cifra
+        ratio = max(claim_abs, other_abs) / min(claim_abs, other_abs)
+        if ratio > REVENUE_SERIES_CONFLICT_RATIO:
+            return {
+                "warning": "conflicto de serie: dos hechos reportados de ingresos del mismo periodo difieren mas de 2x",
+                "claim_value": float(value),
+                "conflicting_value": float(other.value),
+                "conflicting_source_id": other.source_id,
+                "ratio": round(ratio, 3),
+            }
+    return None
+
+
 class ThesisService:
     def __init__(self) -> None:
         self.valuation_service = ValuationService()
@@ -1528,6 +1578,12 @@ class ThesisService:
                     "prompt_version": PROMPT_VERSION,
                 },
             )
+            conflict = _revenue_series_conflict(db, company.id, payload)
+            if conflict:
+                # La cifra no concilia con otro hecho revenue del mismo
+                # periodo: no sale «respaldada» (avisar, nunca ocultar).
+                claim.status = "unverified"
+                claim.metadata_["series_conflict"] = conflict
             db.add(claim)
             db.flush()
             if source_id:

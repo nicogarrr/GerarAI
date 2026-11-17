@@ -71,8 +71,14 @@ def _sec_filing_title(form: str | None, filed: str | None) -> str:
 # FY2010 y paso a RevenueFromContract...); a igual fecha, manda el orden
 # de preferencia (F133).
 SEC_EVIDENCE_TAGS: dict[str, tuple[list[str], str]] = {
+    # Los dos ultimos son ingresos de arrendador (ASC 842): un REIT puede
+    # dejar en RevenueFromContract... solo una partida residual (CPT FY2025:
+    # 12,97 M) y etiquetar su ingreso real como OperatingLeaseLeaseIncome
+    # (1.573,5 M). Van los ultimos (a igual periodo manda el contractual) y
+    # _prefer_lessor_revenue aplica la misma regla que la ingesta completa:
+    # en la MISMA presentacion gana el mayor.
     "revenue": (
-        ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue"],
+        ["Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax", "SalesRevenueNet", "RevenueFromContractWithCustomerIncludingAssessedTax", "RegulatedAndUnregulatedOperatingRevenue", "OperatingLeaseLeaseIncome", "OperatingLeasesIncomeStatementLeaseRevenue"],
         "USD",
     ),
     "shares_diluted": (
@@ -706,6 +712,55 @@ class ThesisEvidenceService:
     # SEC lo publica aunque el ultimo 10-K ya no traiga la linea (HYMC: la
     # linea de ingresos desaparece tras FY2023, pero FY2022 sigue en
     # companyfacts). Aditivo: cada (metrica, periodo) se inserta una sola vez.
+    # Ingresos por arrendamiento (ASC 842). Espejo de
+    # financial_ingestion_service.LESSOR_REVENUE_CONCEPTS (misma regla: no se
+    # suman, pueden solaparse; en la misma presentacion gana el mayor).
+    LESSOR_REVENUE_TAGS = (
+        "OperatingLeaseLeaseIncome",
+        "OperatingLeasesIncomeStatementLeaseRevenue",
+    )
+
+    def _prefer_lessor_revenue(
+        self,
+        us_gaap: dict[str, Any],
+        tags: list[str],
+        unit: str,
+        by_end: dict[str, tuple[int, str, str, dict[str, Any]]],
+    ) -> dict[str, tuple[int, str, str, dict[str, Any]]]:
+        """Arrendador vs contractual en la MISMA presentacion: gana el mayor.
+
+        Caso real (CPT FY2025, medido por el Piloto en prod): la tesis marcaba
+        «respaldada / 1 prueba: ingresos 12,97 MUSD» (RevenueFromContract...
+        residual) mientras finanzas mostraba 1.573,5 MUSD
+        (OperatingLeaseLeaseIncome) del MISMO 10-K. La preferencia de tag por
+        si sola coronaba la partida residual. Regla de la ingesta completa
+        (_revenue_with_lessor_income): mismo periodo y mismo accn, max.
+        Presentaciones distintas (accn distinto) no se mezclan.
+        """
+        best: dict[tuple[str, Any], tuple[int, str, str, dict[str, Any]]] = {}
+        for preference, tag in enumerate(tags):
+            if tag not in self.LESSOR_REVENUE_TAGS:
+                continue
+            entries = ((us_gaap.get(tag) or {}).get("units") or {}).get(unit, [])
+            for entry in entries:
+                if not isinstance(entry, dict) or entry.get("val") is None or not entry.get("end"):
+                    continue
+                if str(entry.get("form", "")).upper() not in ANNUAL_FORMS:
+                    continue
+                if not self._is_annual_duration(entry, "revenue"):
+                    continue
+                key = (str(entry["end"]), entry.get("accn"))
+                current = best.get(key)
+                if current is None or entry["val"] > current[3]["val"]:
+                    best[key] = (preference, str(entry.get("filed", "")), tag, entry)
+        for end, chosen in list(by_end.items()):
+            if chosen[2] in self.LESSOR_REVENUE_TAGS:
+                continue  # ya es arrendador: no habia contractual en su periodo
+            candidate = best.get((end, chosen[3].get("accn")))
+            if candidate is not None and candidate[3]["val"] > chosen[3]["val"]:
+                by_end[end] = candidate
+        return by_end
+
     RECENT_ANNUAL_YEARS = 3
 
     def _extract_recent_annuals(
@@ -746,6 +801,8 @@ class ThesisEvidenceService:
                         preference == current[0] and filed > current[1]
                     ):
                         by_end[end] = (preference, filed, tag, entry)
+            if metric == "revenue" and by_end:
+                by_end = self._prefer_lessor_revenue(us_gaap, tags, unit, by_end)
             if not by_end:
                 legacy_map = self._extract_latest_annual(
                     us_gaap, tags_map=mapping, currency=currency

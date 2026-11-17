@@ -158,13 +158,21 @@ def test_evidencia_utility_regulated_operating_revenue():
 
 def test_contrato_lista_tags_revenue_ambos_servicios():
     """La lista de candidatos de revenue debe ser identica en la ingesta
-    principal y en la ruta de evidencia, e incluir las variantes F352."""
-    from app.services.financial_ingestion_service import SEC_METRIC_MAP
+    principal y en la ruta de evidencia, e incluir las variantes F352.
+
+    Los dos tags de arrendador (ASC 842) van al final en AMBOS servicios:
+    la ingesta los anade al recolectar (_revenue_concepts_for) y colapsa
+    con _revenue_with_lessor_income; la evidencia los lleva en su lista y
+    aplica la misma regla de maximo en la misma presentacion
+    (_prefer_lessor_revenue). Caso CPT FY2025: 12,97 MUSD residuales
+    contra 1.573,5 MUSD de OperatingLeaseLeaseIncome del mismo 10-K.
+    """
+    from app.services.financial_ingestion_service import LESSOR_REVENUE_CONCEPTS, SEC_METRIC_MAP
     from app.services.thesis_evidence_service import SEC_EVIDENCE_TAGS
 
     main_tags = {m: tags for m, tags, _unit in SEC_METRIC_MAP}["revenue"]
     evidence_tags, _unit = SEC_EVIDENCE_TAGS["revenue"]
-    assert main_tags == evidence_tags
+    assert evidence_tags == [*main_tags, *LESSOR_REVENUE_CONCEPTS]
     assert "RevenueFromContractWithCustomerIncludingAssessedTax" in main_tags
     assert "RegulatedAndUnregulatedOperatingRevenue" in main_tags
 
