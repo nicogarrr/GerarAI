@@ -240,7 +240,10 @@ export default async function OwnershipPage({ searchParams }: PageProps) {
                                 </tbody>
                             </table>
                         </OverflowScrollRegion>
-                        {holdings.provenance ? (
+                        {/* fetched_at puede ser null (sin fecha real de descarga el backend
+                            la declara nula, no fabrica una): sin fecha no se pinta etiqueta,
+                            nunca un «N/D» que sugiere descarga sin datar. */}
+                        {holdings.provenance?.fetched_at ? (
                             <p className="mt-3 text-xs text-gray-500">
                                 {t('ownership.page.fetchedAt', { datetime: fmt.formatUserDateTime(holdings.provenance.fetched_at) })}
                             </p>
