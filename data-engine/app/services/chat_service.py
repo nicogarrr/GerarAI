@@ -803,6 +803,15 @@ def _question_metrics(question: str) -> set[str]:
     return found
 
 
+# Cifras o conceptos de valoracion que no deben salir por el chat desde un
+# borrador no publicable (valor esperado, margen de seguridad, DCF inverso,
+# WACC, importes en moneda y porcentajes).
+_VALUATION_FIGURE_RE = re.compile(
+    r"(?i)valor esperado|valor intr[ií]nseco|margen de seguridad|reverse dcf|dcf inverso|"
+    r"valoraci[oó]n indicativa|\bwacc\b|[$€]\s?\d|\d\s?(?:\$|€|usd|eur\b)|\d\s?%"
+)
+
+
 def _answer_lead(
     question: str, *, company: Company, facts: list[FinancialFact], thesis: ThesisVersion | None,
     thesis_line: str | None, news: list[NewsEvent], claims: list[Claim],
@@ -840,10 +849,20 @@ def _answer_lead(
         if thesis_withheld:
             return thesis_line
         summary = " ".join((thesis.executive_summary or "").split())
+        is_published = (thesis.status or "").strip() == "published"
         draft_note = (
             " Es un borrador: cualquier rango de valor que aparezca es indicativo, no un valor intrínseco final."
-            if (thesis.status or "").strip() != "published" else ""
+            if not is_published else ""
         )
+        if summary and not is_published and _VALUATION_FIGURE_RE.search(summary):
+            # El resumen de un borrador lleva cifras de valoración (valor esperado,
+            # margen de seguridad, DCF inverso...) que la ficha no publica: el chat
+            # tampoco las cita. Se dice por que y a donde mirar, sin repetir cifras.
+            return (
+                thesis_line + draft_note
+                + " No cito su resumen: incluye cifras de valoración de un borrador que no es publicable."
+                " En la pestaña Valoración de la ficha ves qué entradas faltan."
+            )
         return thesis_line + draft_note + (f" Resumen: {_short(summary, 320)}" if summary else "")
     if focus_metrics:
         wanted = [f for f in facts if f.metric in focus_metrics]

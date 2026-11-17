@@ -14,7 +14,7 @@ from app.core.database import SessionLocal, get_db
 from app.schemas import ChatRequest, ChatResponse
 from app.services.async_bridge import run_from_any_context
 from app.services.chat_service import ChatService
-from app.services.chat_telemetry import classify_response, record_chat_event
+from app.services.chat_telemetry import classify_response, fallback_error, record_chat_event
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -165,5 +165,6 @@ async def chat(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatRespo
         used_llm=used_llm,
         model=response.model,
         latency_ms=int((time.monotonic() - started) * 1000),
+        error=fallback_error(response),
     )
     return response
