@@ -109,10 +109,44 @@ def _compact(value: str) -> str:
 logger = logging.getLogger("gerarai.knowledge_library")
 
 
+def extraction_diagnostic(
+    exc: Exception,
+    *,
+    response: Any,
+    batch_index: int,
+    batch_count: int,
+    source_chars: int,
+    max_tokens: int,
+) -> dict[str, Any]:
+    """Datos medidos de una salida inválida del modelo, acotados y sin texto del
+    documento ni de la respuesta: solo tamaños, motivo de corte y contadores."""
+    usage = getattr(response, "usage", None)
+    text = getattr(response, "text", "") or ""
+    return {
+        "error_type": type(exc).__name__,
+        "batch_index": batch_index,
+        "batch_count": batch_count,
+        "finish_reason": getattr(response, "finish_reason", None),
+        "degraded": bool(getattr(response, "degraded", False)),
+        "response_chars": len(text) if isinstance(text, str) else None,
+        "output_tokens": getattr(usage, "output_tokens", None),
+        "max_tokens": max_tokens,
+        "source_chars": source_chars,
+    }
+
+
 def extraction_error_message(exc: Exception) -> str:
     """Error de extracción legible para la UI: los fallos del modelo (timeout,
     caída, cuota) se explican en español natural en vez del `ProviderTransportError: ...`
     técnico en inglés. El detalle técnico queda en el log del actor."""
+    diagnostic = getattr(exc, "diagnostic", None)
+    if isinstance(diagnostic, dict):
+        reason = diagnostic.get("finish_reason") or "desconocido"
+        return (
+            "El modelo respondió, pero la salida no fue válida "
+            f"(lote {diagnostic.get('batch_index')}/{diagnostic.get('batch_count')}, "
+            f"motivo de corte: {reason}). Divide el documento o vuelve a intentarlo."
+        )
     from app.llm.errors import LLMError
 
     if isinstance(exc, LLMError):
@@ -442,10 +476,8 @@ class KnowledgeLibraryService:
                 document.metadata_ = {**(document.metadata_ or {}), "hy4_principle_run_state": "blocked"}
                 db.commit()
                 raise ProviderDisabledError("Hy4 extraction stopped; no automatic retry or fallback") from exc
-            payload = parse_json_response(response.text)
-            # Contabilidad del gasto: sin este record, ninguna de las llamadas
-            # de este bucle aparecia en budget_usage, asi que el gasto real no
-            # se compedia contra el tope diario.
+            # El gasto ya ocurrio: se contabiliza ANTES de validar la salida, para
+            # que una respuesta invalida tampoco desaparezca de budget_usage.
             budget.record(
                 db,
                 response.model,
@@ -458,10 +490,30 @@ class KnowledgeLibraryService:
                 response.usage.total_tokens,
                 commit=False,
             )
-            if not isinstance(payload, dict) or not isinstance(
-                payload.get("principles"), list
-            ):
-                raise ValueError("Invalid investment principle extraction response")
+            try:
+                payload = parse_json_response(response.text)
+                if not isinstance(payload, dict) or not isinstance(
+                    payload.get("principles"), list
+                ):
+                    raise ValueError("Invalid investment principle extraction response")
+            except Exception as exc:
+                # El actor hace rollback antes de escribir job.error: lo que no se
+                # commitea aqui (gasto, estado hy4) se perderia.
+                exc.diagnostic = extraction_diagnostic(  # type: ignore[attr-defined]
+                    exc,
+                    response=response,
+                    batch_index=batch_index,
+                    batch_count=len(batches),
+                    source_chars=len(source),
+                    max_tokens=3000,
+                )
+                if hy4_mode:
+                    document.metadata_ = {
+                        **(document.metadata_ or {}),
+                        "hy4_principle_run_state": "blocked",
+                    }
+                db.commit()
+                raise
             chunks_by_id = {chunk.id: chunk for chunk in batch}
             for item in payload["principles"]:
                 outcome = self._create_principle_candidate(

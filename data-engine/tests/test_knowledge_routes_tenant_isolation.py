@@ -15,6 +15,7 @@ import main
 from app.core import auth as auth_module
 from app.core.database import SessionLocal, init_db
 from app.models import (
+    BudgetUsage,
     InvestmentPrinciple,
     KnowledgeChunk,
     KnowledgeCollection,
@@ -161,7 +162,7 @@ def test_knowledge_routes_do_not_cross_tenants(monkeypatch):
                 select(Tenant.id).where(Tenant.external_id.in_([tenant_a, tenant_b]))
             ).all()
             if tenant_ids:
-                for model in (InvestmentPrinciple, ProcessingJob, KnowledgeChunk,
+                for model in (BudgetUsage, InvestmentPrinciple, ProcessingJob, KnowledgeChunk,
                               KnowledgeDocument, KnowledgeCollection):
                     db.execute(
                         delete(model).where(model.tenant_id.in_(tenant_ids))

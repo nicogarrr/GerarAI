@@ -1563,6 +1563,9 @@ def extract_knowledge_principles(
 
             job.status = "failed"
             job.error = extraction_error_message(exc)
+            diagnostic = getattr(exc, "diagnostic", None)
+            if isinstance(diagnostic, dict):
+                job.result = {"error_diagnostic": diagnostic}
             job.completed_at = datetime.now(UTC)
             db.commit()
         return _handle_actor_error(
