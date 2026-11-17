@@ -73,7 +73,9 @@ def test_sync_empty_wire(monkeypatch) -> None:
     assert provenance["source_kind"] == "unofficial"
     assert provenance["source"].startswith("Yahoo Finance")
     assert "note" in provenance  # _PROVENANCE_NOTE siempre se emite aqui
-    assert provenance["fetched_at"]
+    # Sin posiciones ni watchlist no hubo descarga: fetched_at se declara
+    # nulo (None honesto, #5792), nunca el momento de la peticion.
+    assert provenance["fetched_at"] is None
 
 
 def _seed_watch_item(tenant_ext: str, symbol: str) -> None:
