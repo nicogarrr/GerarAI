@@ -41,6 +41,10 @@ def test_recent_provider_failure_is_not_retried_immediately(db, monkeypatch):
     assert len(calls) == 1
     assert first["companies"][0]["history_failure"] == "provider_error"
     assert second["companies"][0]["history_failure"] == "provider_error"
+    # Sin datos obtenidos no hay fecha de obtención: la ficha dirá «sin dato»,
+    # nunca «obtenido el <hoy>» con la petición fallida.
+    assert first["companies"][0]["fetched_at"] is None
+    assert second["companies"][0]["fetched_at"] is None
 
 
 def test_total_time_budget_returns_partial_marked(db, monkeypatch):
@@ -53,3 +57,4 @@ def test_total_time_budget_returns_partial_marked(db, monkeypatch):
     result = asyncio.run(svc.HistoricalStressService().build(db, ticker="AAA", budget_seconds=0.3))
     assert time.monotonic() - start < 2
     assert result["companies"][0]["history_failure"] == "provider_error"
+    assert result["companies"][0]["fetched_at"] is None  # presupuesto agotado: nada obtenido

@@ -218,7 +218,9 @@ class HistoricalStressService:
                 "prices": {},
                 "source": "Yahoo Finance",
                 "source_url": None,
-                "fetched_at": datetime.now(UTC).isoformat(),
+                # fetched_at nulo: no se ha obtenido nada (aun). Estampar ahora
+                # pintaria «obtenido el <hoy>» en la ficha sin un solo dato.
+                "fetched_at": None,
                 "currency": None,
                 "symbol": instrument["symbol"],
                 "failure": None,
@@ -265,7 +267,8 @@ class HistoricalStressService:
                     "prices": {},
                     "source": "Yahoo Finance",
                     "source_url": None,
-                    "fetched_at": datetime.now(UTC).isoformat(),
+                    # Presupuesto agotado: nada obtenido, fecha nula (no ahora).
+                    "fetched_at": None,
                     "currency": None,
                     "symbol": instrument["symbol"],
                     "failure": "provider_error",
