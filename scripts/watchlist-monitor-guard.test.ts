@@ -59,4 +59,8 @@ test('el resumen del monitor reserva su altura mientras llega por streaming (sin
     // (17-nov-2026). Las min-h replican las líneas medidas del resumen
     // (text-xs = 16px/línea): 3 en móvil, 2 en sm, 1 en lg.
     assert.match(page, /monitorEl\(rankSummaryEl, <p aria-hidden="true" className="min-h-12 text-xs sm:min-h-8 lg:min-h-4">/);
+    // La columna del titulo ocupa todo el ancho bajo lg tambien en el estado
+    // pendiente: sin el w-full, al llegar la franja el boton de alta se
+    // envolvia debajo y empujaba el contenido 56px (replica medida 17-nov-2026).
+    assert.match(page, /<div className="min-w-0 w-full lg:w-auto">/);
 });

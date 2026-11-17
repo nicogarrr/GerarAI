@@ -517,7 +517,11 @@ export default async function WatchlistPage({
         <WatchlistMembership key={watchlistItems.map((item) => item.symbol).sort().join('|')}>
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip">
             <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
+                {/* w-full bajo lg: la columna ocupa todo el ancho tambien en el estado
+                    pendiente, asi el boton de alta ya nace envuelto debajo y su salto
+                    al llegar la franja (56px medidos en replica, 17-nov-2026) no
+                    desplaza el contenido. En lg la franja cabe en linea con el boton. */}
+                <div className="min-w-0 w-full lg:w-auto">
                     <h1 className="flex items-center gap-2 text-xl font-bold break-words text-gray-100 sm:text-2xl">
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
