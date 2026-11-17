@@ -27,7 +27,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import JSON, case, cast, column, func, literal, select, true
+from sqlalchemy import JSON, func, literal_column, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
@@ -137,30 +137,14 @@ def engine_peer_ratios(db: Session) -> dict[int, float]:
     payload = ValuationOutput.output_payload
     # Keep JSON types and the same Python value/ADR rules, but never transfer
     # the unrelated valuation trace for every company in the peer universe.
-    projected_from = []
     if db.get_bind().dialect.name == "postgresql":
-        # JSON (not JSONB) reparses the whole document for EACH -> operator.
-        # json_to_record reads it once, then projects the small listed values
-        # in a second lateral record without sending the nested object back.
-        empty_object = cast(literal("{}"), JSON)
-        inputs = func.json_to_record(case(
-            (func.json_typeof(payload) == "object", payload), else_=empty_object,
-        )).table_valued(
-            column("listed_share_values", JSON), column("adr_ratio", JSON),
-            column("expected_value", JSON), column("base_value", JSON),
-            column("current_price", JSON),
-        ).render_derived(with_types=True).lateral()
-        listed = func.json_to_record(case(
-            (func.json_typeof(inputs.c.listed_share_values) == "object", inputs.c.listed_share_values),
-            else_=empty_object,
-        )).table_valued(
-            column("expected", JSON), column("base", JSON),
-        ).render_derived(with_types=True).lateral()
-        projected = (
-            listed.c.expected, listed.c.base, inputs.c.adr_ratio,
-            inputs.c.expected_value, inputs.c.base_value, inputs.c.current_price,
-        )
-        projected_from = [inputs, listed]
+        # Online 0136 fills this array on writes and in resumable batches.
+        # A missing backfill row falls back to the identical live projection.
+        # Select one array, not six copies of the fallback expression.
+        from app.valuation.peer_rank_projection import COLUMN
+
+        inputs = literal_column(f"valuation_outputs.{COLUMN}", type_=JSON)
+        projected = (func.coalesce(inputs, func.valuation_peer_rank_inputs_v1(payload, type_=JSON)),)
     else:
         projected = (
             payload["listed_share_values"]["expected"], payload["listed_share_values"]["base"],
@@ -172,11 +156,12 @@ def engine_peer_ratios(db: Session) -> dict[int, float]:
         .join(ranked, ValuationModel.id == ranked.c.id)
         .join(ValuationOutput, ValuationOutput.valuation_model_id == ValuationModel.id)
         .join(Company, Company.id == ValuationModel.company_id)
-        .where(ranked.c.rank == 1)
+        .where(ranked.c.rank == 1, ValuationModel.status != "insufficient_data")
     )
-    for source in projected_from:
-        statement = statement.join(source, true())
     rows = db.execute(statement).all()
+    if db.get_bind().dialect.name == "postgresql":
+        rows = [(company_id, status, *inputs, currency)
+                for company_id, status, inputs, currency in rows]
     out: dict[int, float] = {}
     for company_id, status, listed_expected, listed_base, adr_ratio, expected, base, price, currency in rows:
         if status == "insufficient_data" or int(company_id) in out:
