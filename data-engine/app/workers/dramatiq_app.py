@@ -5855,7 +5855,10 @@ def ingest_house_ptr(
         budget = max_new
         for target in (year, year - 1):
             result = politician_trades.ingest_year(db, target, tenant_id=tenant_id, max_new=budget)
-            budget -= result["new"] - result["scanned"]
+            # ingest_year gasta un PDF de presupuesto por cada PTR electronico
+            # intentado, tambien si falla (stats["errors"], no suma a "new"):
+            # sin contarlos el tope max_new se superaba entre los dos años.
+            budget -= (result["new"] - result["scanned"]) + len(result.get("errors") or [])
             stats.append(result)
             if budget <= 0:
                 break
