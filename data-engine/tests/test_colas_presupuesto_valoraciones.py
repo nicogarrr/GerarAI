@@ -123,7 +123,9 @@ def test_actor_presupuesto_agotado_guarda_cursor_y_sigue_en_otro_mensaje(monkeyp
     assert fake.store.get("valuation_metrics:cursor:1") == "MMM"
     assert len(sent) == 1
     assert sent[0]["kwargs"] == {"tenant_id": 1, "user_id": "u"}
-    assert sent[0]["delay"] >= 60_000
+    # Continuacion corta: tras soltar lease y claim, no un minuto entero.
+    assert dramatiq_app.VALUATION_CONTINUATION_DELAY_MS <= sent[0]["delay"] < 60_000
+    assert sent[0]["delay"] >= 15_000
 
 
 def test_actor_429_en_el_ultimo_intento_guarda_cursor_y_no_va_a_dead_letter(monkeypatch):
@@ -254,3 +256,55 @@ def test_actor_propicks_declara_limite_y_pasa_presupuesto(monkeypatch):
     limit = dramatiq_app.refresh_propicks_prices.options["time_limit"]
     assert seen["budget_seconds"] * 1000 < limit
     assert limit <= 30 * 60 * 1000
+
+
+def test_tanda_de_valoraciones_es_corta_y_el_actor_la_pasa_al_servicio(monkeypatch):
+    """La tanda es de 5 min: una sola corrida no ocupa el hilo de externa 50."""
+    from app.services.valuation_metrics_service import ValuationTimeBudgetExhausted
+
+    assert dramatiq_app.VALUATION_TIME_BUDGET_SECONDS == 300
+    seen = {}
+
+    def _refresh(db, *, start_after_ticker=None, deadline=None, **kwargs):
+        seen["remaining"] = deadline.remaining()
+        raise ValuationTimeBudgetExhausted("MMM")
+
+    _actor_env(monkeypatch, _refresh)
+    dramatiq_app.refresh_valuation_metrics.fn(tenant_id=1, user_id="u")
+    assert 290 < seen["remaining"] <= 300
+
+
+def test_tenants_avanzan_por_turnos_no_uno_hasta_acabar(monkeypatch):
+    """Equidad: cada continuacion entra al final de la cola, asi que con tres
+    tenants que necesitan tres tandas cada uno el orden es A,B,C,A,B,C,A,B,C y
+    ninguno espera a que otro termine su universo."""
+    from app.services.valuation_metrics_service import ValuationTimeBudgetExhausted
+
+    tandas_pendientes = {1: 3, 2: 3, 3: 3}
+    orden = []
+    cola = [{"tenant_id": t, "user_id": "u"} for t in (1, 2, 3)]
+    fake = _Redis()
+    monkeypatch.setattr("app.services.connectors.finnhub.finnhub_blocked_for", lambda: 0.0)
+    monkeypatch.setattr(dramatiq_app, "_redis_client", lambda: fake)
+    monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda *a, **k: "token")
+    monkeypatch.setattr(dramatiq_app, "release_job_lease", lambda *a, **k: None)
+    monkeypatch.setattr(dramatiq_app, "_rollback", lambda db: None)
+    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: SimpleNamespace(close=lambda: None, tenant=tenant_id))
+
+    def _refresh(db, *, start_after_ticker=None, deadline=None, **kwargs):
+        tenant = db.tenant
+        orden.append(tenant)
+        tandas_pendientes[tenant] -= 1
+        if tandas_pendientes[tenant] > 0:
+            raise ValuationTimeBudgetExhausted("T")
+        return {"companies": 1}
+
+    monkeypatch.setattr("app.services.valuation_metrics_service.refresh_valuation_metrics", _refresh)
+    monkeypatch.setattr(
+        dramatiq_app.refresh_valuation_metrics, "send_with_options", lambda **k: cola.append(k["kwargs"])
+    )
+    while cola:
+        kwargs = cola.pop(0)
+        dramatiq_app.refresh_valuation_metrics.fn(**kwargs)
+    assert orden == [1, 2, 3, 1, 2, 3, 1, 2, 3]
+    assert tandas_pendientes == {1: 0, 2: 0, 3: 0}
