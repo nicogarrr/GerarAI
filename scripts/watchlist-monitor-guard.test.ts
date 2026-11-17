@@ -58,15 +58,21 @@ test('el resumen del monitor reserva su altura mientras llega por streaming (sin
     // título, botón de alta y tabla: CLS 0.164-0.176 medido en prod a 390x844
     // (17-nov-2026). Las min-h replican las líneas medidas del resumen
     // (text-xs = 16px/línea): 3 en móvil, 2 en sm, 1 en lg.
-    assert.match(page, /const rankSummarySlot = <p aria-hidden="true" className="min-h-12 text-xs sm:min-h-8 lg:min-h-4">/);
+    assert.match(page, /const rankSummarySlot = <p aria-hidden="true" className="min-h-12 text-xs @md:min-h-8 @3xl:min-h-4">/);
     // Sin ranks validos (ranked=0) la franja resuelve a la misma reserva, no a
     // null: con null la reserva colapsaba al resolver el stream y el contenido
     // subia (CLS inverso, hallazgo del auditor 17-nov-2026).
     assert.match(page, /: rankSummarySlot;/);
     // Con watchlist vacia no hay franja posible: no se reserva nada.
     assert.match(page, /watchlistStocks\.length > 0 && monitorEl\(rankSummaryEl, rankSummarySlot\)/);
-    // La columna del titulo ocupa todo el ancho bajo lg tambien en el estado
-    // pendiente: sin el w-full, al llegar la franja el boton de alta se
-    // envolvia debajo y empujaba el contenido 56px (replica medida 17-nov-2026).
-    assert.match(page, /<div className="min-w-0 w-full lg:w-auto">/);
+    // La cabecera se rige por ANCHO DISPONIBLE (@container), no de ventana:
+    // con el sidebar expandido (240px desde md) la ventana 1024px deja 720px
+    // utiles, la franja ocupa 2 lineas y el boton se envolvia: +72px de salto
+    // (NO FAV del auditor a v3, 17-nov-2026).
+    assert.match(page, /<div className="@container flex min-w-0 flex-wrap items-center justify-between gap-3">/);
+    // La columna del titulo ocupa todo el ancho disponible bajo 1024px de
+    // contenedor tambien en el estado pendiente: sin el w-full, al llegar la
+    // franja el boton de alta se envolvia debajo y empujaba el contenido 56px
+    // (replica medida 17-nov-2026). Por encima caben franja de 1 linea + boton.
+    assert.match(page, /<div className="min-w-0 w-full @min-\[1024px\]:w-auto">/);
 });

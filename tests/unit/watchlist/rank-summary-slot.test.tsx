@@ -108,6 +108,19 @@ describe('rank summary slot (sin CLS en ningun desenlace)', () => {
     expect(JSON.stringify(resolved)).toContain('watchlist.page.fairValue.summary');
   });
 
+  it('la cabecera usa container queries (ancho disponible, no de ventana)', async () => {
+    // El sidebar expandido resta 240px desde md: con breakpoints de ventana la
+    // reserva quedaba corta y el boton se envolvia a 1024px (NO FAV auditor v3).
+    m.state.mockResolvedValue(ONE_STOCK);
+    m.basics.mockResolvedValue({ AAPL: { name: 'Apple', exchange: 'NASDAQ', currency: 'USD' } });
+    m.dated.mockResolvedValue({}); m.dca.mockResolvedValue({ data: null, unavailable: false });
+    m.monitor.mockReturnValue(new Promise(() => {}));
+    const page = await renderPage();
+    expect(hasClass(page, '@container')).toBe(true);
+    expect(hasClass(page, '@min-[1024px]:w-auto')).toBe(true);
+    expect(hasClass(page, '@3xl:min-h-4')).toBe(true);
+  });
+
   it('no reserva nada con watchlist vacia (no hay stream ni slot)', async () => {
     m.state.mockResolvedValue({ items: [], unavailable: false });
     m.basics.mockResolvedValue({});
