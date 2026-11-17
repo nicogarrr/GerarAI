@@ -196,6 +196,14 @@ def _english_label(value: str | None) -> str:
     return _ENGLISH_LABELS.get(key, key.replace("_", " "))
 
 
+_DRAFT_VALUATION_CRITERION_RE = re.compile(
+    r"reverse\s*dcf|margen de seguridad|valor intr[ií]nseco"
+    r"|escenario\s+(?:base|optimista|pesimista|de\s+valoraci[oó]n)"
+    r"|\d+(?:[.,]\d+)?\s*(?:%|€|\$|x\b|millones|por acci[oó]n)",
+    re.IGNORECASE,
+)
+
+
 def build_memo_markdown(
     db: Session,
     company: Company,
@@ -419,6 +427,10 @@ def build_memo_markdown(
 
     lines.append(tr("## Criterios de invalidación", "## Invalidation criteria"))
     criteria = thesis.invalidation_criteria or []
+    if draft:
+        # Un criterio con terminos o cifras de valoracion (p. ej. el reverse DCF)
+        # reproduce lo que el borrador retiene. Anos y recuentos cualitativos pasan.
+        criteria = [item for item in criteria if not _DRAFT_VALUATION_CRITERION_RE.search(str(item))]
     if criteria:
         for item in criteria:
             lines.append(f"- {item}")
