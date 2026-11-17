@@ -7,8 +7,15 @@
  * aproximación deliberada, no una réplica exacta: mantener sincronizadas con
  * CompanyHeaderQuote y con el placeholder h-[400px] de
  * CompanyTechnicalWorkspace.
+ *
+ * `compact` replica la variante compacta de CompanyHeaderQuote (vistas
+ * secundarias de la ficha: solo etiqueta, precio e insignia, ~93px en
+ * móvil). Sin él la reserva completa (~690px con tira de métricas y gráfico
+ * que la variante compacta nunca pinta) colapsaba al llegar el streaming y
+ * movía la página ~600px (CLS medido en prod 0.22-0.26 a 390x844, primera
+ * visita fría a ?view=tesis/finanzas).
  */
-export function CompanyHeaderQuoteSkeleton() {
+export function CompanyHeaderQuoteSkeleton({ compact = false }: { compact?: boolean }) {
     return (
         <div aria-hidden="true" className="flex w-full animate-pulse flex-col gap-4" data-testid="company-header-quote-skeleton">
             {/* Cotización: etiqueta, precio, insignia de variación y fechas. */}
@@ -16,23 +23,31 @@ export function CompanyHeaderQuoteSkeleton() {
                 <div className="h-3 w-24 rounded bg-gray-800" />
                 <div className="mt-1 h-10 w-44 rounded bg-gray-800 sm:h-12" />
                 <div className="mt-2 h-7 w-40 rounded-full bg-gray-800" />
-                <div className="mt-2 h-3 w-48 rounded bg-gray-800" />
-                <div className="mt-1 h-3 w-32 rounded bg-gray-800" />
+                {compact ? null : (
+                    <>
+                        <div className="mt-2 h-3 w-48 rounded bg-gray-800" />
+                        <div className="mt-1 h-3 w-32 rounded bg-gray-800" />
+                    </>
+                )}
             </div>
-            {/* Tira de métricas: 2 columnas en móvil, 4 en sm+. */}
-            <div className="min-w-0 max-w-full">
-                <div className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800">
-                    {['Apertura', 'Máximo', 'Mínimo', 'Cierre anterior'].map((label) => (
-                        <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={label}>
-                            <div className="h-3 w-14 rounded bg-gray-800" />
-                            <div className="mt-1 h-4 w-20 rounded bg-gray-800" />
+            {compact ? null : (
+                <>
+                    {/* Tira de métricas: 2 columnas en móvil, 4 en sm+. */}
+                    <div className="min-w-0 max-w-full">
+                        <div className="grid min-w-0 grid-cols-2 gap-x-3 border-y border-gray-800 sm:grid-cols-4 sm:gap-x-0 sm:divide-x sm:divide-gray-800">
+                            {['Apertura', 'Máximo', 'Mínimo', 'Cierre anterior'].map((label) => (
+                                <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={label}>
+                                    <div className="h-3 w-14 rounded bg-gray-800" />
+                                    <div className="mt-1 h-4 w-20 rounded bg-gray-800" />
+                                </div>
+                            ))}
                         </div>
-                    ))}
-                </div>
-                <div className="mt-2 h-3 w-64 max-w-full rounded bg-gray-800" />
-            </div>
-            {/* Gráfico: misma reserva que el placeholder del dynamic import. */}
-            <div className="h-[400px] rounded-xl border border-gray-800 bg-surface-1" />
+                        <div className="mt-2 h-3 w-64 max-w-full rounded bg-gray-800" />
+                    </div>
+                    {/* Gráfico: misma reserva que el placeholder del dynamic import. */}
+                    <div className="h-[400px] rounded-xl border border-gray-800 bg-surface-1" />
+                </>
+            )}
         </div>
     );
 }

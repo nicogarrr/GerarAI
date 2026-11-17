@@ -1978,7 +1978,7 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
           <CompanyNavigation ticker={ticker} activeView={activeView} locale={locale} />
           <Suspense fallback={null}><ListingStaleBanner exchange={company.exchange} priceAsOf={headerMarket?.quote?.priceAsOf ?? null} quote={headerQuotePromise} /></Suspense>
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
-          {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
+          {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton compact={activeView !== 'overview'} />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
           <div className="scroll-mt-6" id="analistas"><MobileCollapse deferMount title={t('research.fichaAnalystTargetsTitle')}><DeferredAnalystTargets initial={overviewAnalystsPromise} symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></MobileCollapse></div>
           <div className="scroll-mt-6" id="historial-analistas"><MobileCollapse deferMount title={t('research.fichaAnalystHistoryTitle')}><DeferredAnalystHistory symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} /></MobileCollapse></div>
