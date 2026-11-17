@@ -75,6 +75,8 @@ const APP_EXCEPTIONS: Record<string, string> = {};
  * directiva y el detector la siga justificando.
  */
 const JUSTIFIED_USE_CLIENT: Record<string, string> = {
+  'components/settings/BrainChatModelForm.tsx':
+    'useState y onChange mantienen el selector del modelo del chat general; localStorage conserva la preferencia en este navegador.',
   'components/research/DcaPreparingRefresh.tsx': 'useEffect and useRouter subscribe to bounded card status polling and refresh once after completion.',
   'components/research/CompanyNavigationScroll.tsx':
     'Client boundary uses refs, useEffect and MutationObserver to keep the active tab visible after client navigation.',
