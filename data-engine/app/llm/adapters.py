@@ -26,6 +26,7 @@ from app.llm.contracts import (
 )
 from app.llm.errors import (
     ProviderDisabledError,
+    ProviderEmptyResponseError,
     ProviderRequestError,
     ProviderResponseError,
     ProviderTransportError,
@@ -619,7 +620,7 @@ class OpenAICompatibleProvider(LLMProvider):
             raise ProviderResponseError(f"{self.name} returned no assistant message") from None
         tool_calls = parse_tool_calls(assistant.get("tool_calls"))
         if not content and not tool_calls:
-            raise ProviderResponseError(f"{self.name} returned an empty assistant message")
+            raise ProviderEmptyResponseError(f"{self.name} returned an empty assistant message")
 
         if self._strip_response_format and request.response_format is not None:
             # El modelo a veces envuelve el JSON en un bloque ```: se desenvuelve

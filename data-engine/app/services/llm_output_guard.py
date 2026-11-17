@@ -24,6 +24,10 @@ from dataclasses import dataclass, field, replace
 from typing import Any, Literal, cast
 
 from app.llm import LLMRequest, Message
+from app.llm.errors import ProviderEmptyResponseError
+
+#: Plazo minimo restante (s) del chat para repetir UNA llamada que devolvio cuerpo vacio.
+EMPTY_RETRY_MIN_REMAINING_S = 6.0
 
 logger = logging.getLogger(__name__)
 
@@ -485,8 +489,17 @@ async def complete_guarded(
     expected_language: str = "es",
     on_response: Callable[[Any], None] | None = None,
     before_retry: Callable[[], None] | None = None,
+    retry_empty_once: bool = False,
 ) -> GuardedResponse:
     """``provider.complete`` con validacion y UN reintento.
+
+    ``retry_empty_once`` (solo chat interactivo; por defecto False para no
+    repetir llamadas de extraccion/expertos con guardas de no-replay): si la
+    PRIMERA llamada falla con ``ProviderEmptyResponseError`` (200 sin texto)
+    se repite UNA vez, siempre que ``before_retry`` lo permita y queden al
+    menos ``EMPTY_RETRY_MIN_REMAINING_S`` segundos de plazo. Sin fallback de
+    modelo ni de pago: es el mismo proveedor. Si la segunda tambien falla, el
+    error se propaga y el llamador degrada.
 
     ``on_response`` se llama con CADA respuesta del proveedor (tambien las
     descartadas) para que el llamador registre su coste. ``before_retry`` se
@@ -496,7 +509,20 @@ async def complete_guarded(
     Los errores del proveedor se propagan sin tocar.
     """
     _count(source, "calls")
-    first = await provider.complete(request)
+    try:
+        first = await provider.complete(request)
+    except ProviderEmptyResponseError:
+        if not retry_empty_once:
+            raise
+        from app.llm.interactive_deadline import remaining_seconds
+
+        if remaining_seconds() < EMPTY_RETRY_MIN_REMAINING_S:
+            raise
+        _count(source, "empty_retry")
+        logger.warning("llm_output_guard[%s]: respuesta vacia del proveedor, reintento unico", source)
+        if before_retry is not None:
+            before_retry()
+        first = await provider.complete(request)
     if on_response is not None:
         on_response(first)
     reasons = inspect_response_text(
