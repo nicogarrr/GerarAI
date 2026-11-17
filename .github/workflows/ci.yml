@@ -725,11 +725,17 @@ jobs:
       # GHSA-vfj7-8cjw-p6xm (braces <=3.0.3) no tenia parche; GitHub retiro esa
       # advisory y `npm audit` del arbol completo vuelve a dar 0 hallazgos, asi
       # que vuelve a bloquear como pedia el recordatorio de #806.
+      # Ambos pasos pasan por scripts/npm-audit-gate.mjs: igual que
+      # `--audit-level=high` salvo GHSA-fc5q-39xc-vjpf (picomatch <= 4.0.7, sin
+      # version parcheada upstream a 17-nov-2026; ver el guard para motivo y
+      # condicion de retirada). El script ejecuta npm y decide por su cuenta (un pipe
+      # con `npm audit` fallaria bajo `bash -eo pipefail`); falla cerrado si npm
+      # no devuelve JSON valido o la cadena de una advisory no se puede atribuir.
       - name: Audit npm dependencies (produccion)
-        run: npm audit --omit=dev --audit-level=high
+        run: node scripts/npm-audit-gate.mjs --omit=dev
       - name: Audit npm dependencies (incluye desarrollo)
         if: ${{ always() }}
-        run: npm audit --audit-level=high
+        run: node scripts/npm-audit-gate.mjs
       # `if: always()` en los dos pasos de pip: un `npm audit` en rojo no debe
       # dejar el lado Python sin auditar. Los dos hallazgos se ven juntos.
       - name: Install pip-audit
