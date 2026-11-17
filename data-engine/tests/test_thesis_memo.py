@@ -627,3 +627,53 @@ def test_english_memo_other_currency_keeps_its_code():
     assert _money_en(-12, "EUR") == "-€12.00"
     assert _money_en(343.46, "USD") == "$343.46"
     assert _money_en(None, "EUR") == "pending"
+
+
+@pytest.mark.parametrize(
+    "criterion",
+    [
+        "Los ingresos reales se desvian de forma persistente del 37,3 % anual que exige el reverse DCF.",
+        "El margen de seguridad cae por debajo del umbral.",
+        "El valor por acción baja de 50 $ en el modelo.",
+        "El escenario base deja de cumplirse.",
+    ],
+)
+def test_draft_drops_valuation_derived_invalidation_criteria(db, criterion):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.status = "draft"
+    thesis.invalidation_criteria = [criterion, "Perdida de cuota sostenida en su mercado principal."]
+    db.commit()
+
+    memo = build_memo_markdown(db, company, thesis, draft=True)
+
+    assert criterion not in memo
+    assert "Perdida de cuota sostenida" in memo
+
+
+@pytest.mark.parametrize(
+    "criterion",
+    [
+        "La expansión a China no se materializa antes de 2028.",
+        "El dividendo no crece en 3 años consecutivos.",
+        "El escenario regulatorio se endurece en la UE.",
+        "El escenario competitivo se deteriora con la entrada de nuevos players.",
+    ],
+)
+def test_draft_keeps_qualitative_criteria(db, criterion):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.status = "draft"
+    thesis.invalidation_criteria = [criterion]
+    db.commit()
+
+    assert criterion in build_memo_markdown(db, company, thesis, draft=True)
+
+
+def test_published_memo_keeps_all_invalidation_criteria(db):
+    company = _company(db)
+    thesis = _full_thesis(db, company.id)
+    thesis.invalidation_criteria = ["Ingresos por debajo del 37,3 % anual que exige el reverse DCF."]
+    db.commit()
+
+    assert "37,3 % anual" in build_memo_markdown(db, company, thesis)
