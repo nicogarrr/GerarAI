@@ -186,7 +186,6 @@ const DYNAMIC_KNOWN: Record<string, number> = {
     'lib/actions/live-quotes.actions.ts': 1,
     'lib/actions/newsSources.actions.ts': 3,
     'lib/actions/privacy.actions.ts': 2,
-    'lib/actions/screener.actions.ts': 1,
     'lib/upstream/finnhub.ts': 1,
     // boundedFetch de /api/logo: fetch a dominio EXTERNO (icono del sitio de la
     // empresa, validado por isSafeIconUrl en site-icon), nunca a /api/.
