@@ -7,19 +7,20 @@ test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
 // Verifica geometría real del carril a 390px y navegación por toque.
-test("pestañas ficha 390px: carril deslizable sin barra visible y toque navega", async ({ page }) => {
+test("pestañas ficha 390px: carril deslizable con affordance visible y toque navega", async ({ page }) => {
   await page.goto("/research/UBER");
   const nav = page.getByTestId("company-navigation");
   await expect(nav).toBeVisible();
 
-  // El carril desborda en 390px (6 pestañas) pero la barra queda oculta.
+  // El carril desborda en 390px (6 pestañas) y muestra el affordance fino de
+  // scroll-affordance-x (contrato visual de #5783), no scrollbar-hide.
   const metrics = await nav.evaluate((el) => ({
     overflowX: getComputedStyle(el).overflowX,
     scrollbarWidth: getComputedStyle(el).scrollbarWidth,
     desborda: el.scrollWidth > el.clientWidth,
   }));
   expect(metrics.overflowX).toBe("auto");
-  expect(metrics.scrollbarWidth).toBe("none");
+  expect(metrics.scrollbarWidth).toBe("thin");
   expect(metrics.desborda).toBe(true);
 
   // Check the center of each visible intersection, not a clipped link midpoint.

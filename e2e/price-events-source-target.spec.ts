@@ -1,4 +1,7 @@
 import {expect,test} from '@playwright/test';
+const runUiE2E = process.env.E2E_UI_RUN === "1";
+// Skip before the page fixture launches: the API-only job has no browser.
+test.skip(!runUiE2E, "Set E2E_UI_RUN=1 to run browser tests.");
 // Applies when the production chart has a sourced stored event. Fixture SSR
 // measurement accompanying this PR covers the always-present synthetic SEC link.
 test('source links offer mobile tap targets',async({page})=>{
