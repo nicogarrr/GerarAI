@@ -21,6 +21,10 @@ class ProviderResponseError(LLMError):
     pass
 
 
+class ProviderEmptyResponseError(ProviderResponseError):
+    """El proveedor respondio 200 pero sin texto ni tool calls (cuerpo vacio)."""
+
+
 class StructuredOutputError(LLMError):
     pass
 

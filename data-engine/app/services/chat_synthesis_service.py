@@ -533,6 +533,8 @@ _MODEL_DOWN_MOTIVES = {
                  "the model's write-up did not pass the source check"),
     "timeout": ("el modelo no respondió a tiempo", "the model did not answer in time"),
     "down": ("el proveedor del modelo no responde", "the model provider is not answering"),
+    "empty": ("el modelo devolvió una respuesta vacía (se reintentó una vez); vuelve a preguntar",
+              "the model returned an empty answer (retried once); ask again"),
 }
 
 _GUARD_MISSING = (
@@ -589,6 +591,10 @@ def _model_down_kind(exc: BaseException | None, reason: str) -> str:
         seen.add(id(current))
         chain.append(current)
         current = current.__cause__ or current.__context__
+    from app.llm.errors import ProviderEmptyResponseError
+
+    if any(isinstance(item, ProviderEmptyResponseError) for item in chain):
+        return "empty"
     texts = " ".join(str(item) for item in chain)
     if re.search(r"after primary \S*:(?:ProviderResponseError|ValueError)\b", texts):
         return "rejected"
@@ -1584,6 +1590,7 @@ class ChatSynthesisService:
                 expected_language=current_language(),
                 on_response=None if bind else _record,
                 before_retry=_can_retry,
+                retry_empty_once=True,
             )
         except Exception as exc:  # proveedor caido, guard agotado o presupuesto: fallback honesto
             from app.llm.chat_provider import is_quota_exhausted
