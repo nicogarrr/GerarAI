@@ -1,5 +1,6 @@
 'use client';
-import { useAiAvailability, AiAvailabilityNotice } from '@/components/ai/AiAvailabilityNotice';
+import { useAiAvailability } from '@/components/ai/AiAvailabilityNotice';
+import { readBrainChatModel } from '@/lib/brain/chat-model';
 import { TickerSearchInput } from '@/components/search/TickerSearchInput';
 
 import { memo, useCallback, useState, useRef, useEffect, type ComponentProps } from 'react';
@@ -92,7 +93,8 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         void import('react-markdown');
     }, []);
     const [isMaximized, setIsMaximized] = useState(false);
-    const [chatModel, setChatModel] = useState<'' | 'hy4-flash-free'>('');
+    // Preferencia editada en Ajustes > LLM (local del navegador); se lee al abrir el panel.
+    const [chatModel] = useState<'' | 'hy4-flash-free'>(() => readBrainChatModel(globalThis.localStorage));
     // Modo guía (asistente de research unificado): con ticker en el selector el
     // Cerebro pregunta a /api/research/assistant en vez de al chat general.
     const [author, setAuthor] = useState('');
@@ -451,16 +453,10 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
             </CardContent>
 
             <CardFooter className="shrink-0 flex-col gap-2 p-3 border-t border-slate-800 bg-slate-900/50">
-                <AiAvailabilityNotice availability={availability} />
-                {!knowledge && !guideTicker.trim() && <label className="flex w-full min-w-0 flex-col gap-1 text-xs text-slate-300">
-                    {t('brain.panel.modelLabel')}
-                    <select aria-label={t('brain.panel.modelLabel')} value={chatModel} disabled={loading}
-                        onChange={e => setChatModel(e.target.value === 'hy4-flash-free' ? 'hy4-flash-free' : '')}
-                        className="min-h-11 w-full rounded border border-slate-700 bg-slate-950 px-3 text-base sm:text-sm">
-                        <option value="">{t('brain.panel.modelDefault')}</option>
-                        <option value="hy4-flash-free">{t('brain.panel.modelHy4')}</option>
-                    </select>
-                </label>}
+                {/* Sin cartel de disponibilidad en el panel: si el envío
+                    falla, el error sale en el propio mensaje de respuesta
+                    (handleSend), no como aviso fijo (producto, 17-nov-2026).
+                    El hook sigue gateando el botón de enviar. */}
                 <form
                     className="flex w-full gap-2"
                     onSubmit={(e) => { e.preventDefault(); handleSend(); }}
@@ -468,6 +464,9 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                     <label htmlFor="global-brain-input" className="sr-only">
                         {t('brain.panel.inputLabel')}
                     </label>
+                    {/* El modelo del chat general se elige en Ajustes > LLM,
+                        no aquí: el pie del panel queda solo con el input
+                        (producto, 17-nov-2026). */}
                     {knowledge ? <textarea
                         ref={inputRef as React.RefObject<HTMLTextAreaElement>}
                         id="global-brain-input"

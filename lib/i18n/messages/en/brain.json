@@ -146,10 +146,7 @@
     "guideEmpty": "Guide for {ticker}: answer with no text.",
     "guideError": "The guide could not be fetched. Try again; nothing was changed.",
     "unknownError": "Sorry, an unknown error occurred.",
-    "responseError": "The answer could not be completed. If it takes longer than usual, try again in a few seconds.",
-    "modelLabel": "General chat model",
-    "modelDefault": "Current brain (default)",
-    "modelHy4": "HY 4 Flash (Go)"
+    "responseError": "The answer could not be completed. If it takes longer than usual, try again in a few seconds."
   },
   "suggested": {
     "general": {

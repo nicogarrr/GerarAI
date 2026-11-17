@@ -199,7 +199,10 @@
       "publishedLimits": "Tope gratuito publicado: hasta {rpd} solicitudes/día según el modelo",
       "tenant": "Usas tu propia clave: tu consumo lo gestiona tu proveedor y no aparece aquí.",
       "generatedAt": "Actualizado {date}"
-    }
+    },
+    "chatModelLabel": "Modelo del chat general",
+    "chatModelDefault": "Cerebro actual (predeterminado)",
+    "chatModelHy4": "HY 4 Flash (Go)"
   },
   "tax": {
     "title": "Datos fiscales del declarante",

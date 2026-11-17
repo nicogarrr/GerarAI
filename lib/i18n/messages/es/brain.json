@@ -146,10 +146,7 @@
     "guideEmpty": "Guía de {ticker}: respuesta sin texto.",
     "guideError": "No se pudo obtener la guía. Reintenta; no se ha modificado nada.",
     "unknownError": "Lo siento, hubo un error desconocido.",
-    "responseError": "No se pudo completar la respuesta. Si tarda más de lo normal, reinténtalo en unos segundos.",
-    "modelLabel": "Modelo del chat general",
-    "modelDefault": "Cerebro actual (predeterminado)",
-    "modelHy4": "HY 4 Flash (Go)"
+    "responseError": "No se pudo completar la respuesta. Si tarda más de lo normal, reinténtalo en unos segundos."
   },
   "suggested": {
     "general": {
