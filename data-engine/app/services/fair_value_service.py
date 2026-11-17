@@ -45,7 +45,7 @@ from sqlalchemy.orm import Session
 from app.core.i18n import current_language
 from app.core.local_date import as_date as _as_date
 from app.core.tenancy import tenant_filters
-from app.models import Company, ThesisVersion, ValuationModel, ValuationOutput
+from app.models import Company, ThesisVersion, ValuationModel
 from app.services.date_format import readable_date
 from app.services.thesis_publication_gate import thesis_withheld_reasons
 
@@ -601,23 +601,23 @@ def persisted_engine_readings(
         if model.status == "insufficient_data"
     }
     by_model = {model.id: model for model in models if model.status != "insufficient_data"}
+    from app.services.fair_value_projection import output_reading_statement, reading_payload
+
     outputs = (
-        db.scalars(
-            select(ValuationOutput).where(ValuationOutput.valuation_model_id.in_(list(by_model)))
-        ).all()
+        db.execute(output_reading_statement(db, list(by_model))).all()
         if by_model
         else []
     )
     out: dict[int, Candidate] = {}
     payload_gaps: dict[int, str] = {}
     for output in outputs:
-        model = by_model[output.valuation_model_id]
+        model = by_model[output[0]]
         company_id = int(model.company_id)
         if company_id in out:
             continue
-        value = _engine_value(output.output_payload)
+        payload = reading_payload(output)
+        value = _engine_value(payload)
         if value is None:
-            payload = output.output_payload if isinstance(output.output_payload, dict) else {}
             adr = bool(payload.get("adr_ratio")) and not isinstance(payload.get("listed_share_values"), dict)
             payload_gaps.setdefault(company_id, ENGINE_GAP_ADR if adr else ENGINE_GAP_NON_POSITIVE)
             continue
@@ -625,8 +625,8 @@ def persisted_engine_readings(
             value=value,
             as_of=_as_date(model.created_at),
             publishable=model.status == "final",
-            estimated_inputs=_estimated_inputs(output.output_payload),
-            method_label=_method_label(output.output_payload),
+            estimated_inputs=_estimated_inputs(payload),
+            method_label=_method_label(payload),
         )
     if gaps is not None:
         models_by_company = {int(model.company_id): model for model in models}
