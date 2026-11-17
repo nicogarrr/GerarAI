@@ -417,8 +417,9 @@ class GuardedResponse:
     response: Any
     #: Respuestas descartadas por el validador (ya pasaron por ``on_response``).
     discarded: list = field(default_factory=list)
+    #: True si hubo una segunda llamada, por cuerpo vacio o por rechazo del validador.
     retried: bool = False
-    #: Llamadas reales al proveedor (1 o 2).
+    #: Llamadas reales al proveedor (1 o 2): tope compartido por complete_guarded.
     calls: int = 1
 
 
@@ -501,6 +502,11 @@ async def complete_guarded(
     modelo ni de pago: es el mismo proveedor. Si la segunda tambien falla, el
     error se propaga y el llamador degrada.
 
+    El reintento es UNO solo por llamada, sea por vacio o por el validador:
+    tras el reintento por vacio, una respuesta rechazada por el validador ya no
+    se repite (tope total de 2 llamadas) y se levanta ``LLMOutputRejected``.
+    ``calls`` y ``retried`` cuentan siempre las llamadas reales.
+
     ``on_response`` se llama con CADA respuesta del proveedor (tambien las
     descartadas) para que el llamador registre su coste. ``before_retry`` se
     llama antes del segundo intento y puede levantar (p. ej. presupuesto
@@ -509,6 +515,7 @@ async def complete_guarded(
     Los errores del proveedor se propagan sin tocar.
     """
     _count(source, "calls")
+    calls = 1
     try:
         first = await provider.complete(request)
     except ProviderEmptyResponseError:
@@ -522,6 +529,7 @@ async def complete_guarded(
         logger.warning("llm_output_guard[%s]: respuesta vacia del proveedor, reintento unico", source)
         if before_retry is not None:
             before_retry()
+        calls = 2
         first = await provider.complete(request)
     if on_response is not None:
         on_response(first)
@@ -529,11 +537,22 @@ async def complete_guarded(
         getattr(first, "text", "") or "", english=english, expected_language=expected_language
     )
     if not reasons:
-        return GuardedResponse(first)
+        return GuardedResponse(first, retried=calls > 1, calls=calls)
     _count(source, "triggered")
     await _evict(provider, first)
     for reason in reasons:
         _count(source, f"reason.{reason}")
+    if calls > 1:
+        # Ya se gasto el unico reintento en el cuerpo vacio: tope de 2 llamadas.
+        _count(source, "rejected")
+        logger.warning(
+            "llm_output_guard[%s]: salida rechazada (%s) tras reintento por vacio, sin mas llamadas",
+            source, ",".join(reasons),
+        )
+        capped = LLMOutputRejected(source, reasons)
+        capped.discarded = [first]  # type: ignore[attr-defined]
+        capped.calls = calls  # type: ignore[attr-defined]
+        raise capped
     logger.warning("llm_output_guard[%s]: salida rechazada (%s), reintento unico", source, ",".join(reasons))
     if before_retry is not None:
         before_retry()
