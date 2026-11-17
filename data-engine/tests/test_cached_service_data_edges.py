@@ -116,11 +116,16 @@ def test_portfolio_summary_performance_and_invalidation_delegation(rows, monkeyp
         "portfolio_id": fund.id,
         "positions_count": 1,
         "total_value": 30.0,
+        "total_value_complete": True,
+        "positions_missing_base_value": [],
         "currencies": ["EUR"],
     }
-    snapshot = service.get_portfolio_snapshot.__wrapped__(service, db, as_of=date(2026, 1, 1))
-    assert snapshot["snapshot_date"] == "2026-01-01" and snapshot["total_value"] == 30
+    snapshot = service.get_portfolio_snapshot.__wrapped__(service, db)
+    assert snapshot["generated_at"] == date.today().isoformat()
+    assert snapshot["total_value"] == 30 and snapshot["total_value_complete"] is True
+    assert snapshot["positions_missing_base_value"] == []
     assert snapshot["positions"][0]["symbol"] == "CACHE" and snapshot["positions"][0]["quantity"] == 2.5
+    assert snapshot["positions"][0]["value"] == 30.0 and snapshot["positions"][0]["value_base"] == 30.0
     seen = []
     monkeypatch.setattr(service, "get_portfolio_snapshot", lambda session: seen.append(session) or snapshot)
     assert service.get_portfolio_performance.__wrapped__(service, db, days=17) == {
