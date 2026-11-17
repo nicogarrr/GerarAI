@@ -54,4 +54,18 @@ describe('HistoricalStressView: rejilla de tarjetas', () => {
             expect(grid.className).not.toContain('md:grid-cols-3');
         }
     });
+
+    it('fetched_at nulo (proveedor caído): «Consultado Sin datos», nunca una fecha inventada', () => {
+        // fix11 backend: sin datos obtenidos fetched_at llega null; la ficha lo
+        // declara «Sin datos» en vez de pintar una fecha que no hubo.
+        const caido: HistoricalStressReport = {
+            ...report,
+            companies: [{ ...report.companies[0], fetched_at: null }],
+        };
+        const { container } = render(<HistoricalStressView report={caido} />);
+        expect(container.textContent).toContain('Consultado Sin datos');
+        const { container: ok } = render(<HistoricalStressView report={report} />);
+        expect(ok.textContent).toContain('Consultado');
+        expect(ok.textContent).not.toContain('Consultado Sin datos');
+    });
 });
