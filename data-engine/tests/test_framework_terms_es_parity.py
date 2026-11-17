@@ -46,3 +46,12 @@ def test_drivers_de_los_marcos_tienen_etiqueta_es():
         and not re.search(r"[×÷]", key)
     }
     assert sin_etiqueta == set()
+
+
+def test_positive_terminal_fcf_se_traduce_igual_en_memo_y_marcos():
+    """Clave que emiten los motores DCF como entrada que falta (FCF terminal no positivo)."""
+    esperado = "flujo de caja libre terminal positivo"
+    assert framework_term_es("positive_terminal_fcf") == esperado
+    assert term_es("positive_terminal_fcf") == esperado
+    assert term_es("positive terminal fcf") == esperado
+

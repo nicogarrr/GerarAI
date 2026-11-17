@@ -18,7 +18,7 @@ import itertools
 
 import pytest
 
-from app.valuation.dcf_fcff import DCFInputs, run_dcf
+from app.valuation.dcf_fcff import DCFInputs, TerminalFCFNotPositiveError, run_dcf
 from app.valuation.engines.sotp_engine import sotp_discount_sensitivity
 from app.valuation.scenario_definitions import (
     holding_company_scenarios,
@@ -40,15 +40,24 @@ def test_bear_de_empresa_en_caida_no_supera_al_base_valores_a_mano():
     assert _value(bear.assumptions) == pytest.approx(22.316831019, rel=1e-9)
 
 
-@pytest.mark.parametrize(
-    "growth,margin,wacc,terminal",
-    list(
-        itertools.product(
-            [-0.15, -0.10, -0.06, -0.02, 0.05, 0.30], [0.05, 0.20, 0.50], [0.07, 0.10, 0.14], [0.0, 0.025]
-        )
-    ),
+_GRID = list(
+    itertools.product(
+        [-0.15, -0.10, -0.06, -0.02, 0.05, 0.30], [0.05, 0.20, 0.50], [0.07, 0.10, 0.14], [0.0, 0.025]
+    )
 )
+
+
+@pytest.mark.parametrize("growth,margin,wacc,terminal", _GRID)
 def test_drivers_y_valor_ordenados_bear_base_bull(growth, margin, wacc, terminal):
+    """Orden bear <= base <= bull donde hay valor.
+
+    Con margen base de 5 %, el bear baja 6 pp a -1 %: su FCF terminal es
+    negativo y una perpetuidad de Gordon no existe. run_dcf lo declara
+    (TerminalFCFNotPositiveError, #5778) y los motores dejan ese escenario sin
+    valor con missing_inputs=["positive_terminal_fcf"]. Inventar un valor para
+    el bear seria un dato falso, asi que el test exige el error declarado y no
+    un numero; base y bull siguen ordenados.
+    """
     bear, base, bull = mechanical_dcf_scenarios(growth, margin, wacc, terminal, 0.8)
     assert (
         bear.assumptions["revenue_growth"]
@@ -56,7 +65,33 @@ def test_drivers_y_valor_ordenados_bear_base_bull(growth, margin, wacc, terminal
         <= bull.assumptions["revenue_growth"]
     )
     assert bear.assumptions["wacc"] >= base.assumptions["wacc"]
-    assert _value(bear.assumptions) <= _value(base.assumptions) <= _value(bull.assumptions)
+    assert bear.assumptions["fcf_margin"] < base.assumptions["fcf_margin"] <= bull.assumptions["fcf_margin"]
+    assert _value(base.assumptions) <= _value(bull.assumptions)
+    if bear.assumptions["fcf_margin"] <= 0:
+        with pytest.raises(TerminalFCFNotPositiveError):
+            _value(bear.assumptions)
+    else:
+        assert _value(bear.assumptions) <= _value(base.assumptions)
+
+
+_GRID3 = list(itertools.product([-0.15, -0.10, -0.06, -0.02, 0.05, 0.30], [0.07, 0.10, 0.14], [0.0, 0.025]))
+
+
+@pytest.mark.parametrize("growth,wacc,terminal", _GRID3)
+def test_margen_base_bajo_deja_el_bear_sin_valor_declarado(growth, wacc, terminal):
+    """El caso de margen 5 %: el bear nunca devuelve un numero inventado."""
+    bear, base, _ = mechanical_dcf_scenarios(growth, 0.05, wacc, terminal, 0.8)
+    assert bear.assumptions["fcf_margin"] == pytest.approx(-0.01)
+    with pytest.raises(TerminalFCFNotPositiveError):
+        _value(bear.assumptions)
+    assert _value(base.assumptions) > 0
+
+
+@pytest.mark.parametrize("growth,wacc,terminal", _GRID3)
+def test_margen_base_alto_el_bear_si_tiene_valor_y_no_supera_al_base(growth, wacc, terminal):
+    bear, base, _ = mechanical_dcf_scenarios(growth, 0.20, wacc, terminal, 0.8)
+    assert bear.assumptions["fcf_margin"] > 0
+    assert 0 < _value(bear.assumptions) <= _value(base.assumptions)
 
 
 @pytest.mark.parametrize(
