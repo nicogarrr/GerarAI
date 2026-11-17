@@ -44,6 +44,23 @@ from app.valuation.currency import normalize_currency
 ECB_DATA_URL = "https://data-api.ecb.europa.eu/service/data/EXR/D.{codes}.EUR.SP00.A"
 ECB_SOURCE = "ECB"
 
+#: Columnas que la cabecera ``format=csvdata`` del BCE debe traer. Un 200 con
+#: HTML (challenge, página de error) o un CSV con otra cabecera NO es salud:
+#: sin esta validación, ``parse_ecb_csv`` devuelve [] y el backfill reporta
+#: TODAS las divisas pedidas como «not_published», indistinguible de «el BCE
+#: de verdad no publica esa divisa», mientras el panel de salud queda verde
+#: (misma doctrina que ``fred.series_csv``: validar el esquema ANTES de
+#: registrar el éxito). Una divisa no publicada sí pasa esta validación: el
+#: CSV viene bien formado pero sin filas para ella.
+_CSV_REQUIRED_COLUMNS = frozenset({"CURRENCY", "TIME_PERIOD", "OBS_VALUE"})
+
+
+def _require_csv_header(text: str) -> None:
+    """Exige la cabecera CSVdata del BCE; levanta RuntimeError si no está."""
+    header = next(csv.reader(io.StringIO(text.lstrip("\ufeff"))), [])
+    if not _CSV_REQUIRED_COLUMNS.issubset({column.strip().upper() for column in header}):
+        raise RuntimeError("BCE no devolvió el CSV esperado (challenge o cambio de formato)")
+
 #: Subunidad → (divisa principal, divisor).
 MINOR_UNITS: dict[str, tuple[str, Decimal]] = {
     "GBX": ("GBP", Decimal("100")),
@@ -112,6 +129,11 @@ async def fetch_ecb_csv(codes: list[str], start: date, end: date) -> str:
         raise
     except httpx.TransportError as exc:
         registry.record_failure(_ECB_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    try:
+        _require_csv_header(text)
+    except RuntimeError:
+        registry.record_failure(_ECB_REGISTRY_KEY, "respuesta no CSV (challenge o cambio de formato)")
         raise
     registry.record_success(_ECB_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
     return text
@@ -196,6 +218,11 @@ def fetch_ecb_csv_sync(codes: list[str], start: date, end: date) -> str:
         raise
     except httpx.TransportError as exc:
         registry.record_failure(_ECB_REGISTRY_KEY, f"error de red: {type(exc).__name__}")
+        raise
+    try:
+        _require_csv_header(text)
+    except RuntimeError:
+        registry.record_failure(_ECB_REGISTRY_KEY, "respuesta no CSV (challenge o cambio de formato)")
         raise
     registry.record_success(_ECB_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
     return text

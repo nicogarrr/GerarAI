@@ -22,13 +22,15 @@ def test_sync_fetch_request_and_registry_outcome(monkeypatch, status):
 
     def handler(request):
         requests.append(request)
-        return httpx.Response(status, text="local CSV fixture")
+        return httpx.Response(status, text="CURRENCY,TIME_PERIOD,OBS_VALUE\nUSD,2026-11-09,1.1\n")
 
     monkeypatch.setattr(
         ecb.httpx, "Client", lambda **kw: original_client(transport=httpx.MockTransport(handler), **kw)
     )
     if status == 200:
-        assert ecb.fetch_ecb_csv_sync(["USD", "GBP"], DAY, DAY) == "local CSV fixture"
+        assert ecb.fetch_ecb_csv_sync(["USD", "GBP"], DAY, DAY) == (
+            "CURRENCY,TIME_PERIOD,OBS_VALUE\nUSD,2026-11-09,1.1\n"
+        )
         registry.record_success.assert_called_once()
         assert registry.record_success.call_args.args[0] == "ecb"
         assert registry.record_success.call_args.args[1] >= 0
