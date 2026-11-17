@@ -13,7 +13,9 @@ export type OwnershipProvenance = {
   source: string;
   source_kind: string;
   source_url: string | null;
-  fetched_at: string;
+  // fetched_at es nullable: sin fecha real de descarga el backend la declara
+  // nula en vez de fabricar el momento de la peticion (ProvenanceOut).
+  fetched_at: string | null;
   coverage: string;
   note?: string | null;
 };
