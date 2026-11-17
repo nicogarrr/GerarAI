@@ -63,13 +63,17 @@ RETURNING outputs.id
 
 
 def backfill_batch(connection, batch_size=25):
-    """One transaction's row batch. Caller commits; an empty batch is not done.
+    """Administrative cross-tenant schema backfill, never a request-path query.
 
-    Concurrently locked rows are skipped. Re-run after them, and verify no
-    NULLs remain separately. Timeouts/commit ownership belong to the runner.
+    The operator supplies a maintenance connection. All tenants must be filled;
+    only the derived projection is rewritten from each row's own payload by the
+    trigger. Only touched IDs are returned, not payloads. Caller commits;
+    an empty batch is not done. Concurrently locked rows are skipped. Re-run
+    after them and verify no NULLs remain. Runner owns timeouts/commit scope.
     """
     from sqlalchemy import text
 
     if not isinstance(batch_size, int) or isinstance(batch_size, bool) or not 1 <= batch_size <= 100:
         raise ValueError("batch_size must be an integer from 1 to 100")
+    # nosemgrep: gerarai-tenant-raw-sql -- Operator-only global schema backfill; trigger derives each row from its own payload, never tenant request data.
     return list(connection.execute(text(BACKFILL_SQL), {"batch_size": batch_size}).scalars())
