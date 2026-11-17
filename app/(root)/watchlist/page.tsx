@@ -382,6 +382,20 @@ export default async function WatchlistPage({
     // misma cifra que inicio y screener) y puesto frente al resto de empresas
     // valoradas: «infravalorada/sobrevalorada» (valor > precio) no anticipaba
     // nada a 12 meses; el puesto relativo sí ordenó a 24 (lib/watchlist/value-rank.ts).
+    // Reserva de la franja del resumen del monitor mientras llega por
+    // streaming. Con fallback=null su llegada empujaba titulo, boton de alta y
+    // tabla (CLS 0.164-0.176 medido en prod, 17-nov-2026). Tambien es el
+    // resultado cuando no hay ranks validos (ranked=0): devolver null ahi
+    // colapsaba la reserva al resolver el stream y el contenido subia (CLS
+    // inverso al resolver el stream).
+    // Alturas por ancho disponible (@container): dimensionadas con la franja
+    // larga medida (167 chars reales, 17-nov-2026), que ocupa 4 lineas bajo
+    // 344px de contenedor, 3 bajo 640, 2 bajo 1216 y 1 por encima. Si la
+    // franja sale mas corta que la reserva, el min-h solo deja aire. La franja
+    // resuelta lleva las mismas min-h para conservar la altura reservada
+    // (replica medida 17-nov-2026).
+    const rankSummarySlotClass = "min-h-16 text-xs @min-[344px]:min-h-12 @min-[640px]:min-h-8 @min-[1216px]:min-h-4";
+    const rankSummarySlot = <p aria-hidden="true" className={rankSummarySlotClass}>&nbsp;</p>;
     const rankSummaryEl = (data: MonitorData) => {
         const stocks = metricSort ? watchlistStocks : watchlistStocks.map(stock => ({...stock, monitor: data.items[stock.symbol.trim().toUpperCase()] ?? null}));
         const rankSummary = valueRankSummary(stocks.map((stock) => stock.monitor?.valuation_rank));
@@ -393,7 +407,7 @@ export default async function WatchlistPage({
             byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
         ].filter(Boolean).join(', ');
 
-        return rankSummary.ranked > 0 ? <p className="text-xs text-gray-500">{t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}</p> : null;
+        return rankSummary.ranked > 0 ? <p className={`${rankSummarySlotClass} text-gray-500`}>{t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}</p> : rankSummarySlot;
     };
     const monitorEl = (render: (data: MonitorData) => ReactNode, fallback: ReactNode = null) => metricSort ? render(monitorData) : <Suspense fallback={fallback}><MonitorStockStream promise={monitorPromise} render={render} /></Suspense>;
 
@@ -516,13 +530,21 @@ export default async function WatchlistPage({
     return (
         <WatchlistMembership key={watchlistItems.map((item) => item.symbol).sort().join('|')}>
         <main id="content" tabIndex={-1} className="mx-auto flex w-full max-w-full min-w-0 flex-col space-y-6 overflow-x-clip">
-            <div className="flex min-w-0 flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
+            {/* @container: la altura de la reserva se decide por ancho
+                disponible (el sidebar resta 240/64px desde md), no por ventana. */}
+            <div className="@container flex min-w-0 flex-wrap items-center justify-between gap-3">
+                {/* w-full siempre: el boton de alta vive en su propia fila a
+                    cualquier ancho; en linea con la franja, su wrap variaba con
+                    el largo del texto (+56px medidos en replica a 1440 con la
+                    franja larga, 17-nov-2026). */}
+                <div className="min-w-0 w-full">
                     <h1 className="flex items-center gap-2 text-xl font-bold break-words text-gray-100 sm:text-2xl">
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
                     </h1>
-                    {monitorEl(rankSummaryEl)}
+                    {/* Con watchlist vacia no hay franja posible (se sabe sin el
+                        stream): no se reserva nada. */}
+                    {watchlistStocks.length > 0 && monitorEl(rankSummaryEl, rankSummarySlot)}
                 </div>
                 {/* Alta directa desde la página (QA 2026-10-19: antes solo se
                     podía añadir desde la ficha research o el screener). */}
