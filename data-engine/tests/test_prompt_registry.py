@@ -224,3 +224,77 @@ def test_second_order_news_prompt_version_and_hash_are_pinned():
     )
     assert resolved.source == "code"
     assert resolved.text == prompt_registry.SECOND_ORDER_NEWS
+
+
+class _FakeRemotePrompt:
+    """Minimo objeto prompt de Langfuse: solo importa el atributo prompt."""
+
+    def __init__(self, prompt):
+        self.prompt = prompt
+
+
+def _enable_remote(monkeypatch, candidate):
+    """Langfuse habilitado y sirviendo ``candidate`` como prompt remoto."""
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("LANGFUSE_ENABLED", "true")
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk")
+    get_settings.cache_clear()
+    client = SimpleNamespace(get_prompt=lambda name, label: _FakeRemotePrompt(candidate))
+    monkeypatch.setattr("langfuse.Langfuse", lambda **kw: client)
+
+
+def test_remote_string_prompt_wins_over_code(monkeypatch):
+    _enable_remote(monkeypatch, "TEXTO REMOTO PLANO")
+    try:
+        resolved = prompt_registry.get_prompt("chat_source_synthesis")
+        assert resolved.source == "remote"
+        assert resolved.fallback is False
+        assert resolved.text == "TEXTO REMOTO PLANO"
+    finally:
+        get_settings.cache_clear()
+
+
+def test_remote_chat_prompt_concatenates_message_contents(monkeypatch):
+    candidate = [
+        {"role": "system", "content": "parte uno"},
+        {"role": "user", "content": "parte dos"},
+        {"role": "assistant"},  # sin content: se descarta
+        "basura",
+    ]
+    _enable_remote(monkeypatch, candidate)
+    try:
+        resolved = prompt_registry.get_prompt("chat_source_synthesis")
+        assert resolved.source == "remote"
+        assert resolved.text == "parte uno\nparte dos"
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.parametrize("candidate", [None, 42, {"prompt": "anidado"}, "   "])
+def test_remote_non_text_candidate_falls_back_to_code(monkeypatch, candidate):
+    _enable_remote(monkeypatch, candidate)
+    try:
+        resolved = prompt_registry.get_prompt("chat_source_synthesis")
+        assert resolved.source == "code"
+        assert resolved.fallback is True
+        assert resolved.text == prompt_registry.CHAT_SOURCE_SYNTHESIS
+    finally:
+        get_settings.cache_clear()
+
+
+def test_remote_chat_prompt_without_any_content_falls_back_to_code(monkeypatch):
+    _enable_remote(monkeypatch, [{"role": "system"}, "basura"])
+    try:
+        resolved = prompt_registry.get_prompt("chat_source_synthesis")
+        assert resolved.source == "code"
+        assert resolved.text == prompt_registry.CHAT_SOURCE_SYNTHESIS
+    finally:
+        get_settings.cache_clear()
+
+
+def test_prefetch_marks_every_prompt_as_code_when_remote_unavailable():
+    sources = prompt_registry.prefetch()
+    assert set(sources) == set(prompt_registry.PROMPTS)
+    assert set(sources.values()) == {"code"}
