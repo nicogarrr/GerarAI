@@ -5,13 +5,15 @@ El actor solo restaba (new - scanned), asi que con PDFs fallidos pedia al año
 anterior mas presupuesto del que quedaba y superaba el tope total.
 """
 from __future__ import annotations
+
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+
 import pytest
+
 from app.services import politician_trades
 from app.workers import dramatiq_app as worker
-
 
 
 @pytest.fixture()
