@@ -117,8 +117,8 @@ describe('rank summary slot (sin CLS en ningun desenlace)', () => {
     m.monitor.mockReturnValue(new Promise(() => {}));
     const page = await renderPage();
     expect(hasClass(page, '@container')).toBe(true);
-    expect(hasClass(page, '@min-[1024px]:w-auto')).toBe(true);
-    expect(hasClass(page, '@3xl:min-h-4')).toBe(true);
+    expect(hasClass(page, 'min-w-0 w-full')).toBe(true);
+    expect(hasClass(page, '@min-[1216px]:min-h-4')).toBe(true);
   });
 
   it('no reserva nada con watchlist vacia (no hay stream ni slot)', async () => {

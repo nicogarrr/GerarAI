@@ -382,18 +382,22 @@ export default async function WatchlistPage({
     // misma cifra que inicio y screener) y puesto frente al resto de empresas
     // valoradas: «infravalorada/sobrevalorada» (valor > precio) no anticipaba
     // nada a 12 meses; el puesto relativo sí ordenó a 24 (lib/watchlist/value-rank.ts).
-    // Reserva de la franja del resumen del monitor: mientras llega por streaming
-    // ocupa las lineas medidas del resumen (text-xs, 16px/linea): 3 en movil
-    // (48px), 2 en tablet (32px), 1 en escritorio (16px). Con fallback=null su
-    // llegada empujaba titulo, boton de alta y tabla (CLS 0.164-0.176 medido en
-    // prod, 17-nov-2026). Tambien es el resultado cuando no hay ranks validos
-    // (ranked=0): devolver null ahi colapsaba la reserva al resolver el stream
-    // y el contenido subia (CLS inverso, hallazgo del auditor, 17-nov-2026).
-    // Las alturas van por ANCHO DISPONIBLE (@container), no de ventana: con el
-    // sidebar expandido (240px desde md) la ventana 1024px deja solo 720px
-    // utiles y la franja ocupa 2 lineas, no 1 (NO FAV del auditor a v3,
-    // 17-nov-2026).
-    const rankSummarySlot = <p aria-hidden="true" className="min-h-12 text-xs @md:min-h-8 @3xl:min-h-4">&nbsp;</p>;
+    // Reserva de la franja del resumen del monitor mientras llega por
+    // streaming. Con fallback=null su llegada empujaba titulo, boton de alta y
+    // tabla (CLS 0.164-0.176 medido en prod, 17-nov-2026). Tambien es el
+    // resultado cuando no hay ranks validos (ranked=0): devolver null ahi
+    // colapsaba la reserva al resolver el stream y el contenido subia (CLS
+    // inverso, hallazgo del auditor, 17-nov-2026).
+    // Alturas por ANCHO DISPONIBLE (@container) y por PEOR CASO de texto, no
+    // por breakpoint de ventana ni por largo del texto actual (NO FAV del
+    // auditor a v3 y v4, 17-nov-2026): la franja real mas larga (~176 chars,
+    // ~1150px a text-xs) ocupa 4 lineas bajo 344px de contenedor, 3 bajo 640,
+    // 2 bajo 1216 y 1 por encima. min-h NUNCA encoge: si la franja sale mas
+    // corta solo queda aire, y el contenido no se mueve jamas. La franja
+    // resuelta lleva LAS MISMAS min-h: sin ellas, al ser mas corta que la
+    // reserva, el contenido subia al llegar (replica medida 17-nov-2026).
+    const rankSummarySlotClass = "min-h-16 text-xs @min-[344px]:min-h-12 @min-[640px]:min-h-8 @min-[1216px]:min-h-4";
+    const rankSummarySlot = <p aria-hidden="true" className={rankSummarySlotClass}>&nbsp;</p>;
     const rankSummaryEl = (data: MonitorData) => {
         const stocks = metricSort ? watchlistStocks : watchlistStocks.map(stock => ({...stock, monitor: data.items[stock.symbol.trim().toUpperCase()] ?? null}));
         const rankSummary = valueRankSummary(stocks.map((stock) => stock.monitor?.valuation_rank));
@@ -405,7 +409,7 @@ export default async function WatchlistPage({
             byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
         ].filter(Boolean).join(', ');
 
-        return rankSummary.ranked > 0 ? <p className="text-xs text-gray-500">{t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}</p> : rankSummarySlot;
+        return rankSummary.ranked > 0 ? <p className={`${rankSummarySlotClass} text-gray-500`}>{t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}</p> : rankSummarySlot;
     };
     const monitorEl = (render: (data: MonitorData) => ReactNode, fallback: ReactNode = null) => metricSort ? render(monitorData) : <Suspense fallback={fallback}><MonitorStockStream promise={monitorPromise} render={render} /></Suspense>;
 
@@ -531,14 +535,11 @@ export default async function WatchlistPage({
             {/* @container: la reserva y el wrap del boton se deciden por ancho
                 disponible (el sidebar resta 240/64px desde md), no por ventana. */}
             <div className="@container flex min-w-0 flex-wrap items-center justify-between gap-3">
-                {/* w-full bajo 1024px de contenedor: la columna ocupa todo el ancho
-                    tambien en el estado pendiente, asi el boton de alta ya nace
-                    envuelto debajo y su salto al llegar la franja (56px medidos en
-                    replica, 17-nov-2026) no desplaza el contenido. El umbral no
-                    puede ser menor: la franja de 1 linea (hasta ~850px segun el
-                    texto) + boton (~172px) solo caben en linea con holgura a
-                    partir de 1024px de ancho disponible. */}
-                <div className="min-w-0 w-full @min-[1024px]:w-auto">
+                {/* w-full siempre: el boton de alta vive en su propia fila a
+                    cualquier ancho. En linea con la franja, su wrap dependia del
+                    largo del texto y nunca convergia (NO FAV del auditor a v4:
+                    +56px a 1440 con la franja larga, 17-nov-2026). */}
+                <div className="min-w-0 w-full">
                     <h1 className="flex items-center gap-2 text-xl font-bold break-words text-gray-100 sm:text-2xl">
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
