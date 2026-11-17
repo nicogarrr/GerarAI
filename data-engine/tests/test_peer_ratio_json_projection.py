@@ -294,3 +294,40 @@ def test_pg_filled_projection_does_not_execute_full_payload_function(db):
         assert engine_peer_ratios(session) == {company_id: 1.5}
     finally:
         savepoint.rollback()
+
+
+def test_peer_projection_model_matches_online_column_and_is_deferred(db):
+    from sqlalchemy import inspect
+
+    session, _ = db
+    column = ValuationOutput.__table__.c.peer_rank_inputs
+    from sqlalchemy import JSON
+
+    assert isinstance(column.type, JSON)
+    assert column.nullable
+    assert column.default is None
+    assert column.server_default is None
+    assert inspect(ValuationOutput).attrs.peer_rank_inputs.deferred
+
+    company = _company(session, "DEFERRED")
+    _output(session, company, {"expected_value": 150, "current_price": 100})
+    session.commit()
+    session.expunge_all()
+    statements = []
+
+    def record(_conn, _cursor, statement, _parameters, _context, _many):
+        statements.append(statement)
+
+    event.listen(session.get_bind(), "before_cursor_execute", record)
+    try:
+        output = session.scalars(select(ValuationOutput)).one()
+        assert "peer_rank_inputs" in inspect(output).unloaded
+        assert all("peer_rank_inputs" not in statement for statement in statements)
+        assert output.peer_rank_inputs == (
+            [None, None, None, 150, None, 100]
+            if session.get_bind().dialect.name == "postgresql" else None
+        )
+        assert "peer_rank_inputs" not in inspect(output).unloaded
+        assert "peer_rank_inputs" in statements[-1]
+    finally:
+        event.remove(session.get_bind(), "before_cursor_execute", record)
