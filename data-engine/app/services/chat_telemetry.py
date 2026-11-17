@@ -35,6 +35,24 @@ def classify_response(response: Any) -> tuple[str, bool]:
     return route[:60], used_llm
 
 
+def fallback_error(response: Any) -> str | None:
+    """Motivo (redactado) cuando la respuesta fue el degradado determinista.
+
+    /api/chat devuelve 200 con el texto honesto, pero la telemetria no debe
+    quedar con error=None si el intento al modelo fallo (p. ej. read_timeout).
+    Solo lee la traza; None si no hubo fallback.
+    """
+    trace = getattr(response, "llm_trace", None) or {}
+    if not trace.get("fallback"):
+        return None
+    parts = [
+        str(trace[key])
+        for key in ("reason", "fallback_reason", "model_down", "fallback_detail")
+        if trace.get(key)
+    ]
+    return ("fallback: " + " | ".join(parts))[:_MAX_TEXT] if parts else "fallback"
+
+
 def record_chat_event(
     *,
     tenant_id: int | None,
