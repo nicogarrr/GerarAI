@@ -522,7 +522,12 @@ export default async function WatchlistPage({
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
                     </h1>
-                    {monitorEl(rankSummaryEl)}
+                    {/* Reserva de la franja del resumen del monitor mientras llega por
+                        streaming: con fallback=null su llegada empujaba titulo, boton de
+                        alta y tabla (CLS 0.164-0.176 medido en prod, 17-nov-2026).
+                        min-h = lineas medidas del resumen (text-xs, 16px/linea):
+                        3 en movil (48px), 2 en sm (32px), 1 en lg (16px). */}
+                    {monitorEl(rankSummaryEl, <p aria-hidden="true" className="min-h-12 text-xs sm:min-h-8 lg:min-h-4">&nbsp;</p>)}
                 </div>
                 {/* Alta directa desde la página (QA 2026-10-19: antes solo se
                     podía añadir desde la ficha research o el screener). */}

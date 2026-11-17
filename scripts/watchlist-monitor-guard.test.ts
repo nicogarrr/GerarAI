@@ -52,3 +52,11 @@ test('inicio y screener leen el mismo valor justo único, con etiqueta', () => {
 test('sin URLs de proveedor construidas a mano en el frontend', () => {
     assert.doesNotMatch(page, /nasdaq\.com|finance\.yahoo\.com/);
 });
+
+test('el resumen del monitor reserva su altura mientras llega por streaming (sin CLS)', () => {
+    // Sin la reserva, la llegada de la franja "Según el valor justo…" empujaba
+    // título, botón de alta y tabla: CLS 0.164-0.176 medido en prod a 390x844
+    // (17-nov-2026). Las min-h replican las líneas medidas del resumen
+    // (text-xs = 16px/línea): 3 en móvil, 2 en sm, 1 en lg.
+    assert.match(page, /monitorEl\(rankSummaryEl, <p aria-hidden="true" className="min-h-12 text-xs sm:min-h-8 lg:min-h-4">/);
+});
