@@ -1586,6 +1586,8 @@ class ValuationOutput(TenantOwnedMixin, Base, TimestampMixin):
     value_per_share: Mapped[Decimal] = mapped_column(Numeric(20, 4), default=0)
     margin_of_safety: Mapped[Decimal] = mapped_column(Numeric(12, 6), default=0)
     output_payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    # 0136: database trigger owns the projection; do not fetch it on ORM loads.
+    peer_rank_inputs: Mapped[list | None] = mapped_column(JSON, nullable=True, deferred=True)
 
 
 class ThesisVersion(TenantOwnedMixin, Base, TimestampMixin):
