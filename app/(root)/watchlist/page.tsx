@@ -382,6 +382,14 @@ export default async function WatchlistPage({
     // misma cifra que inicio y screener) y puesto frente al resto de empresas
     // valoradas: «infravalorada/sobrevalorada» (valor > precio) no anticipaba
     // nada a 12 meses; el puesto relativo sí ordenó a 24 (lib/watchlist/value-rank.ts).
+    // Reserva de la franja del resumen del monitor: mientras llega por streaming
+    // ocupa las lineas medidas del resumen (text-xs, 16px/linea): 3 en movil
+    // (48px), 2 en sm (32px), 1 en lg (16px). Con fallback=null su llegada
+    // empujaba titulo, boton de alta y tabla (CLS 0.164-0.176 medido en prod,
+    // 17-nov-2026). Tambien es el resultado cuando no hay ranks validos
+    // (ranked=0): devolver null ahi colapsaba la reserva al resolver el stream
+    // y el contenido subia (CLS inverso, hallazgo del auditor, 17-nov-2026).
+    const rankSummarySlot = <p aria-hidden="true" className="min-h-12 text-xs sm:min-h-8 lg:min-h-4">&nbsp;</p>;
     const rankSummaryEl = (data: MonitorData) => {
         const stocks = metricSort ? watchlistStocks : watchlistStocks.map(stock => ({...stock, monitor: data.items[stock.symbol.trim().toUpperCase()] ?? null}));
         const rankSummary = valueRankSummary(stocks.map((stock) => stock.monitor?.valuation_rank));
@@ -393,7 +401,7 @@ export default async function WatchlistPage({
             byEngine > 0 ? t('watchlist.page.fairValue.byEngine', { count: byEngine }) : null,
         ].filter(Boolean).join(', ');
 
-        return rankSummary.ranked > 0 ? <p className="text-xs text-gray-500">{t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}</p> : null;
+        return rankSummary.ranked > 0 ? <p className="text-xs text-gray-500">{t('watchlist.page.fairValue.summary', { source: fairValueSourceNote, peers: rankSummary.peers, cheap: rankSummary.cheap, dear: rankSummary.dear })}</p> : rankSummarySlot;
     };
     const monitorEl = (render: (data: MonitorData) => ReactNode, fallback: ReactNode = null) => metricSort ? render(monitorData) : <Suspense fallback={fallback}><MonitorStockStream promise={monitorPromise} render={render} /></Suspense>;
 
@@ -526,12 +534,9 @@ export default async function WatchlistPage({
                         <Eye className="h-5 w-5 shrink-0 text-purple-400" aria-hidden="true" />
                         Watchlist
                     </h1>
-                    {/* Reserva de la franja del resumen del monitor mientras llega por
-                        streaming: con fallback=null su llegada empujaba titulo, boton de
-                        alta y tabla (CLS 0.164-0.176 medido en prod, 17-nov-2026).
-                        min-h = lineas medidas del resumen (text-xs, 16px/linea):
-                        3 en movil (48px), 2 en sm (32px), 1 en lg (16px). */}
-                    {monitorEl(rankSummaryEl, <p aria-hidden="true" className="min-h-12 text-xs sm:min-h-8 lg:min-h-4">&nbsp;</p>)}
+                    {/* Con watchlist vacia no hay franja posible (se sabe sin el
+                        stream): no se reserva y nada puede desplazarse. */}
+                    {watchlistStocks.length > 0 && monitorEl(rankSummaryEl, rankSummarySlot)}
                 </div>
                 {/* Alta directa desde la página (QA 2026-10-19: antes solo se
                     podía añadir desde la ficha research o el screener). */}
