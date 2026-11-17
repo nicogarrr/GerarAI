@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps, ComponentType } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, type RenderResult } from '@testing-library/react';
 
 type LazyComponent = ComponentType<Record<string, unknown>>;
 
@@ -51,9 +51,27 @@ function summary(over: Record<string, unknown> = {}): TabsProps['summary'] {
     return { totalValue: 10000, totalCost: 8000, totalGain: 2000, totalGainPercent: 25, baseCurrency: 'EUR', cash: 0,
         holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25 }], quality: undefined, ...over } as TabsProps['summary'];
 }
-function renderTabs(over: Record<string, unknown> = {}) {
-    return render(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as TabsProps['scores']} tearsheet={null}
-        forecast={null} dividends={null} userId="u" {...(over as Partial<TabsProps>)} />);
+// Las lecturas tolerantes llegan como promesas ya lanzadas (la página ya no
+// espera a todas): aquí se resuelven al instante y se vacía la cola de
+// microtareas tras el render para asertar los paneles ya desenvueltos.
+const stream = <T,>(value: T, error: string | null = null) => Promise.resolve({ value, error });
+type ScoresValue = Awaited<TabsProps['scores']>['value'];
+const STREAM_KEYS = ['transactions', 'scores', 'tearsheet', 'forecast', 'dividends', 'partialMessage'];
+async function renderTabs(over: Record<string, unknown> = {}) {
+    const wrapped = Object.fromEntries(Object.entries(over).map(([key, value]) => [
+        key,
+        STREAM_KEYS.includes(key) ? (key === 'partialMessage' ? Promise.resolve(value) : stream(value)) : value,
+    ]));
+    // Render dentro de un act esperado: use() resuelve la promesa y React
+    // reintenta el límite <Suspense> dentro del mismo act (fuera, jsdom se
+    // queda con el fallback).
+    let utils!: RenderResult;
+    await act(async () => {
+        utils = render(<PortfolioTabs summary={summary()} transactions={stream({ items: [], total: 0, offset: 0 })} scores={stream({} as ScoresValue)}
+            tearsheet={stream(null)} forecast={stream(null)} dividends={stream(null)} userId="u" {...(wrapped as Partial<TabsProps>)} />);
+    });
+    await act(async () => {});
+    return utils;
 }
 const selected = () => screen.getAllByRole('tab').find((t) => t.getAttribute('aria-selected') === 'true')!.textContent;
 // Las vistas de pestaña no inicial cargan diferidas (next/dynamic): su mock se
@@ -68,7 +86,7 @@ describe('PortfolioTabs pestana desde la URL', () => {
         ['prevision', 'Previsión'], ['estrategia', 'Factores'], ['factores', 'Factores'], ['inventada', 'Resumen'],
     ])('?tab=%s abre %s', async (tab, label) => {
         if (tab) nav.params = new URLSearchParams({ tab });
-        renderTabs();
+        await renderTabs();
         await flushDynamic();
         expect(selected()).toBe(label);
     });
@@ -76,92 +94,98 @@ describe('PortfolioTabs pestana desde la URL', () => {
     it('cambiar de pestana conserva los demas parametros en la URL', async () => {
         nav.params = new URLSearchParams('foo=bar&page=2');
         const spy = vi.spyOn(window.history, 'replaceState');
-        renderTabs();
-        fireEvent.mouseDown(screen.getByRole('tab', { name: 'Movimientos' }));
+        await renderTabs();
+        // El panel se monta al abrir la pestaña y desenvuelve su promesa con
+        // use(): el clic va dentro de un act esperado para que React reintente
+        // el <Suspense> en el mismo scope.
+        await act(async () => {
+            fireEvent.mouseDown(screen.getByRole('tab', { name: 'Movimientos' }));
+        });
         expect(spy).toHaveBeenCalledWith(null, '', '/portfolio?foo=bar&page=2&tab=movimientos');
-        expect(await screen.findByText('transactions-tab')).toBeInTheDocument();
+        await flushDynamic();
+        expect(screen.getByText('transactions-tab')).toBeInTheDocument();
     });
 
     it('un cambio posterior del parametro de URL sincroniza la pestana', async () => {
-        const { rerender } = renderTabs();
+        const { rerender } = await renderTabs();
         expect(selected()).toBe('Resumen');
         nav.params = new URLSearchParams({ tab: 'posiciones' });
-        rerender(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as TabsProps['scores']} tearsheet={null} forecast={null} dividends={null} userId="u" />);
+        rerender(<PortfolioTabs summary={summary()} transactions={stream({ items: [], total: 0, offset: 0 })} scores={stream({} as ScoresValue)} tearsheet={stream(null)} forecast={stream(null)} dividends={stream(null)} userId="u" />);
         await flushDynamic();
         expect(selected()).toBe('Posiciones');
     });
 });
 
 describe('PortfolioTabs contenido', () => {
-    it('no repite el aviso genérico de proveedor y retardo en la cabecera', () => {
-        renderTabs();
+    it('no repite el aviso genérico de proveedor y retardo en la cabecera', async () => {
+        await renderTabs();
         expect(screen.queryByText(/15 min de retardo|Yahoo Finance/i)).not.toBeInTheDocument();
         expect(screen.getByRole('heading', { name: 'Resumen' })).toBeInTheDocument();
     });
-    it('previsión y dividendos no cargados: aviso, no un panel vacio', () => {
+    it('previsión y dividendos no cargados: aviso, no un panel vacio', async () => {
         nav.params = new URLSearchParams({ tab: 'prevision' });
-        const { unmount } = renderTabs();
+        const { unmount } = await renderTabs();
         expect(screen.getByRole('status')).toHaveTextContent('No se pudo cargar la previsión');
         unmount();
         nav.params = new URLSearchParams({ tab: 'dividendos' });
-        renderTabs();
+        await renderTabs();
         expect(screen.getByRole('status')).toHaveTextContent('No se pudo cargar la proyección de dividendos');
     });
 
     it('con datos pinta los paneles', async () => {
         nav.params = new URLSearchParams({ tab: 'prevision' });
-        const { unmount } = renderTabs({ forecast: {} });
+        const { unmount } = await renderTabs({ forecast: {} });
         expect(await screen.findByText('forecast-tab')).toBeInTheDocument();
         expect(await screen.findByText('savings-tab')).toBeInTheDocument();
         unmount();
         nav.params = new URLSearchParams({ tab: 'dividendos' });
-        renderTabs({ dividends: {} });
+        await renderTabs({ dividends: {} });
         expect(await screen.findByText('dividends-tab')).toBeInTheDocument();
     });
 
-    it('mensaje de cartera parcial solo si lo hay', () => {
-        const { unmount } = renderTabs({ partialMessage: 'faltan precios' });
+    it('mensaje de cartera parcial solo si lo hay', async () => {
+        const { unmount } = await renderTabs({ partialMessage: 'faltan precios' });
         expect(screen.getByText(/Cartera parcialmente disponible: faltan precios/)).toBeInTheDocument();
         unmount();
-        renderTabs();
+        await renderTabs();
         expect(screen.queryByText(/Cartera parcialmente disponible/)).not.toBeInTheDocument();
     });
 
-    it('cartera vacia: invita a registrar la primera compra y no muestra rentabilidad', () => {
-        renderTabs({ summary: summary({ holdings: [], totalGain: 0, totalValue: 0 }) });
+    it('cartera vacia: invita a registrar la primera compra y no muestra rentabilidad', async () => {
+        await renderTabs({ summary: summary({ holdings: [], totalGain: 0, totalValue: 0 }) });
         expect(screen.getByText(/Aún no tienes posiciones/)).toBeInTheDocument();
         expect(screen.queryByText(/Rentabilidad no disponible/)).not.toBeInTheDocument();
     });
 
-    it('sin base de coste valida: no presenta el valor neto como beneficio', () => {
-        renderTabs({ summary: summary({ holdings: [{ symbol: 'A', cost: 0, value: 10000, gain: 10000, gainPercent: 0 }] }) });
+    it('sin base de coste valida: no presenta el valor neto como beneficio', async () => {
+        await renderTabs({ summary: summary({ holdings: [{ symbol: 'A', cost: 0, value: 10000, gain: 10000, gainPercent: 0 }] }) });
         expect(screen.getByText(/Rentabilidad no disponible: falta una base de coste válida/)).toBeInTheDocument();
         expect(screen.queryByText(/\+25,00/)).not.toBeInTheDocument();
     });
 
-    it('con base de coste: rentabilidad con signo y ganancia en euros', () => {
-        renderTabs();
+    it('con base de coste: rentabilidad con signo y ganancia en euros', async () => {
+        await renderTabs();
         const line = screen.getByText(/\+25,00\s?%/).closest('p')!;
         expect(line.textContent).toMatch(/2\.?000/);
         expect(line.className).toContain('text-green');
     });
 
-    it('perdida: en rojo y sin mas', () => {
-        renderTabs({ summary: summary({ totalGain: -500, totalGainPercent: -5 }) });
+    it('perdida: en rojo y sin mas', async () => {
+        await renderTabs({ summary: summary({ totalGain: -500, totalGainPercent: -5 }) });
         const line = screen.getByText(/-5,00\s?%|−5,00\s?%/).closest('p')!;
         expect(line.className).toContain('text-red');
     });
 
-    it('sin serie historica: no dibuja grafico y lo explica', () => {
-        renderTabs();
+    it('sin serie historica: no dibuja grafico y lo explica', async () => {
+        await renderTabs();
         expect(screen.getByText(/Aún no hay una serie continua/)).toBeInTheDocument();
         expect(screen.queryByTestId('nav-chart')).not.toBeInTheDocument();
     });
 
-    it('con serie: dibuja el grafico y el periodo cambia el numero de puntos', () => {
+    it('con serie: dibuja el grafico y el periodo cambia el numero de puntos', async () => {
         const dates = Array.from({ length: 400 }, (_, i) => new Date(Date.UTC(2025, 8, 1) + i * 86400000).toISOString().slice(0, 10));
         const nav_ = dates.map((_, i) => 1000 + i);
-        renderTabs({ scores: { history: { dates, nav: nav_ } } });
+        await renderTabs({ scores: { history: { dates, nav: nav_ } } });
         const points = () => Number(screen.getByTestId('nav-chart').getAttribute('data-points'));
         const month = points();
         expect(month).toBeGreaterThan(0);
@@ -170,26 +194,26 @@ describe('PortfolioTabs contenido', () => {
         expect(screen.getByTestId('nav-chart')).toHaveAttribute('data-currency', 'EUR');
     });
 
-    it('serie con fechas pero sin nav no dibuja', () => {
-        renderTabs({ scores: { history: { dates: ['2026-01-01'], nav: [] } } });
+    it('serie con fechas pero sin nav no dibuja', async () => {
+        await renderTabs({ scores: { history: { dates: ['2026-01-01'], nav: [] } } });
         expect(screen.queryByTestId('nav-chart')).not.toBeInTheDocument();
     });
 });
 
 
 describe('Cartera: jerarquía y periodos honestos', () => {
-    it('ordena las pestañas por uso, sin perder ninguna', () => {
-        renderTabs();
+    it('ordena las pestañas por uso, sin perder ninguna', async () => {
+        await renderTabs();
         expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['Resumen', 'Posiciones', 'Movimientos', 'Dividendos', 'Previsión', 'Factores']);
     });
-    it.each([undefined, { dates: ['2026-01-01'], nav: [100] }, { dates: ['2026-01-01', '2026-01-02'], nav: [null, null] }])('sin dos valoraciones no ofrece rangos ni gráfico', history => {
-        renderTabs({ scores: { history } });
+    it.each([undefined, { dates: ['2026-01-01'], nav: [100] }, { dates: ['2026-01-01', '2026-01-02'], nav: [null, null] }])('sin dos valoraciones no ofrece rangos ni gráfico', async history => {
+        await renderTabs({ scores: { history } });
         expect(screen.queryByRole('group', { name: 'Periodo del gráfico de valor' })).not.toBeInTheDocument();
         expect(screen.queryByTestId('nav-chart')).not.toBeInTheDocument();
         expect(screen.getByText('G/P desde compra:')).toBeInTheDocument();
     });
-    it('una ventana sin dos puntos se desactiva, Todo sigue accesible y G/P no cambia de significado', () => {
-        renderTabs({ scores: { history: { dates: ['2025-01-01', '2026-01-02'], nav: [100, 120] } } });
+    it('una ventana sin dos puntos se desactiva, Todo sigue accesible y G/P no cambia de significado', async () => {
+        await renderTabs({ scores: { history: { dates: ['2025-01-01', '2026-01-02'], nav: [100, 120] } } });
         expect(screen.getByRole('button', { name: '1M' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Todo' })).toBeEnabled();
         fireEvent.click(screen.getByRole('button', { name: 'Todo' }));
@@ -200,19 +224,19 @@ describe('Cartera: jerarquía y periodos honestos', () => {
 
 
 describe('Cartera: corte de la reconstrucción del TWR', () => {
-    it('marca «Reconstrucción: serie reiniciada» cuando la serie empieza en la base nueva', () => {
-        renderTabs({ scores: { history: { dates: ['2026-10-04', '2026-10-05'], nav: [100, 101], rebuild_reset_date: '2026-10-03' } } });
+    it('marca «Reconstrucción: serie reiniciada» cuando la serie empieza en la base nueva', async () => {
+        await renderTabs({ scores: { history: { dates: ['2026-10-04', '2026-10-05'], nav: [100, 101], rebuild_reset_date: '2026-10-03' } } });
         expect(screen.getByTestId('twr-rebuild-reset')).toHaveTextContent(/Reconstrucción: serie reiniciada el/);
     });
-    it('sin corte no hay aviso', () => {
-        renderTabs({ scores: { history: { dates: ['2026-10-04', '2026-10-05'], nav: [100, 101], rebuild_reset_date: null } } });
+    it('sin corte no hay aviso', async () => {
+        await renderTabs({ scores: { history: { dates: ['2026-10-04', '2026-10-05'], nav: [100, 101], rebuild_reset_date: null } } });
         expect(screen.queryByTestId('twr-rebuild-reset')).not.toBeInTheDocument();
     });
 });
 
 describe('PortfolioTabs: cabecera con coste pendiente de revisión', () => {
-    it('no muestra «G/P desde compra» si una posición tiene el coste por revisar (igual que el Resumen)', () => {
-        renderTabs({ summary: summary({ holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25, costReviewMessage: 'Divisa del coste sin verificar' }] }) });
+    it('no muestra «G/P desde compra» si una posición tiene el coste por revisar (igual que el Resumen)', async () => {
+        await renderTabs({ summary: summary({ holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25, costReviewMessage: 'Divisa del coste sin verificar' }] }) });
         expect(screen.getByText(/Rentabilidad pendiente de revisión/)).toBeInTheDocument();
         expect(screen.queryByText(/G\/P desde compra/)).toBeNull();
     });

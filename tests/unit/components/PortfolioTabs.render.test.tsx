@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 
 // Rendimiento de «Resumen»: cambiar el periodo del gráfico (1S/1M/3M/…) solo
 // cambia el panel del gráfico. Las métricas, el donut y el tearsheet no
@@ -38,9 +38,14 @@ const summary = { totalValue: 10000, totalCost: 8000, totalGain: 2000, totalGain
 const scores = { quality: null, growth: null, value: null, dividend: null, cagr3y: null, history: { dates, nav } } as any;
 const counts = () => [h.summary, h.notice, h.allocation, h.tearsheet].map((fn) => fn.mock.calls.length);
 
+const stream = <T,>(value: T, error: string | null = null) => Promise.resolve({ value, error });
+// Las lecturas tolerantes son promesas desenvueltas con use() en <Suspense>:
+// hay que vaciar la cola de microtareas para asertar los paneles resueltos.
+const base = { transactions: stream({ items: [], total: 0, offset: 0 }), scores: stream(scores), tearsheet: stream(null), forecast: stream(null), dividends: stream(null) };
+
 describe('Resumen: cambiar el periodo del gráfico', () => {
-    it('solo repinta el gráfico, no las métricas, el donut ni el tearsheet', () => {
-        render(<PortfolioTabs summary={summary} transactions={[]} scores={scores} tearsheet={null} forecast={null} dividends={null} userId="u" />);
+    it('solo repinta el gráfico, no las métricas, el donut ni el tearsheet', async () => {
+        await act(async () => { render(<PortfolioTabs summary={summary} {...base} userId="u" />); });
         expect(counts()).toEqual([1, 1, 1, 1]);
         const before = Number(screen.getByTestId('nav-chart').dataset.points);
         fireEvent.click(within(screen.getByRole('group')).getByRole('button', { name: '1A' }));
@@ -50,9 +55,10 @@ describe('Resumen: cambiar el periodo del gráfico', () => {
         expect(counts()).toEqual([1, 1, 1, 1]);
     });
 
-    it('un resumen nuevo (refresco de datos) sí repinta métricas y donut', () => {
-        const { rerender } = render(<PortfolioTabs summary={summary} transactions={[]} scores={scores} tearsheet={null} forecast={null} dividends={null} userId="u" />);
-        rerender(<PortfolioTabs summary={{ ...summary, holdings: [...summary.holdings] }} transactions={[]} scores={scores} tearsheet={null} forecast={null} dividends={null} userId="u" />);
+    it('un resumen nuevo (refresco de datos) sí repinta métricas y donut', async () => {
+        let utils!: import('@testing-library/react').RenderResult;
+        await act(async () => { utils = render(<PortfolioTabs summary={summary} {...base} userId="u" />); });
+        await act(async () => { utils.rerender(<PortfolioTabs summary={{ ...summary, holdings: [...summary.holdings] }} {...base} userId="u" />); });
         expect(counts()).toEqual([2, 2, 2, 1]);
     });
 });

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps, ComponentType } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, type RenderResult } from '@testing-library/react';
 
 type LazyComponent = ComponentType<Record<string, unknown>>;
 
@@ -51,9 +51,16 @@ function summary(over: Record<string, unknown> = {}): TabsProps['summary'] {
     return { totalValue: 10000, totalCost: 8000, totalGain: 2000, totalGainPercent: 25, baseCurrency: 'EUR', cash: 0,
         holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25 }], quality: undefined, ...over } as TabsProps['summary'];
 }
-function renderTabs(over: Record<string, unknown> = {}) {
-    return render(<PortfolioTabs summary={summary()} transactions={[]} scores={{} as TabsProps['scores']} tearsheet={null}
-        forecast={null} dividends={null} userId="u" {...(over as Partial<TabsProps>)} />);
+const stream = <T,>(value: T, error: string | null = null) => Promise.resolve({ value, error });
+type ScoresValue = Awaited<TabsProps['scores']>['value'];
+async function renderTabs(over: Record<string, unknown> = {}) {
+    let utils!: RenderResult;
+    await act(async () => {
+        utils = render(<PortfolioTabs summary={summary()} transactions={stream({ items: [], total: 0, offset: 0 })} scores={stream({} as ScoresValue)}
+            tearsheet={stream(null)} forecast={stream(null)} dividends={stream(null)} userId="u" {...(over as Partial<TabsProps>)} />);
+    });
+    await act(async () => {});
+    return utils;
 }
 
 // Cartera vacía (sin posiciones ni caja): las tarjetas de arriba decían «N/D» y la tarjeta
@@ -61,17 +68,19 @@ function renderTabs(over: Record<string, unknown> = {}) {
 const blank = { holdings: [], totalValue: 0, totalCost: 0, totalGain: 0, totalGainPercent: 0, equityValue: 0, cash: 0 };
 
 describe('cartera vacía: un solo estado vacío', () => {
-    it('la tarjeta principal no pinta «0,00 €» cuando las de arriba dicen N/D', () => {
-        renderTabs({ summary: summary(blank) });
+    it('la tarjeta principal no pinta «0,00 €» cuando las de arriba dicen N/D', async () => {
+        await renderTabs({ summary: summary(blank) });
         expect(screen.getByText(/Aún no tienes posiciones/)).toBeInTheDocument();
         expect(screen.queryByText(/0,00\s€/)).not.toBeInTheDocument();
     });
-    it('sin posiciones pero con caja, el valor (la caja) sí es un dato', () => {
-        renderTabs({ summary: summary({ ...blank, totalValue: 500, cash: 500 }) });
+    it('sin posiciones pero con caja, el valor (la caja) sí es un dato', async () => {
+        await renderTabs({ summary: summary({ ...blank, totalValue: 500, cash: 500 }) });
+        await act(async () => {});
         expect(screen.getByText(/500,00\s€/)).toBeInTheDocument();
     });
-    it('con posiciones, el valor sigue ahí', () => {
-        renderTabs();
+    it('con posiciones, el valor sigue ahí', async () => {
+        await renderTabs();
+        await act(async () => {});
         expect(screen.getByText(/10\.000,00\s€/)).toBeInTheDocument();
     });
 });

@@ -49,6 +49,8 @@ import { translateMessage } from '@/lib/i18n/translate';
 
 type TabsProps = ComponentProps<typeof PortfolioTabs>;
 
+const stream = <T,>(value: T, error: string | null = null) => Promise.resolve({ value, error });
+
 const summary: TabsProps['summary'] = {
     totalValue: 1, totalCost: 1, totalGain: 0, totalGainPercent: 0, baseCurrency: 'EUR', cash: 0, holdings: [],
     equityValue: 1, status: 'ok', missingFx: [], valuationHold: [],
@@ -58,8 +60,10 @@ const holdingsEn = translateMessage('en', 'portfolio.holdings.title');
 describe('cartera en inglés', () => {
     it.each([['dividendos', 'dividends'], ['prevision', 'forecast']])('?tab=%s recibe el idioma activo', async (tab, label) => {
         nav.params = new URLSearchParams({ tab });
-        render(<LocaleProvider locale="en"><PortfolioTabs summary={summary} transactions={[]} scores={{} as TabsProps['scores']}
-            tearsheet={null} forecast={{} as TabsProps['forecast']} dividends={{} as TabsProps['dividends']} userId="u" /></LocaleProvider>);
+        await act(async () => {
+            render(<LocaleProvider locale="en"><PortfolioTabs summary={summary} transactions={stream({ items: [], total: 0, offset: 0 })} scores={stream({} as never)}
+                tearsheet={stream(null)} forecast={stream({} as never)} dividends={stream({} as never)} userId="u" /></LocaleProvider>);
+        });
         await act(async () => {});
         expect(await screen.findByText(`${label}:${holdingsEn}`)).toBeInTheDocument();
     });

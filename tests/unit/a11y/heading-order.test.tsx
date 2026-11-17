@@ -1,5 +1,5 @@
 import axe from 'axe-core';
-import { render } from '@testing-library/react';
+import { act, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 // axe heading-order (WCAG 1.3.1 / 2.4.6) en las dos pantallas donde Lighthouse
@@ -47,10 +47,15 @@ describe('a11y: titulares sin saltos de nivel (heading-order)', () => {
             totalValue: 10000, totalCost: 8000, totalGain: 2000, totalGainPercent: 25, baseCurrency: 'EUR', cash: 0,
             holdings: [{ symbol: 'A', cost: 8000, value: 10000, gain: 2000, gainPercent: 25 }], quality: undefined,
         };
-        const { container } = render(
-            <PortfolioTabs summary={summary as never} transactions={[]} scores={{} as never} tearsheet={null}
-                forecast={null} dividends={null} userId="u" />,
-        );
+        const stream = <T,>(value: T, error: string | null = null) => Promise.resolve({ value, error });
+        let container!: HTMLElement;
+        await act(async () => {
+            ({ container } = render(
+                <PortfolioTabs summary={summary as never} transactions={stream({ items: [], total: 0, offset: 0 })} scores={stream({} as never)} tearsheet={stream(null)}
+                    forecast={stream(null)} dividends={stream(null)} userId="u" />,
+            ));
+        });
+        await act(async () => {});
         expect(levels(container)).toContain('h2 Valor de la cartera');
         expect(await headingOrder(container)).toEqual([]);
     });
