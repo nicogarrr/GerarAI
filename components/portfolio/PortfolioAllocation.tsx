@@ -75,8 +75,12 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                 <span className="text-xs text-gray-500">{ti('portfolio.allocation.weightsNote')}</span>
             </div>
 
-            {/* Contenido: Pie Chart + Leyenda */}
-            <div className="flex-1 flex flex-col items-center justify-center gap-6 sm:flex-row sm:justify-between">
+            {/* Contenido: donut con la leyenda apilada debajo. En horizontal
+                (donut 250 + gap 24 + leyenda mínima 160 = 434px) no cabe la
+                franja de 80px del botón flotante del cerebro en la tarjeta
+                (428px útiles medidos a 1280px, 17-nov-2026): el % de la
+                leyenda quedaba bajo el botón al hacer scroll. */}
+            <div className="flex-1 flex flex-col items-center justify-center gap-6">
                 {/* Pie Chart - Más grande */}
                 <div className="relative h-[200px] w-[200px] flex-shrink-0 sm:h-[250px] sm:w-[250px]">
                     {chartData.length > 0 ? (
@@ -101,8 +105,10 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                     )}
                 </div>
 
-                {/* Leyenda lateral - Pegada a la derecha */}
-                <div id="portfolio-allocation-legend" className="max-h-[250px] w-full min-w-0 space-y-3 overflow-y-auto sm:max-h-none sm:w-auto sm:min-w-[160px] sm:max-w-[260px] sm:overflow-visible">
+                {/* Leyenda a ancho completo bajo el donut; md:pr-24 deja
+                    libre la franja del botón flotante (80px medidos) para
+                    que el % nunca quede bajo él en ningún scroll. */}
+                <div id="portfolio-allocation-legend" className="max-h-[250px] w-full min-w-0 space-y-3 overflow-y-auto sm:max-h-none sm:overflow-visible md:pr-24">
                     {chartData.map((item, index) => (
                         <div key={item.symbol} className="flex min-w-0 items-center justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-2">
