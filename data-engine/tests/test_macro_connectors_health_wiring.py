@@ -230,7 +230,13 @@ def test_ecb_history_fallo_agrega_en_ecb(monkeypatch):
 
 def test_ecb_history_exito_agrega_en_ecb(monkeypatch):
     def handler(request):
-        return httpx.Response(200, text="TIME_PERIOD,USD\n2026-01-01,1.08\n")
+        # Formato real del csvdata del BCE (EXR, formato largo): la cabecera
+        # "TIME_PERIOD,USD" que había aquí nunca fue la de la fuente.
+        return httpx.Response(
+            200,
+            text="FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE\n"
+            "D,USD,EUR,SP00,A,2026-01-01,1.08\n",
+        )
 
     real_async_client = httpx.AsyncClient
 
