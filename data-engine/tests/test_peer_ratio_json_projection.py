@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, func, select, text
+from sqlalchemy import create_engine, event, func, select, text
 from sqlalchemy.orm import Session
 
 from app.core.database import Base
@@ -65,7 +65,25 @@ def db():
         with engine.begin() as conn:
             conn.execute(text(f'CREATE SCHEMA "{schema}"'))
         engine = engine.execution_options(schema_translate_map={None: schema})
+
+        @event.listens_for(engine, "begin")
+        def search_path(conn):
+            conn.exec_driver_sql(f'SET LOCAL search_path TO "{schema}"')
     Base.metadata.create_all(engine)
+    if engine.dialect.name == "postgresql":
+        from app.valuation.peer_rank_projection import (
+            ADD_COLUMN_SQL,
+            FUNCTION_SQL,
+            TRIGGER_FUNCTION_SQL,
+            TRIGGER_SQL,
+        )
+        with engine.begin() as conn:
+            # Resolve the projection function in this disposable schema only.
+            conn.execute(text(f'SET LOCAL search_path TO "{schema}"'))
+            conn.execute(text(FUNCTION_SQL))
+            conn.execute(text(ADD_COLUMN_SQL))
+            conn.execute(text(TRIGGER_FUNCTION_SQL))
+            conn.execute(text(TRIGGER_SQL))
     try:
         with Session(engine) as session:
             session.add_all([Tenant(id=i, external_id=f"projection-{i}", name="synthetic") for i in (2, 5)])
@@ -177,3 +195,102 @@ def test_projection_preserves_tenant_2_5_latest_status_and_subunit_rules(db):
             execute=session.connection().execute,
         )
         assert engine_peer_ratios(core_only) == {shared.id: ratio}
+
+
+def test_peer_read_is_one_core_select_with_no_output_entities(db):
+    session, _ = db
+    company = _company(session, "SCENARIOS")
+    _output(session, company, {"expected_value": 150, "current_price": 100})
+    model = session.scalar(select(ValuationModel))
+    session.add(ValuationOutput(tenant_id=2, valuation_model_id=model.id,
+                               scenario="bull", output_payload={"expected_value": 150, "current_price": 100}))
+    session.commit()
+    session.info["tenant_id"] = 2
+    statements, loaded = [], []
+
+    def record(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().startswith("SELECT"):
+            statements.append(statement)
+
+    def load(target, context):
+        loaded.append(target)
+
+    bind = session.get_bind()
+    event.listen(bind, "before_cursor_execute", record)
+    event.listen(ValuationOutput, "load", load)
+    try:
+        ratios = engine_peer_ratios(session)
+    finally:
+        event.remove(bind, "before_cursor_execute", record)
+        event.remove(ValuationOutput, "load", load)
+    assert len(ratios) == 1 and list(ratios.values()) == [1.5]
+    assert len(statements) == 1
+    assert loaded == []
+    if bind.dialect.name == "postgresql":
+        assert "peer_rank_inputs" in statements[0]
+        assert "json_to_record" not in statements[0]
+        assert "coalesce(" in statements[0].lower()
+        assert "valuation_peer_rank_inputs_v1" in statements[0]
+
+
+def test_stored_projection_tracks_update_without_stale_cache(db):
+    session, _ = db
+    company = _company(session, "UPDATE")
+    _output(session, company, {"expected_value": 150, "current_price": 100})
+    session.commit()
+    session.info['tenant_id'] = 2
+    assert engine_peer_ratios(session) == {company.id: 1.5}
+    output = session.scalar(select(ValuationOutput))
+    output.output_payload = {"listed_share_values": {"expected": 240}, "adr_ratio": 8, "current_price": 100}
+    session.commit()
+    assert engine_peer_ratios(session) == {company.id: 2.4}
+    output.output_payload = {"adr_ratio": 8, "expected_value": 150, "current_price": 100}
+    session.commit()
+    assert engine_peer_ratios(session) == {}
+
+
+def test_pg_partial_backfill_fallback_is_not_missing_or_stale(db):
+    session, _ = db
+    if session.get_bind().dialect.name != 'postgresql':
+        pytest.skip('PG fallback only')
+    from app.valuation.peer_rank_projection import backfill_batch
+    companies = [_company(session, 'OLD1'), _company(session, 'OLD2')]
+    for company in companies:
+        _output(session, company, {'expected_value': 150, 'current_price': 100})
+    session.commit()
+    session.info['tenant_id'] = 2
+    ids = [company.id for company in companies]
+    # Simulate rows predating expand: migration does not fill those rows.
+    session.execute(text('ALTER TABLE valuation_outputs DISABLE TRIGGER valuation_peer_rank_inputs_write'))
+    session.execute(text('UPDATE valuation_outputs SET peer_rank_inputs=NULL'))
+    session.execute(text('ALTER TABLE valuation_outputs ENABLE TRIGGER valuation_peer_rank_inputs_write'))
+    session.commit()
+    assert engine_peer_ratios(session) == _legacy_ratios(session) == dict.fromkeys(ids, 1.5)
+    assert len(backfill_batch(session.connection(), 1)) == 1
+    session.commit()
+    assert engine_peer_ratios(session) == _legacy_ratios(session)
+    assert len(backfill_batch(session.connection(), 1)) == 1
+    session.commit()
+    assert engine_peer_ratios(session) == _legacy_ratios(session)
+
+
+def test_pg_filled_projection_does_not_execute_full_payload_function(db):
+    session, _ = db
+    if session.get_bind().dialect.name != 'postgresql':
+        pytest.skip('PG short-circuit only')
+    company = _company(session, 'SHORTCIRCUIT')
+    _output(session, company, {'expected_value': 150, 'current_price': 100})
+    session.commit()
+    session.info['tenant_id'] = 2
+    company_id = company.id
+    # Failure-injection at the DB function boundary, not a Python swallowed spy.
+    savepoint = session.begin_nested()
+    session.execute(text("""
+        CREATE OR REPLACE FUNCTION valuation_peer_rank_inputs_v1(payload json)
+        RETURNS json LANGUAGE plpgsql IMMUTABLE AS $test$
+        BEGIN RAISE EXCEPTION 'full payload fallback executed'; END $test$
+    """))
+    try:
+        assert engine_peer_ratios(session) == {company_id: 1.5}
+    finally:
+        savepoint.rollback()
