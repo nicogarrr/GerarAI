@@ -260,6 +260,7 @@ FRAMEWORK_TERMS_ES: dict[str, str] = {
     'reserve_adequacy': 'suficiencia de reservas',
     'supply_chain': 'cadena de suministro',
     'mix': 'mezcla de producto',
+    'positive_terminal_fcf': 'flujo de caja libre terminal positivo',
 }
 
 

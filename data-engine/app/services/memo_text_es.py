@@ -97,6 +97,7 @@ TERMS_ES: dict[str, str] = {
     "holdco_debt": "deuda del holding",
     "asset_value": "valor de los activos",
     "positive_cap_rate_and_shares": "tasa de capitalización positiva y acciones",
+    "positive_terminal_fcf": "flujo de caja libre terminal positivo",
     "valid_shares_and_cost_of_equity_spread": "acciones válidas y diferencial sobre el coste del capital",
     "cost_of_equity_above_book_value_growth": "coste del capital propio por encima del crecimiento del valor contable",
     "consistent_period_volume_cost_price": "volumen, coste y precio de un mismo período",
