@@ -11,7 +11,7 @@ export type HistoricalStressReport = {
     portfolio: StressWindow[];
     companies: Array<{
         ticker: string; weight: number | null; weight_as_of: string | null;
-        source: string; source_url: string | null; fetched_at: string; currency: string | null;
+        source: string; source_url: string | null; fetched_at: string | null; currency: string | null;
         windows: StressWindow[];
     }>;
 };
