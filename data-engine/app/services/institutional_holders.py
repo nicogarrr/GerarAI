@@ -491,16 +491,32 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
             PublicSourceDocument.provider == PROVIDER, PublicSourceDocument.source_url == refs[0].url,
             PublicSourceDocument.checksum.startswith(DETAIL_VERSION))).all()
         processed = {cid for cid, key in rows if _listing_cusip(key) is not None and _listing_cusip(key) == company_cusip.get(cid)}
-        # El salto no vale solo por URL: si la SEC republica el mismo ZIP con
+        # El salto no vale solo por URL: si la SEC republica un ZIP con
         # contenido corregido (otro ETag), hay que recalcular aunque todas las
-        # empresas tengan documento de ese URL.
-        head_etag = _head_etag(http, refs[0].url)
-        state = session.scalars(select(ConnectorState).where(
-            ConnectorState.connector == _REGISTRY_KEY,
-            ConnectorState.company_id.is_(None),
-            ConnectorState.feed_url == refs[0].url)).first()
-        etag_changed = bool(state is not None and state.etag and head_etag and state.etag != head_etag)
-        if not etag_changed and all(company.id in processed for company in cusips.values()):
+        # empresas tengan documento de ese URL. Se vigilan AMBOS ZIP: el
+        # resumen compara el trimestre actual con el previo, así que una
+        # corrección republicada del previo también cambia el resultado.
+        head_etags = [_head_etag(http, ref.url) for ref in refs]
+        states = {
+            ref.url: session.scalars(select(ConnectorState).where(
+                ConnectorState.connector == _REGISTRY_KEY,
+                ConnectorState.company_id.is_(None),
+                ConnectorState.feed_url == ref.url)).first()
+            for ref in refs
+        }
+        etag_changed = any(
+            states[ref.url] is not None and states[ref.url].etag and head_etags[i]
+            and states[ref.url].etag != head_etags[i]
+            for i, ref in enumerate(refs))
+        # Datos procesados ANTES de la vigilancia por ETag (o con el HEAD
+        # caído aquel día): sin ETag guardado el salto «sin_cambios» se
+        # repetiría para siempre aunque la SEC republicara el ZIP. Si la SEC
+        # sí sirve ETag y no hay ninguno guardado, hay que descargar una vez
+        # y fijarlo (migración pre-ETag).
+        etag_missing = any(
+            head_etags[i] and not (states[ref.url] is not None and states[ref.url].etag)
+            for i, ref in enumerate(refs))
+        if not etag_changed and not etag_missing and all(company.id in processed for company in cusips.values()):
             registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
             return {"status": "sin_cambios", "dataset": refs[0].url}
         parses, checksums, etags = [], [], []
@@ -516,7 +532,8 @@ def refresh_institutional_holders(db: Session | None = None, client: httpx.Clien
             # afirma salud ni se fija el ETag — la próxima pasada reintenta.
             registry.record_failure(_REGISTRY_KEY, f"dataset ilegible: {result.get('reason', '')[:120]}")
             return result
-        _save_etag(session, _REGISTRY_KEY, refs[0].url, state, etags[0] or head_etag)
+        for i, ref in enumerate(refs):
+            _save_etag(session, _REGISTRY_KEY, ref.url, states[ref.url], etags[i] or head_etags[i])
         registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
         return result
     except Exception as exc:  # noqa: BLE001 - job programado: se informa, no se cae

@@ -242,7 +242,13 @@ def refresh_fund_holders(db: Session | None = None, client: httpx.Client | None 
             ConnectorState.company_id.is_(None),
             ConnectorState.feed_url == ref.url)).first()
         etag_changed = bool(state is not None and state.etag and head_etag and state.etag != head_etag)
-        if not etag_changed and all(company.id in processed for company in cusips.values()):
+        # Datos procesados ANTES de la vigilancia por ETag (o con el HEAD
+        # caído aquel día): sin ETag guardado el salto «sin_cambios» se
+        # repetiría para siempre aunque la SEC republicara el ZIP. Si la SEC
+        # sí sirve ETag y no hay ninguno guardado, hay que descargar una vez
+        # y fijarlo (migración pre-ETag).
+        etag_missing = bool(head_etag) and not (state is not None and state.etag)
+        if not etag_changed and not etag_missing and all(company.id in processed for company in cusips.values()):
             registry.record_success(_REGISTRY_KEY, (time.perf_counter() - started) * 1000)
             return {"status": "sin_cambios", "dataset": ref.url}
         digest = hashlib.sha256()
