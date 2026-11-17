@@ -200,14 +200,33 @@ def build_tools(db: Session, *, today: date | None = None) -> dict[str, ToolSpec
     def portfolio_concentration(ctx: RunContext) -> ToolOutput | None:
         company = _company(db, ctx)
         positions = _positions(ctx)
-        total = sum(_num(p.market_value_base) or 0.0 for p in positions)
+        # market_value_base es None cuando falta el tipo de cambio: esa
+        # posición NO vale 0 en el total. Se excluye y se declara (misma
+        # doctrina que user_position: mejor vacío que una suma parcial que
+        # el experto tomaría por la total); un None contado como 0 inflaría
+        # el peso de todas las demás posiciones.
+        valued = [(p, _num(p.market_value_base)) for p in positions]
+        excluded_ids = sorted(
+            {p.company_id for p, v in valued if v is None and (_num(p.quantity) or 0.0) > 0}
+        )
+        total = sum(v for _p, v in valued if v is not None)
         if company is None or total <= 0:
             return None
-        mine = sum(_num(p.market_value_base) or 0.0 for p in positions if p.company_id == company.id)
+        own_open = [v for p, v in valued if p.company_id == company.id and (_num(p.quantity) or 0.0) > 0]
+        weight: float | None
+        if not own_open:
+            weight = 0.0
+        elif all(v is not None for v in own_open):
+            weight = round(100 * sum(v for v in own_open if v is not None) / total, 2)
+        else:
+            # La propia posición no tiene valor en base: el peso es
+            # desconocido, no 0 %.
+            weight = None
         return ToolOutput(
             source={"table": "positions", "date": _day(today or local_today()), "url": "/portfolio"},
-            data={"ticker": company.ticker, "weight_pct": round(100 * mine / total, 2),
-                  "positions_count": len(positions)},
+            data={"ticker": company.ticker, "weight_pct": weight,
+                  "positions_count": len(positions),
+                  "positions_excluded_missing_fx": len(excluded_ids)},
         )
 
     def news_events(ctx: RunContext) -> list[ToolOutput]:
