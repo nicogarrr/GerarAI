@@ -32,6 +32,8 @@ import { pathToFileURL } from 'node:url';
 export const IGNORED_ADVISORIES = new Set(['GHSA-fc5q-39xc-vjpf']);
 
 const BLOCKING = new Set(['high', 'critical']);
+const SEVERITIES = new Set(['info', 'low', 'moderate', 'high', 'critical']);
+const isRecord = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const GHSA_RE = /GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}/i;
 
@@ -68,10 +70,25 @@ function rootAdvisories(vulnerabilities, start) {
  */
 export function evaluateAudit(report, ignored = IGNORED_ADVISORIES) {
   const fail = (error) => ({ ok: false, blocking: [], ignored: [], error });
-  if (!report || typeof report !== 'object') return fail('respuesta de npm audit vacia o no es un objeto');
+  if (!isRecord(report)) return fail('respuesta de npm audit vacia o no es un objeto');
   if (report.error) return fail(`npm audit devolvio un error: ${report.error.summary}`);
   const vulns = report.vulnerabilities;
-  if (!vulns || typeof vulns !== 'object') return fail('sin campo vulnerabilities en la salida de npm audit');
+  if (!isRecord(vulns)) return fail('sin mapa vulnerabilities valido en la salida de npm audit');
+  // Validate before filtering by severity: an incomplete node must not become
+  // a clean report merely because its severity cannot be recognized.
+  for (const [name, vuln] of Object.entries(vulns)) {
+    if (!isRecord(vuln) || !SEVERITIES.has(vuln.severity) || !Array.isArray(vuln.via)) {
+      return fail(`paquete ${name}: severidad o cadena via invalida`);
+    }
+    for (const via of vuln.via) {
+      if (typeof via === 'string' && via.length > 0) continue;
+      if (!isRecord(via) || !SEVERITIES.has(via.severity)
+        || typeof via.name !== 'string' || !via.name
+        || typeof via.title !== 'string' || typeof via.url !== 'string') {
+        return fail(`paquete ${name}: advisory raiz invalida`);
+      }
+    }
+  }
 
   const ignoredLower = new Set([...ignored].map((id) => id.toLowerCase()));
   const blocking = [];

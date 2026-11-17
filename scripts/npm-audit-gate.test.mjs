@@ -205,3 +205,31 @@ test('--stdin: lee el JSON de stdin', () => {
   const bad = spawnSync(process.execPath, ['scripts/npm-audit-gate.mjs', '--stdin'], { input: '', encoding: 'utf8' });
   assert.equal(bad.status, 1);
 });
+
+
+test('falla cerrado ante un mapa o nodo de vulnerabilidades incompleto', () => {
+  for (const vulnerabilities of [[], "bad", { pkg: null }, { pkg: [] },
+    { pkg: { via: [] } }, { pkg: { severity: "HIGH", via: [] } },
+    { pkg: { severity: "high" } }]) {
+    const result = evaluateAudit({ vulnerabilities });
+    assert.equal(result.ok, false);
+    assert.equal(typeof result.error, 'string');
+  }
+});
+
+test('una advisory raiz malformada no se omite ni hace caer el parser', () => {
+  for (const via of [null, [], 42, "", { ...OTHER, severity: undefined },
+    { ...OTHER, severity: "unknown" }, { ...OTHER, name: null },
+    { ...OTHER, title: null }, { ...OTHER, url: null }]) {
+    const result = evaluateAudit({ vulnerabilities: { pkg: { severity: 'high', via: [via] } } });
+    assert.equal(result.ok, false);
+    assert.equal(typeof result.error, 'string');
+  }
+});
+
+test('valida tambien nodos no bloqueantes antes de declarar un informe limpio', () => {
+  const result = evaluateAudit({ vulnerabilities: { pkg: { severity: 'low', via: [null] } } });
+  assert.equal(result.ok, false);
+  assert.equal(evaluateAudit(report({ ...OTHER, severity: 'info' })).ok, true);
+  assert.equal(evaluateAudit(report({ ...OTHER, severity: 'low' })).ok, true);
+});
