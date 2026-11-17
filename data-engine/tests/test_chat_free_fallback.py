@@ -35,8 +35,10 @@ class Fake:
         self.delay = delay
         self.calls = []
         self.cancelled = False
+        self.started = asyncio.Event()
     async def complete(self, request):
         self.calls.append(request)
+        self.started.set()
         try:
             await asyncio.sleep(self.delay)
             if isinstance(self.value, Exception): raise self.value
@@ -165,10 +167,25 @@ async def test_slow_valid_primary_never_touches_a_failing_backup():
 async def test_external_cancel_collects_both_tasks():
     p, b = Fake(delay=1), Fake(delay=1)
     task = asyncio.create_task(ChatFallbackProvider(p, b, total=2, delay=.01).complete(LLMRequest([Message("user", "hola")], task="chat")))
-    await asyncio.sleep(.03)
+    # Se espera al ARRANQUE del respaldo, no a un reloj: con el bucle cargado
+    # vencen a la vez el plazo de Go (.01) y un sleep(.03) del test, la
+    # cancelacion llega antes de que el respaldo empiece y nunca se marca.
+    await asyncio.wait_for(b.started.wait(), 5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError): await task
     assert p.cancelled and b.cancelled
+
+
+@run_async
+async def test_external_cancel_before_backup_starts_leaves_no_task_and_no_backup_call():
+    p, b = Fake(delay=1), Fake(delay=1)
+    task = asyncio.create_task(ChatFallbackProvider(p, b, total=2, delay=.5).complete(LLMRequest([Message("user", "hola")], task="chat")))
+    await asyncio.wait_for(p.started.wait(), 5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError): await task
+    await asyncio.sleep(0)
+    assert p.cancelled and not b.calls
+    assert [t for t in asyncio.all_tasks() if t is not asyncio.current_task()] == []
 
 
 @run_async
