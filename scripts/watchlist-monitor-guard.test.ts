@@ -56,25 +56,24 @@ test('sin URLs de proveedor construidas a mano en el frontend', () => {
 test('el resumen del monitor reserva su altura mientras llega por streaming (sin CLS)', () => {
     // Sin la reserva, la llegada de la franja "Según el valor justo…" empujaba
     // título, botón de alta y tabla: CLS 0.164-0.176 medido en prod a 390x844
-    // (17-nov-2026). Las min-h replican las líneas medidas del resumen
-    // (text-xs = 16px/línea): 3 en móvil, 2 en sm, 1 en lg.
+    // (17-nov-2026). Las min-h cubren la franja larga medida (167 chars):
+    // 4 líneas bajo 344px de contenedor, 3 bajo 640, 2 bajo 1216, 1 por encima.
     assert.match(page, /const rankSummarySlotClass = "min-h-16 text-xs @min-\[344px\]:min-h-12 @min-\[640px\]:min-h-8 @min-\[1216px\]:min-h-4"/);
     // La franja resuelta lleva LAS MISMAS min-h: sin ellas, al ser mas corta
     // que la reserva, el contenido subia al llegar (replica medida 17-nov-2026).
     assert.match(page, /className=\{`\$\{rankSummarySlotClass\} text-gray-500`\}/);
     // Sin ranks validos (ranked=0) la franja resuelve a la misma reserva, no a
     // null: con null la reserva colapsaba al resolver el stream y el contenido
-    // subia (CLS inverso, hallazgo del auditor 17-nov-2026).
+    // subia.
     assert.match(page, /: rankSummarySlot;/);
     // Con watchlist vacia no hay franja posible: no se reserva nada.
     assert.match(page, /watchlistStocks\.length > 0 && monitorEl\(rankSummaryEl, rankSummarySlot\)/);
-    // La cabecera se rige por ANCHO DISPONIBLE (@container), no de ventana, y
-    // la reserva cubre el PEOR CASO de texto (~176 chars), no el actual:
-    // breakpoints de ventana o alturas por texto real no convergen (NO FAV del
-    // auditor a v3 y v4, 17-nov-2026).
+    // La cabecera se rige por ancho disponible (@container), no de ventana, y
+    // la reserva se dimensiona con la franja larga medida (167 chars reales):
+    // por breakpoint de ventana quedaba corta con el sidebar expandido.
     assert.match(page, /<div className="@container flex min-w-0 flex-wrap items-center justify-between gap-3">/);
-    // El boton de alta vive SIEMPRE en su propia fila (columna w-full): en
-    // linea con la franja, su wrap dependia del largo del texto y no convergia
-    // (NO FAV auditor v4: +56px a 1440 con la franja larga, 17-nov-2026).
+    // El boton de alta vive siempre en su propia fila (columna w-full): en
+    // linea con la franja, su wrap variaba con el largo del texto (+56px
+    // medidos en replica a 1440 con la franja larga, 17-nov-2026).
     assert.match(page, /<div className="min-w-0 w-full">/);
 });

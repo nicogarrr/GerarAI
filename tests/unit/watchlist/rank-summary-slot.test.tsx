@@ -1,11 +1,11 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 
-// La reserva de la franja del resumen (rankSummarySlot) es el contrato de
-// estabilidad del header de /watchlist (CLS 0.164-0.176 medido en prod,
-// 17-nov-2026): visible mientras el monitor streamea, se queda cuando no hay
-// ranks validos (devolver null colapsaba la reserva y el contenido subia,
-// CLS inverso hallado por el auditor) y no existe cuando la watchlist esta
-// vacia (ahi se sabe sin el stream que no habra franja).
+// La reserva de la franja del resumen (rankSummarySlot) estabiliza el header
+// de /watchlist (CLS 0.164-0.176 medido en prod, 17-nov-2026): visible
+// mientras el monitor streamea, se queda cuando no hay ranks validos
+// (devolver null colapsaba la reserva y el contenido subia al resolver el
+// stream) y no existe cuando la watchlist esta vacia (ahi se sabe sin el
+// stream que no habra franja).
 const m = vi.hoisted(() => ({
   dated: vi.fn(),
   dca: vi.fn(),
@@ -110,7 +110,7 @@ describe('rank summary slot (sin CLS en ningun desenlace)', () => {
 
   it('la cabecera usa container queries (ancho disponible, no de ventana)', async () => {
     // El sidebar expandido resta 240px desde md: con breakpoints de ventana la
-    // reserva quedaba corta y el boton se envolvia a 1024px (NO FAV auditor v3).
+    // reserva quedaba corta y el boton se envolvia a 1024px de ventana.
     m.state.mockResolvedValue(ONE_STOCK);
     m.basics.mockResolvedValue({ AAPL: { name: 'Apple', exchange: 'NASDAQ', currency: 'USD' } });
     m.dated.mockResolvedValue({}); m.dca.mockResolvedValue({ data: null, unavailable: false });
