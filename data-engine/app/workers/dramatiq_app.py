@@ -2008,9 +2008,10 @@ def backfill_finnhub_profiles(
 
 # Carril externa (2 hilos): backfill_sec_fundamentals dura 7,5-10,6 min por
 # mensaje (medido por el Piloto el 18-nov: 2 backfills ocupaban los 2 hilos y
-# refresh_valuation_metrics esperaba). Tope global de UNA corrida en vuelo: el
-# otro hilo queda siempre libre para valoraciones y el resto de la cola. Una
-# copia que llega con el hueco ocupado NO ocupa hilo: se reencola con retardo
+# refresh_valuation_metrics esperaba). Tope de UNA corrida SEC en vuelo con
+# Redis disponible (fallback por proceso si falla). Evita que SEC monopolice
+# ambos hilos; otros actores aun pueden ocupar el restante. Una copia con el
+# hueco ocupado solo usa el hilo para reencolarse con retardo
 # (sin gastar reintentos ni tocar time_limit). Tras SEC_BACKFILL_MAX_DEFERRALS
 # se rinde y deja la pasada al siguiente tick diario.
 SEC_BACKFILL_SLOT = "backfill_sec_fundamentals:slot"

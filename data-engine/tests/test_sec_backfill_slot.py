@@ -2,7 +2,8 @@
 
 Medido por el Piloto (18-nov): cada mensaje dura 7,5-10,6 min; dos a la vez
 ocupaban los 2 hilos de worker-externa y refresh_valuation_metrics esperaba.
-Invariantes: (1) como mucho UNA corrida en vuelo en todo el despliegue;
+Invariantes: (1) como mucho UNA corrida en vuelo con Redis disponible (fallback local
+por proceso si falla);
 (2) la copia que llega con el hueco ocupado no trabaja ni abre sesion: se
 reencola con retardo y contador; (3) agotados los diferimientos se rinde sin
 reencolar; (4) el hueco se libera siempre (exito, error, sesion rota);
@@ -10,6 +11,8 @@ reencolar; (4) el hueco se libera siempre (exito, error, sesion rota);
 """
 
 from __future__ import annotations
+
+from typing import Any
 
 import pytest
 
@@ -37,7 +40,7 @@ class _Db:
 
 
 def _stub(monkeypatch, run=None, session=None):
-    calls = {"sessions": [], "runs": [], "sends": []}
+    calls: dict[str, Any] = {"sessions": [], "runs": [], "sends": []}
     db = _Db()
 
     def _session(tenant, user):
@@ -158,7 +161,7 @@ def test_hueco_cubre_el_time_limit_y_los_timeouts_no_cambian():
     options = worker.backfill_sec_fundamentals.options
     assert options["time_limit"] == 1_800_000
     assert options["max_retries"] == 2
-    assert worker.SEC_BACKFILL_SLOT_TTL_SECONDS * 1000 > options["time_limit"]
+    assert options["time_limit"] < worker.SEC_BACKFILL_SLOT_TTL_SECONDS * 1000
     assert worker.backfill_sec_fundamentals.queue_name == "externa"
 
 
