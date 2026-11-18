@@ -144,6 +144,7 @@ function AlertsManager() {
             setReady(true);
             void loadAlerts();
         });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {

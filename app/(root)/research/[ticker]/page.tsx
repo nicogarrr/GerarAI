@@ -170,7 +170,7 @@ import { dedupeNewsEvents, newsDisplayTitle } from '@/lib/news-display';
 import ThesisApproveButton from '@/components/research/ThesisApproveButton';
 import FollowButton from '@/components/screener/FollowButton';
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
-import { createFormatters, formatDate, formatMarketCapUsd, formatMarketDate, formatNumber, formatUserDate, formatUserDateTime, formatMoney, formatPrice, isValidCurrencyCode, naFor } from '@/lib/format';
+import { createFormatters, formatMarketDate, formatUserDate, isValidCurrencyCode, naFor } from '@/lib/format';
 import { getInsiderFilings, getInsiderSummary, getOwnershipSignals } from '@/lib/actions/insider.actions';
 import { getPoliticianTickerTrades } from '@/lib/actions/politicians.actions';
 import { InsidersSection } from '@/components/research/InsidersSection';

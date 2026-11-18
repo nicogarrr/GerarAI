@@ -119,7 +119,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
             const label = zoomLabelRef.current;
             if (label) label.textContent = t('knowledgeGraph.canvas.zoomLevel', { percent: scalePercent(viewportRef.current) });
         });
-    }, []);
+    }, [t]);
 
     /** Ajusta la vista al subgrafo en foco (o al grafo entero) y respeta el freno de arrastre. */
     const fit = useCallback(
@@ -133,7 +133,7 @@ export default function KnowledgeGraphCanvas({ graph }: Props) {
             layerRef.current?.setAttribute('transform', toSvgTransform(next));
             if (zoomLabelRef.current) zoomLabelRef.current.textContent = t('knowledgeGraph.canvas.zoomLevel', { percent: scalePercent(next) });
         },
-        [scene, size],
+        [scene, size, t],
     );
 
     /* -------------------------------------------------------------- *
