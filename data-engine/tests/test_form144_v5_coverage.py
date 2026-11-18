@@ -1,3 +1,6 @@
+"""Cobertura de lo nuevo (auditor FAV v4): migracion 0137, connector,
+monitor, news, persistence, actor y scheduler."""
+
 from __future__ import annotations
 
 from unittest.mock import Mock, patch
@@ -14,6 +17,8 @@ from app.services import form144_monitor, form144_news, form144_persistence
 from app.services.connectors import form144
 from tests.test_0137_form144_migration import _create_table, _load
 from tests.test_form144_monitor import REAL_144_XML, _db, _FakeClient
+
+# ---------------- migracion 0137 ----------------
 
 
 def _create_table_nullable_flipped(conn):
@@ -99,6 +104,7 @@ def test_downgrade_without_provenance_row_keeps_table(monkeypatch):
         assert sa.inspect(conn).has_table("form144_notices")
 
 
+# ---------------- connector ----------------
 
 
 def test_sleep_and_get_text_delegate(monkeypatch):
@@ -176,6 +182,7 @@ def test_parse_helpers_never_invent():
     assert form144.proposed_sale_totals({"securities": []})["shares_to_sell"] is None
 
 
+# ---------------- monitor ----------------
 
 
 def test_normalize_cik_tolerant():
@@ -395,3 +402,81 @@ def test_persist_existing_filing_notifies_news_without_duplicate(monkeypatch):
     assert seen  # la noticia se recalcula sobre la fila existente
 
 
+# ---------------- actor y scheduler ----------------
+
+
+def test_actor_executes_scan_under_lease(monkeypatch):
+    from app.workers import dramatiq_app
+
+    closed = {"db": False}
+
+    class FakeDb:
+        info = {"tenant_id": 7}
+
+        def close(self):
+            closed["db"] = True
+
+    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: FakeDb())
+    monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda *a, **k: object())
+    released = []
+    monkeypatch.setattr(dramatiq_app, "release_job_lease", lambda *a, **k: released.append(a))
+    monkeypatch.setattr(dramatiq_app, "_lease_redis_url", lambda: None)
+    from app.services import form144_monitor as monitor_mod
+
+    monkeypatch.setattr(
+        monitor_mod,
+        "scan",
+        lambda db, **kw: {
+            "status": "ok",
+            "tickers_scanned": 1,
+            "filings_seen": 1,
+            "filings_new": 0,
+            "filings_unparsed": 0,
+            "filings_rejected": 0,
+            "errors": [],
+        },
+    )
+    out = dramatiq_app.scan_form144_watchlist.fn(tenant_id=7)
+    assert out["status"] == "ok"
+    assert out["actor"] == "scan_form144_watchlist"
+    assert closed["db"] and released
+
+
+def test_actor_skips_when_lease_held(monkeypatch):
+    from app.workers import dramatiq_app
+
+    class FakeDb:
+        info = {"tenant_id": 7}
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: FakeDb())
+    monkeypatch.setattr(dramatiq_app, "acquire_job_lease", lambda *a, **k: None)
+    monkeypatch.setattr(dramatiq_app, "_lease_redis_url", lambda: None)
+    out = dramatiq_app.scan_form144_watchlist.fn(tenant_id=7)
+    assert out["status"] == "skipped"
+    assert out["reason"] == "lease_held"
+
+
+def test_scheduler_registers_form144_hourly_job():
+    import app.workers.scheduler as sched
+
+    jobs = []
+
+    class Fake:
+        def add_job(self, func, trigger, id=None, **kw):
+            jobs.append((id, trigger, kw, func))
+
+    with patch.object(sched, "BlockingScheduler", return_value=Fake()), patch.object(
+        sched, "tenant_contexts", return_value=[]
+    ), patch("app.workers.dramatiq_app._redis_client", return_value=None):
+        sched.build_scheduler()
+    hourly = [job for job in jobs if job[0] == "form144_watchlist_hourly"]
+    assert len(hourly) == 1
+    _, trigger, kwargs, func = hourly[0]
+    assert trigger == "interval"
+    assert kwargs["hours"] == 1
+    from app.workers.dramatiq_app import scan_form144_watchlist
+
+    assert scan_form144_watchlist in func.args
