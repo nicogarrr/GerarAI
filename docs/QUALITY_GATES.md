@@ -112,7 +112,7 @@ Detalle de los controles negativos por dataset:
 
 ### Por que el job `evals` es un job y no pasos dentro de `backend`
 
-- `backend` esta cerca de su `timeout-minutes: 30` (suite completa + ruff +
+- `backend` esta cerca de su `timeout-minutes: 40` (era 30; un run normal tarda ~20 min) (suite completa + ruff +
   pyright + round trip contra Qdrant). Anadirle cuatro runners, uno de ellos con
   el embedder real, haria que **todos** los PRs esperaran a los evals.
 - El job necesita su propio servicio de Qdrant, su propia descarga previa del
