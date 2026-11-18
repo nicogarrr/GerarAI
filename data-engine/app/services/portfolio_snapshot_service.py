@@ -7,6 +7,7 @@ from typing import Any
 from sqlalchemy import delete, desc, func, select
 from sqlalchemy.orm import Session
 
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import (
     CashBalance,
@@ -33,7 +34,11 @@ class PortfolioSnapshotService:
         as_of: date | None = None,
         source: str = "market_refresh",
     ) -> PortfolioDailySnapshot:
-        snapshot_date = as_of or date.today()
+        # Fecha por defecto = hoy en Madrid (local_today), no el dia UTC del
+        # servidor: prod corre TZ=UTC y tras medianoche Madrid date.today() aun
+        # es ayer; la foto se pisaba con la del dia anterior y los lectores
+        # (proactividad, plan) filtran por local_today().
+        snapshot_date = as_of or local_today()
         portfolio = self.fx.ensure_portfolio(db)
         db.flush()  # autoflush=False: incluir posiciones/caja pendientes del caller
         positions = list(

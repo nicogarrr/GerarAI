@@ -310,3 +310,94 @@ def test_cash_is_not_carried_forward_across_an_fx_conversion(db):
     assert snapshot.cash_value_base == Decimal("0")
     assert snapshot.pricing_coverage < Decimal("1")
     assert snapshot.metadata_["cash_carried_forward"] == []
+
+
+def test_capture_default_date_is_madrid_not_utc(db, monkeypatch):
+    """Prod corre TZ=UTC (local_date.py): entre las 00:00 y la 01:00/02:00 de
+    Madrid, date.today() del servidor aun es ayer. Una captura sin as_of a esa
+    hora pisaba la foto del dia anterior y dejaba el dia de Madrid sin foto;
+    los lectores (proactividad, plan) filtran por local_today()."""
+    import app.services.portfolio_snapshot_service as snapshot_module
+    from app.core.local_date import local_today
+
+    madrid_today = local_today()
+    utc_still_yesterday = madrid_today - timedelta(days=1)
+
+    class _UtcDate(date):
+        @classmethod
+        def today(cls):
+            return utc_still_yesterday
+
+    monkeypatch.setattr(snapshot_module, "date", _UtcDate)
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=madrid_today)
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=madrid_today))
+    db.commit()
+
+    snapshot = snapshot_module.PortfolioSnapshotService().capture(db)
+    assert snapshot.snapshot_date == madrid_today
+    assert snapshot.pricing_coverage == Decimal("1")
+
+
+def test_history_y_count_sin_cartera_y_con_paginacion(db):
+    """count_history/history: sin cartera 0 y [] honestos; con cartera,
+    filtro start, pagina, offset explicito y ventana entera (page_size=None)."""
+    service = PortfolioSnapshotService()
+    assert service.count_history(db) == 0
+    assert service.history(db) == []
+
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=TODAY)
+    service.capture(db, as_of=YESTERDAY)
+    service.capture(db, as_of=TODAY)
+
+    assert service.count_history(db) == 2
+    assert service.count_history(db, start=TODAY) == 1
+    whole = service.history(db, page_size=None)
+    assert [s.snapshot_date for s in whole] == [YESTERDAY, TODAY]
+    assert [s.snapshot_date for s in service.history(db, page=1, page_size=1)] == [YESTERDAY]
+    assert [s.snapshot_date for s in service.history(db, page=2, page_size=1)] == [TODAY]
+    # offset explicito gana a la pagina derivada.
+    assert [s.snapshot_date for s in service.history(db, page=1, page_size=1, offset=1)] == [TODAY]
+    assert [s.snapshot_date for s in service.history(db, start=TODAY, page_size=None)] == [TODAY]
+
+
+def test_relink_respeta_fotos_solo_posiciones(db):
+    """_relink_following: una foto solo-posiciones (twr_rebuild) no se
+    relinkea (continue) y la siguiente foto real queda declarada base de
+    tramo nuevo tras el cambio de alcance, sin retorno fabricado."""
+    service = PortfolioSnapshotService()
+    company = _company(db)
+    portfolio, _ = _portfolio_positions(db, company, as_of=TODAY)
+    older = TODAY - timedelta(days=2)
+    for day, meta, daily, twr in [
+        (older, {}, None, None),
+        (YESTERDAY, {"positions_only": True}, Decimal("0.01"), Decimal("0.02")),
+        (TODAY, {}, None, None),
+    ]:
+        db.add(PortfolioDailySnapshot(
+            portfolio_id=portfolio.id, snapshot_date=day,
+            base_currency="EUR", positions_value_base=Decimal("100"),
+            cash_value_base=Decimal("0"), total_value_base=Decimal("100"),
+            pricing_coverage=Decimal("1"), metadata_=meta,
+            daily_return=daily, cumulative_twr=twr,
+        ))
+    db.commit()
+
+    service._relink_following(db, portfolio.id, older)
+
+    rows = {
+        s.snapshot_date: s
+        for s in db.scalars(select(PortfolioDailySnapshot)).all()
+    }
+    # La solo-posiciones no se toca: su cadena la calcula twr_rebuild y el
+    # relink no borra su retorno (mata el mutante que quita el continue).
+    assert rows[YESTERDAY].metadata_ == {"positions_only": True}
+    assert rows[YESTERDAY].daily_return == Decimal("0.01")
+    assert rows[YESTERDAY].cumulative_twr == Decimal("0.02")
+    # La real tras ella: declarada base nueva tras cambio de alcance, sin
+    # retorno contra la foto solo-posiciones.
+    assert rows[TODAY].metadata_["twr_base_after_scope_change"] is True
+    assert rows[TODAY].metadata_["twr_blocked_by_scope_change"] is True
+    assert rows[TODAY].daily_return is None
+    assert rows[TODAY].cumulative_twr is None
