@@ -62,6 +62,11 @@ if url.endswith('/snapshots'):
 if url.endswith('/collections'):
     if mode == 'api_down':
         sys.exit(7)
+    if mode == 'bad_collections':
+        # Una coleccion valida y luego un objeto sin 'name' (repro del
+        # auditor: el parser lanza pero la primera ya salio).
+        print('{"result":{"collections":[{"name":"knowledge_rag_v2"},{"sin_name":true}]}}')
+        sys.exit(0)
     print(os.environ.get('MOCK_COLLECTIONS',
         '{"result":{"collections":[{"name":"knowledge_rag_v2"},{"name":"docs"}]}}'))
     sys.exit(0)
@@ -322,6 +327,19 @@ class QdrantSnapshotTests(unittest.TestCase):
         self.assertIn('vacio', r.stdout)
         self.assertEqual(list(out.glob('*.part')), [])
         self.assertEqual([p for p in out.glob('docs-*.snapshot')], [])
+
+    def test_listado_de_colecciones_parcial_no_toca_nada(self):
+        """v3 (repro del auditor): una coleccion valida + una sin name.
+
+        En v2 el parser lanzaba pero mapfile conservaba la primera: se
+        descargaba y borraba su snapshot y salia OK con inventario parcial.
+        """
+        r, out, deleted = self.run_case(mode='bad_collections')
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('ilegible o con nombres invalidos', r.stdout)
+        self.assertEqual(deleted, [])
+        self.assertEqual([p for p in out.glob('*.snapshot')], [])
+        self.assertNotIn('OK:', r.stdout)
 
     def test_sin_colecciones_es_error(self):
         tmp = tempfile.TemporaryDirectory()

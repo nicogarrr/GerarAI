@@ -79,7 +79,28 @@ tiene_copia_local_verificada() {  # $1=coleccion $2=nombre en el servidor
 }
 
 COLLECTIONS_JSON="$(curl -fsS "${API}/collections")" || { echo "[qdrant-snapshot] ERROR: API no disponible en ${API} (copias anteriores intactas)"; exit 1; }
-mapfile -t COLLECTIONS < <(printf '%s' "${COLLECTIONS_JSON}" | python3 -c 'import json,sys; [print(c["name"]) for c in json.load(sys.stdin)["result"]["collections"]]')
+# Validar TODO el listado ANTES de crear, descargar o borrar nada: la forma
+# esperada y TODOS los nombres validos. Un parseo a medias (process
+# substitution tragaba el exit del parser y seguia con la primera coleccion)
+# presentaba un inventario parcial como sano (hallazgo del auditor, v3).
+if ! COLLECTIONS_LIST="$(printf '%s' "${COLLECTIONS_JSON}" | python3 -c '
+import json, re, sys
+data = json.load(sys.stdin)
+collections = data["result"]["collections"]
+names = []
+for c in collections:
+    name = c["name"]
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
+        raise SystemExit("nombre de coleccion invalido: " + repr(name))
+    names.append(name)
+for n in names:
+    print(n)
+')"; then
+  echo "[qdrant-snapshot] ERROR: listado de colecciones ilegible o con nombres invalidos (copias anteriores intactas, no se toca nada)"
+  exit 1
+fi
+mapfile -t COLLECTIONS <<< "${COLLECTIONS_LIST}"
+[ "${#COLLECTIONS[@]}" -gt 0 ] && [ -n "${COLLECTIONS[0]}" ] || COLLECTIONS=()
 if [ "${#COLLECTIONS[@]}" -eq 0 ]; then
   echo "[qdrant-snapshot] ERROR: la API no devolvio ninguna coleccion (copias anteriores intactas)"
   exit 1
