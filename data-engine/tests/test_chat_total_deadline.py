@@ -182,15 +182,33 @@ async def test_nested_deadline_is_not_restarted(monkeypatch):
 
 
 @run_async
-async def test_cjk_retry_respects_total_deadline():
+async def test_cjk_retry_respects_total_deadline(monkeypatch):
+    """El reintento CJK acota la cadena de respaldo con el plazo total.
+
+    No mide segundos de pared (flaky en runners lentos: 1,027 s en CI #5843).
+    Se espia el timeout que recibe el wait_for externo: el plazo se pasa
+    (<= total, nunca None) y, al vencer, el miembro de respaldo en vuelo
+    se cancela y sale ProviderTransportError. El proveedor falso tarda 5 s,
+    asi que solo el plazo puede cortarlo, con cualquier carga de CPU.
+    """
     primary = Fake(delay=5)
     groq = Fake(delay=5, name="groq")
     provider = ChatFallbackProvider(primary, groq, total=.15, delay=.05)
-    start = time.monotonic()
+    real_wait_for = asyncio.wait_for
+    timeouts = []
+
+    async def spy(aw, timeout):
+        timeouts.append(timeout)
+        return await real_wait_for(aw, timeout=timeout)
+
+    monkeypatch.setattr(asyncio, "wait_for", spy)
     with pytest.raises(ProviderTransportError):
         await provider.complete_cjk_retry(chat_request())
-    assert time.monotonic() - start < 1
+    assert timeouts and timeouts[0] is not None
+    assert 0 < timeouts[0] <= .15
+    assert len(groq.calls) == 1  # un solo intento: no reintenta tras vencer
     assert groq.cancelled
+    assert not primary.calls  # el reintento CJK salta al respaldo, no repite el primario
 
 
 @run_async
