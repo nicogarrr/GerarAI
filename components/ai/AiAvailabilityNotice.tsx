@@ -42,6 +42,6 @@ export function AiAvailabilityNotice({ availability }: { availability: ReturnTyp
         <p role="status" aria-live="polite">{t(labels[key])}</p>
         {status?.state === 'paused' && status.retry_after_seconds ? <p>{t('brain.aiAvailability.wait', { seconds: status.retry_after_seconds })}</p> : null}
         <p className="mt-1 text-amber-100/70">{t('brain.aiAvailability.localOnly')}</p>
-        <button type="button" disabled={checking} className="mt-1 underline underline-offset-2 disabled:opacity-50" onClick={() => { void refresh(); }}>{t('brain.aiAvailability.refresh')}</button>
+        <button type="button" disabled={checking} className="relative mt-1 underline underline-offset-2 before:absolute before:-inset-3 before:content-[''] disabled:opacity-50" onClick={() => { void refresh(); }}>{t('brain.aiAvailability.refresh')}</button>
     </div>;
 }
