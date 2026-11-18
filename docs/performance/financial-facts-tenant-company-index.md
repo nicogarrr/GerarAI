@@ -30,7 +30,38 @@ Pilot read-only evidence on 18 November 2026:
 - 12:37 catalog estimate: 20,823,231 live and 964,080 dead tuples;
   relallvisible 432816/437827 pages = 98.86%; last autovacuum 05:32.
   This is catalog visibility, not pg_visibility. COUNT DISTINCT company
-  was canceled at 15s. Company count and tenant distribution are UNKNOWN.
+  was canceled at 15s. Current production company count and tenant
+  distribution were not measured by that query.
+
+### Backup distribution, separate from current production
+
+Pilot's read-only measurement reported via Main at12:44 on18 November2026
+comes from the09:54 backup snapshot, NOT current production:20,859,478
+financial_facts rows,2,133 distinct companies and17 tenants. Tenant IDs were
+not provided; positions below are descending row-count ranks, not IDs.
+
+| Tenant rank | Rows | Distinct companies |
+|---|---:|---:|
+| 1 | 1,676,234 | 2,133 |
+| 2 | 1,490,242 | 1,830 |
+| 3 | 1,486,301 | 1,830 |
+| 4 | 1,483,161 | 1,829 |
+| 5 | 1,476,831 | 1,828 |
+| 6 | 1,476,767 | 1,829 |
+| 7 | 1,475,456 | 1,829 |
+| 8 | 1,475,385 | 1,829 |
+| 9 | 1,431,743 | 1,757 |
+| 10 | 1,426,928 | 1,758 |
+| Remaining7 combined | 5,960,430 | Breakdown pending |
+
+The ten listed tenants total14,899,048 rows; adding the remaining7 matches
+20,859,478. Each large tenant has about1.4-1.7M rows across about1,800-2,100
+companies,786-815 rows/company (about800). Thus the tenant/company key is
+selective relative to the complete facts table for a single company or a
+small company set. This distribution supports the index choice; it is not
+a planner/latency measurement, a guarantee for every company or IN-list, or
+evidence that the synthetic80% tenant scenario matches real skew. Per-company
+skew and the remaining tenants' company counts are not established here.
 
 These observations select a target; they do not prove that this index will
 remove the entire 2-6s snapshot time or establish a production improvement.
