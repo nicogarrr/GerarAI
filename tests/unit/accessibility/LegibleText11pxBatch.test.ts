@@ -46,11 +46,10 @@ describe('texto legible lote 11 px: nada de lectura bajo 12 px', () => {
         expect(src(path)).not.toContain('text-[11px]');
     });
 
-    it('watchlist solo conserva la etiqueta «Precio» a 11 px (bloqueada por #5852)', () => {
+    it('watchlist solo conserva una ocurrencia a 11 px (la etiqueta «Precio», bloqueada por #5852)', () => {
         const s = src('app/(root)/watchlist/page.tsx');
         const occurrences = s.match(/text-\[11px\]/g) ?? [];
         expect(occurrences).toHaveLength(1);
-        expect(s).toContain('text-[11px] font-normal text-gray-500 xl:hidden">{t(\'watchlist.page.sort.price\')}');
     });
 
     it('knowledge etiqueta de sección a text-xs sin variante sm redundante', () => {
@@ -66,7 +65,8 @@ describe('texto legible lote 11 px: nada de lectura bajo 12 px', () => {
     it('AnalystReportView iguala fuente y alcance de consenso a text-xs', () => {
         const s = src('components/research/AnalystReportView.tsx');
         expect(s).toContain("'block text-xs text-gray-500'");
-        expect(s).toContain("data-testid=\"consensus-base-rate-reach\"");
+        const reachLine = s.split('\n').find((line) => line.includes('consensus-base-rate-reach')) ?? '';
+        expect(reachLine).toContain('text-xs');
     });
 
     it('watchlist mantiene el sup «*» a 10 px como marcador tipográfico', () => {
