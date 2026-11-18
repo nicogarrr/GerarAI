@@ -27,6 +27,129 @@ OPERATORS = {
     "==": lambda actual, target: actual == target,
 }
 
+# Multiplicadores de magnitud que aparecen tras la cifra en una promesa real
+# ("at least $5 billion", "hasta 200 millones"). Sin escalarlos, el objetivo
+# quedaba en unidades sueltas (5) y el veredicto contra el hecho en unidades
+# brutas (5_000_000_000) salia inventado. OJO: escala del espanol — un billon
+# son 10^12 (un "mil millones" es 10^9); en ingles billion es 10^9.
+_MAGNITUDES = {
+    "mil millones": Decimal("1000000000"),
+    "billones": Decimal("1000000000000"),
+    "billón": Decimal("1000000000000"),
+    "billion": Decimal("1000000000"),
+    "bn": Decimal("1000000000"),
+    "millones": Decimal("1000000"),
+    "million": Decimal("1000000"),
+    "millón": Decimal("1000000"),
+    "mn": Decimal("1000000"),
+    "thousand": Decimal("1000"),
+    "mil": Decimal("1000"),
+    "k": Decimal("1000"),
+}
+
+# Cualificador -> operador. Los EN conservan su mapeo historico (at least,
+# more than, above -> >=; up to, less than, below -> <=); los ES se mapean por
+# significado: "mas de"/"menos de" son estrictos.
+_QUALIFIER_OPERATORS = {
+    "at least": ">=",
+    "more than": ">=",
+    "above": ">=",
+    "up to": "<=",
+    "less than": "<=",
+    "below": "<=",
+    "approximately": "==",
+    "about": "==",
+    "al menos": ">=",
+    "como mínimo": ">=",
+    "como minimo": ">=",
+    "más de": ">",
+    "mas de": ">",
+    "superior a": ">",
+    "por encima de": ">",
+    "hasta": "<=",
+    "como máximo": "<=",
+    "como maximo": "<=",
+    "menos de": "<",
+    "inferior a": "<",
+    "por debajo de": "<",
+    "aproximadamente": "==",
+    "alrededor de": "==",
+    "cerca de": "==",
+}
+
+# Solo estos cualificadores hacen que un "==" cuente cumplido dentro del 5%:
+# la aproximacion la declara el directivo. Un "==" sin cualificador sigue
+# siendo exacto para "met" y "partial" dentro del 5%.
+_APPROXIMATE_QUALIFIERS = frozenset(
+    {"approximately", "about", "aproximadamente", "alrededor de", "cerca de"}
+)
+
+# Alternacion ordenada de mayor a menor longitud para que "mil millones" gane
+# a "mil" y "como mínimo" a "mínimo".
+_QUALIFIERS_ALT = "|".join(
+    sorted(_QUALIFIER_OPERATORS, key=len, reverse=True)
+)
+_MAGNITUDES_ALT = "|".join(sorted(_MAGNITUDES, key=len, reverse=True))
+
+# El \b inicial impide casar el digito de un token pegado (Q3, FY2026, H1):
+# ahi no hay frontera de palabra y no se genera candidato.
+_TARGET_RE = re.compile(
+    rf"\b(?:(?P<qualifier>{_QUALIFIERS_ALT})\b\s*)?"
+    r"[$€£]?\s*"
+    r"(?P<number>\d{1,3}(?:[.,]\d{3})+(?:[.,]\d{1,2})?|\d+(?:[.,]\d+)?)"
+    rf"(?:\s*(?P<magnitude>{_MAGNITUDES_ALT})\b)?",
+    flags=re.IGNORECASE,
+)
+
+# "2H26" (semestre): el digito inicial lo sigue H+fecha; no es un objetivo.
+_HALF_PREFIX_RE = re.compile(r"^[Hh]\d")
+# "10-K": el numero del formulario no es un objetivo.
+_FORM_10K_RE = re.compile(r"^-\s*[Kk]\b")
+# "between $4 and $5 billion": un rango no es un objetivo unico.
+_BETWEEN_RE = re.compile(r"\bbetween\s*[$€£]?\s*$", flags=re.IGNORECASE)
+_RANGE_JOIN_RE = re.compile(r"^\s*[$€£]?\s*(?:and|y|to|[-–])\s*[$€£]?\s*$")
+
+_EN_MAGNITUDES = frozenset({"billion", "bn", "million", "mn", "thousand", "k"})
+_ES_MAGNITUDES = frozenset({"millones", "millón", "mil millones", "billones", "billón", "mil"})
+
+
+def _parse_number(raw: str, magnitude: str = "") -> Decimal | None:
+    """Cifra con separadores; el idioma de la magnitud decide su papel.
+
+    Con magnitud espanola (millones, mil millones, billones, mil) el punto es
+    de millares y la coma decimal; con magnitud inglesa (billion, million,
+    bn, mn, thousand, k) o sin magnitud, al reves. Una cabeza "0" siempre es
+    decimal ("0.250" es 0.25). "12.000" sin magnitud es ambiguo: None antes
+    que inventar la escala (un x1000 cambia el veredicto).
+    """
+    es = magnitude.lower() in _ES_MAGNITUDES
+    try:
+        if "," in raw and "." in raw:
+            if raw.rfind(",") > raw.rfind("."):
+                return Decimal(raw.replace(".", "").replace(",", "."))
+            return Decimal(raw.replace(",", ""))
+        if "," in raw:
+            _head, _, tail = raw.rpartition(",")
+            if not es and len(tail) == 3:
+                # EN o sin magnitud: "1,200" son millares.
+                return Decimal(raw.replace(",", ""))
+            # ES: "2,5" es 2.5 (los millares van con punto).
+            return Decimal(raw.replace(",", "."))
+        if "." in raw:
+            head, _, tail = raw.rpartition(".")
+            if head == "0":
+                return Decimal(raw)
+            if es:
+                if len(tail) == 3 and head.replace(".", "").isdigit():
+                    return Decimal(raw.replace(".", ""))
+                return Decimal(raw)
+            if not magnitude and len(tail) == 3 and head.replace(".", "").isdigit():
+                return None
+            return Decimal(raw)
+        return Decimal(raw)
+    except ArithmeticError:
+        return None
+
 
 class ManagementCredibilityService:
     def register(
@@ -43,6 +166,7 @@ class ManagementCredibilityService:
         unit: str | None,
         source_document_id: int | None = None,
         call_claim_id: int | None = None,
+        approximate: bool = False,
     ) -> ManagementPromise:
         if target_value is not None and operator not in OPERATORS:
             raise ValueError("A numeric promise requires a supported operator")
@@ -66,7 +190,10 @@ class ManagementCredibilityService:
             unit=unit,
             status="open",
             evidence=[],
-            metadata_={"source": "manual" if call_claim_id is None else "call_claim"},
+            metadata_={
+                "source": "manual" if call_claim_id is None else "call_claim",
+                "approximate": approximate,
+            },
         )
         db.add(row)
         db.commit()
@@ -97,14 +224,17 @@ class ManagementCredibilityService:
             if existing:
                 created.append(existing)
                 continue
-            operator, target = self._target(claim.claim)
+            operator, target, qualifier = self._parse_target(claim.claim)
             row = ManagementPromise(
                 company_id=company.id,
                 call_claim_id=claim.id,
                 promise=claim.claim,
                 promise_date=claim.created_at.date(),
                 expected_period=claim.period or "unspecified",
-                metric=claim.metric,
+                # register() normaliza la metrica; aqui llega cruda del extractor
+                # y un 'Revenue' con mayuscula nunca casaba con el hecho
+                # ('revenue'), dejando la promesa abierta para siempre.
+                metric=claim.metric.strip().lower() if claim.metric else None,
                 operator=operator,
                 target_value=target,
                 unit=None,
@@ -116,7 +246,14 @@ class ManagementCredibilityService:
                         "speaker": claim.speaker,
                     }
                 ],
-                metadata_={"source": "call_claim", "speaker_role": claim.speaker_role},
+                metadata_={
+                    "source": "call_claim",
+                    "speaker_role": claim.speaker_role,
+                    # Solo una promesa declarada aproximada ('about', 'alrededor
+                    # de'...) puede contar cumplida dentro del 5%; un '=='
+                    # pelado sigue exigiendo la cifra exacta para 'met'.
+                    "approximate": qualifier in _APPROXIMATE_QUALIFIERS,
+                },
             )
             db.add(row)
             created.append(row)
@@ -141,6 +278,10 @@ class ManagementCredibilityService:
             statement = select(FinancialFact).where(
                 FinancialFact.company_id == company.id,
                 FinancialFact.metric == promise.metric,
+                # Un veredicto solo puede salir de cifras REPORTADAS: un hecho
+                # estimado o derivado marcaba promesas como cumplidas con un
+                # dato que la empresa nunca publico.
+                FinancialFact.is_reported.is_(True),
             )
             year_match = re.search(r"(?:19|20)\d{2}", promise.expected_period)
             if year_match:
@@ -188,11 +329,19 @@ class ManagementCredibilityService:
                 promise.status = "outcome_recorded"
             else:
                 met = OPERATORS[promise.operator](actual.value, promise.target_value)
-                if met:
+                distance = abs(actual.value - promise.target_value)
+                tolerance = abs(promise.target_value) * Decimal("0.05")
+                approximate = promise.operator == "==" and bool(
+                    (promise.metadata_ or {}).get("approximate")
+                )
+                if met or (
+                    # Solo si el directivo dijo 'approximately/about' (o su
+                    # equivalente ES) la igualdad no es exacta: dentro del 5%
+                    # cuenta cumplida. Un '==' sin cualificador sigue parcial.
+                    approximate and distance <= tolerance
+                ):
                     promise.status = "met"
                 else:
-                    distance = abs(actual.value - promise.target_value)
-                    tolerance = abs(promise.target_value) * Decimal("0.05")
                     promise.status = "partial" if distance <= tolerance else "missed"
             # Conciliar otra vez con el mismo dato no es evidencia nueva: antes
             # cada pulsación de «Conciliar» repetía la entrada.
@@ -280,20 +429,62 @@ class ManagementCredibilityService:
         }
 
     @staticmethod
+    def _parse_target(text: str) -> tuple[str | None, Decimal | None, str]:
+        """(operador, objetivo, cualificador); cualificador "" si no hubo."""
+        candidates: list[tuple[str, Decimal, str, int, int]] = []
+        for match in _TARGET_RE.finditer(text):
+            number_text = match.group("number")
+            magnitude = (match.group("magnitude") or "").lower()
+            magnitude = re.sub(r"\s+", " ", magnitude)
+            qualifier = (match.group("qualifier") or "").lower()
+            following = text[match.end("number"):]
+            # Un ano (2026), un semestre (2H26) o un formulario (10-K) no son
+            # el objetivo numerico: antes se tomaban como target y el veredicto
+            # comparaba el hecho contra 2026.
+            if _HALF_PREFIX_RE.match(following) or _FORM_10K_RE.match(following):
+                continue
+            preceding = text[: match.start("number")].rstrip()
+            # Token de periodo SUELTO delante ("FY 2026", "Q 3", "H 2"); un
+            # token pegado (Q3) ya lo frena el \b y una palabra que acabe en h
+            # (launch, growth) no es un periodo.
+            if re.search(r"(?:^|\s)(?:fy|q|h)$", preceding, flags=re.IGNORECASE):
+                continue
+            numeric = _parse_number(number_text, magnitude)
+            if numeric is None:
+                continue
+            if (
+                not qualifier
+                and not magnitude
+                and not re.search(r"[.,]", number_text)
+                and len(number_text) == 4
+                and 1900 <= int(number_text) <= 2099
+            ):
+                continue
+            candidates.append(
+                (qualifier, numeric, magnitude, match.start("number"), match.end("number"))
+            )
+        if not candidates:
+            return None, None, ""
+        # "between $4 and $5 billion": un rango no cabe en un (operador,
+        # objetivo) unico; declararlo sin objetivo es mejor que un == contra
+        # el extremo inferior (FAV Calidad/datos).
+        if len(candidates) >= 2:
+            _q0, _n0, _m0, start0, end0 = candidates[0]
+            _q1, _n1, _m1, start1, _e1 = candidates[1]
+            if _BETWEEN_RE.search(text[:start0]) and _RANGE_JOIN_RE.fullmatch(
+                text[end0:start1]
+            ):
+                return None, None, ""
+        # Si hay una cifra con cualificador ('at least $5 billion'), esa manda;
+        # sin cualificadores se toma la primera cifra que no sea ano/trimestre.
+        qualifier, numeric, magnitude, _start, _end = next(
+            (candidate for candidate in candidates if candidate[0]),
+            candidates[0],
+        )
+        operator = _QUALIFIER_OPERATORS.get(qualifier, "==")
+        return operator, numeric * _MAGNITUDES.get(magnitude, Decimal(1)), qualifier
+
+    @staticmethod
     def _target(text: str) -> tuple[str | None, Decimal | None]:
-        match = re.search(
-            r"(at least|more than|above|up to|less than|below|approximately|about)?\s*"
-            r"([$€£]?\s*\d+(?:\.\d+)?)",
-            text,
-            flags=re.IGNORECASE,
-        )
-        if not match:
-            return None, None
-        qualifier = (match.group(1) or "approximately").lower()
-        operator = (
-            ">=" if qualifier in {"at least", "more than", "above"} else
-            "<=" if qualifier in {"up to", "less than", "below"} else
-            "=="
-        )
-        numeric = re.sub(r"[^0-9.]", "", match.group(2))
-        return operator, Decimal(numeric)
+        operator, numeric, _qualifier = ManagementCredibilityService._parse_target(text)
+        return operator, numeric
