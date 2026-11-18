@@ -101,13 +101,17 @@ _TARGET_RE = re.compile(
     flags=re.IGNORECASE,
 )
 
-# "2H26" (semestre): el digito inicial lo sigue H+fecha; no es un objetivo.
-_HALF_PREFIX_RE = re.compile(r"^[Hh]\d")
+# "2H26" y "2H" (semestre, con o sin ano): el digito inicial lo sigue una H
+# de periodo; no es un objetivo ("growth in 2H of 8%" apunta al 8, no al 2).
+_HALF_PREFIX_RE = re.compile(r"^[Hh](?:\d|\b)")
 # "10-K": el numero del formulario no es un objetivo.
 _FORM_10K_RE = re.compile(r"^-\s*[Kk]\b")
-# "between $4 and $5 billion": un rango no es un objetivo unico.
-_BETWEEN_RE = re.compile(r"\bbetween\s*[$€£]?\s*$", flags=re.IGNORECASE)
-_RANGE_JOIN_RE = re.compile(r"^\s*[$€£]?\s*(?:and|y|to|[-–])\s*[$€£]?\s*$")
+# Un rango no es un objetivo unico. Marcador delante de la primera cifra
+# ("between $4 and...", "entre 4 y...", "de 4 a...") con union palabra, o
+# union dura sin marcador ("4 to 5", "$4-$5").
+_RANGE_MARKER_RE = re.compile(r"\b(?:between|entre|de)\s*[$€£]?\s*$", flags=re.IGNORECASE)
+_RANGE_WORD_JOIN_RE = re.compile(r"^\s*[$€£]?\s*(?:and|y|a)\s*[$€£]?\s*$", flags=re.IGNORECASE)
+_RANGE_HARD_JOIN_RE = re.compile(r"^\s*[$€£]?\s*(?:to|[-–])\s*[$€£]?\s*$", flags=re.IGNORECASE)
 
 _EN_MAGNITUDES = frozenset({"billion", "bn", "million", "mn", "thousand", "k"})
 _ES_MAGNITUDES = frozenset({"millones", "millón", "mil millones", "billones", "billón", "mil"})
@@ -465,14 +469,17 @@ class ManagementCredibilityService:
             )
         if not candidates:
             return None, None, ""
-        # "between $4 and $5 billion": un rango no cabe en un (operador,
-        # objetivo) unico; declararlo sin objetivo es mejor que un == contra
-        # el extremo inferior (FAV Calidad/datos).
+        # Un rango no cabe en un (operador, objetivo) unico; declararlo sin
+        # objetivo es mejor que un == contra el extremo inferior (FAV
+        # Calidad/datos): "between $4 and $5 billion", "entre 4 y 5 mil
+        # millones", "de 4 a 5", "4 to 5 billion", "$4-$5 billion".
         if len(candidates) >= 2:
             _q0, _n0, _m0, start0, end0 = candidates[0]
             _q1, _n1, _m1, start1, _e1 = candidates[1]
-            if _BETWEEN_RE.search(text[:start0]) and _RANGE_JOIN_RE.fullmatch(
-                text[end0:start1]
+            join = text[end0:start1]
+            if _RANGE_HARD_JOIN_RE.fullmatch(join) or (
+                _RANGE_MARKER_RE.search(text[:start0])
+                and _RANGE_WORD_JOIN_RE.fullmatch(join)
             ):
                 return None, None, ""
         # Si hay una cifra con cualificador ('at least $5 billion'), esa manda;

@@ -591,3 +591,31 @@ def test_target_decimal_con_punto_y_magnitud_es():
         "==",
         Decimal("15500000"),
     )
+
+
+def test_rangos_es_y_otros_no_son_objetivo_unico():
+    """FAV v3 (nota 1): un rango no cabe en (operador, objetivo); None honesto
+    igual que "between $4 and $5 billion"."""
+    service = ManagementCredibilityService
+    assert service._target("EBITDA entre 4 y 5 mil millones") == (None, None)
+    assert service._target("EBITDA de 4 a 5 mil millones de euros") == (None, None)
+    assert service._target("EBITDA $4-$5 billion") == (None, None)
+    assert service._target("EBITDA 4 to 5 billion") == (None, None)
+
+
+def test_rango_no_traga_un_objetivo_normal():
+    """El detector de rangos no debe apagar cifras sueltas legitimas."""
+    service = ManagementCredibilityService
+    assert service._target("revenue of $4.5 billion") == ("==", Decimal("4.5e9"))
+    assert service._target("crecer a 5 millones de usuarios") == ("==", Decimal("5000000"))
+    assert service._target("alrededor de 5 millones") == ("==", Decimal("5000000"))
+
+
+def test_semestre_sin_ano_no_es_objetivo():
+    """FAV v3 (nota 2): "2H" sin ano tambien es un periodo, no la cifra 2;
+    el objetivo es la cifra del crecimiento."""
+    service = ManagementCredibilityService
+    assert service._target("growth in 2H of 8%") == ("==", Decimal("8"))
+    # "1H" suelto igual; y "2H26" sigue sin ser objetivo.
+    assert service._target("growth in 1H of 5%") == ("==", Decimal("5"))
+    assert service._target("2H26 revenue of $3 billion") == ("==", Decimal("3000000000"))
