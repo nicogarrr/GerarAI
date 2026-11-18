@@ -63,6 +63,30 @@ test('sanitizeCboeChain: mapa por contrato con saneado defensivo', () => {
     assert.equal(sanitizeCboeChain({ data: { options: 'no-array' } }), null);
 });
 
+test('sanitizeCboeChain: precio vacío o solo espacios NO es 0; hora imposible se descarta', () => {
+    const chain = sanitizeCboeChain({
+        data: {
+            options: [
+                // Auditor 18-nov-2026: Number('') y Number('   ') son 0; sin el
+                // saneado la fila saldría VALORADA a 0 con PyG -100 % inventada.
+                { option: 'ASTS261120C00045000', last_trade_price: '', last_trade_time: '2026-11-17T15:47:43' },
+                { option: 'ASTS261120C00046000', last_trade_price: '   ', last_trade_time: '2026-11-17T15:47:43' },
+                // Horas que pasan el regex pero no existen: se descartan (null),
+                // nunca llegan al formateo de la etiqueta.
+                { option: 'ASTS261120C00047000', last_trade_price: 1.2, last_trade_time: '2026-99-99T99:99:99' },
+                { option: 'ASTS261120C00048000', last_trade_price: 1.2, last_trade_time: '2026-11-18T25:00:00' },
+                { option: 'ASTS261120C00049000', last_trade_price: 1.2, last_trade_time: '2026-02-30T10:00:00' },
+            ],
+        },
+    });
+    assert.ok(chain);
+    assert.equal(chain.get(cboeContractKey('ASTS', '2026-11-20', 'call', 45))?.lastTradePrice, null, 'cadena vacía no es un precio');
+    assert.equal(chain.get(cboeContractKey('ASTS', '2026-11-20', 'call', 46))?.lastTradePrice, null, 'espacios no son un precio');
+    assert.equal(chain.get(cboeContractKey('ASTS', '2026-11-20', 'call', 47))?.lastTradeTime, null, '99/99/99 no es una hora');
+    assert.equal(chain.get(cboeContractKey('ASTS', '2026-11-20', 'call', 48))?.lastTradeTime, null, 'las 25 h no existen');
+    assert.equal(chain.get(cboeContractKey('ASTS', '2026-11-20', 'call', 49))?.lastTradeTime, null, 'el 30 de febrero no existe');
+});
+
 const okAttempt = (payload: unknown): CboeChainAttempt => {
     const chain = sanitizeCboeChain(payload);
     return { chain, fetchFailed: !chain, retryAfterSeconds: null };

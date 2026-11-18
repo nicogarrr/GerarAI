@@ -187,6 +187,42 @@ test('opciones: aviso visible si la última operación tiene más de 1 día háb
     assert.equal(noClock.note, null);
 });
 
+test('opciones: prima 0 (o vacía saneada a null) es SIN operación, nunca una fila valorada a 0 con PyG -100 %', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2 };
+    for (const lastTradePrice of [0, null]) {
+        const row = valuePositions([option], {}, {
+            optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice, lastTradeTime: '2026-11-17T15:47:43' }, fetchFailed: false }]]),
+        }).rows[0] as ValuedPosition;
+        assert.equal(row.status, 'sin-cotizacion', `precio ${lastTradePrice} no es una operación`);
+        assert.equal(row.marketValue, null);
+        assert.match(row.note ?? '', /Sin operación registrada/);
+    }
+});
+
+test('opciones: hora imposible o futura nunca rompe la valoración ni sale como operación válida', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2 };
+    // Hora que pasa el regex pero no existe (auditor 18-nov-2026: lanzaba
+    // RangeError al formatear la etiqueta y podía romper la valoración entera).
+    const broken = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 1.2, lastTradeTime: '2026-99-99T99:99:99' }, fetchFailed: false }]]),
+    }).rows[0] as ValuedPosition;
+    assert.equal(broken.status, 'sin-cotizacion');
+    assert.equal(broken.marketValue, null);
+    // Fecha FUTURA respecto al reloj de la valoración: dato inválido, N/D con aviso.
+    const future = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 1.2, lastTradeTime: '2026-11-19T10:00:00' }, fetchFailed: false }]]),
+        optionPremiumNowMs: Date.parse('2026-11-18T15:00:00Z'), // 10:00 en Nueva York
+    }).rows[0] as ValuedPosition;
+    assert.equal(future.status, 'sin-cotizacion');
+    assert.equal(future.marketValue, null);
+    assert.match(future.note ?? '', /futura/);
+    // Misma hora pero SIN reloj inyectado: no se puede juzgar, no se inventa el fallo.
+    const noClock = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 1.2, lastTradeTime: '2026-11-19T10:00:00' }, fetchFailed: false }]]),
+    }).rows[0] as ValuedPosition;
+    assert.equal(noClock.status, 'valorada');
+});
+
 test('divisa: sin verificar => N/D; no coincide => N/D; GBp u otras => N/D; nunca por sufijo ni ausencia', () => {
     for (const currency of [null, undefined, '', 'GBp', 'CHF']) {
         const r = valuePositions([asts], { ASTS: { ...live, currency } });

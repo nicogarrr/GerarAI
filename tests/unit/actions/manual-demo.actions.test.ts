@@ -55,7 +55,7 @@ const chainOf = (result: unknown) => {
 
 let session: { withTransaction: (fn: () => Promise<void>) => Promise<void>; endSession: () => Promise<void> };
 
-const NOW = 1_777_000_000_000; // ms epoch plausible
+const NOW = 1_795_500_000_000; // ms epoch plausible (2026-11-24: posterior a las primas CBOE de los fixtures, 17-nov-2026, o el control de fecha futura las rechazaría)
 const order = (over: object = {}) => ({
     clientOrderId: 'orden-de-prueba-1',
     side: 'buy',

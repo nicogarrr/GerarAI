@@ -57,7 +57,8 @@
       "optionNoTrades": "No recorded trade for the contract: N/A (no premium is made up).",
       "optionNotQueried": "Not checked: limit of {limit} option underlyings per request.",
       "optionNoTradeTime": "The source publishes a price with no trade time: N/A (without its time the premium cannot be labelled).",
-      "optionStalePremium": "The contract's last trade is more than 1 business day old: the premium may not reflect the current price."
+      "optionStalePremium": "The contract's last trade is more than 1 business day old: the premium may not reflect the current price.",
+      "optionFutureTradeTime": "The source publishes a trade with a future date: invalid data, N/A."
     },
     "quoteLabels": {
       "live": "{time} (Madrid time) · live",

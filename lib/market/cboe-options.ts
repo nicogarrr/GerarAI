@@ -76,13 +76,39 @@ const MAX_CHAIN_ROWS = 20_000;
 const PRICE_MAX = 1_000_000;
 
 function finiteOrNull(value: unknown, max: number): number | null {
+    // Cadena vacía o solo espacios: Number('') === 0, y 0 no es una operación
+    // (auditor 18-nov-2026: la fila salía valorada a 0 con PyG -100 % inventada).
+    if (typeof value === 'string' && value.trim() === '') return null;
     const n = typeof value === 'string' ? Number(value) : value;
     if (typeof n !== 'number' || !Number.isFinite(n)) return null;
     if (n < 0 || n > max) return null;
     return n;
 }
 
-const TRADE_TIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/;
+const TRADE_TIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(:(\d{2}))?$/;
+
+/**
+ * Hora de operación tal cual la publica CBOE (Nueva York, naive) si es una
+ * fecha y hora que EXISTEN; null en cualquier otro caso. El regex solo fija
+ * la forma: "2026-99-99T99:99:99" lo pasa y luego rompía el formateo de la
+ * etiqueta con RangeError (auditor 18-nov-2026), así que aquí se valida el
+ * valor: mes 1-12, día civil real (ni 30 de febrero), hora 0-23, minuto y
+ * segundo 0-59.
+ */
+function validTradeTime(raw: unknown): string | null {
+    if (typeof raw !== 'string') return null;
+    const m = TRADE_TIME_RE.exec(raw);
+    if (!m) return null;
+    const [, yy, mm, dd, hh, mi, , ss] = m;
+    const year = Number(yy);
+    const month = Number(mm);
+    const day = Number(dd);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+    if (Number(hh) > 23 || Number(mi) > 59 || (ss !== undefined && Number(ss) > 59)) return null;
+    const probe = new Date(Date.UTC(year, month - 1, day));
+    if (probe.getUTCFullYear() !== year || probe.getUTCMonth() !== month - 1 || probe.getUTCDate() !== day) return null;
+    return raw;
+}
 
 /**
  * Sanea el payload de la delayed quotes API de CBOE a un mapa
@@ -97,8 +123,7 @@ export function sanitizeCboeChain(payload: unknown): Map<string, CboeOptionPremi
     for (const row of options.slice(0, MAX_CHAIN_ROWS)) {
         const parsed = parseOccSymbol((row as { option?: unknown })?.option);
         if (!parsed) continue;
-        const lastTradeTimeRaw = (row as { last_trade_time?: unknown })?.last_trade_time;
-        const lastTradeTime = typeof lastTradeTimeRaw === 'string' && TRADE_TIME_RE.test(lastTradeTimeRaw) ? lastTradeTimeRaw : null;
+        const lastTradeTime = validTradeTime((row as { last_trade_time?: unknown })?.last_trade_time);
         map.set(cboeContractKey(parsed.underlying, parsed.expiry, parsed.callPut, parsed.strike), {
             lastTradePrice: finiteOrNull((row as { last_trade_price?: unknown })?.last_trade_price, PRICE_MAX),
             lastTradeTime,
