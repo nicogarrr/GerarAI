@@ -58,7 +58,7 @@ export async function MostBought({ pagina }: { pagina?: string }) {
                                         {item.value_usd === null ? NA : formatMarketCapUsd(item.value_usd)}
                                     </p>
                                     {item.notice ? (
-                                        <p className="max-w-64 text-[11px] text-amber-300/90" role="status">{item.notice}</p>
+                                        <p className="max-w-64 text-xs text-amber-300/90" role="status">{item.notice}</p>
                                     ) : null}
                                 </div>
                             </div>

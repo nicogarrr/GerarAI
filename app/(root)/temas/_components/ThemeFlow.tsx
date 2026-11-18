@@ -77,7 +77,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
       <h3 className="text-sm font-semibold text-gray-100">
         {t('themes.flow.title', { name: flow.name })}
       </h3>
-      <p className="mt-0.5 text-[11px] text-gray-500">{flow.tagline}</p>
+      <p className="mt-0.5 text-xs text-gray-500">{flow.tagline}</p>
       {flow.notes.map((note) => (
         <p key={note} className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
           {note}
@@ -104,19 +104,19 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
               <p className="text-sm font-bold tabular-nums text-teal-300">
                 {spender.amount === null ? NA : formatFlowAmount(spender.amount, spender.unit, NA, locale)}
                 {spender.period_label ? (
-                  <span className="ml-1 text-[11px] font-normal text-gray-500">{spender.period_label}</span>
+                  <span className="ml-1 text-xs font-normal text-gray-500">{spender.period_label}</span>
                 ) : null}
               </p>
             </div>
-            {spender.reason ? <p className="mt-1 text-[11px] leading-4 text-gray-500">{spender.reason}</p> : null}
+            {spender.reason ? <p className="mt-1 text-xs leading-4 text-gray-500">{spender.reason}</p> : null}
             {spender.source ? (
-              <p className="mt-1 text-[11px]">
+              <p className="mt-1 text-xs">
                 <SourceLink source={spender.source} />
               </p>
             ) : null}
-            {spender.note ? <p className="mt-1 text-[11px] text-gray-500">{spender.note}</p> : null}
+            {spender.note ? <p className="mt-1 text-xs text-gray-500">{spender.note}</p> : null}
             {spender.extra_amount !== null && spender.extra_label ? (
-              <p className="mt-1 text-[11px] text-gray-400">
+              <p className="mt-1 text-xs text-gray-400">
                 + {formatFlowAmount(spender.extra_amount, spender.unit, NA, locale)} {spender.extra_label}
                 {spender.extra_source ? (
                   <>
@@ -146,7 +146,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
             {attributed ? t('themes.flow.thirdParty') : t('themes.flow.reported')}
           </h4>
           {flow.destinations_note ? (
-            <p className="mt-1 text-[11px] text-gray-500">{flow.destinations_note}</p>
+            <p className="mt-1 text-xs text-gray-500">{flow.destinations_note}</p>
           ) : null}
           <ul className="mt-2 space-y-1.5">
             {flow.destinations.map((destination) => {
@@ -174,7 +174,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
                       {formatFlowAmount(destination.amount, destination.unit, NA, locale)}
                     </span>
                   </div>
-                  <p className="mt-0.5 pl-1 text-[11px] text-gray-500">
+                  <p className="mt-0.5 pl-1 text-xs text-gray-500">
                     <SourceLink source={destination.source} />
                     {destination.source.note ? ` · ${destination.source.note}` : ''}
                   </p>
@@ -192,7 +192,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
             {t('themes.flow.suppliers')}
           </h4>
           {flow.suppliers_note ? (
-            <p className="mt-1 text-[11px] text-gray-500">{flow.suppliers_note}</p>
+            <p className="mt-1 text-xs text-gray-500">{flow.suppliers_note}</p>
           ) : null}
           <ul className="mt-2 grid gap-2 sm:grid-cols-2">
             {flow.suppliers.map((supplier, index) => (
@@ -215,12 +215,12 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
                   ) : null}
                 </div>
                 {supplier.ticker ? (
-                  <p className="text-[11px] text-gray-500">{supplier.name}</p>
+                  <p className="text-xs text-gray-500">{supplier.name}</p>
                 ) : null}
-                <p className="mt-1 text-[11px] leading-4 text-gray-500">{supplier.reason}</p>
-                {supplier.note ? <p className="mt-0.5 text-[11px] text-gray-500">{supplier.note}</p> : null}
+                <p className="mt-1 text-xs leading-4 text-gray-500">{supplier.reason}</p>
+                {supplier.note ? <p className="mt-0.5 text-xs text-gray-500">{supplier.note}</p> : null}
                 {supplier.source ? (
-                  <p className="mt-0.5 text-[11px]">
+                  <p className="mt-0.5 text-xs">
                     <SourceLink source={supplier.source} />
                   </p>
                 ) : null}
@@ -264,7 +264,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
         </p>
       ) : null}
 
-      <footer className="mt-3 border-t border-gray-800 pt-2 text-[11px] text-gray-500">
+      <footer className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-500">
         <p>{flow.method}</p>
         <p className="mt-1">{flow.limitation}</p>
       </footer>
