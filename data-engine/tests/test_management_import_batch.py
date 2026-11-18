@@ -1,12 +1,15 @@
 """Repeated call-claim imports must not do two SELECTs per existing promise."""
 import math
 import os
+import re
 from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, event, select, text
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session
+from sqlalchemy.schema import CreateSchema, DropSchema
+from sqlalchemy.sql.elements import quoted_name
 
 from app.models import CallClaim, Company, Document, FinancialFact, ManagementPromise, Tenant, Transcript
 from app.models.entities import Base
@@ -32,9 +35,15 @@ def engine():
     url = os.environ.get('MANAGEMENT_TEST_POSTGRES_URL')
     raw_engine = create_engine(url or 'sqlite:///:memory:')
     schema = 'management_review_' + uuid4().hex
+    # Semgrep avoid-sqlalchemy-text: el nombre sale de uuid4().hex, pero se
+    # valida igualmente (prefijo fijo + 32 hex) y se pasa con quoted_name al
+    # DDL nativo de SQLAlchemy; nunca se interpola texto en SQL.
+    if not re.fullmatch(r'management_review_[0-9a-f]{32}', schema):
+        raise RuntimeError('invalid test schema name')
+    schema_name = quoted_name(schema, quote=True)
     if url:
         with raw_engine.begin() as conn:
-            conn.execute(text(f'CREATE SCHEMA {schema}'))
+            conn.execute(CreateSchema(schema_name))
         engine = raw_engine.execution_options(schema_translate_map={None: schema})
         Base.metadata.create_all(engine, tables=[model.__table__ for model in
             [Tenant, Company, Document, FinancialFact, Transcript, CallClaim, ManagementPromise]])
@@ -49,7 +58,7 @@ def engine():
     finally:
         if url:
             with raw_engine.begin() as conn:
-                conn.execute(text(f'DROP SCHEMA {schema} CASCADE'))
+                conn.execute(DropSchema(schema_name, cascade=True))
         raw_engine.dispose()
 
 
