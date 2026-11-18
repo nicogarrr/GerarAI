@@ -156,7 +156,7 @@ export function CompanyHeaderQuote({
     return (
         <div className="flex w-full flex-col gap-4" data-testid="company-header-quote">
             <div data-testid="company-header-price-block">
-                <p className="text-[11px] uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `${lastIsClose ? t('research.headerQuote.chartClose') : t('research.headerQuote.chartLastCandle')} · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
+                <p className="text-xs uppercase tracking-wide text-gray-500">{showPrice ? label : useFallback ? `${lastIsClose ? t('research.headerQuote.chartClose') : t('research.headerQuote.chartLastCandle')} · ${formatMarketDate(last!.date)}` : loading ? '\u00a0' : NA}</p>
                 <div className={compact ? 'min-h-10 text-3xl font-semibold tracking-tight text-gray-100 sm:min-h-12' : 'min-h-10 text-4xl font-semibold tracking-tight text-gray-100 sm:min-h-12 sm:text-5xl'} aria-busy={loading || undefined}>
                     {showPrice ? headerMoney(fmt, quote!.price, currency) : useFallback ? headerMoney(fmt, fallbackPrice, fallbackCurrency!) : loading ? (
                         <>
@@ -210,8 +210,8 @@ export function CompanyHeaderQuote({
                         <div className="min-w-0 py-3 sm:px-3 sm:first:pl-0" key={String(metricLabel)}>
                             <dt className="text-xs text-gray-500">{t(METRIC_KEYS[String(metricLabel) as keyof typeof METRIC_KEYS])}</dt>
                             <dd className="mt-1 break-words text-sm font-medium text-gray-200">{loading ? <span aria-hidden="true" className="inline-block h-4 w-16 animate-pulse rounded bg-gray-800 align-middle" /> : value == null || !isValidCurrencyCode(currency) ? NA : headerMoney(fmt, value as number, currency)}</dd>
-                            {useFallback && metricLabel === 'Cierre anterior' && prev ? <dd className="break-words text-[11px] text-gray-500">{formatMarketDate(prev.date)}</dd> : null}
-                            {!useFallback && metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <dd className="break-words text-[11px] text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp, locale)} · ${quoteTime(quote.previous_close_timestamp, locale)}` : quoteSessionDate(quote.previous_close_date, locale)}</dd> : null}
+                            {useFallback && metricLabel === 'Cierre anterior' && prev ? <dd className="break-words text-xs text-gray-500">{formatMarketDate(prev.date)}</dd> : null}
+                            {!useFallback && metricLabel === 'Cierre anterior' && (quote?.previous_close_timestamp || quote?.previous_close_date) ? <dd className="break-words text-xs text-gray-500">{quote.previous_close_timestamp ? `${quoteDate(quote.previous_close_timestamp, locale)} · ${quoteTime(quote.previous_close_timestamp, locale)}` : quoteSessionDate(quote.previous_close_date, locale)}</dd> : null}
                         </div>
                     ))}
                 </dl>
