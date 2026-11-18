@@ -13,7 +13,7 @@ import type { DemoValuation, ValuationPosition, ValuationQuote, ValuedPosition }
 const valuePositions = v.valuePositions as (
     positions: ValuationPosition[],
     quotes: Record<string, ValuationQuote | null | undefined>,
-    options?: { notQueried?: ReadonlySet<string> },
+    options?: Parameters<typeof v.valuePositions>[2],
 ) => DemoValuation;
 
 const asts: ValuationPosition = { instrumentKey: 'A:ASTS', name: 'AST SpaceMobile', kind: 'accion', currency: 'USD', quantity: 5, avgCost: 50 };
@@ -148,7 +148,7 @@ test('opciones: precio válido SIN hora => N/D con motivo propio (una prima sin 
     const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2 };
     const row = valuePositions([option], {}, {
         optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: null }, fetchFailed: false }]]),
-    } as never).rows[0] as ValuedPosition;
+    }).rows[0] as ValuedPosition;
     // Hay PRECIO pero no su hora: la etiqueta "diferida" necesita la hora,
     // asi que la fila es N/D. El motivo NO puede ser "sin operacion
     // registrada" (la hay): es un hueco distinto de la fuente.
@@ -164,7 +164,7 @@ test('opciones: aviso visible si la última operación tiene más de 1 día háb
         valuePositions([option], {}, {
             optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime }, fetchFailed: false }]]),
             optionPremiumNowMs: nowMs,
-        } as never).rows[0] as ValuedPosition;
+        }).rows[0] as ValuedPosition;
     // 2026-11-16T20:00Z = lunes 16 nov, 15:00 en Nueva York (EST, UTC-5).
     const monday = Date.parse('2026-11-16T20:00:00Z');
     // Viernes 13 -> lunes 16: 1 día hábil transcurrido, SIN aviso.
@@ -183,7 +183,7 @@ test('opciones: aviso visible si la última operación tiene más de 1 día háb
     assert.equal(value('2026-11-16T14:00:00', monday).note, null);
     const noClock = valuePositions([option], {}, {
         optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-10T10:05:00' }, fetchFailed: false }]]),
-    } as never).rows[0] as ValuedPosition;
+    }).rows[0] as ValuedPosition;
     assert.equal(noClock.note, null);
 });
 

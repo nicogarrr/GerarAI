@@ -22,7 +22,7 @@ it.each(['es','en'] as const)('keeps expired/today option warnings, valuation re
  expect(document.body.textContent).toContain(locale==='en'?'08/01/2026':'01/08/2026');
 });
 it('a valued row with a staleness warning shows the warning (not just in a title attr)',()=>{
- const option={...position,instrumentKey:'O:ASTS:2026-12-18:call:50:100',kind:'opcion',optionExpiry:null,optionBadge:null,realizedPnl:0};
+ const option={...position,instrumentKey:'O:ASTS:2026-12-18:call:50:100',kind:'opcion' as const,optionExpiry:null,optionBadge:null,realizedPnl:0};
  const staleNote='La última operación del contrato tiene más de 1 día hábil: la prima puede no reflejar el precio actual.';
  const valuation={rows:[{...option,status:'valorada',marketValue:460,unrealizedPnl:160,unrealizedPct:53.3,quoteLabel:'última operación 12 nov, 15:47 (hora de Nueva York) · diferida',note:staleNote}],totals:[],coverage:{valued:1,total:1}};
  render(<PositionsTable positions={[option]} valuation={valuation as never}/>);

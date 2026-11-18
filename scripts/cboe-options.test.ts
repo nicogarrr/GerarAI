@@ -9,13 +9,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 // @ts-expect-error TS5097: la extensión explícita la exige node --experimental-strip-types.
-import {
-    cboeContractKey,
-    createCboeChainCache,
-    parseOccSymbol,
-    sanitizeCboeChain,
-    type CboeChainAttempt,
-} from '../lib/market/cboe-options.ts';
+import * as cboe from '../lib/market/cboe-options.ts';
+import type { CboeChainAttempt } from '../lib/market/cboe-options';
+
+const { cboeContractKey, createCboeChainCache, fetchCboeChain, parseOccSymbol, sanitizeCboeChain } = cboe;
 
 test('parseOccSymbol: OCC estándar y rechazos', () => {
     assert.deepEqual(parseOccSymbol('ASTS261120C00045000'), { underlying: 'ASTS', expiry: '2026-11-20', callPut: 'call', strike: 45 });
@@ -193,7 +190,6 @@ test('caché: timeout del fetch cuenta como fallo y no envenena con dato tardío
 });
 
 test('fetcher por defecto valida la forma del subyacente antes de salir a red', async () => {
-    const { fetchCboeChain } = await import('../lib/market/cboe-options.ts');
     const r = await fetchCboeChain('no es un simbolo valido!');
     assert.equal(r.chain, null);
     assert.equal(r.fetchFailed, true);
