@@ -40,10 +40,12 @@
     "cuellos": "Bottlenecks",
     "calendarioMacro": "Macro calendar",
     "plan": "Plan",
-    "ayuda": "Help"
+    "ayuda": "Help",
+    "export": "Export"
   },
   "descriptions": {
     "screener": "Explore companies by sector and see gainers, losers and most active.",
+    "screeners": "Saved filters and custom metrics with coverage and ranking.",
     "panoramaMercado": "Indices, futures, stocks, commodities and currencies with the time of each quote.",
     "insider": "Purchases disclosed by executives on Form\u00A04.",
     "ownership": "Positions disclosed by large funds on Form\u00A013F.",

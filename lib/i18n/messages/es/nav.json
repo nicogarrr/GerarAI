@@ -40,10 +40,12 @@
     "cuellos": "Cuellos de botella",
     "calendarioMacro": "Calendario macro",
     "plan": "Plan",
-    "ayuda": "Ayuda"
+    "ayuda": "Ayuda",
+    "export": "Exportación"
   },
   "descriptions": {
     "screener": "Explora empresas por sector y mira subidas, bajadas y más activas.",
+    "screeners": "Filtros guardados y métricas personalizadas con cobertura y ranking.",
     "panoramaMercado": "Índices, futuros, acciones, materias primas y divisas con la hora de cada cotización.",
     "insider": "Compras declaradas por directivos en Form\u00A04.",
     "ownership": "Posiciones declaradas por los grandes fondos en el Form\u00A013F.",

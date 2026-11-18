@@ -19,12 +19,15 @@ test('cada destino del sidebar aparece una sola vez (árbol + pie)', () => {
     // /security no está en el árbol: su pie se mantiene.
     assert.ok(!sidebar.includes('FooterLink href="/security"'));
     assert.ok(readFileSync("components/UserDropdown.tsx", "utf8").includes('router.push("/security")'));
-    // En el árbol, cada href una vez.
+    // /export, /settings y /security entran en el catálogo (migas y buscador),
+    // pero no en NAV_SECTIONS, que es lo que pinta el sidebar.
+    const sidebarTree = constants.slice(constants.indexOf('export const NAV_SECTIONS'), constants.indexOf('export const ROUTE_CATALOG'));
+    assert.ok(!sidebarTree.includes("href: '/export'"), '/export no debe entrar en el menú lateral');
+    // En el árbol completo (NAV_SECTIONS + ROUTE_CATALOG), cada href una vez.
     const tree = constants.slice(constants.indexOf('export const NAV_SECTIONS'), constants.indexOf('export function flattenNavItems'));
-    assert.ok(!tree.includes("href: '/export'"), '/export ya no esta en el menu');
     for (const href of ['/plan', '/help']) {
         const occurrences = tree.split(`href: '${href}'`).length - 1;
-        assert.equal(occurrences, 1, `${href} debe aparecer exactamente una vez en NAV_SECTIONS`);
+        assert.equal(occurrences, 1, `${href} debe aparecer exactamente una vez en el árbol`);
     }
 });
 
@@ -95,10 +98,9 @@ function listRoutes(dir: string, base: string): string[] {
 // Rutas reales fuera del catálogo A PROPÓSITO. Cada una lleva su motivo; una
 // ruta nueva que no esté en el catálogo ni aquí rompe el guard.
 const CATALOG_EXCEPTIONS: Record<string, string> = {
-    '/security': 'menú del avatar (UserDropdown), no es destino de sección',
-    '/settings': 'menú del avatar (UserDropdown), no es destino de sección',
+    // /export, /settings y /security ya están en el catálogo (auditoría de
+    // flujo): sin hub, para migas y buscador, sin entrada en el menú lateral.
     // '/research/data-health' se eliminó entera por decisión de Nico (2026-10-20).
-    '/export': 'quitado del menú por decisión de Nico (sin uso); ruta conservada y enlazada desde Ayuda',
     '/search': 'página-herramienta del buscador global, se abre desde el header',
     // /inversores/mas-compradas y /inversores/solape ya no existen: son
     // vistas de /ownership (decision de Nico, WhatsApp 2026-10-20 00:59).

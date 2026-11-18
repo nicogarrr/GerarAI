@@ -9,6 +9,7 @@ import {
   Briefcase,
   Building2,
   CircleHelp,
+  Download,
   FileSearch,
   Filter,
   CalendarDays,
@@ -20,7 +21,9 @@ import {
   LineChart,
   Newspaper,
   Receipt,
+  Settings,
   Share2,
+  Shield,
   Sparkles,
   Star,
   Target,
@@ -141,10 +144,9 @@ export const ROUTE_CATALOG: NavSection[] = [
         labelKey: 'nav.screeners',
         icon: Filter,
         hub: '/discover',
-        // Sin tarjeta propia en /discover (sin descriptionKey): duplicaba
-        // concepto con «Explorar acciones» (informe UX 29-oct, punto 7). Se
-        // llega desde /screener («Crea el primero en Screeners») y por el
-        // subnav del hub.
+        // /screeners (filtros guardados) y /screener (explorar acciones) son
+        // destinos distintos: ambos tienen tarjeta en /discover y migas propias.
+        descriptionKey: 'nav.descriptions.screeners',
         children: [{ href: '/screener', labelKey: 'nav.screener', icon: LineChart, hub: '/discover', descriptionKey: 'nav.descriptions.screener' }],
       },
       {
@@ -195,10 +197,15 @@ export const ROUTE_CATALOG: NavSection[] = [
   },
   {
     titleKey: 'nav.sections.sistema',
-    // /export ya no esta en el menu (sin uso; la ruta sigue existiendo). /security vive en el menu del avatar y /screener como hijo de Screeners.
-    // /help es publica y sin hub: no se resalta ninguna seccion al visitarla.
+    // Destinos de apoyo, sin hub: no resaltan seccion ni pintan subnav, pero
+    // ahora tienen migas, buscador y entrada en el catalogo. /export solo se
+    // enlazaba desde Ayuda (auditoria de flujo); /settings y /security se abren
+    // desde el menu del avatar. Ninguno entra en el menu lateral (NAV_SECTIONS).
     items: [
       { href: '/help', labelKey: 'nav.items.ayuda', icon: CircleHelp, hub: null },
+      { href: '/export', labelKey: 'nav.items.export', icon: Download, hub: null },
+      { href: '/settings', labelKey: 'shell.user.settings', icon: Settings, hub: null },
+      { href: '/security', labelKey: 'shell.user.security', icon: Shield, hub: null },
     ],
   },
 ];
