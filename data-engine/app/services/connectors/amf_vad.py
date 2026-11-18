@@ -169,7 +169,7 @@ def _allowed_url(url: str) -> bool:
 
 def _public_get(url: str) -> str:
     """GET acotado via public_fetch. Rechazo de politica/tamano/IP = deriva
-    (AMFVADParseError); HTTP >=400 propaga httpx.HTTPStatusError (con su
+    (AMFVADParseError); HTTP >=400 propaga HTTPStatusError de httpx (con su
     cabecera Retry-After); un cuerpo no UTF-8 tambien es deriva."""
     try:
         content, _content_type, _final_url = fetch_public_url(
