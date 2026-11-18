@@ -1682,6 +1682,40 @@ def ingest_sec_bottleneck_filings(tenant_id: int | None = None, user_id: str | N
 
 
 @dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
+@_coalesce_on_success("ingest_cnmv_nod_daily", 330 * 60, ("tenant_id",))
+def ingest_cnmv_nod_daily(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Operaciones de directivos CNMV (NOD, registro oficial, coste 0).
+
+    Cabeceras de los ultimos 3 dias (la ventana cubre fines de semana con
+    una corrida diaria); una corrida = 1 GET por pagina de resultados.
+    Declarado (auditoria 2026-11-18): corre en la queue INGESTA de Dramatiq
+    (declarada en queue_taxonomy) y cada tenant
+    descarga el mismo listado por separado: coste acotado a max_pages GET
+    por tenant y dia (20 por defecto), a 1 req/s global via pacer «cnmv».
+    Si el listado supera el tope de paginas, la metrica truncated=1 lo
+    senala: lo a medias nunca se presenta como completo.
+    """
+    from datetime import date, timedelta
+
+    from app.services.cnmv_nod_ingestion import ingest_cnmv_nod
+
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("ingest_cnmv_nod_daily", exc, tenant_id=tenant_id)
+    try:
+        end = date.today()
+        result = ingest_cnmv_nod(db, db.info["tenant_id"], end - timedelta(days=3), end)
+        return {"actor": "ingest_cnmv_nod_daily", "status": "ok", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("ingest_cnmv_nod_daily", exc)
+    finally:
+        db.close()
+
+
+
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
 @_coalesce_on_success("ingest_uk_pdmr_filings", 330 * 60, ("tenant_id",))
 def ingest_uk_pdmr_filings(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
     """Movimientos PDMR del Reino Unido (tracefour, gratis, CC BY 4.0): 1 GET por corrida."""
