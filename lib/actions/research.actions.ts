@@ -373,7 +373,7 @@ export type ResearchThesisChange = {
 export type ResearchChatResponse = {
   answer: string;
   sections: Array<{
-    key: 'facts' | 'calculations' | 'user_hypotheses' | 'inferences' | 'contradictions' | 'insufficient_data' | 'conclusion';
+    key: components['schemas']['SynthesisSection']['key'];
     body: string;
     citations: string[];
   }>;
