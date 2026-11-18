@@ -19,6 +19,7 @@ el consolidado (dims == []), igual que en el carril del indice.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, BinaryIO
@@ -109,8 +110,13 @@ def parse_ixbrl_facts(source: str | BinaryIO) -> dict[str, Any]:
     "entity_lei": lei_mas_frecuente}."""
     # huge_tree: los informes ESEF llevan nodos de texto de varios MB
     # (el limite por defecto de libxml2 rechaza informes reales, p.ej.
-    # Kerry FY2021 linea 192).
-    tree = etree.parse(source, etree.XMLParser(huge_tree=True))
+    # Kerry FY2021 linea 192). resolve_entities=False + no_network: mismo
+    # endurecimiento que sec_filing_instance y xbrl_extension_map - un
+    # informe ESEF es XML externo y sus entidades nunca se expanden (las
+    # referencias numericas y las 5 predefinidas siguen funcionando).
+    tree = etree.parse(
+        source, etree.XMLParser(huge_tree=True, resolve_entities=False, no_network=True)
+    )
     root = tree.getroot()
 
     contexts: dict[str, _Context] = {}
@@ -202,10 +208,21 @@ def parse_ixbrl_facts(source: str | BinaryIO) -> dict[str, Any]:
     return {"facts": facts, "dropped": dropped, "entity_lei": entity_lei}
 
 
+# resolve_entities=False deja las entidades no predefinidas como texto
+# literal "&nombre;". Las 5 predefinidas y las referencias numericas llegan
+# ya resueltas como caracteres, asi que un '&...;' literal en el texto es
+# siempre una entidad no expandida (un '&' suelto, como en "AT&T", viene de
+# &amp; y es legitimo).
+_UNRESOLVED_ENTITY = re.compile(r"&[A-Za-z_][\w.-]*;")
+
+
 def parse_entity_name(source: str | BinaryIO) -> str | None:
     """Nombre legal declarado (ifrs-full:NameOfReportingEntity...) con cadena
     de continuaciones; None si el documento no lo declara."""
-    tree = etree.parse(source, etree.XMLParser(huge_tree=True))
+    # Mismo parser endurecido que parse_ixbrl_facts (XML externo).
+    tree = etree.parse(
+        source, etree.XMLParser(huge_tree=True, resolve_entities=False, no_network=True)
+    )
     root = tree.getroot()
     continuations = {
         e.get("id"): e for e in root.iter(_IX + "continuation") if e.get("id")
@@ -215,5 +232,9 @@ def parse_entity_name(source: str | BinaryIO) -> str | None:
             "ifrs-full:NameOfReportingEntityOrOtherMeansOfIdentification"
         ):
             name = _collect_continuations(elem, continuations).strip()
+            if _UNRESOLVED_ENTITY.search(name):
+                # El nombre contendria una entidad sin expandir: mejor no
+                # declarar nombre que fabricarlo a medias.
+                return None
             return " ".join(name.split()) or None
     return None

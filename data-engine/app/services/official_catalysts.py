@@ -353,7 +353,11 @@ def catalysts_for(db: Any, company: Any, *, today: date | None = None) -> list[d
             continue
         for cat in extract(text, terms=terms, published=_published(doc), url=url, publisher=_host(url),
                            source_kind=kind, document_id=doc.id, title=doc.title):
-            key = hashlib.sha1(f"{cat.url}|{cat.kind}|{cat.summary[:120]}".encode()).hexdigest()
+            # Clave de dedup, no frontera criptografica: usedforsecurity=False
+            # (misma pauta que sec_edgar; ademas corre bajo Python en modo FIPS).
+            key = hashlib.sha1(
+                f"{cat.url}|{cat.kind}|{cat.summary[:120]}".encode(), usedforsecurity=False
+            ).hexdigest()
             if key not in seen:
                 seen.add(key)
                 rows.append(cat)

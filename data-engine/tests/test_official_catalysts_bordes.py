@@ -556,3 +556,24 @@ def test_collect_con_discover_y_newsevent_roto(monkeypatch):
     assert db.rolled_back is True  # NewsEvent roto no para la recogida
     assert report["candidates"] == 1 and len(report["stored"]) == 1
     assert report["stored"][0]["date"] == "2026-11-09"  # la página la confirma
+
+
+def test_dedup_hash_usedforsecurity_false(monkeypatch):
+    # El sha1 de dedup no es frontera criptografica (pauta del repo, ver
+    # sec_edgar): con un hashlib que solo acepta usos no criptograficos
+    # (como un Python en modo FIPS), el dedup sigue funcionando.
+    import hashlib
+
+    contrato = "AST SpaceMobile signed a definitive agreement with the Agency yesterday afternoon."
+    docs = [_doc(1, "https://www.sec.gov/Archives/edgar/data/1/2.htm", contrato, form="8-K")]
+    db = _DB([docs] + [[d._text] for d in docs])
+    real_sha1 = hashlib.sha1
+
+    def fips_sha1(data=b"", *, usedforsecurity=True, **kwargs):
+        if usedforsecurity:
+            raise ValueError("sha1 bloqueado: uso criptografico")
+        return real_sha1(data, **kwargs)
+
+    monkeypatch.setattr(hashlib, "sha1", fips_sha1)
+    out = oc.catalysts_for(db, ASTS, today=date(2026, 11, 9))
+    assert [c["url"] for c in out] == ["https://www.sec.gov/Archives/edgar/data/1/2.htm"]

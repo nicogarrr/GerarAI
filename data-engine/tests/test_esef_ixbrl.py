@@ -240,3 +240,101 @@ def test_typed_dimensions_never_look_consolidated():
                 'ifrs-full:BusinessAxis' if axis else '__unknown_dimension__'
             ]
             assert parsed['dropped'] == 1  # unchanged invalid numeric fixture
+
+
+def test_internal_entities_in_external_xml_never_expanded():
+    # Un informe ESEF es XML externo: las entidades internas no se expanden
+    # (resolve_entities=False). Un hecho cuyo valor vive en una entidad se
+    # descarta en vez de fabricarse a partir de contenido expandido.
+    doc = DOC.replace(
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html [<!ENTITY smuggled "9,999.9">]>',
+    ).replace(
+        '<p><ix:nonFraction name="ifrs-full:Revenue"',
+        '<p><ix:nonFraction name="ifrs-full:Revenue" format="ixt4:num-dot-decimal" '
+        'contextRef="c-1" unitRef="u-1" decimals="1">&smuggled;</ix:nonFraction></p>\n'
+        '<p><ix:nonFraction name="ifrs-full:Revenue"',
+    )
+    parsed = parse_ixbrl_facts(io.BytesIO(doc.encode()))
+    revenue_vals = [e['val'] for e in parsed['facts']['ifrs-full:Revenue']['iso4217:EUR']]
+    assert '9999.9' not in revenue_vals
+
+    namedoc = doc.replace('>Kerry Group</ix:nonNumeric>', '>&smuggled;</ix:nonNumeric>')
+    # El nombre con una entidad sin expandir se descarta entero: devolverlo
+    # literal ('&smuggled; plc') lo fabricaria a medias.
+    assert parse_entity_name(io.BytesIO(namedoc.encode())) is None
+
+
+def test_entity_name_with_literal_ampersand_kept():
+    # Un '&' legitimo (llega como &amp;, entidad predefinida) no se confunde
+    # con una entidad sin expandir: el nombre se conserva.
+    doc = DOC.replace('>Kerry Group</ix:nonNumeric>', '>Kerry &amp; Group</ix:nonNumeric>')
+    assert parse_entity_name(io.BytesIO(doc.encode())) == 'Kerry & Group plc'
+
+
+def test_transform_numeric_formatos_restantes_negativo_y_desconocido():
+    from decimal import Decimal
+
+    from app.services.connectors.esef_ixbrl import _transform_numeric
+
+    assert _transform_numeric('1.234,56', 'ixt4:num-comma-decimal') == Decimal('1234.56')
+    assert _transform_numeric('1 234.56', 'ixt4:num-space-dot') == Decimal('1234.56')
+    assert _transform_numeric('1 234,56', 'ixt4:num-space-comma') == Decimal('1234.56')
+    assert _transform_numeric('(1.234,56)', 'ixt4:numdotcomma') == Decimal('-1234.56')
+    assert _transform_numeric('123', 'ixt4:formato-no-revisado') is None
+    assert _transform_numeric('   ', None) is None
+
+
+def test_continuation_chain_stops_on_missing_link():
+    doc = DOC.replace('continuationRef="k1">Kerry Group', 'continuationRef="k-missing">Kerry Group')
+    assert parse_entity_name(io.BytesIO(doc.encode())) == 'Kerry Group'
+
+
+def test_fact_with_empty_text_is_dropped():
+    doc = DOC.replace(
+        '<p><ix:nonFraction name="ifrs-full:Revenue"',
+        '<p><ix:nonFraction name="ifrs-full:Empty" contextRef="c-1" unitRef="u-1" decimals="0"></ix:nonFraction></p>\n'
+        '<p><ix:nonFraction name="ifrs-full:Revenue"',
+        1,
+    )
+    out = parse_ixbrl_facts(io.BytesIO(doc.encode()))
+    assert 'ifrs-full:Empty' not in out['facts']
+    assert out['dropped'] == 2  # el vacio + el fixture invalido de siempre
+
+
+def test_fact_with_non_integer_scale_is_dropped():
+    doc = DOC.replace('decimals="-5" scale="6">6,757.6', 'decimals="-5" scale="seis">6,757.6')
+    out = parse_ixbrl_facts(io.BytesIO(doc.encode()))
+    vals = [e['val'] for e in out['facts']['ifrs-full:Revenue']['iso4217:EUR']]
+    assert '6757600000.0' not in vals
+
+
+def test_divide_unit_without_numerator_and_empty_measure_are_ignored():
+    doc = DOC.replace(
+        '<xbrli:unitNumerator><xbrli:measure>iso4217:EUR</xbrli:measure></xbrli:unitNumerator>',
+        '<xbrli:unitNumerator></xbrli:unitNumerator>',
+    )
+    out = parse_ixbrl_facts(io.BytesIO(doc.encode()))
+    assert 'ifrs-full:BasicEarningsLossPerShare' not in out['facts']
+
+    doc2 = DOC.replace('<xbrli:measure>iso4217:EUR</xbrli:measure>', '<xbrli:measure></xbrli:measure>', 1)
+    out2 = parse_ixbrl_facts(io.BytesIO(doc2.encode()))
+    assert 'ifrs-full:Revenue' not in out2['facts']
+
+
+def test_fact_with_context_without_lei_kept_without_lei():
+    doc = DOC.replace(
+        '<xbrli:identifier scheme="http://standards.iso.org/iso/17442">LEITEST00000000000001</xbrli:identifier>',
+        '',
+        1,
+    )
+    out = parse_ixbrl_facts(io.BytesIO(doc.encode()))
+    revenue = [e for e in out['facts']['ifrs-full:Revenue']['iso4217:EUR'] if not e['dims']]
+    assert revenue[0]['lei'] is None
+
+
+def test_entity_name_absent_other_nonnumeric_and_empty_name():
+    other = DOC.replace('ifrs-full:NameOfReportingEntityOrOtherMeansOfIdentification', 'ifrs-full:OtraCosa')
+    assert parse_entity_name(io.BytesIO(other.encode())) is None
+    empty = DOC.replace('contextRef="c-1" continuationRef="k1">Kerry Group', 'contextRef="c-1">')
+    assert parse_entity_name(io.BytesIO(empty.encode())) is None

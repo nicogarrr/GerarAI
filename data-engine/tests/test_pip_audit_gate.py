@@ -235,3 +235,168 @@ def test_cpu_skips_with_nonzero_exit_do_not_start_secondary_audit(tmp_path):
     rc, calls, delays = exercise(tmp_path, [result(1, CPU_REPORT)])
     assert rc == 1 and len(calls) == 1 and not delays
     assert not (tmp_path / "cpu-base-requirements.txt").exists()
+
+
+def pyproject(tmp_path, spec='>=3.12,<3.13'):
+    file = tmp_path / "pyproject.toml"
+    file.write_text(f'[project]\nrequires-python = "{spec}"\n')
+    return file
+
+
+def test_interpreter_outside_requires_python_stays_red_without_auditing(tmp_path, capsys):
+    rc, calls, delays = exercise(
+        tmp_path, [result()], _pyproject=pyproject(tmp_path), _version_info=(3, 10, 12)
+    )
+    assert rc == 1 and calls == [] and delays == []
+    assert "3.10.12" in capsys.readouterr().err
+
+
+def test_interpreter_inside_requires_python_audits(tmp_path):
+    rc, calls, _ = exercise(
+        tmp_path, [result()], _pyproject=pyproject(tmp_path), _version_info=(3, 12, 9)
+    )
+    assert rc == 0 and len(calls) == 1
+
+
+def test_interpreter_boundaries_of_requires_python(tmp_path):
+    spec = '>=3.12,<3.13'
+    low = gate.check_interpreter(pyproject(tmp_path, spec), (3, 11, 9), stderr=None)
+    high = gate.check_interpreter(pyproject(tmp_path, spec), (3, 13, 0), stderr=None)
+    inside = gate.check_interpreter(pyproject(tmp_path, spec), (3, 12, 9), stderr=None)
+    assert low is False and high is False and inside is True
+    # Sin cota superior, un Python mayor satisface la restriccion.
+    assert gate.check_interpreter(pyproject(tmp_path, '>=3.12.1'), (3, 13, 0), stderr=None) is True
+    assert gate.check_interpreter(pyproject(tmp_path, '>=3.12.1'), (3, 12, 0), stderr=None) is False
+
+
+def test_missing_or_unknown_requires_python_stays_red(tmp_path, capsys):
+    missing = tmp_path / "nope.toml"
+    assert gate.check_interpreter(missing, (3, 12, 9), stderr=None) is False
+    weird = pyproject(tmp_path, "~=3.12")
+    assert gate.check_interpreter(weird, (3, 12, 9), stderr=None) is False
+    empty = pyproject(tmp_path, "")
+    file = tmp_path / "pyproject.toml"
+    file.write_text("[project]\n")
+    assert gate.check_interpreter(file, (3, 12, 9), stderr=None) is False
+
+
+def test_real_project_pyproject_accepts_ci_interpreter():
+    assert gate.check_interpreter(gate._PYPROJECT, (3, 12, 9), stderr=None) is True
+    assert gate.check_interpreter(gate._PYPROJECT, (3, 10, 12), stderr=None) is False
+
+
+def test_pyproject_with_non_utf8_bytes_stays_red(tmp_path):
+    file = tmp_path / "pyproject.toml"
+    file.write_bytes(b'[project]\nrequires-python = ">=3.12\xff\xfe"\n')
+    assert gate.check_interpreter(file, (3, 12, 9), stderr=None) is False
+
+
+VULNS_QA = json.dumps({"dependencies": [
+    {"name": "anyio", "version": "4.12.1", "vulns": [{"id": "PYSEC-1"}]},
+    {"name": "pillow", "version": "12.3.0", "vulns": [{"id": "PYSEC-2"}]},
+], "fixes": []})
+
+
+def test_ignored_pins_waive_only_the_exact_pinned_version(tmp_path):
+    rc, _, _ = exercise(tmp_path, [result(1, VULNS_QA)],
+                        _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"})
+    assert rc == 0
+    # Otra version del mismo paquete con advisories sigue en rojo.
+    moved = VULNS_QA.replace('"12.3.0"', '"12.4.0"')
+    rc, _, _ = exercise(tmp_path, [result(1, moved)],
+                        _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"})
+    assert rc == 1
+    # Otro paquete con advisories sigue en rojo.
+    other = VULNS_QA.replace('"anyio"', '"starlette"')
+    rc, _, _ = exercise(tmp_path, [result(1, other)],
+                        _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"})
+    assert rc == 1
+
+
+def test_ignored_pins_do_not_leak_into_strict_audit(tmp_path):
+    rc, _, _ = exercise(tmp_path, [result(1, VULNERABLE)])
+    assert rc == 1
+
+
+def test_real_qa_agents_pins_match_current_advisories():
+    # La tabla de excepciones va por pin exacto: si browser-use cambia sus
+    # pins, las entradas viejas quedan huerfanas y las nuevas versiones se
+    # auditan en serio. Este test fija que la tabla sigue siendo la de
+    # browser-use 0.13.14 (la del requirements).
+    assert set(gate.QA_AGENTS_IGNORED_PINS) == {"anyio", "mcp", "pillow", "pypdf"}
+
+
+def test_ignored_pins_crash_exit_code_stays_red(tmp_path):
+    # Un returncode 2 (crash de pip-audit) con JSON completo y limpio-via-
+    # excepciones NO es evidencia: sin el chequeo de returncode quedaba verde.
+    rc, calls, _ = exercise(
+        tmp_path, [result(2, VULNS_QA)], _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"}
+    )
+    assert rc == 1 and len(calls) == 1
+    # Tambien con un informe sin advisories: un 2 nunca es verde.
+    rc, calls, _ = exercise(
+        tmp_path, [result(2, CLEAN)], _ignored_pins={"anyio": "4.12.1"}
+    )
+    assert rc == 1 and len(calls) == 1
+
+
+def test_ignored_pins_valid_exit_codes_pass(tmp_path):
+    # 1 es el codigo de pip-audit cuando hay advisories (los que se excepcionan).
+    rc, _, _ = exercise(
+        tmp_path, [result(1, VULNS_QA)], _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"}
+    )
+    assert rc == 0
+    # 0 si la resolucion ya viene limpia.
+    rc, _, _ = exercise(tmp_path, [result(0, CLEAN)], _ignored_pins={"anyio": "4.12.1"})
+    assert rc == 0
+
+
+def test_ignored_pins_clock_phases(tmp_path, capsys):
+    """Reloj inyectable: antes del aviso, en ventana de aviso, tras caducidad."""
+    from datetime import date
+
+    pins = dict(gate.QA_AGENTS_IGNORED_PINS)
+
+    def run(day):
+        return exercise(
+            tmp_path, [result(1, VULNS_QA)], _ignored_pins=pins,
+            _today=lambda: day,
+        )[0]
+
+    # Antes de la ventana de aviso: verde y sin AVISO.
+    assert run(date(2026, 11, 18)) == 0
+    assert "AVISO" not in capsys.readouterr().err
+    assert run(date(2026, 12, 3)) == 0
+    assert "AVISO" not in capsys.readouterr().err
+    # Ventana de aviso (14 dias antes): verde, AVISO datado en stderr.
+    assert run(date(2026, 12, 4)) == 0
+    err = capsys.readouterr().err
+    assert "AVISO" in err and "2026-12-18" in err
+    assert run(date(2026, 12, 18)) == 0
+    assert "AVISO" in capsys.readouterr().err
+    # Tras la fecha: rojo, y el mensaje dice alta, las 4 entradas y que hacer.
+    assert run(date(2026, 12, 19)) == 1
+    err = capsys.readouterr().err
+    assert "alta 2026-11-18" in err
+    for name in ("anyio", "mcp", "pillow", "pypdf"):
+        assert name in err
+    assert "browser-use" in err
+
+
+def test_expiry_never_touches_the_strict_audit(tmp_path):
+    # Sin _ignored_pins el reloj no existe: la auditoria estricta de
+    # data-engine da el mismo veredicto antes y despues de la fecha.
+    from datetime import date
+
+    future = lambda: date(2027, 6, 1)  # noqa: E731
+    rc, _, _ = exercise(tmp_path, [result(0, CLEAN)], _today=future)
+    assert rc == 0
+    rc, _, _ = exercise(tmp_path, [result(1, VULNERABLE)], _today=future)
+    assert rc == 1
+
+
+def test_ignored_pins_review_date_is_real_and_future_of_registration():
+    from datetime import date
+
+    assert date(2026, 11, 18) == gate.QA_AGENTS_IGNORED_PINS_SINCE
+    assert gate.QA_AGENTS_IGNORED_PINS_REVIEW >= gate.QA_AGENTS_IGNORED_PINS_SINCE
