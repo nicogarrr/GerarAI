@@ -253,9 +253,64 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         name: 'Ondas',
         section: { url: 'https://ir.ondas.com/financial-results', labelKey: 'quarterlyResults' },
         events: [
-            { date: '2026-11-12', period: 'T3 2026', url: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
+            {
+                date: '2026-11-12',
+                period: 'T3 2026',
+                url: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call',
+                assets: [
+                    { kind: 'presentacion', url: 'https://d1io3yog0oux5.cloudfront.net/_bfade721c20366831ed364c6d248d42e/ondas/db/603/4845/conference_call_presentation/Q3_2026_ER_Presentation_ONDS.pdf', source: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
+                    { kind: 'webcast', url: 'https://event.choruscall.com/mediaframe/webcast.html?webcastid=p2HHvXFF', source: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-09',
+        verifiedOn: '2026-11-18',
+    },
+    NVDA: {
+        name: 'NVIDIA',
+        section: { url: 'https://investor.nvidia.com/financial-info/quarterly-results/', labelKey: 'quarterlyResults' },
+        events: [
+            // NVIDIA cierra su ejercicio fiscal en enero: es el T3 del ejercicio 2027.
+            {
+                date: '2026-11-17',
+                period: 'T3 fiscal 2027',
+                url: 'https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-3rd-Quarter-FY27-Financial-Results/default.aspx',
+                assets: [
+                    { kind: 'presentacion', url: 'https://s201.q4cdn.com/141608511/files/doc_financials/2027/Q327/NVDA-F3Q27-Quarterly-Presentation.pdf', source: 'https://investor.nvidia.com/financial-info/quarterly-results/default.aspx' },
+                    { kind: 'webcast', url: 'https://events.q4inc.com/attendee/902213296', source: 'https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-3rd-Quarter-FY27-Financial-Results/default.aspx' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-18',
+    },
+    CHTR: {
+        name: 'Charter Communications',
+        section: { url: 'https://ir.charter.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    HIMS: {
+        name: 'Hims & Hers Health',
+        section: { url: 'https://investors.hims.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    NAUT: {
+        name: 'Nautilus Biotechnology',
+        section: { url: 'https://investors.nautilus.bio/investor-relations/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    RXRX: {
+        name: 'Recursion Pharmaceuticals',
+        section: { url: 'https://ir.recursion.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    AMD: {
+        name: 'Advanced Micro Devices',
+        section: { url: 'https://ir.amd.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
     },
     AMZN: {
         name: 'Amazon.com',

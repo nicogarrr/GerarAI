@@ -46,6 +46,20 @@
       "source": "https://corporate.magnumicecream.com/en/investors/results-and-presentations.html"
     }
   },
+  "NVDA": {
+    "2026-11-17": {
+      "kind": "webcast",
+      "url": "https://events.q4inc.com/attendee/902213296",
+      "source": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-3rd-Quarter-FY27-Financial-Results/default.aspx"
+    }
+  },
+  "ONDS": {
+    "2026-11-12": {
+      "kind": "webcast",
+      "url": "https://event.choruscall.com/mediaframe/webcast.html?webcastid=p2HHvXFF",
+      "source": "https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call"
+    }
+  },
   "REXR": {
     "2026-10-22": {
       "kind": "webcast",

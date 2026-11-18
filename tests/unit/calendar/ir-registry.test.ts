@@ -195,6 +195,27 @@ describe('irLinksFor', () => {
         expect(irLinksFor(ticker, '2026-12-31')?.eventPage, ticker).toBeNull();
     });
 
+    it('cubre las posiciones y watchlist registradas el 2026-11-18', () => {
+        // Guard anti-regresion: NVDA y los 4X DCA sin entrada propia (CHTR, HIMS, NAUT, RXRX) + AMD.
+        for (const ticker of ['NVDA', 'CHTR', 'HIMS', 'NAUT', 'RXRX', 'AMD']) {
+            expect(irLinksFor(ticker, '2026-11-18')?.section.url, ticker).toMatch(/^https:\/\//);
+        }
+    });
+
+    it('ONDS enlaza presentacion y webcast del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('ONDS', '2026-11-12');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
+        expect(irLinksFor('ONDS', '2026-11-13')?.eventPage).toBeNull();
+    });
+
+    it('NVDA enlaza presentacion y webcast del T3 fiscal 2027 solo ese dia', () => {
+        const exact = irLinksFor('NVDA', '2026-11-17');
+        expect(exact?.eventPage?.period).toBe('T3 fiscal 2027');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
+        expect(irLiveAssetFor('NVDA', '2026-11-17')?.asset.url).toContain('q4inc.com');
+        expect(irLinksFor('NVDA', '2026-11-18')?.eventPage).toBeNull();
+    });
+
     it('KRKNF lleva el webcast oficial anunciado para el 2026-11-24', () => {
         // Regresion 2026-11-18: posicion de cartera sin evento registrado para su T3 2026.
         const live = irLiveAssetFor('KRKNF', '2026-11-24');
