@@ -260,3 +260,49 @@ def test_mixed_currency_ledger_keeps_prices_and_converts_each_flow(db):
     # con el flujo: retorno del dia 3 = (198 - 99) / 90 - 1 = 0,1.
     day3 = D0 + timedelta(days=2)
     assert res.returns[day3] == pytest.approx(0.1, rel=1e-9)
+
+
+def test_third_currency_flow_loaded(db):
+    # Variante del Auditor (FAV funcional): la segunda compra va en GBP, una
+    # TERCERA divisa que no es ni la de la posicion (USD) ni la base (EUR).
+    # Discrimina el tercer punto del fix: la tabla FX debe pedirse con las
+    # divisas de los flujos, no solo con las de las posiciones + base; si no,
+    # la pata GBP no encuentra tipo y la reconstruccion aborta con
+    # missing_fx_for_flow (o convierte con un tipo que no es el suyo).
+    from app.models.entities import FXRate
+
+    company = Company(
+        ticker="USDCo", name="USDCo", exchange="NASDAQ", currency="USD", sector="T",
+        industry="I", company_type="holding", valuation_model="unassigned",
+        special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    for offset, close in enumerate([10, 10, 11, 12]):
+        db.add(MarketPrice(company_id=company.id, date=D0 + timedelta(days=offset),
+                           close=Decimal(close), adj_close=Decimal(close), source="t"))
+    db.add(Transaction(company_id=company.id, trade_date=D0, action="buy",
+                       quantity=Decimal("10"), price=Decimal("10"), fees=Decimal("0"),
+                       currency="USD", raw_payload={}))
+    db.add(Transaction(company_id=company.id, trade_date=D0 + timedelta(days=2), action="buy",
+                       quantity=Decimal("10"), price=Decimal("9.9"), fees=Decimal("0"),
+                       currency="GBP", raw_payload={}))
+    db.add(Position(company_id=company.id, quantity=Decimal("20"), currency="USD",
+                    market_value=Decimal("240"), market_value_base=Decimal("216"), as_of=D0))
+    for offset in range(4):
+        db.add(FXRate(base_currency="EUR", quote_currency="USD",
+                      rate_date=D0 + timedelta(days=offset), rate=Decimal("0.90")))
+        db.add(FXRate(base_currency="EUR", quote_currency="GBP",
+                      rate_date=D0 + timedelta(days=offset), rate=Decimal("1.0")))
+    db.commit()
+
+    res = PortfolioReconstructionService().build(db)
+
+    assert res.status == "ok"
+    assert res.series, "la serie no puede salir vacia con precios y libro presentes"
+    # 20 titulos x 12 USD x 0,90 EUR/USD = 216,0 EUR.
+    assert res.series[-1]["value_base"] == pytest.approx(216.0, rel=1e-9)
+    # La subida 10 -> 11 (+10 %) con la compra GBP en medio no se contamina
+    # con el flujo: retorno del dia 3 = (198 - 99 x 1,0) / 90 - 1 = 0,1.
+    day3 = D0 + timedelta(days=2)
+    assert res.returns[day3] == pytest.approx(0.1, rel=1e-9)
