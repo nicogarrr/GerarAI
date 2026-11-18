@@ -12,7 +12,7 @@
 
 > Esto no es asesoramiento financiero. Los datos pueden llegar con retraso o estar incompletos según el proveedor.
 
-**Estado:** v0.6.0 (pre-release). La base de producción anterior fue v0.5.0 (30 de octubre de 2026). Las mejoras y la revisión siguen en curso.
+**Estado:** v0.6.0 está etiquetada y publicada (15 de noviembre de 2026, `60d7e8f1`); 0.6.1 está en preparación y no está etiquetada ni desplegada. La base de producción anterior fue v0.5.0 (30 de octubre de 2026). La validación de 0.6.0 fue acotada: sin smoke con la cuenta del propietario y con timeouts recuperados en la primera carga en frío.
 
 ## Qué hace
 
