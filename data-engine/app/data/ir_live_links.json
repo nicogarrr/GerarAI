@@ -11,6 +11,13 @@
       "source": "https://investors.ast-science.com/events"
     }
   },
+  "BABA": {
+    "2026-11-19": {
+      "kind": "webcast",
+      "url": "https://www.alibabagroup.com/en/ir/earnings",
+      "source": "https://home.alibabagroup.com/en-US/document-2054756418245885952"
+    }
+  },
   "FRPH": {
     "2026-11-05": {
       "kind": "webcast",
@@ -25,6 +32,13 @@
       "source": "https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx"
     }
   },
+  "MICC.AS": {
+    "2026-10-29": {
+      "kind": "webcast",
+      "url": "https://youtu.be/qyBdgRb1iik",
+      "source": "https://corporate.magnumicecream.com/en/investors/results-and-presentations.html"
+    }
+  },
   "REXR": {
     "2026-10-22": {
       "kind": "webcast",
@@ -37,6 +51,13 @@
       "kind": "webcast",
       "url": "https://ir.tesla.com/webcast-2026-10-21",
       "source": "https://ir.tesla.com/"
+    }
+  },
+  "WOSG.L": {
+    "2026-11-10": {
+      "kind": "webcast",
+      "url": "https://stream.brrmedia.co.uk/broadcast/6ad77ddbe50bec7a2a7d1d40",
+      "source": "https://www.thewosgroupplc.com/investors/results-centre/"
     }
   }
 }

@@ -183,4 +183,24 @@ describe('irLinksFor', () => {
         const links = irLinksFor('BN', '2026-08-13');
         expect(links?.eventPage?.assets.map((a) => a.kind)).toEqual(['grabacion', 'transcripcion']);
     });
+
+    it.each([
+        ['MICC.AS', '2026-10-29', ['presentacion', 'webcast', 'transcripcion']],
+        ['SFC.TO', '2026-11-11', ['presentacion', 'grabacion']],
+        ['WOSG.L', '2026-11-10', ['webcast']],
+        ['CGEO.L', '2026-10-28', ['presentacion']],
+    ])('los materiales verificados el 2026-11-18 de %s enlazan solo en su dia exacto', (ticker, date, kinds) => {
+        const exact = irLinksFor(ticker, date);
+        expect(exact?.eventPage?.assets.map((a) => a.kind), ticker).toEqual(kinds);
+        expect(irLinksFor(ticker, '2026-12-31')?.eventPage, ticker).toBeNull();
+    });
+
+    it('BABA lleva el directo oficial anunciado para el 2026-11-19', () => {
+        // Regresion 2026-11-18: el evento existia sin assets, asi que ni el chip
+        // "Ver directo oficial" ni el aviso del dia llevaban el enlace.
+        const live = irLiveAssetFor('BABA', '2026-11-19');
+        expect(live?.asset.kind).toBe('webcast');
+        expect(live?.asset.url).toBe('https://www.alibabagroup.com/en/ir/earnings');
+        expect(irLiveAssetFor('BABA', '2026-11-20')).toBeNull();
+    });
 });

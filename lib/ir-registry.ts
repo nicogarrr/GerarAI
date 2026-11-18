@@ -139,9 +139,16 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         name: 'Georgia Capital',
         section: { url: 'https://georgiacapital.ge/investor-relations/financial-results', labelKey: 'resultsAndReports' },
         events: [
-            { date: '2026-10-28', period: 'T3 2026', url: 'https://georgiacapital.ge/news/company-news/1324-georgia-capital-plc-3q26-and-9m26-results' },
+            {
+                date: '2026-10-28',
+                period: 'T3 2026',
+                url: 'https://georgiacapital.ge/news/company-news/1324-georgia-capital-plc-3q26-and-9m26-results',
+                assets: [
+                    { kind: 'presentacion', url: 'https://app.georgiacapital.ge/static/file/202610290907-georgia-capital-plc-3q26-and-9m26-results-call-presentation.pdf', source: 'https://georgiacapital.ge/investor-relations/financial-results' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     KRKNF: {
         name: 'Kraken Robotics',
@@ -154,9 +161,18 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         section: { url: 'https://www.alibabagroup.com/en-US/ir-financial-reports-quarterly-results', labelKey: 'quarterlyResults' },
         events: [
             // Anuncio oficial de la fecha (19 nov 2026, trimestre de septiembre).
-            { date: '2026-11-19', period: 'T3 2026', url: 'https://home.alibabagroup.com/en-US/document-2054756418245885952' },
+            {
+                date: '2026-11-19',
+                period: 'T3 2026',
+                url: 'https://home.alibabagroup.com/en-US/document-2054756418245885952',
+                assets: [
+                    // El propio anuncio: "a live webcast of the earnings conference call can be
+                    // accessed at https://www.alibabagroup.com/en/ir/earnings" (grabacion despues en el mismo enlace).
+                    { kind: 'webcast', url: 'https://www.alibabagroup.com/en/ir/earnings', source: 'https://home.alibabagroup.com/en-US/document-2054756418245885952' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-09',
+        verifiedOn: '2026-11-18',
     },
     BWMX: {
         name: 'Betterware de México',
@@ -388,25 +404,52 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         section: { url: 'https://www.thewosgroupplc.com/news-media/', labelKey: 'pressReleases' },
         events: [
             // Su ejercicio fiscal cierra en abril: esto es el trading update del primer semestre FY27.
-            { date: '2026-11-10', period: 'S1 F2027', url: 'https://www.thewosgroupplc.com/media/fvknqdcx/h1-fy27-trading-update.pdf' },
+            {
+                date: '2026-11-10',
+                period: 'S1 F2027',
+                url: 'https://www.thewosgroupplc.com/media/fvknqdcx/h1-fy27-trading-update.pdf',
+                assets: [
+                    // Enlace "Webcast" del results centre oficial (replay del directo del trading update).
+                    { kind: 'webcast', url: 'https://stream.brrmedia.co.uk/broadcast/6ad77ddbe50bec7a2a7d1d40', source: 'https://www.thewosgroupplc.com/investors/results-centre/' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     'MICC.AS': {
         name: 'The Magnum Ice Cream Company',
         section: { url: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html', labelKey: 'resultsAndReports' },
         events: [
-            { date: '2026-10-29', period: 'T3 2026', url: 'https://news.magnumicecream.com/q3-2026-trading-update/' },
+            {
+                date: '2026-10-29',
+                period: 'T3 2026',
+                url: 'https://news.magnumicecream.com/q3-2026-trading-update/',
+                assets: [
+                    { kind: 'presentacion', url: 'https://assets.unileversolutions.com/v1/150971866.pdf?disposition=inline', source: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html' },
+                    // La empresa enlaza su propio webcast alojado en su canal oficial de YouTube.
+                    { kind: 'webcast', url: 'https://youtu.be/qyBdgRb1iik', source: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html' },
+                    { kind: 'transcripcion', url: 'https://assets.unileversolutions.com/v1/151013876.pdf?disposition=inline', source: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     'SFC.TO': {
         name: 'Sagicor Financial',
         section: { url: 'https://investors.sagicor.com/', labelKey: 'investorRelations' },
         events: [
-            { date: '2026-11-11', period: 'T3 2026', url: 'https://investors.sagicor.com/2026-11-11-Sagicor-Financial-Reports-Third-Quarter-2026-Results' },
+            {
+                date: '2026-11-11',
+                period: 'T3 2026',
+                url: 'https://investors.sagicor.com/2026-11-11-Sagicor-Financial-Reports-Third-Quarter-2026-Results',
+                assets: [
+                    { kind: 'presentacion', url: 'https://investors.sagicor.com/image/SFC+Results+Presentation+Q3+2026.pdf', source: 'https://investors.sagicor.com/' },
+                    // La portada IR enlaza "Q3 2026 Earnings Webcast" a este mp3 (grabacion de la llamada).
+                    { kind: 'grabacion', url: 'https://investors.sagicor.com/image/61971-261112163046.mp3', source: 'https://investors.sagicor.com/' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     'ERF.PA': {
         name: 'Eurazeo',
