@@ -211,7 +211,7 @@ export default function PortfolioTransactions({ transactions, userId, page, erro
           {ti('portfolio.transactions.title')}
         </CardTitle>
         {transactions.length > 0 ? (
-          <p className="mt-1 text-[11px] leading-4 text-gray-500">
+          <p className="mt-1 text-xs leading-4 text-gray-500">
             {ti('portfolio.transactions.grossNote')}
           </p>
         ) : null}

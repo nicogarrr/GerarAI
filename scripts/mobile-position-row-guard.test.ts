@@ -26,7 +26,10 @@ test('fila de posición: estructura de columnas y separador', () => {
     assert.ok(!src.includes('ml-auto text-right font-mono text-gray-300'), 'el importe ya no es un hermano ml-auto (causaba el solape medido en prod)');
     assert.ok(src.includes('flex min-w-0 flex-1 flex-col gap-1'), 'columna izquierda con min-w-0 para que el flex-wrap decida bien');
     assert.ok(!src.includes('flex min-w-0 flex-wrap items-center gap-1'), 'min-w-0 en chips dejaba desbordar la pista VJ');
-    assert.ok(src.includes('whitespace-nowrap text-[11px] text-gray-400'), 'pista VJ sin corte interno');
+    assert.ok(src.includes('whitespace-nowrap text-xs text-gray-400'), 'pista VJ sin corte interno');
+    // 18-nov-2026: la pista sube de 11 px a text-xs (suelo de lectura, lote resto
+    // 11px); el invariante de este guard es el nowrap, no el tamaño.
+    assert.ok(!src.includes('whitespace-nowrap text-[11px] text-gray-400'), 'la pista VJ no vuelve a 11 px');
     assert.ok(src.includes('\\u00a0\\u00b7 ${formatPercent((h.value / portfolioSummary.equityValue)'), '«·» pegado al importe con NBSP');
     assert.ok(!src.includes('\\u00a0\\u00b7\\u00a0${formatPercent'), 'NBSP en ambos lados haría la cadena irrompible y desbordaría');
 });

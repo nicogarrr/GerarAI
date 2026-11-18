@@ -51,8 +51,11 @@ test('F290: los KPIs de /portfolio dimensionan por ancho de contenido (sidebar e
     // 15rem visible desde md, a 768px el contenido son ~31rem y 4 columnas
     // dejaban ~7rem por tarjeta (valores clipados, 4ª fuera del borde).
     // auto-fit+minmax(12rem) colapsa a 2 columnas hasta que cada tarjeta
-    // tiene sitio real (~1280px con sidebar), sin tocar el móvil (<sm sigue
-    // en 2 columnas, verificado por QA).
+    // tiene sitio real (~1280px con sidebar). Móvil: P23 (18-nov, medido en
+    // Chrome a 320px) — en 2 columnas la caja son ~104px y «GANANCIA/PÉRDIDA»
+    // (irrompible) mide 145px a 12px: overflow-hidden la recortaba. 1 columna
+    // hasta 420px (breakpoint ya usado por los valores), 2 desde ahí.
     const summary = readFileSync('components/portfolio/PortfolioSummary.tsx', 'utf8');
-    assert.match(summary, /grid grid-cols-2 gap-3 sm:gap-4 sm:\[grid-template-columns:repeat\(auto-fit,minmax\(12rem,1fr\)\)\]/);
-    assert.doesNotMatch(summary, /md:grid-cols-4/);});
+    assert.match(summary, /grid grid-cols-1 min-\[420px\]:grid-cols-2 gap-3 sm:gap-4 sm:\[grid-template-columns:repeat\(auto-fit,minmax\(12rem,1fr\)\)\]/);
+    assert.doesNotMatch(summary, /md:grid-cols-4/);
+    assert.doesNotMatch(summary, /grid grid-cols-2 gap-3/);});

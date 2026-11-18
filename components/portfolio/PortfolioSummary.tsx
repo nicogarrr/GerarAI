@@ -48,7 +48,12 @@ export default function PortfolioSummary({ summary }: Props) {
           dejaban tarjetas de ~7rem con valores clipados y la 4ª fuera por la
           derecha. auto-fit+minmax(12rem) da 2 columnas hasta ~1280px y 4
           cuando cada tarjeta tiene sitio real para el valor. */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:[grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
+      {/* P23 (18-nov, medido en Chrome a 320px): en 2 columnas la caja de
+          contenido son ~104px y «GANANCIA/PÉRDIDA» (token irrompible) mide
+          145px a 12px — overflow-hidden la recortaba en silencio. 1 columna
+          hasta 420px (el breakpoint que ya usan los valores); desde ahí la
+          etiqueta cabe en 2 columnas (>=156px). */}
+      <div className="grid grid-cols-1 min-[420px]:grid-cols-2 gap-3 sm:gap-4 sm:[grid-template-columns:repeat(auto-fit,minmax(12rem,1fr))]">
       <div className="bg-[#111111] border border-gray-800 rounded-xl p-4 sm:p-5 relative overflow-hidden group hover:border-teal-500/30 transition-colors">
         {/* Marca de agua decorativa: en <sm queda sobre el valor y estorba la
             lectura (revisión móvil 21-oct); solo adorna desde sm. */}
@@ -98,7 +103,7 @@ export default function PortfolioSummary({ summary }: Props) {
             )
           ) : null}
         </div>
-        <p className="text-gray-400 text-[11px] sm:text-xs uppercase tracking-normal sm:tracking-wider font-semibold mb-1">{ti('portfolio.summary.gainTitle')}</p>
+        <p className="text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1">{ti('portfolio.summary.gainTitle')}</p>
         <p className={`text-base min-[420px]:text-lg sm:text-2xl font-bold tracking-tight break-words ${noData ? 'text-gray-500' : isPositive ? 'text-good' : 'text-bad'}`}>
           {noData
             ? ti('common.na')
