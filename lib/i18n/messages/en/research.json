@@ -1479,6 +1479,8 @@
     "recovering": "Recovering generation…",
     "queuing": "Queuing…",
     "generating": "Generating…",
+    "pollFailed": "The generation status could not be read (network error). Retrying automatically…",
+    "checkNow": "Check now",
     "unknownState": "Unknown state: the generation has not responded for 30 min. The server job is not cancelled; reload the page to read its state again.",
     "waitingQueue": "Waiting for the queue to reconnect",
     "retrying": "Retrying on the server",

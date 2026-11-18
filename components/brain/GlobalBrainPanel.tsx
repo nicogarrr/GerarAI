@@ -115,6 +115,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
     const [input, setInput] = useState(() => openDetail?.detail?.question?.slice(0, 2000) ?? '');
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState<number | null>(null);
+    const [copyFailed, setCopyFailed] = useState<number | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
     const dialogRef = useRef<HTMLDialogElement>(null);
@@ -146,9 +147,13 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
     const copyMessage = useCallback(async (index: number, content: string) => {
         try {
             await navigator.clipboard.writeText(content);
+            setCopyFailed(null);
             setCopied(index);
         } catch {
+            // Sin feedback el boton seguia diciendo "Copiar" y el usuario no
+            // sabia que el portapapeles habia rechazado la escritura.
             setCopied(null);
+            setCopyFailed(index);
         }
     }, []);
 
@@ -419,6 +424,7 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
                             message={m}
                             index={i}
                             copied={copied === i}
+                            copyFailed={copyFailed === i}
                             onCopy={copyMessage}
                         />
                     ))}
@@ -524,10 +530,11 @@ const MARKDOWN_COMPONENTS: ComponentProps<typeof ReactMarkdown>['components'] = 
  * el markdown de TODAS las respuestas (30 mensajes ≈ 95 ms por tecla en el
  * banco). Ahora solo se repinta el mensaje que cambia (p. ej. «Copiado»).
  */
-const BrainMessageBubble = memo(function BrainMessageBubble({ message: m, index: i, copied, onCopy }: {
+const BrainMessageBubble = memo(function BrainMessageBubble({ message: m, index: i, copied, copyFailed, onCopy }: {
     message: BrainMessage;
     index: number;
     copied: boolean;
+    copyFailed: boolean;
     onCopy: (index: number, content: string) => Promise<void>;
 }) {
     const t = useT();
@@ -566,7 +573,7 @@ const BrainMessageBubble = memo(function BrainMessageBubble({ message: m, index:
                             onClick={() => void onCopy(i, m.content)}
                             className="mt-2 block min-h-11 text-xs text-indigo-300 hover:text-indigo-200"
                         >
-                            {copied ? t('brain.panel.copied') : t('brain.panel.copy')}
+                            {copied ? t('brain.panel.copied') : copyFailed ? <span role="alert">{t('brain.panel.copyFailed')}</span> : t('brain.panel.copy')}
                         </button>
                     )}
                 </div>

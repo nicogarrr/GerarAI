@@ -22,6 +22,15 @@ const POLL_MS = 3000;
 // maximo el estado es DESCONOCIDO y se dice, no se sigue fingiendo progreso.
 const MAX_POLLS = 600;
 
+/** request_id del click: randomUUID solo existe en contexto seguro. El backend
+ *  lo usa para no replayar un run anterior, asi que un fallback distinto por
+ *  click basta y evita que un TypeError se disfrace de envio fallido. */
+function newRequestId(): string {
+    return typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `thesis-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
 export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { ticker: string; label?: string; emptyCopy?: string }) {
     const router = useRouter();
     const availability = useAiAvailability('thesis');
@@ -37,6 +46,10 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
     // Polling agotado por job: derivado del id del job (no un booleano que
     // hay que resetear en un efecto al cambiar de job).
     const [exhaustedJobId, setExhaustedJobId] = useState<number | null>(null);
+    // Sondeo fallido por job: si no se pudo leer el estado, la UI lo dice y
+    // ofrece consultar de nuevo en vez de seguir aparentando progreso.
+    const [pollFailedJobId, setPollFailedJobId] = useState<number | null>(null);
+    const [pollRetryCycle, setPollRetryCycle] = useState(0);
     const pollCountRef = useRef(0);
     // Reloj local: se fija en cada sondeo y avanza cada 1 s mientras el job
     // corre, para que los segundos no salten de 3 en 3 con el polling.
@@ -86,6 +99,7 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
     // Job nuevo (o cambio de job): ventana de polling nueva. El agotamiento
     // se deriva comparando el id del job agotado con el actual.
     const pollExhausted = jobId != null && exhaustedJobId === jobId;
+    const pollFailed = jobId != null && pollFailedJobId === jobId;
 
     useEffect(() => {
         if (!active || !jobId || pollExhausted) return;
@@ -99,6 +113,7 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
                 if (disposed) return;
                 setJob(next);
                 setPolledAt(Date.now());
+                setPollFailedJobId(null);
                 // Sin router.refresh() automatico: re-renderizaba la ruta
                 // entera (14k px) y el lector perdia su sitio ("reinicio").
                 // La nueva version se ofrece con una accion explicita.
@@ -106,7 +121,9 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
                     return;
                 }
             } catch {
-                // A failed poll must never cancel or re-enqueue server work.
+                // A failed poll must never cancel or re-enqueue server work,
+                // pero si hay que dejar de fingir que sabemos como va el job.
+                if (!disposed) setPollFailedJobId(jobId);
             }
             if (disposed) return;
             pollCountRef.current += 1;
@@ -123,7 +140,7 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
             disposed = true;
             clearTimeout(timer);
         };
-    }, [active, jobId, router, pollExhausted]);
+    }, [active, jobId, router, pollExhausted, pollRetryCycle]);
 
     const running = job?.status === 'running';
     useEffect(() => {
@@ -137,11 +154,14 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
         if (!availability.canStart) return;
         if (!await availability.refresh()) return;
         startingRef.current = true;
+        // Fuera del try: generar la clave no es enviar nada. Si fallase, el
+        // catch de abajo no debe decir "envio no confirmado" (mentira).
+        const requestId = newRequestId();
         setStarting(true);
         setStartedHere(true);
         setError(null);
         try {
-            setJob(await startThesisJob(ticker, true, crypto.randomUUID()));
+            setJob(await startThesisJob(ticker, true, requestId));
         } catch {
             // Enqueue may have committed before the connection dropped. Read
             // it back rather than suggesting that another click is needed.
@@ -197,6 +217,18 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
                 </Link>
             </div>
             <p className="text-xs text-gray-500">{t('research.thesisGenerate.evidenceHint')}</p>
+            {pollFailed && active && !pollExhausted ? (
+                <p className="text-sm text-red-300" role="alert">
+                    {t('research.thesisGenerate.pollFailed')}{' '}
+                    <button
+                        type="button"
+                        onClick={() => setPollRetryCycle((cycle) => cycle + 1)}
+                        className="font-medium underline decoration-red-700 underline-offset-4 hover:text-red-200"
+                    >
+                        {t('research.thesisGenerate.checkNow')}
+                    </button>
+                </p>
+            ) : null}
             {startedHere && job?.status === 'succeeded' ? (
                 <p className="text-sm text-teal-300">
                     {t('research.thesisGenerate.generated', { version: job.result?.version ?? '?' })}
