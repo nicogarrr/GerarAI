@@ -1,6 +1,7 @@
 """Fail-closed pip-audit gate with bounded retries for PyPI read timeouts only."""
 
 import json
+from datetime import date
 import re
 import subprocess
 import sys
@@ -176,6 +177,7 @@ def run_audit(
     _pyproject=_PYPROJECT,
     _version_info=sys.version_info,
     _ignored_pins=None,
+    _today=date.today,
 ):
     if not check_interpreter(pyproject=_pyproject, version_info=_version_info):
         return 1
@@ -240,7 +242,19 @@ def run_audit(
             if not _base_only and result.returncode == 0
             else []
         )
-        if _ignored_pins and report == "clean":
+        # pip-audit exit codes: 0 limpio, 1 con advisories, 2 error (crash,
+        # resolucion rota, CLI mal usada). Un JSON completo NO prueba exito:
+        # solo 0 o 1 son evidencia; un 2 con JSON "clean" sigue en rojo.
+        if _ignored_pins and report == "clean" and result.returncode in (0, 1):
+            if _today() > QA_AGENTS_IGNORED_PINS_REVIEW:
+                print(
+                    "pip-audit: excepciones temporales CADUCADAS el "
+                    f"{QA_AGENTS_IGNORED_PINS_REVIEW.isoformat()} (alta 18-nov-2026): "
+                    "revisar los pins de browser-use o renovar cada entrada con "
+                    "motivo y fecha nueva; mientras, el gate no perdona",
+                    file=sys.stderr,
+                )
+                return 1
             waived = [
                 f"{dep['name']}=={dep['version']}"
                 for dep in json.loads(result.stdout)["dependencies"]
@@ -251,6 +265,12 @@ def run_audit(
                     "pip-audit: advisories cubiertos por excepcion temporal fijada: "
                     + ", ".join(waived)
                 )
+            print(
+                "pip-audit: excepciones temporales en uso "
+                f"(caducan {QA_AGENTS_IGNORED_PINS_REVIEW.isoformat()}, "
+                "alta 18-nov-2026)",
+                file=sys.stderr,
+            )
             return 0
         if pins:
             requirements = output_dir / "cpu-base-requirements.txt"
@@ -290,6 +310,11 @@ def run_audit(
 # version exacta): si la resolucion trae OTRA version con advisories, o
 # cualquier otro paquete, el gate sigue en rojo. Retirar cada entrada al
 # subir browser-use; revisar en cada release de browser-use.
+# Fecha limite de las excepciones: pasada, el gate vuelve a rojo aunque los
+# advisories sigan siendo los fijados. Renovar solo tras revisar el estado de
+# los pins de browser-use y anotar motivo y fecha nueva.
+QA_AGENTS_IGNORED_PINS_REVIEW = date(2026, 12, 18)
+
 QA_AGENTS_IGNORED_PINS = {
     "anyio": "4.12.1",  # PYSEC-2026-4025, PYSEC-2026-4024 (fix 4.14.2)
     "mcp": "2.1.1",  # CVE-2026-59951, CVE-2026-116685, CVE-2026-116684 (fix 2.2.0)

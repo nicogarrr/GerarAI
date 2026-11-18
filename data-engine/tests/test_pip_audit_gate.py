@@ -324,3 +324,56 @@ def test_real_qa_agents_pins_match_current_advisories():
     # auditan en serio. Este test fija que la tabla sigue siendo la de
     # browser-use 0.13.14 (la del requirements).
     assert set(gate.QA_AGENTS_IGNORED_PINS) == {"anyio", "mcp", "pillow", "pypdf"}
+
+
+def test_ignored_pins_crash_exit_code_stays_red(tmp_path):
+    # Un returncode 2 (crash de pip-audit) con JSON completo y limpio-via-
+    # excepciones NO es evidencia: sin el chequeo de returncode quedaba verde.
+    rc, calls, _ = exercise(
+        tmp_path, [result(2, VULNS_QA)], _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"}
+    )
+    assert rc == 1 and len(calls) == 1
+    # Tambien con un informe sin advisories: un 2 nunca es verde.
+    rc, calls, _ = exercise(
+        tmp_path, [result(2, CLEAN)], _ignored_pins={"anyio": "4.12.1"}
+    )
+    assert rc == 1 and len(calls) == 1
+
+
+def test_ignored_pins_valid_exit_codes_pass(tmp_path):
+    # 1 es el codigo de pip-audit cuando hay advisories (los que se excepcionan).
+    rc, _, _ = exercise(
+        tmp_path, [result(1, VULNS_QA)], _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"}
+    )
+    assert rc == 0
+    # 0 si la resolucion ya viene limpia.
+    rc, _, _ = exercise(tmp_path, [result(0, CLEAN)], _ignored_pins={"anyio": "4.12.1"})
+    assert rc == 0
+
+
+def test_ignored_pins_expire_and_warn_with_date(tmp_path, capsys):
+    from datetime import date
+
+    pins = {"anyio": "4.12.1", "pillow": "12.3.0"}
+    # Dentro de plazo: verde y aviso datado en stderr.
+    rc, _, _ = exercise(
+        tmp_path, [result(1, VULNS_QA)], _ignored_pins=pins,
+        _today=lambda: date(2026, 12, 18),
+    )
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "caducan 2026-12-18" in err
+    # En la fecha limite aun vale; al dia siguiente, rojo aunque el informe
+    # y las excepciones sean exactamente los mismos.
+    rc, _, _ = exercise(
+        tmp_path, [result(1, VULNS_QA)], _ignored_pins=pins,
+        _today=lambda: date(2026, 12, 19),
+    )
+    assert rc == 1
+    assert "CADUCADAS el 2026-12-18" in capsys.readouterr().err
+
+
+def test_ignored_pins_review_date_is_real_and_future_of_registration():
+    from datetime import date
+
+    assert gate.QA_AGENTS_IGNORED_PINS_REVIEW >= date(2026, 11, 18)
