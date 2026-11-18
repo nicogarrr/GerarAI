@@ -22,12 +22,24 @@ After restore, run `docker compose run --rm backend alembic upgrade head`, verif
 
 ## Produccion personal (Linux / Oracle VM)
 
-En la VM de produccion los equivalentes en bash son `scripts/backup.sh` y
-`scripts/restore.sh` (mismo contrato: Postgres `pg_dump -Fc`, snapshots de
-Qdrant, tar de MinIO y DuckDB, manifest por backup; restore exige
-`--confirm-restore`). Ambos usan
-`docker compose -f docker-compose.prod.yml --env-file .env.production` (o
-`COMPOSE_CMD` externo).
+**Obsoleto, no usar:** `scripts/backup.sh`, `scripts/restore.sh` y
+`scripts/verify-backup-restore.sh` son flujos legacy de volumen MinIO y hoy
+terminan con error explicito ANTES de tocar nada; no respaldan ni restauran
+Garage (ver `docs/MINIO_RETIREMENT.md`). Lo que sigue en esta seccion es el
+formato del flujo antiguo, conservado solo como referencia.
+
+Los flujos activos hoy son: `scripts/ops/pg-daily-backup.sh` (Postgres diario
+con restauracion estricta verificada, mas abajo), `scripts/mongo-backup.sh`
+(Mongo Atlas cifrado, seccion propia mas abajo) y el backup diario de Garage,
+que vive solo en la VM y aun no tiene script en este repo (brecha abierta:
+codificarlo y verificar copia y restore por separado, como pide
+`docs/MINIO_RETIREMENT.md`). `scripts/ops/check-backup-freshness.sh` vigila la
+frescura de los tres pilares y alerta por cron si uno envejece.
+
+Referencia del flujo legacy (NO ejecutar): los equivalentes en bash eran
+`scripts/backup.sh` y `scripts/restore.sh` (contrato: Postgres `pg_dump -Fc`,
+snapshots de Qdrant, tar de MinIO y DuckDB, manifest por backup; restore
+exigia `--confirm-restore`).
 
 - `backup.sh --stop-storage` para backend, TODOS los workers (worker,
   worker-thesis, worker-kpis, worker-alerts, worker-gdelt, worker-knowledge),
@@ -39,10 +51,10 @@ Qdrant, tar de MinIO y DuckDB, manifest por backup; restore exige
 - `backup.sh` sube a Cloudflare R2 si se define `RCLONE_REMOTE`. Guia completa
   en `docs/oracle-setup.md`.
 
-## Retencion
+## Retencion (flujo legacy, referencia)
 
-- Local (`backups/`): `backup.sh` conserva los ultimos
-  `${BACKUP_RETENTION_COUNT:-8}` backups y borra los mas antiguos solo tras
+- Local (`backups/`): `backup.sh` conservaba los ultimos
+  `${BACKUP_RETENTION_COUNT:-8}` backups y borraba los mas antiguos solo tras
   una ejecucion correcta (con `set -e`, un fallo no purga nada).
 - R2: la retencion la impone el lifecycle del bucket (regla de expiracion en
   el dashboard de Cloudflare, p. ej. 30 dias); `rclone copy` nunca borra.
@@ -71,6 +83,9 @@ Coste 0 EUR, solo lectura sobre Atlas:
 - Programacion: cron semanal (domingo 04:30 UTC), despues del backup del
   stack de las 04:17. Ejemplo:
   `30 4 * * 0 cd ~/GerarAI && ./scripts/mongo-backup.sh`.
+  En la VM de produccion corre a diario desde el 12-nov-2026 (restore
+  probado esa misma noche); la frescura la vigila
+  `scripts/ops/check-backup-freshness.sh`.
 - M0 no tiene backups gestionados: si el cron no corre, no hay segunda copia.
   Verifica el primer domingo que aparece un `backups/mongo-*.age` nuevo.
 
