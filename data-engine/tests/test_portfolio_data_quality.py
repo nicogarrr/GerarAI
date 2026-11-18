@@ -163,3 +163,22 @@ def test_scope_change_base_is_not_a_broken_link():
         result = portfolio_quality(db)
         assert result['twr_chain'] == {'status': 'linked', 'unlinked_snapshots': 0, 'first_unlinked_date': None}
         assert 'twr_chain_broken' not in result['reasons']
+
+
+def test_cash_native_sum_keeps_cents_exact():
+    """Dos filas de caja en la misma divisa (manual + importada) con centimos:
+    la suma en float devolvia ruido binario (100.10 + 200.20 ->
+    300.29999999999995) en un endpoint cuyo contrato es la veracidad del dato.
+    Importes sinteticos de sonda, no datos reales."""
+    engine = create_engine('sqlite:///:memory:')
+    Base.metadata.create_all(engine)
+    with Session(engine) as db:
+        tenant = Tenant(external_id='quality-cents', name='QC')
+        db.add(tenant); db.flush()
+        db.info['tenant_id'] = tenant.id
+        db.add(Portfolio(name='Main', base_currency='EUR', is_default=True))
+        db.flush()
+        db.add(CashBalance(currency='EUR', balance=Decimal('100.10'), as_of=date(2026, 11, 18), source='manual'))
+        db.add(CashBalance(currency='EUR', balance=Decimal('200.20'), as_of=date(2026, 11, 18), source='ibkr_flex'))
+        db.commit()
+        assert portfolio_quality(db)['cash_native'] == {'EUR': 300.30}

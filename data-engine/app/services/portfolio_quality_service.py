@@ -60,9 +60,13 @@ def portfolio_quality(db: Session) -> dict[str, Any]:
         "unlinked_snapshots": unlinked,
         "first_unlinked_date": first_unlinked_date,
     }
-    cash_native: dict[str, float] = {}
+    # La suma es dinero: se acumula en Decimal y se convierte a float UNA vez
+    # al final. Sumar floats por fila devolvía ruido binario (100.10 + 200.20
+    # -> 300.29999999999995) en un endpoint cuyo contrato es la veracidad.
+    cash_totals: dict[str, Decimal] = {}
     for row in cash:
-        cash_native[row.currency] = cash_native.get(row.currency, 0.0) + float(row.balance)
+        cash_totals[row.currency] = cash_totals.get(row.currency, Decimal("0")) + row.balance
+    cash_native = {currency: float(total) for currency, total in cash_totals.items()}
     from app.services.ibkr_cost_reconciliation import reconcile_ibkr_costs
 
     cost_checks = reconcile_ibkr_costs(db, positions)
