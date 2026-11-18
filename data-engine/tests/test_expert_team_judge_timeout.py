@@ -66,7 +66,7 @@ class _SlowJudge(_FakeProvider):
         task = dict(request.metadata).get("expert_team_task", "")
         if "judge" in task:
             self.tasks.append("judge:slow")
-            await asyncio.sleep(5)
+            await asyncio.Event().wait()  # nunca responde: solo el tope del juez lo corta
         response = await super().complete(request)
         if "judge" in task:
             return response
@@ -78,7 +78,12 @@ class _SlowJudge(_FakeProvider):
 
 
 def test_chat_slow_judge_keeps_the_team_answer(db, synthesis_calls, flag_on, monkeypatch):
-    monkeypatch.setattr(team_chat, "CHAT_TEAM_TIMEOUT_S", 2.0)
+    # Presupuestos fijados: los expertos tienen holgura enorme (una CPU cargada no
+    # los puede agotar) y el juez, que nunca responde, solo lo corta su tope corto.
+    # La formula de los presupuestos la cubre test_judge_budget_fits_inside_the_chat_cap.
+    monkeypatch.setattr(team_chat, "CHAT_TEAM_TIMEOUT_S", 120.0)
+    monkeypatch.setattr(team_chat, "team_budget_s", lambda timeout: 100.0)
+    monkeypatch.setattr(team_chat, "judge_budget_s", lambda timeout: 0.2)
     # Este contrato mide el timeout del juez, no el coste del motor financiero.
     # La herramienta real tiene sus propios tests; aquí se fija su evidencia
     # para que una CPU lenta con coverage no consuma el presupuesto del juez.

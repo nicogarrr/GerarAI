@@ -30,9 +30,11 @@ class Fake:
     name = "fake"
     supported_capabilities = frozenset({"text", "structured_output"})
     model_router = None
-    def __init__(self, value=None, delay=0):
+    def __init__(self, value=None, delay=0, gate=None):
         self.value = value or response()
         self.delay = delay
+        # gate: el test decide cuando termina (sin relojes de pared).
+        self.gate = gate
         self.calls = []
         self.cancelled = False
         self.started = asyncio.Event()
@@ -40,7 +42,10 @@ class Fake:
         self.calls.append(request)
         self.started.set()
         try:
-            await asyncio.sleep(self.delay)
+            if self.gate is not None:
+                await self.gate.wait()
+            else:
+                await asyncio.sleep(self.delay)
             if isinstance(self.value, Exception): raise self.value
             return self.value
         except asyncio.CancelledError:
@@ -158,9 +163,26 @@ async def test_real_adapter_envelope_is_opencode_free_with_go_session():
 
 @run_async
 async def test_slow_valid_primary_never_touches_a_failing_backup():
-    p, b = Fake(delay=.08), Fake(ProviderHTTPError("groq", 429))
-    out = await ChatFallbackProvider(p, b, total=.3, delay=.2).complete(LLMRequest([Message("user", "hola")], task="chat"))
+    # Primario lento pero valido: el test controla cuando responde (evento), con
+    # plazos enormes que nunca vencen. Antes: sleeps de 80/200/300 ms que un
+    # bucle cargado en CI reordenaba.
+    gate = asyncio.Event()
+    p, b = Fake(gate=gate), Fake(ProviderHTTPError("groq", 429))
+    task = asyncio.create_task(ChatFallbackProvider(p, b, total=60, delay=40).complete(LLMRequest([Message("user", "hola")], task="chat")))
+    await asyncio.wait_for(p.started.wait(), 5)
+    await asyncio.sleep(0)
+    assert not task.done() and not b.calls  # Go sigue pensando: el respaldo no arranca
+    gate.set()
+    out = await asyncio.wait_for(task, 5)
     assert out.provider == "opencode-go" and not b.calls
+
+
+@run_async
+async def test_primary_past_its_delay_hands_over_to_the_backup():
+    # Contraste del anterior: con el plazo de Go ya vencido (delay=0) el respaldo si responde.
+    p, b = Fake(gate=asyncio.Event()), Fake(response(model=GROQ_MODEL, provider="groq"))
+    out = await asyncio.wait_for(ChatFallbackProvider(p, b, total=60, delay=0).complete(LLMRequest([Message("user", "hola")], task="chat")), 5)
+    assert out.provider == "groq" and len(b.calls) == 1 and p.cancelled
 
 
 @run_async
