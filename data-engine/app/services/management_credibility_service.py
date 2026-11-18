@@ -87,13 +87,21 @@ class ManagementCredibilityService:
                 .order_by(CallClaim.id)
             ).all()
         )
+        # Resolve existing promises in bounded batches instead of one lookup
+        # per claim. Keep IN lists below database/driver parameter limits.
+        claim_ids = [claim.id for claim in claims]
+        existing_by_claim = {
+            row.call_claim_id: row
+            for offset in range(0, len(claim_ids), 500)
+            for row in db.scalars(
+                select(ManagementPromise).where(
+                    ManagementPromise.call_claim_id.in_(claim_ids[offset:offset + 500])
+                )
+            ).all()
+        }
         created = []
         for claim in claims:
-            existing = db.scalar(
-                select(ManagementPromise).where(
-                    ManagementPromise.call_claim_id == claim.id
-                )
-            )
+            existing = existing_by_claim.get(claim.id)
             if existing:
                 created.append(existing)
                 continue
@@ -120,10 +128,24 @@ class ManagementCredibilityService:
             )
             db.add(row)
             created.append(row)
+        # Capture ids before commit: sessions with expire_on_commit=True would
+        # otherwise reload each row just to read its id. Reload all rows once,
+        # preserving the refreshed/default-filled return contract and ordering.
+        db.flush()
+        created_ids = [row.id for row in created]
         db.commit()
-        for row in created:
-            db.refresh(row)
-        return created
+        if not created_ids:
+            return []
+        refreshed = {
+            row.id: row
+            for offset in range(0, len(created_ids), 500)
+            for row in db.scalars(
+                select(ManagementPromise)
+                .where(ManagementPromise.id.in_(created_ids[offset:offset + 500]))
+                .execution_options(populate_existing=True)
+            ).all()
+        }
+        return [refreshed[row_id] for row_id in created_ids]
 
     def reconcile(
         self, db: Session, company: Company
