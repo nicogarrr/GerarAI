@@ -705,7 +705,7 @@ export default async function WatchlistPage({
                                             <span className="block font-sans text-[11px] font-normal text-gray-500 xl:hidden">{t('watchlist.page.sort.price')}</span>
                                             {formatPriceCell(stock.price, stock.currency)}
                                             {stock.priceKind === 'close' ? (
-                                                <div className="text-[10px] font-normal text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</div>
+                                                <div className="text-xs font-normal text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</div>
                                             ) : null}
                                             <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
                                         </TableCell>

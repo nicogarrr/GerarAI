@@ -337,8 +337,8 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                           <span className="text-xs text-gray-500 md:hidden">{t('screener.colPrice')}</span>
                           <div className="text-right">
                             <span className="font-semibold text-gray-200">{screenerPrice(r.price, r.currency, locale)}</span>
-                            {!isValidCurrencyCode(r.currency) ? <div className="text-[10px] text-gray-500">{t('screener.currencyMissing')}</div> : null}
-                            <div className="text-[10px] text-gray-500">{r.priceDate ? t('screener.dailyData', { date: formatMarketDate(r.priceDate, undefined, undefined, locale) }) : quoteObserved(r.priceAsOf, r.priceTimestampKind, locale)}</div>
+                            {!isValidCurrencyCode(r.currency) ? <div className="text-xs text-gray-500">{t('screener.currencyMissing')}</div> : null}
+                            <div className="text-xs text-gray-500">{r.priceDate ? t('screener.dailyData', { date: formatMarketDate(r.priceDate, undefined, undefined, locale) }) : quoteObserved(r.priceAsOf, r.priceTimestampKind, locale)}</div>
                           </div>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
@@ -403,7 +403,7 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                       <div className="text-right">
                         <span className="font-semibold text-gray-100">{formatIndexValue(i)}{i.unit === 'index' ? ` ${t('screener.indexPoints')}` : ''}</span>
                       </div>
-                      <div className="text-right text-[10px] text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open', locale)}</div>
+                      <div className="text-right text-xs text-gray-500">{quoteObserved(i.priceAsOf, 'daily_candle_open', locale)}</div>
                     </div>
                   ))}
                   {validIndices.length === 0 && <p className="text-sm text-gray-500">{t('screener.noIndices')}</p>}

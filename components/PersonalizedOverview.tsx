@@ -793,7 +793,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
                                                 <>
                                                     <div className="text-white font-mono">{isValidCurrencyCode(stock.currency) ? formatPrice(stock.price, stock.currency) : formatNumber(stock.price)}</div>
                                                     {stock.priceKind === 'close' && (
-                                                        <div className="text-[10px] text-gray-500">{stock.priceAsOf ? t('home.watchlist.close', { date: formatMarketDate(stock.priceAsOf) }) : t('home.watchlist.closeNoDate')}</div>
+                                                        <div className="text-xs text-gray-500">{stock.priceAsOf ? t('home.watchlist.close', { date: formatMarketDate(stock.priceAsOf) }) : t('home.watchlist.closeNoDate')}</div>
                                                     )}
                                                     {stock.changePercent != null && (
                                                         <div className={`text-xs ${stock.changePercent >= 0 ? 'text-good' : 'text-bad'}`}>
@@ -804,7 +804,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
                                             ) : (
                                                 <>
                                                     <div className="font-mono text-gray-500" title={t('home.watchlist.noQuote')}>&mdash;</div>
-                                                    <div className="text-[10px] uppercase tracking-wide text-gray-500">{t('home.watchlist.noData')}</div>
+                                                    <div className="text-xs uppercase tracking-wide text-gray-500">{t('home.watchlist.noData')}</div>
                                                 </>
                                             )}
                                         </div>
