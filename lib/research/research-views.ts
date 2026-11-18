@@ -112,6 +112,17 @@ export function asView(value: string | undefined): View {
 }
 
 /**
+ * Los bloques de analistas/historial/DCA de la cabecera de la ficha solo se
+ * renderizan en Resumen y Finanzas: montados en TODAS las pestañas empujaban
+ * el contenido propio de cada una ~1588px hacia abajo en móvil (medido por
+ * Piloto en Tesis, 18-nov-2026). La identidad, la navegación y la cotización
+ * compacta sí quedan en todas.
+ */
+export function showAnalystBlocks(view: View): boolean {
+  return view === 'overview' || view === 'financials';
+}
+
+/**
  * Ancla de la sección pedida por una clave de módulo (`moat` -> `foso`).
  * Los módulos de entrada y las claves de pestaña/grupo no llevan ancla.
  */
