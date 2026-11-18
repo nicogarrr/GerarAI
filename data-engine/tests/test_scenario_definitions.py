@@ -143,9 +143,13 @@ def test_techo_margen_bull_respeta_base_alta():
     assert bull.assumptions["fcf_margin"] == pytest.approx(0.50)
 
 
-def test_wacc_bull_nunca_baja_del_crecimiento_terminal_mas_margen():
-    _, _, bull = mechanical_dcf_scenarios(0.10, 0.20, 0.03, 0.025, 0.0)
-    assert bull.assumptions["wacc"] == pytest.approx(0.035)
+def test_wacc_bull_nunca_sube_sobre_el_base_con_spread_estrecho():
+    # Antes: max(wacc - 1pp, g + 1pp) = max(0.02, 0.035) = 0.035 > base 0.03.
+    # El suelo del 1pp no puede subir el WACC del bull por encima del base:
+    # con spread 5pb eso hacia que el bull descontase mas y valiese menos.
+    _, base, bull = mechanical_dcf_scenarios(0.10, 0.20, 0.03, 0.025, 0.0)
+    assert bull.assumptions["wacc"] == pytest.approx(base.assumptions["wacc"])
+    assert bull.assumptions["wacc"] == pytest.approx(0.03)
     assert bull.assumptions["wacc"] > 0.025
 
 

@@ -176,7 +176,12 @@ def mechanical_dcf_scenarios(
             assumptions={
                 "revenue_growth": growth if burn else growth + growth_shift,
                 "fcf_margin": min(margin + margin_shift, max(0.45, margin)),
-                "wacc": wacc if burn else max(wacc - 0.01, terminal + 0.01),
+                # El suelo terminal + 1pp evita WACC <= g, pero con un spread
+                # base < 1pp sube el WACC por encima del base: el bull descontaba
+                # MAS y valia MENOS (evdcf16, spread 5pb). Nunca se sube sobre el
+                # base; el base ya es > terminal, asi que la perpetuidad sigue
+                # definida y el orden bear <= base <= bull se conserva.
+                "wacc": wacc if burn else min(wacc, max(wacc - 0.01, terminal + 0.01)),
                 "terminal_growth": terminal,
             },
             drivers=["mechanical_growth_up", "mechanical_margin_up", "mechanical_wacc_down", *own_drivers],
