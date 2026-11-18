@@ -46,6 +46,30 @@ def test_importar_main_no_carga_matplotlib():
     assert result.returncode == 0, result.stderr
 
 
+_DEPENDENCIAS_PESADAS = ("matplotlib", "qdrant_client", "llama_index")
+
+
+def test_importar_main_no_carga_dependencias_pesadas():
+    """El arranque del API no paga matplotlib (~1,7 s en frio), qdrant_client
+    (~0,5 s) ni llama_index (~0,5 s): cada uno entra en su primer uso real."""
+    checks = " and ".join(f"'{dep}' not in sys.modules" for dep in _DEPENDENCIAS_PESADAS)
+    code = f"import sys\nimport main\nraise SystemExit(0 if ({checks}) else 1)\n"
+    result = _run(code)
+    assert result.returncode == 0, result.stderr
+
+
+def test_importar_workers_no_carga_dependencias_pesadas():
+    """Los procesos dramatiq (9 en prod) tampoco las pagan al arrancar."""
+    checks = " and ".join(f"'{dep}' not in sys.modules" for dep in _DEPENDENCIAS_PESADAS)
+    code = (
+        "import sys\n"
+        "import app.workers.dramatiq_app\n"
+        f"raise SystemExit(0 if ({checks}) else 1)\n"
+    )
+    result = _run(code)
+    assert result.returncode == 0, result.stderr
+
+
 def test_primer_pdf_importa_matplotlib_y_genera_bytes():
     code = (
         "import sys\n"

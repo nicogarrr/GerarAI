@@ -1,11 +1,31 @@
+from __future__ import annotations
+
 import logging
 import threading
-
-from qdrant_client import QdrantClient
+from typing import TYPE_CHECKING
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets as _redact_core
 from app.llm.base import redact_secrets as _redact_llm
+
+if TYPE_CHECKING:
+    from qdrant_client import QdrantClient
+
+
+def __getattr__(name: str):
+    """Import perezoso de qdrant_client (~0,5 s medido en laboratorio).
+
+    El arranque del API lo pagaba en cadena (routes.chat -> chat_service ->
+    library_context -> rag) aunque la búsqueda semántica no entra en la
+    mayoría de peticiones; el primer uso real lo importa. Cachea en globals
+    para que patch("app.services.rag.QdrantClient") siga funcionando.
+    """
+    if name == "QdrantClient":
+        from qdrant_client import QdrantClient
+
+        globals()["QdrantClient"] = QdrantClient
+        return QdrantClient
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +49,8 @@ def get_qdrant_client(url: str) -> QdrantClient:
         return cached
     with _QDRANT_POOL_LOCK:
         if url not in _QDRANT_CLIENT_POOL:
-            _QDRANT_CLIENT_POOL[url] = QdrantClient(url=url)
+            client_type = globals().get("QdrantClient") or __getattr__("QdrantClient")
+            _QDRANT_CLIENT_POOL[url] = client_type(url=url)
         return _QDRANT_CLIENT_POOL[url]
 
 
