@@ -4,16 +4,75 @@ Todos los cambios relevantes de GerarAI. Formato inspirado en
 [Keep a Changelog](https://keepachangelog.com/es-ES/1.1.0/); versionado
 [SemVer](https://semver.org/lang/es/). Cada entrada enlaza a su PR.
 
-## Cambios sin publicar (0.6.0)
+## Cambios sin publicar (0.6.1)
+
+**0.6.1 NO está etiquetada ni desplegada.** Rango: desde `v0.6.0` (`60d7e8f1`,
+15-nov-2026) hasta `ffe814ca0` en `main` (18-nov-2026): 205 commits en primera
+línea (`git rev-list --count --first-parent v0.6.0..HEAD`) y 208 en el rango
+completo (`git log --oneline v0.6.0..HEAD | Measure-Object -Line` = 208). Por
+prefijo, sobre el rango completo: 103 `fix`, 42 `feat`, 25 `test`, 20 `perf` y el
+resto `chore`, merges y otros. Los títulos son los de cada commit o PR, tal cual;
+la lista completa está en `git log --oneline v0.6.0..HEAD`.
+
+### Lo más destacado
+
+- **Accesibilidad y móvil:** etiqueta «Precio» de watchlist a 12 px (#5901),
+  texto DCA legible a 12 px (#5915), texto informativo legible a 12 px (#5917),
+  zona táctil de enlaces en RecordViews (#5919), chips de exposición y zona
+  táctil SEDI (#5921) y pila P16 y resumen sin recorte a 320 px (#5922).
+- **Form 144 (1/4-4/4):** migración `0137` y entidades (#5905), conector SEC XML
+  (#5908), monitor y feed de venta propuesta (#5909) y actor y scheduler,
+  con reintento de CI (#5911).
+- **CNMV:** NOD, operaciones de directivos en España (#5902) y PS-ES,
+  participaciones significativas (#5904).
+- **Resultados e IR:** IR6/7 con Netflix oficial y WOSG H1 FY27 (#5906).
+- **Reindex de la biblioteca de conocimiento** (#5903).
+- **Rendimiento e índices:** índice concurrente tenant/company para facts,
+  migración `0138` (#5913) y gráficos de P14 al entrar en viewport (#5907).
+- **Multidivisa:** reconstrucción de carteras consistente (#5900).
+- **Terminal:** proyección documental, con repetición de CI con workflow nuevo
+  (#5898).
+- **Resto del rango:** el desglose completo (103 `fix`, 42 `feat`, 25 `test` y
+  20 `perf`) incluye cambios en research, chat, cartera, fuentes, cerebro,
+  watchlist, tesis y workers; no se detallan aquí para no inventar resúmenes no
+  verificados.
+
+### Notas de actualización
+
+- **Migraciones en el rango:** `0137` (Form 144) y `0138` (índice concurrente).
+  Con `0138` la cabeza Alembic actual en `main` queda en 35 migraciones nuevas
+  desde `v0.5.0` (de `0104` a `0138`; la etiqueta v0.5.0 iba por `0103`), frente
+  a las 32 (`0104`..`0135`) del tag v0.6.0. Su estado en producción no se
+  verifica en este documento: re-comprobar en cada despliegue con backup previo
+  y `alembic upgrade head`.
+- **Sin despliegue asociado:** al no existir etiqueta ni despliegue de 0.6.1,
+  nada de lo listado aquí se presenta como desplegado.
+
+## [0.6.0] - 2026-11-15
 
 Desde la etiqueta `v0.5.0` (`fbfeeea2`, 30-oct-2026) hasta `ac20676d` en `main`
 (14-nov-2026): 2.245 merges en primera línea de `main` (2.212 PRs + 33 commits
 directos). Los títulos son los de cada PR o commit, tal cual; la lista completa
 está verificada contra `git log --first-parent fbfeeea2..ac20676d`. El corte de
-la 0.6.0 se congela en este SHA; lo que se mergee después irá a la 0.6.1.
+la 0.6.0 se congeló en este SHA; lo que se mergeó después se recoge en la 0.6.1.
 
-**Estado de despliegue (nada de lo mergeado se vende como desplegado):** todo
-lo listado está en `main`; la 0.6.0 se anuncia solo tras el despliegue con
+**Etiqueta y verificación acotada:** etiqueta anotada `v0.6.0` sobre `60d7e8f1`
+(15-nov-2026). Según el mensaje del tag, el corte se preparó en #5441 (merge
+`102e8d5a`), el changelog quedó verificado PR a PR y el versionado coherente en
+todo el repo; el etiquetado se hizo sobre el SHA desplegado en producción, con
+`worker-kpis` presente y healthy en `deploy-effective.json`, Alembic en `0135`
+tras `upgrade head` y smoke acotado verde con cuenta de auditoría. **Límites
+conocidos:** sin smoke con la cuenta del propietario; primera carga en frío con
+timeouts recuperados; validación acotada, no exhaustiva.
+
+**Estado de despliegue reportado en su momento (14-nov-2026):** el párrafo
+siguiente conserva el estado operativo reportado antes del etiquetado; se mantiene
+como verdad histórica. Para el estado verificado al etiquetar, véase el párrafo
+anterior.
+
+**Estado de despliegue (reportado en su momento, 14-nov-2026; el tag recoge el
+estado verificado el 15-nov):** todo lo listado está en `main`; la 0.6.0 se
+anuncia solo tras el despliegue con
 gates (suite VM verde, backup restaurado, smoke post-deploy). Último estado
 operativo **reportado**, no verificado por esta PR (14-nov-2026; re-verificar en
 el entorno en el despliegue): producción corría `b19d5822` (despliegue del
@@ -61,11 +120,53 @@ de GitHub el 14-nov 10:53 CET).
   en búsqueda, cabeceras de seguridad, tabla de auditoría inmutable, FK en
   cascada, rate limit por IP real tras proxy (lotes VAL-SEC/DB).
 
+### Lo más destacado del cierre (`ac20676d..v0.6.0`, 59 commits)
+
+El corte se congeló en `ac20676d`, pero el tag se etiquetó 59 commits después.
+Estos cambios no figuraban en la sección anterior y quedan recogidos aquí; los
+títulos son los de cada commit o PR, tal cual:
+
+- **Corte de release:** #5441 prepara 0.6.0 con changelog verificado PR a PR,
+  versionado coherente y checklist actualizado (`102e8d5a`).
+- **Smoke y workers:** #5626 distingue la disponibilidad desactivada del chat de
+  las acciones de generación; #5628 mantiene el clasificador compartido dentro
+  del contexto de build de Docker; #5652-#5658 y #5660 cubren los workers de
+  KPIs, DCA, propicks y documentos; #5651, #5656 y #5657 corrigen fallos de
+  sesión estructurada en actores de ingestión.
+- **Arranque y navegación:** #5627 sirve la captura previa a la hidratación desde
+  el layout raíz; #5629 no bloquea la primera visita de temas y precalienta en
+  segundo plano; #5630 y #5635 mantienen la restauración de scroll con el
+  documento todavía creciendo, continuado en #5670.
+- **Accesibilidad:** #5641 y #5647 amplían objetivos táctiles de summaries sin
+  perder el marcador nativo y con guarda sin excepción; #5675 añade roles ARIA
+  explícitos en la tabla compartida.
+- **Rendimiento con una sola tabla responsiva:** #5653 (watchlist), #5663,
+  #5665 y #5667 (insider/feed) y #5672 (noticias) eliminan el árbol duplicado
+  móvil/escritorio; #5649, #5662 y #5677 reducen lecturas ORM y añaden benches
+  aislados; #5632 actualiza datos de mercado en frío en temas.
+- **Insiders y propiedad:** #5644, #5673 y #5679 excluyen presentaciones no
+  publicadas de resúmenes, actividad y alertas; #5666 conserva importes PDMR
+  desconocidos y #5674 evita afirmar flujos netos con importes dudosos.
+- **Datos y validación:** #5645 excluye barras diarias futuras en el agregado
+  DCA; #5661, #5664 y #5668 validan series FRED, fechas reales no futuras y
+  entradas WACC no finitas; #5676 cuenta los misses extremos de ingresos con
+  avisos; #5648 preserva un cero explícito en la brecha de valoración SOTP.
+- **Internacionalización y valoración:** #5640 y #5650 cubren huecos del
+  traductor en ficha y tesis; #5646 avisa cuando un fallback opcional traga una
+  excepción sin cambiar valores.
+- **Verificación y CI:** #5634 publica el informe de bundle por ruta, #5669
+  separa guardas deterministas de benchmarks de tiempo de pared, #5678 añade un
+  benchmark manual con artefactos y #5680-#5685 estabilizan reloj, orden de
+  fallback, latencia en frío y el orden de slots de expertos sin umbral de reloj
+  (#5685, SHA del tag).
+
 ### Notas de actualización
 
-- **Migraciones:** 35 nuevas desde `v0.5.0`, de `0104` a `0138` (cabeza única
-  verificada; la etiqueta v0.5.0 iba por `0103`). Antes de desplegar: backup de
-  Postgres y `alembic upgrade head` probado sobre una copia restaurada.
+- **Migraciones:** 32 nuevas desde `v0.5.0`, de `0104` a `0135` (cabeza única
+  verificada en el tag; la etiqueta v0.5.0 iba por `0103`). A 18-nov-2026 la
+  cabeza en `main` es `0138` (35 migraciones); véase la sección 0.6.1. Antes de
+  desplegar: backup de Postgres y
+  `alembic upgrade head` probado sobre una copia restaurada.
 - **Variables de entorno nuevas** (ver `.env.production.example`):
   `GARAGE_RPC_SECRET`, `GARAGE_ACCESS_KEY`, `GARAGE_SECRET_KEY`
   (almacenamiento; `OBJECT_STORAGE_*` queda como alias), `COMPANIES_HOUSE_API_KEY`,
@@ -4222,5 +4323,6 @@ Los títulos son los de cada PR, tal cual.
 
 Primera referencia histórica; su numeración y etiqueta se retiraron el 30-oct-2026. La referencia vigente es v0.5.0 sobre el commit de producción fbfeeea2.
 
-[Unreleased]: https://github.com/nicogarrr/GerarAI/compare/fbfeeea2df394af5f536992b27966e8c0ead3e54...main
+[Unreleased]: https://github.com/nicogarrr/GerarAI/compare/60d7e8f1f67be9487525e0687b38eecb773a5504...main
+[0.6.0]: https://github.com/nicogarrr/GerarAI/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nicogarrr/GerarAI/releases/tag/v0.5.0

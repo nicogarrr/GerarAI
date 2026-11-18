@@ -1,19 +1,36 @@
 # Checklist de revisión y despliegue
 
-La versión en preparación es **0.6.0** (corte congelado en `ac20676d`; lo
-posterior va a la 0.6.1). La última etiqueta es **v0.5.0**
-(`fbfeeea2df394af5f536992b27966e8c0ead3e54`, 30-oct-2026). Último estado
-reportado (14-nov-2026, sin verificar en el entorno por este documento):
-producción corría `b19d5822` (desplegado el 12-nov-2026).
+La versión en preparación es **0.6.1**, sobre `main` = `ffe814ca0`
+(18-nov-2026). La última etiqueta es **v0.6.0**
+(`60d7e8f1f67be9487525e0687b38eecb773a5504`, 15-nov-2026). 0.6.1 **no está
+etiquetada ni desplegada**: nada de lo que se mergeó después del tag se presenta
+aquí como desplegado.
+
+El tag `v0.6.0` se validó de forma **acotada**, según el mensaje del propio tag:
+el corte se preparó en #5441 (merge `102e8d5a`), se etiquetó sobre el SHA
+desplegado en producción y se verificaron `worker-kpis` presente y healthy en
+`deploy-effective.json`, Alembic en `0135` tras `upgrade head` y un smoke acotado
+verde con cuenta de auditoría. **Límites conocidos del tag:** sin smoke con la
+cuenta del propietario; primera carga en frío con timeouts recuperados;
+validación acotada, no exhaustiva.
 
 El inventario de abajo conserva su fecha histórica y no demuestra el estado actual.
-Cada nuevo despliegue requiere revisar CI, auditoría, backups y el entorno real.
+Los estados con fecha 14-nov-2026 o anterior son históricos: aunque se hayan
+cumplido en el tag, no acreditan el estado de 0.6.1 y deben re-verificarse en
+cada despliegue. Cada nuevo despliegue requiere revisar CI, auditoría, backups y
+el entorno real.
 
 Estado al escribirlo: 27-oct-2026, cabeza Alembic `0082`.
 Actualizado 18-nov-2026: cabeza Alembic `0138` (35 migraciones nuevas desde la
 etiqueta v0.5.0, que iba por `0103`). Último estado verificado: CI en verde en
 main (14/14 jobs superados); el `deploy-effective.json` de producción debe
 incluir `worker-kpis` con su healthcheck activo (gate en sección 3).
+Histórico: en el tag v0.6.0 (15-nov-2026, `60d7e8f1`) la cabeza Alembic era
+`0135` (32 migraciones nuevas) y su mensaje registra `worker-kpis` presente y
+healthy. Estado reportado el 13-nov-2026 (ya superado por el tag): el
+`deploy-effective.json` de producción omitía `worker-kpis` (15 servicios sin él)
+aunque `docker-compose.prod.yml` lo define; en la sección 3 queda como verificado
+en el despliegue del tag, a re-verificar en cada deploy.
 
 **Recuento a 27-oct-2026 18:50 (CET), `main` = `239e68de`** (incluye #2476):
 
@@ -53,6 +70,10 @@ scanning* + *Push protection* en GitHub.
 - [ ] Sin tests intermitentes conocidos. El último visto en `main` (plazo total del
       chat, run de `c78fcec3`) se arregla en #2319.
 - [ ] Ninguna PR abierta de la cola queda en rojo por un fallo que también esté en `main`.
+
+Nota: las casillas de esta sección quedan sin marcar. El estado real de los
+checks en `ffe814ca0` no se ha comprobado en esta revisión: pendiente de verificar
+con `gh run list / gh pr checks`.
 
 Comprobación rápida:
 
@@ -105,10 +126,13 @@ Tras desplegar (a mano, 10 minutos, con tu usuario):
       «La respuesta tardó demasiado…» si el proveedor no responde, nunca un error.
 - [ ] Alertas: crear una de precio y ver que se evalúa; Telegram/correo si están configurados.
 - [ ] Biblioteca: subir un PDF pequeño y verlo indexado.
-- [ ] **`worker-kpis` desplegado y healthy**: el deploy efectivo incluye el servicio
-      (1 hilo, prefetch 1, 1 GiB, 0.40 CPU, healthcheck `kpi_consumer_health`) y la cola
-      drena: `LLEN kpis` bajando tras el arranque. Si falta en el `deploy-effective.json`,
-      el despliegue no cierra la 0.6.0.
+- **Estado en el tag v0.6.0: `worker-kpis` desplegado y healthy**. Verificado en el
+      despliegue del tag según el mensaje de `v0.6.0`; **re-verificar en cada deploy**.
+      Ya no es un gate de cierre pendiente para 0.6.0. El deploy efectivo del tag incluía
+      el servicio (1 hilo, prefetch 1, 1 GiB, 0.40 CPU, healthcheck
+      `kpi_consumer_health`) y la cola drenaba: `LLEN kpis` bajando tras el arranque.
+      Histórico: el 13-nov el `deploy-effective.json` lo omitía (15 servicios sin él);
+      en 0.6.1 se comprueba de nuevo en cada despliegue.
       **Orden de arranque**: antes de activar `worker-kpis` debe estar mergeada #5570
       («402 como diferimiento»; mergeada el 13-nov): con la cuota de Go agotada, el backlog
       de ~500 KPIs quemaría sus 5 intentos si el worker arranca sin ella. Relacionadas
