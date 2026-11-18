@@ -351,29 +351,52 @@ def test_ignored_pins_valid_exit_codes_pass(tmp_path):
     assert rc == 0
 
 
-def test_ignored_pins_expire_and_warn_with_date(tmp_path, capsys):
+def test_ignored_pins_clock_phases(tmp_path, capsys):
+    """Reloj inyectable: antes del aviso, en ventana de aviso, tras caducidad."""
     from datetime import date
 
-    pins = {"anyio": "4.12.1", "pillow": "12.3.0"}
-    # Dentro de plazo: verde y aviso datado en stderr.
-    rc, _, _ = exercise(
-        tmp_path, [result(1, VULNS_QA)], _ignored_pins=pins,
-        _today=lambda: date(2026, 12, 18),
-    )
-    assert rc == 0
+    pins = dict(gate.QA_AGENTS_IGNORED_PINS)
+
+    def run(day):
+        return exercise(
+            tmp_path, [result(1, VULNS_QA)], _ignored_pins=pins,
+            _today=lambda: day,
+        )[0]
+
+    # Antes de la ventana de aviso: verde y sin AVISO.
+    assert run(date(2026, 11, 18)) == 0
+    assert "AVISO" not in capsys.readouterr().err
+    assert run(date(2026, 12, 3)) == 0
+    assert "AVISO" not in capsys.readouterr().err
+    # Ventana de aviso (14 dias antes): verde, AVISO datado en stderr.
+    assert run(date(2026, 12, 4)) == 0
     err = capsys.readouterr().err
-    assert "caducan 2026-12-18" in err
-    # En la fecha limite aun vale; al dia siguiente, rojo aunque el informe
-    # y las excepciones sean exactamente los mismos.
-    rc, _, _ = exercise(
-        tmp_path, [result(1, VULNS_QA)], _ignored_pins=pins,
-        _today=lambda: date(2026, 12, 19),
-    )
+    assert "AVISO" in err and "2026-12-18" in err
+    assert run(date(2026, 12, 18)) == 0
+    assert "AVISO" in capsys.readouterr().err
+    # Tras la fecha: rojo, y el mensaje dice alta, las 4 entradas y que hacer.
+    assert run(date(2026, 12, 19)) == 1
+    err = capsys.readouterr().err
+    assert "alta 2026-11-18" in err
+    for name in ("anyio", "mcp", "pillow", "pypdf"):
+        assert name in err
+    assert "browser-use" in err
+
+
+def test_expiry_never_touches_the_strict_audit(tmp_path):
+    # Sin _ignored_pins el reloj no existe: la auditoria estricta de
+    # data-engine da el mismo veredicto antes y despues de la fecha.
+    from datetime import date
+
+    future = lambda: date(2027, 6, 1)  # noqa: E731
+    rc, _, _ = exercise(tmp_path, [result(0, CLEAN)], _today=future)
+    assert rc == 0
+    rc, _, _ = exercise(tmp_path, [result(1, VULNERABLE)], _today=future)
     assert rc == 1
-    assert "CADUCADAS el 2026-12-18" in capsys.readouterr().err
 
 
 def test_ignored_pins_review_date_is_real_and_future_of_registration():
     from datetime import date
 
-    assert gate.QA_AGENTS_IGNORED_PINS_REVIEW >= date(2026, 11, 18)
+    assert gate.QA_AGENTS_IGNORED_PINS_SINCE == date(2026, 11, 18)
+    assert gate.QA_AGENTS_IGNORED_PINS_REVIEW >= gate.QA_AGENTS_IGNORED_PINS_SINCE

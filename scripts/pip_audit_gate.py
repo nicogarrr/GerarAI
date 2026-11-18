@@ -245,16 +245,35 @@ def run_audit(
         # pip-audit exit codes: 0 limpio, 1 con advisories, 2 error (crash,
         # resolucion rota, CLI mal usada). Un JSON completo NO prueba exito:
         # solo 0 o 1 son evidencia; un 2 con JSON "clean" sigue en rojo.
+        # La caducidad solo vive en esta rama (_ignored_pins): la auditoria
+        # estricta de data-engine nunca caduca.
         if _ignored_pins and report == "clean" and result.returncode in (0, 1):
-            if _today() > QA_AGENTS_IGNORED_PINS_REVIEW:
+            today = _today()
+            if today > QA_AGENTS_IGNORED_PINS_REVIEW:
+                entries = ", ".join(
+                    f"{name}=={version}"
+                    for name, version in sorted(_ignored_pins.items())
+                )
                 print(
-                    "pip-audit: excepciones temporales CADUCADAS el "
-                    f"{QA_AGENTS_IGNORED_PINS_REVIEW.isoformat()} (alta 18-nov-2026): "
-                    "revisar los pins de browser-use o renovar cada entrada con "
-                    "motivo y fecha nueva; mientras, el gate no perdona",
+                    "pip-audit: excepciones temporales de qa-agents CADUCADAS "
+                    f"(alta {QA_AGENTS_IGNORED_PINS_SINCE.isoformat()}, "
+                    f"limite {QA_AGENTS_IGNORED_PINS_REVIEW.isoformat()}). "
+                    f"Entradas vigentes: {entries}. Que hacer: mirar si "
+                    "browser-use ya solto estos pins (subirlo y retirar las "
+                    "entradas) o renovar cada una con motivo y fecha nueva; "
+                    "mientras, el gate no perdona",
                     file=sys.stderr,
                 )
                 return 1
+            remaining = (QA_AGENTS_IGNORED_PINS_REVIEW - today).days
+            if remaining <= _QA_AGENTS_WARN_DAYS:
+                print(
+                    "pip-audit: AVISO: las excepciones temporales de qa-agents "
+                    f"caducan en {remaining} dias "
+                    f"({QA_AGENTS_IGNORED_PINS_REVIEW.isoformat()}); revisar "
+                    "los pins de browser-use antes de esa fecha",
+                    file=sys.stderr,
+                )
             waived = [
                 f"{dep['name']}=={dep['version']}"
                 for dep in json.loads(result.stdout)["dependencies"]
@@ -310,10 +329,13 @@ def run_audit(
 # version exacta): si la resolucion trae OTRA version con advisories, o
 # cualquier otro paquete, el gate sigue en rojo. Retirar cada entrada al
 # subir browser-use; revisar en cada release de browser-use.
-# Fecha limite de las excepciones: pasada, el gate vuelve a rojo aunque los
+# Alta y fecha limite de las excepciones: 14 dias antes del limite el gate
+# avisa en stderr sin fallar; pasado el limite vuelve a rojo aunque los
 # advisories sigan siendo los fijados. Renovar solo tras revisar el estado de
 # los pins de browser-use y anotar motivo y fecha nueva.
+QA_AGENTS_IGNORED_PINS_SINCE = date(2026, 11, 18)
 QA_AGENTS_IGNORED_PINS_REVIEW = date(2026, 12, 18)
+_QA_AGENTS_WARN_DAYS = 14
 
 QA_AGENTS_IGNORED_PINS = {
     "anyio": "4.12.1",  # PYSEC-2026-4025, PYSEC-2026-4024 (fix 4.14.2)
