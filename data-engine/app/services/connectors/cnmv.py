@@ -22,6 +22,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from app.services.connectors.cnmv_pacer import cnmv_pacer, respect_retry_after
 from app.services.data_source_health import get_data_source_registry
 
 _REGISTRY_KEY = "cnmv"
@@ -31,8 +32,6 @@ OIR_RESULTS_URL = "https://www.cnmv.es/portal/otra-informacion-relevante/resulta
 ENTITY_PAGE_URL = "https://www.cnmv.es/portal/consultas/datosentidad.aspx"
 MADRID = ZoneInfo("Europe/Madrid")
 _USER_AGENT = "GerarAI/1.0 (research; contact: single-user app)"
-_MIN_INTERVAL_S = 1.0
-_last_request_at = 0.0
 
 _REG_N = re.compile(r"Número de registro:\s*(\d+)")
 _NIF_RE = re.compile(r"nif=([A-Z0-9-]+)", re.IGNORECASE)
@@ -41,14 +40,6 @@ _MAX_DAYS = 30
 
 class CNMVParseError(RuntimeError):
     """The CNMV page structure drifted; caller must degrade honestly."""
-
-
-def _throttle() -> None:
-    global _last_request_at
-    wait = _MIN_INTERVAL_S - (time.monotonic() - _last_request_at)
-    if wait > 0:
-        time.sleep(wait)
-    _last_request_at = time.monotonic()
 
 
 def parse_oir_results(page_html: str) -> list[dict]:
@@ -123,7 +114,10 @@ async def fetch_oir_filings(*, days: int = 1, client: httpx.AsyncClient | None =
     """
     if not 1 <= days <= _MAX_DAYS:
         raise ValueError(f"days must be 1..{_MAX_DAYS}")
-    _throttle()
+    # await (no wait_sync): un Retry-After compartido con NOD/PS puede ser de
+    # hasta 3600 s y NO debe bloquear el event loop (auditoria v4, repro con
+    # latido asyncio).
+    await cnmv_pacer.wait()
     owns_client = client is None
     client = client or httpx.AsyncClient(
         timeout=30, headers={"User-Agent": _USER_AGENT}, follow_redirects=True
@@ -132,6 +126,7 @@ async def fetch_oir_filings(*, days: int = 1, client: httpx.AsyncClient | None =
     started = time.perf_counter()
     try:
         response = await client.get(OIR_RESULTS_URL, params={"dias": days, "lang": "es"})
+        respect_retry_after(response)
         response.raise_for_status()
         filings = parse_oir_results(response.text)
     except httpx.HTTPStatusError as exc:
