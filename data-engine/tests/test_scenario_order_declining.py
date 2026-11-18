@@ -40,6 +40,46 @@ def test_bear_de_empresa_en_caida_no_supera_al_base_valores_a_mano():
     assert _value(bear.assumptions) == pytest.approx(22.316831019, rel=1e-9)
 
 
+def test_spread_wacc_terminal_de_5pb_no_invierte_el_orden():
+    """Caso evdcf16 del dataset congelado, calculado a mano con la misma formula.
+
+    Antes del arreglo el bull usaba max(0.035 - 0.01, 0.03 + 0.01) = 0.04,
+    un WACC MAS ALTO que el 0.035 del base: con el valor terminal dividido
+    por (wacc - g), el bull valia 386,1491 < 388,8115 del base. El suelo
+    g + 1pp solo protege la perpetuidad; nunca debe subir el WACC del bull
+    por encima del base.
+    """
+    bear, base, bull = mechanical_dcf_scenarios(0.08, 0.15, 0.035, 0.03, 0.9)
+
+    def value(assumptions):
+        return run_dcf(
+            DCFInputs(
+                2000.0,
+                assumptions["revenue_growth"],
+                assumptions["fcf_margin"],
+                assumptions["wacc"],
+                assumptions["terminal_growth"],
+                400.0,
+                200.0,
+            )
+        ).value_per_share
+
+    assert bull.assumptions["wacc"] == pytest.approx(base.assumptions["wacc"])
+    assert bull.assumptions["wacc"] > base.assumptions["terminal_growth"]
+    assert value(bear.assumptions) == pytest.approx(30.2144378685, rel=1e-9)
+    assert value(base.assumptions) == pytest.approx(388.811510822, rel=1e-9)
+    assert value(bull.assumptions) == pytest.approx(777.9985772102, rel=1e-9)
+    assert value(bear.assumptions) <= value(base.assumptions) <= value(bull.assumptions)
+
+
+@pytest.mark.parametrize("spread", [0.001, 0.005, 0.009, 0.010, 0.015, 0.085])
+def test_wacc_bull_dentro_de_la_banda_para_cualquier_spread(spread):
+    """El bull nunca desconta mas que el base ni cae sobre el terminal."""
+    terminal = 0.03
+    _, base, bull = mechanical_dcf_scenarios(0.08, 0.15, terminal + spread, terminal, 0.9)
+    assert terminal < bull.assumptions["wacc"] <= base.assumptions["wacc"]
+
+
 _GRID = list(
     itertools.product(
         [-0.15, -0.10, -0.06, -0.02, 0.05, 0.30], [0.05, 0.20, 0.50], [0.07, 0.10, 0.14], [0.0, 0.025]
