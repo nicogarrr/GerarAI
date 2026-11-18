@@ -107,7 +107,7 @@ describe('initial HTML clicks before React hydration', () => {
         markBrainReady(true);
         const listener = vi.fn();
         window.addEventListener('gerarai:open-brain', listener);
-        render(<LibraryChat scope="library" authors={['Buffett']} />);
+        render(<LibraryChat scope="library" authors={['Buffett']} label="Preguntar a la biblioteca" />);
         const button = screen.getByRole('button', { name: 'Preguntar a la biblioteca' });
         fireEvent.click(button);
         expect(listener).toHaveBeenCalledOnce();
