@@ -111,6 +111,11 @@
     "decision": "3. Decisión.",
     "decisionText": "Registra la decisión en el Diario de decisiones (Comprar / Mantener / Reducir / Vender / Vigilar / Evitar) con la evidencia que la justifica y las condiciones verificables («Qué debe cumplirse»). Más adelante, «Expectativa vs realidad» compara tu previsión con los hechos publicados."
   },
+  "firstSteps": {
+    "evidenceTitle": "4. Evidencia.",
+    "evidenceText": "Abre la Biblioteca y su pestaña «Subir» para aportar documentos: sin evidencia, la tesis puede salir con datos insuficientes y subir documentos mejora la trazabilidad.",
+    "evidenceLink": "Ir a la Biblioteca"
+  },
   "glossary": {
     "text": "Los términos técnicos (DCF, WACC, reverse DCF, moat, margen de seguridad, look-ahead, owner earnings, TAM/SAM/SOM, ROIC, VaR, drawdown, Sharpe) llevan un tooltip con su definición dondequiera que aparecen. Los motores de valoración con sus supuestos, las fuentes de datos (Finnhub, Yahoo Finance, SEC EDGAR), los límites y los costes están documentados en"
   }

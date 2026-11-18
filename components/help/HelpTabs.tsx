@@ -142,6 +142,11 @@ export default function HelpTabs() {
                 <Link href="/export" className="text-teal-400 underline underline-offset-4 hover:text-teal-300">/export</Link>{' '}{t('help.steps.exportText')}</li>
                 <li><strong className="text-teal-400">{t('help.steps.valuation')}</strong>{' '}{t('help.steps.valuationText')}</li>
                 <li><strong className="text-teal-400">{t('help.steps.decision')}</strong>{' '}{t('help.steps.decisionText')}</li>
+                <li>
+                  <strong className="text-teal-400">{t('help.firstSteps.evidenceTitle')}</strong>{' '}
+                  {t('help.firstSteps.evidenceText')}{' '}
+                  <Link href="/knowledge?tab=subir" className="text-teal-400 underline underline-offset-4 hover:text-teal-300">{t('help.firstSteps.evidenceLink')}</Link>
+                </li>
               </ol>
             </section>
 

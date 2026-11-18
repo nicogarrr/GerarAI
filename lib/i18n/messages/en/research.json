@@ -1484,7 +1484,9 @@
     "queued": "Queued",
     "generated": "Thesis v{version} generated",
     "view": "View thesis v{version}",
-    "failed": "The generation failed{errorClass}. You can retry."
+    "failed": "The generation failed{errorClass}. You can retry.",
+    "addEvidence": "Add evidence",
+    "evidenceHint": "Without supporting documents, the thesis may come back with insufficient data. Uploading documents improves traceability."
   },
   "companyMenu": {
     "moreActions": "More actions",

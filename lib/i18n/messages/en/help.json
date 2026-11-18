@@ -111,6 +111,11 @@
     "decision": "3. Decision.",
     "decisionText": "Record the decision in the Decision journal (Buy / Hold / Trim / Sell / Watch / Avoid) with the evidence behind it and the verifiable conditions («What must be true»). Later, «Expectations vs reality» compares your forecast with the published facts."
   },
+  "firstSteps": {
+    "evidenceTitle": "4. Evidence.",
+    "evidenceText": "Open the Library and its «Upload» tab to add documents: without evidence, the thesis may come back with insufficient data and uploading documents improves traceability.",
+    "evidenceLink": "Go to the Library"
+  },
   "glossary": {
     "text": "Technical terms (DCF, WACC, reverse DCF, moat, margin of safety, look-ahead, owner earnings, TAM/SAM/SOM, ROIC, VaR, drawdown, Sharpe) carry a tooltip with their definition wherever they appear. The valuation engines with their assumptions, the data sources (Finnhub, Yahoo Finance, SEC EDGAR), the limits and the costs are documented in"
   }
