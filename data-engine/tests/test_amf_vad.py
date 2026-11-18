@@ -31,7 +31,7 @@ FIXTURE = (Path(__file__).parent / "fixtures" / "amf" / "vad_2026-11.csv").read_
 
 _API_JSON = (
     '{"resources": [{"title": "ventes-a-decouvert", "format": "csv",'
-    ' "url": "https://amf.s3.example/VAD/export_test.csv"}]}'
+    ' "url": "https://amf.s3.sbg.io.cloud.ovh.net/VAD/export_test.csv"}]}'
 )
 
 
@@ -42,6 +42,17 @@ def _clean_cache():
     amf_vad.reset_cache()
 
 
+def _fetch_of(client: httpx.Client):
+    """Fetcher inyectable con la forma de public_fetch: texto o HTTPStatusError."""
+
+    def fetch(url: str) -> str:
+        response = client.get(url)
+        response.raise_for_status()
+        return response.text
+
+    return fetch
+
+
 # ---- resolución del recurso vía API data.gouv (fail-closed) ----
 
 
@@ -50,7 +61,7 @@ def test_resolve_resource_url_ok(monkeypatch):
     client = httpx.Client(
         transport=httpx.MockTransport(lambda req: httpx.Response(200, text=_API_JSON))
     )
-    assert amf_vad.resolve_resource_url(client) == "https://amf.s3.example/VAD/export_test.csv"
+    assert amf_vad.resolve_resource_url(_fetch_of(client)) == "https://amf.s3.sbg.io.cloud.ovh.net/VAD/export_test.csv"
 
 
 def test_resolve_api_schema_drift_raises(monkeypatch):
@@ -59,7 +70,7 @@ def test_resolve_api_schema_drift_raises(monkeypatch):
         transport=httpx.MockTransport(lambda req: httpx.Response(200, text="<html>portal</html>"))
     )
     with pytest.raises(amf_vad.AMFVADParseError, match="JSON de dataset"):
-        amf_vad.resolve_resource_url(client)
+        amf_vad.resolve_resource_url(_fetch_of(client))
 
 
 def test_resolve_two_csv_resources_raises(monkeypatch):
@@ -72,7 +83,7 @@ def test_resolve_two_csv_resources_raises(monkeypatch):
         transport=httpx.MockTransport(lambda req: httpx.Response(200, text=payload))
     )
     with pytest.raises(amf_vad.AMFVADParseError, match="recursos CSV"):
-        amf_vad.resolve_resource_url(client)
+        amf_vad.resolve_resource_url(_fetch_of(client))
 
 
 def test_resolve_resource_without_url_raises(monkeypatch):
@@ -82,7 +93,7 @@ def test_resolve_resource_without_url_raises(monkeypatch):
         transport=httpx.MockTransport(lambda req: httpx.Response(200, text=payload))
     )
     with pytest.raises(amf_vad.AMFVADParseError, match="recursos CSV"):
-        amf_vad.resolve_resource_url(client)
+        amf_vad.resolve_resource_url(_fetch_of(client))
 
 
 def test_resolve_http_error_raises(monkeypatch):
@@ -94,7 +105,7 @@ def test_resolve_http_error_raises(monkeypatch):
         )
     )
     with pytest.raises(httpx.HTTPStatusError):
-        amf_vad.resolve_resource_url(client)
+        amf_vad.resolve_resource_url(_fetch_of(client))
 
 
 # ---- parser fail-closed ----
@@ -261,28 +272,71 @@ def test_fetch_current_full_flow_and_cache(monkeypatch):
         return original_get(url, **kw)
 
     monkeypatch.setattr(client, "get", counting_get)
-    first = amf_vad.fetch_current(client=client)
-    second = amf_vad.fetch_current(client=client)
+    first = amf_vad.fetch_current(fetch=_fetch_of(client))
+    second = amf_vad.fetch_current(fetch=_fetch_of(client))
     assert len(calls) == 2  # API + CSV; la segunda lectura sale de cache
     assert first is second
     assert len(first) == 11
 
 
-def test_fetch_current_own_client_closes(monkeypatch):
+def test_public_get_uses_public_fetch_with_policy(monkeypatch):
+    seen = {}
+
+    def fake_fetch(url, **kwargs):
+        seen["url"], seen["kwargs"] = url, kwargs
+        return "texto \u00e9".encode(), "text/csv", url
+
+    monkeypatch.setattr(amf_vad, "fetch_public_url", fake_fetch)
+    assert amf_vad._public_get(amf_vad.DATASET_API_URL) == "texto \u00e9"
+    assert seen["kwargs"]["max_bytes"] == amf_vad.MAX_BYTES
+    assert seen["kwargs"]["allowed_url"] is amf_vad._allowed_url
+    assert seen["kwargs"]["user_agent"] == amf_vad.USER_AGENT
+
+
+def test_public_get_policy_size_and_encoding_are_drift(monkeypatch):
+    def refuse(url, **kwargs):
+        raise ValueError("Remote document exceeds 32MB limit")
+
+    monkeypatch.setattr(amf_vad, "fetch_public_url", refuse)
+    with pytest.raises(amf_vad.AMFVADParseError, match="rechazada por public_fetch"):
+        amf_vad._public_get(amf_vad.DATASET_API_URL)
+    monkeypatch.setattr(amf_vad, "fetch_public_url", lambda url, **kw: (b"\xff\xfe\xfa", None, url))
+    with pytest.raises(amf_vad.AMFVADParseError, match="UTF-8"):
+        amf_vad._public_get(amf_vad.DATASET_API_URL)
+
+
+def test_http_error_from_public_fetch_propagates_with_retry_after(monkeypatch):
+    cooldowns = []
     monkeypatch.setattr(amf_vad, "_throttle", lambda: None)
-    closed = {"n": 0}
-    real_client = _flow_client()
+    monkeypatch.setattr(amf_vad._pacer, "cool_down", lambda s: cooldowns.append(s))
+    request = httpx.Request("GET", amf_vad.DATASET_API_URL)
 
-    class FakeClient:
-        def get(self, url, **kw):
-            return real_client.get(url, **kw)
+    def fetch_503(url, **kwargs):
+        raise httpx.HTTPStatusError(
+            "503", request=request, response=httpx.Response(503, headers={"Retry-After": "3600"}, request=request)
+        )
 
-        def close(self):
-            closed["n"] += 1
+    monkeypatch.setattr(amf_vad, "fetch_public_url", fetch_503)
+    with pytest.raises(httpx.HTTPStatusError):
+        amf_vad.fetch_current(cache={})
+    assert cooldowns == [3600.0]  # Retry-After integro
 
-    monkeypatch.setattr(amf_vad.httpx, "Client", lambda **kwargs: FakeClient())
-    rows = amf_vad.fetch_current()
-    assert len(rows) == 11 and closed["n"] == 1
+
+def test_allowed_url_policy():
+    assert amf_vad._allowed_url("https://www.data.gouv.fr/api/1/datasets/x/")
+    assert amf_vad._allowed_url("https://amf.s3.sbg.io.cloud.ovh.net/VAD/export.csv")
+    assert not amf_vad._allowed_url("http://amf.s3.sbg.io.cloud.ovh.net/VAD/export.csv")  # no https
+    assert not amf_vad._allowed_url("https://evil.example/VAD/export.csv")
+    assert not amf_vad._allowed_url("https://amf.s3.sbg.io.cloud.ovh.net.evil.example/x.csv")
+    assert not amf_vad._allowed_url("not a url")
+
+
+def test_resolve_rejects_resource_outside_allowlist(monkeypatch):
+    monkeypatch.setattr(amf_vad, "_throttle", lambda: None)
+    payload = '{"resources": [{"format": "csv", "url": "https://evil.example/export.csv"}]}'
+    client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(200, text=payload)))
+    with pytest.raises(amf_vad.AMFVADParseError, match="allowlist"):
+        amf_vad.resolve_resource_url(_fetch_of(client))
 
 
 def test_fetch_records_registry_failure_on_parse_error(monkeypatch):
@@ -293,7 +347,7 @@ def test_fetch_records_registry_failure_on_parse_error(monkeypatch):
         transport=httpx.MockTransport(lambda req: httpx.Response(200, text="html, no csv"))
     )
     with pytest.raises(amf_vad.AMFVADParseError):
-        amf_vad.fetch_current(client=client)
+        amf_vad.fetch_current(fetch=_fetch_of(client))
     assert registry.record_failure.called
     assert not registry.record_success.called
 
@@ -308,7 +362,7 @@ def test_fetch_records_registry_failure_on_network_error(monkeypatch):
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
     with pytest.raises(httpx.ConnectError):
-        amf_vad.fetch_current(client=client)
+        amf_vad.fetch_current(fetch=_fetch_of(client))
     assert registry.record_failure.called
 
 
@@ -316,7 +370,7 @@ def test_fetch_records_success(monkeypatch):
     monkeypatch.setattr(amf_vad, "_throttle", lambda: None)
     registry = Mock()
     monkeypatch.setattr(amf_vad, "get_data_source_registry", lambda: registry)
-    amf_vad.fetch_current(client=_flow_client())
+    amf_vad.fetch_current(fetch=_fetch_of(_flow_client()))
     assert registry.record_success.called
 
 
@@ -549,7 +603,7 @@ def test_concurrent_cache_miss_single_download(monkeypatch):
     results = []
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         threads = [
-            threading.Thread(target=lambda: results.append(amf_vad.fetch_current(client=client, cache=cache)))
+            threading.Thread(target=lambda: results.append(amf_vad.fetch_current(fetch=_fetch_of(client), cache=cache)))
             for _ in range(3)
         ]
         for t in threads:

@@ -47,14 +47,17 @@ import json
 import re
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
+from urllib.parse import urlparse
 
 import httpx
 
 from app.services.connectors.global_pacing import GlobalPacer
 from app.services.data_source_health import get_data_source_registry
+from app.services.public_fetch import fetch_public_url
 
 FORM = "AMF-VAD"
 SOURCE = "AMF"
@@ -148,32 +151,54 @@ def _respect_retry_after(response: httpx.Response) -> None:
     _pacer.cool_down(seconds)
 
 
-def _client(client: httpx.Client | None) -> tuple[httpx.Client, bool]:
-    if client is not None:
-        return client, False
-    return (
-        httpx.Client(
-            timeout=httpx.Timeout(60.0, connect=10.0),
-            headers={"User-Agent": USER_AGENT, "Accept-Language": "fr,en"},
-            follow_redirects=True,
-        ),
-        True,
-    )
+# Descarga por app.services.public_fetch (camino aprobado por seguridad: valida
+# IP publica, fija la IP validada, sigue redirecciones a mano revalidando cada
+# salto y corta por tamano). La politica de hosts es una ALLOWLIST estricta:
+# la API de data.gouv y el bucket OVH de la propia AMF. Un recurso que apunte a
+# otro host (o a http) se rechaza: fail-closed, no se descarga.
+_ALLOWED_HOSTS = frozenset({"www.data.gouv.fr", "amf.s3.sbg.io.cloud.ovh.net"})
+MAX_BYTES = 32 * 1024 * 1024  # CSV medido 5,2 MB (41.620 filas) el 18-nov-2026; crece despacio
+FETCH_TIMEOUT_S = 60.0
 
 
-def _get_text(client: httpx.Client, url: str) -> str:
+def _allowed_url(url: str) -> bool:
+    parsed = urlparse(url)
+    return parsed.scheme == "https" and (parsed.hostname or "") in _ALLOWED_HOSTS
+
+
+def _public_get(url: str) -> str:
+    """GET acotado via public_fetch. Rechazo de politica/tamano/IP = deriva
+    (AMFVADParseError); HTTP >=400 propaga httpx.HTTPStatusError (con su
+    cabecera Retry-After); un cuerpo no UTF-8 tambien es deriva."""
+    try:
+        content, _content_type, _final_url = fetch_public_url(
+            url,
+            max_bytes=MAX_BYTES,
+            timeout=FETCH_TIMEOUT_S,
+            allowed_url=_allowed_url,
+            user_agent=USER_AGENT,
+        )
+    except ValueError as exc:
+        raise AMFVADParseError(f"descarga rechazada por public_fetch: {exc}") from exc
+    try:
+        return content.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise AMFVADParseError("respuesta no UTF-8 (deriva del fichero)") from exc
+
+
+def _get_text(fetch: Callable[[str], str], url: str) -> str:
     _throttle()
-    response = client.get(url)
-    if response.status_code >= 400:
-        _respect_retry_after(response)
-        response.raise_for_status()
-    return response.text
+    try:
+        return fetch(url)
+    except httpx.HTTPStatusError as exc:
+        _respect_retry_after(exc.response)
+        raise
 
 
-def resolve_resource_url(client: httpx.Client) -> str:
+def resolve_resource_url(fetch: Callable[[str], str]) -> str:
     """URL vigente del CSV vía API de data.gouv. Fail-closed: si la API no
     ofrece exactamente un recurso CSV reconocible, es deriva, no «sin cortos»."""
-    payload = _get_text(client, DATASET_API_URL)
+    payload = _get_text(fetch, DATASET_API_URL)
     try:
         dataset = json.loads(payload)
         resources = dataset["resources"]
@@ -189,6 +214,8 @@ def resolve_resource_url(client: httpx.Client) -> str:
         raise AMFVADParseError(
             f"API data.gouv: {len(csv_urls)} recursos CSV (esperado 1): esquema del dataset cambiado"
         )
+    if not _allowed_url(csv_urls[0]):
+        raise AMFVADParseError("recurso CSV fuera de la allowlist de hosts (https, data.gouv/OVH AMF)")
     return csv_urls[0]
 
 
@@ -296,7 +323,7 @@ def reset_cache() -> None:
 
 def fetch_current(
     *,
-    client: httpx.Client | None = None,
+    fetch: Callable[[str], str] | None = None,
     cache: dict[str, tuple[float, list[AMFVADRow]]] | None = None,
     monotonic=time.monotonic,
 ) -> list[AMFVADRow]:
@@ -311,16 +338,15 @@ def fetch_current(
         cached = cache.get("current")
         if cached is not None and monotonic() - cached[0] < CACHE_TTL_S:
             return cached[1]
-        return _download(cache, client, monotonic)
+        return _download(cache, fetch or _public_get, monotonic)
 
 
-def _download(cache, client, monotonic) -> list[AMFVADRow]:
-    client, own_client = _client(client)
+def _download(cache, fetch, monotonic) -> list[AMFVADRow]:
     registry = get_data_source_registry()
     try:
         try:
-            url = resolve_resource_url(client)
-            text = _get_text(client, url)
+            url = resolve_resource_url(fetch)
+            text = _get_text(fetch, url)
         except httpx.HTTPError as exc:
             registry.record_failure(_REGISTRY_KEY, f"error de red o HTTP: {type(exc).__name__}")
             raise
@@ -328,9 +354,6 @@ def _download(cache, client, monotonic) -> list[AMFVADRow]:
     except AMFVADParseError as exc:
         registry.record_failure(_REGISTRY_KEY, f"parseo: {type(exc).__name__}")
         raise
-    finally:
-        if own_client:
-            client.close()
     registry.record_success(_REGISTRY_KEY)
     cache["current"] = (monotonic(), rows)
     return rows
