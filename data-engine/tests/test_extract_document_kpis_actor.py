@@ -196,3 +196,26 @@ def test_http_401_es_fallo_permanente_no_se_difiere(env):
     assert out["status"] == "error"
     assert worker.KPI_DEFERRED_KEY not in env.db.doc.metadata_
     assert env.db.closed == 1
+
+
+def test_deterministic_only_sin_metricas_sin_resolver_es_ok(env):
+    env.db = _DB(_Doc({"kpi_deterministic": {"mode": "deterministic-only", "unresolved_metrics": []}}))
+    env.result = [_Cand(1)]
+
+    out = _call()
+
+    assert out["status"] == "ok"
+    assert out["mode"] == "deterministic-only"
+    assert out["unresolved_metrics"] == []
+
+
+def test_metricas_sin_resolver_fuera_de_deterministic_only_es_ok(env):
+    # Solo el modo deterministic-only degrada a partial: con LLM el hueco no es un fallo.
+    env.db = _DB(_Doc({"kpi_deterministic": {"mode": "auto", "unresolved_metrics": ["fcf"]}}))
+    env.result = [_Cand(1)]
+
+    out = _call()
+
+    assert out["status"] == "ok"
+    assert out["mode"] == "auto"
+    assert out["unresolved_metrics"] == ["fcf"]
