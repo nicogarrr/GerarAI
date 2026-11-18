@@ -1182,7 +1182,15 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
               {t('research.fichaNewsLoadError')}
             </p>
           ) : overviewNews.length === 0 ? (
-            <NewsPreparingNotice ticker={ticker} fallback={<EmptyState title={t('research.fichaNoRecentNews')} />} />
+            <NewsPreparingNotice
+              fallback={
+                <EmptyState
+                  action={<EmptyLink href="/research/news">{t('research.fichaAnalyzeLatestNews')}</EmptyLink>}
+                  title={t('research.fichaNoRecentNews')}
+                />
+              }
+              ticker={ticker}
+            />
           ) : (
             <ul className="space-y-3">
               {overviewNews.map((event) => (

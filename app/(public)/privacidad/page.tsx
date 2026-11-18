@@ -128,6 +128,7 @@ export default async function PrivacyPage() {
                     <p>
                         {t('landing.privacidad.s6.p1Pre')}{' '}
                         <Link className="text-teal-300 underline" href="/security">/security</Link>{' '}
+                        <span className="text-xs text-gray-500">{t('landing.securityLinkNote')}</span>{' '}
                         {t('landing.privacidad.s6.p1Post')}
                     </p>
                     <p>

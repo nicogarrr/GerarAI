@@ -1,6 +1,6 @@
 'use client';
 
-import { EmptyState } from '@/components/ui/empty-state';
+import { EmptyLink, EmptyState } from '@/components/ui/empty-state';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useT, useLocale, useFormat } from '@/lib/i18n/client';
 import { valuationRowKey, type DemoValuation, type ValuedPosition } from '@/lib/market/demo-valuation';
@@ -30,7 +30,13 @@ export function PositionsTable({ positions, valuation }: { positions: DemoPositi
     const f = useFormat();
     const valued = new Map<string, ValuedPosition>((valuation?.rows ?? []).map((row) => [valuationRowKey(row), row]));
     if (positions.length === 0) {
-        return <EmptyState title={ti('paperTrading.positions.emptyTitle')} description={ti('paperTrading.positions.emptyDescription')} />;
+        return (
+            <EmptyState
+                action={<EmptyLink href="/paper-trading">{ti('paperTrading.panel.tradePanel')}</EmptyLink>}
+                description={ti('paperTrading.positions.emptyDescription')}
+                title={ti('paperTrading.positions.emptyTitle')}
+            />
+        );
     }
     return (
         <div className="space-y-2">
