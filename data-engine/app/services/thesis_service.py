@@ -23,6 +23,7 @@ from app.models import (
     SourceAudit,
     ThesisVersion,
 )
+from app.services.claim_drift import claim_drift_metadata
 from app.services.claim_scope import supersede_claims_of
 from app.services.company_resolver import resolve_company
 from app.services.framework_terms_es import framework_term_es
@@ -1576,6 +1577,9 @@ class ThesisService:
                         "verification_state", "unverified"
                     ),
                     "prompt_version": PROMPT_VERSION,
+                    # Cifra, metrica y periodo del claim: permiten avisar luego
+                    # de que el hecho vivo cambio (claim_drift), sin tocar la tesis.
+                    **claim_drift_metadata(payload),
                 },
             )
             conflict = _revenue_series_conflict(db, company.id, payload)
