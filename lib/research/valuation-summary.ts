@@ -27,7 +27,7 @@ export type FinancialHealth = {
 };
 export type ValuationSummary = {
   ticker: string;
-  fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean; reason?: string | null; missing_inputs?: string[] };
+  fair_value: { value: number | null; currency: string | null; label: string; as_of: string | null; publishable: boolean; stale: boolean; reason?: string | null; missing_inputs?: string[]; warnings?: string[] };
   reverse_dcf: { status: string; required_revenue_growth: number | null; as_of: string | null; source: string; market_price: number | null; model_version_id: number | null; reason?: string | null; base_rate_check?: BaseRateCheck | null };
   health: FinancialHealth;
   /** Empresa que quema caja: tasas base medidas (data-engine app/valuation/cash_burn_base_rate.py). */

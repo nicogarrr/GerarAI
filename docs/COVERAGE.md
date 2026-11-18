@@ -298,14 +298,3 @@ Lo que sigue pendiente:
    `.coveragerc` gana y el resto se ignora en silencio. Dos ficheros de
    configuracion para la misma medicion es justo el fallo que hace que un numero
    deje de gatear sin que nadie lo note.
-
-## Nota sobre fallos preexistentes
-
-En el commit base (`0be7186c`) la suite ya venia con **14 tests rojos**, sin
-relacion con la cobertura: 13 en `tests/test_retitle_sec_news_es.py` (por
-`os.O_DIRECTORY`, que no existe en `win32`) y 1 en
-`tests/test_company_snapshot_batch.py` (comparacion de `recent_changes` que no
-coincide). Se reproducen igual con `python -m pytest` sin `--cov`. El job de
-cobertura saldra en rojo por ellos hasta que se arreglen, con el informe de
-cobertura igualmente impreso antes de fallar: el gate imprime la medicion y luego
-falla, nunca al reves.

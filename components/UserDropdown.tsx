@@ -82,7 +82,7 @@ const UserDropdown = ({ user }: { user: User }) => {
                     className="cursor-pointer text-sm font-medium text-gray-100 transition-colors focus:text-teal-300"
                 >
                     <CircleHelp aria-hidden="true" className="mr-2 hidden h-4 w-4 sm:block" />
-                    Ayuda
+                    {t('nav.items.ayuda')}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-gray-600" />
                 <DropdownMenuItem

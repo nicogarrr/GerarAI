@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 test('menú móvil ofrece Cerebro aunque el FAB esté oculto por solape', () => {
   const nav = readFileSync('components/MobileNav.tsx', 'utf8') + '\n' + readFileSync('components/MobileNavDrawer.tsx', 'utf8');
   const brain = readFileSync('components/brain/GlobalBrain.tsx', 'utf8') + '\n' + readFileSync('components/brain/GlobalBrainPanel.tsx', 'utf8');
-  assert.ok(nav.includes('>Cerebro'));
+  assert.ok(nav.includes("{t('brain.name')}"));
   assert.ok(nav.includes("from '@/lib/brain/open-brain'"));
   assert.ok(nav.includes("closeDrawer(); openBrain();"));
   assert.ok(nav.includes("dialogRef.current?.close();"));

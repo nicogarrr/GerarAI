@@ -2,7 +2,6 @@
   "app/(root)/error.tsx": 1,
   "app/(root)/insider/page.tsx": 1,
   "app/(root)/inversores/_components/investor-views.ts": 3,
-  "app/(root)/inversores/_components/LibraryChat.tsx": 1,
   "app/(root)/inversores/_components/Portfolio.tsx": 5,
   "app/(root)/inversores/canales/channels.ts": 32,
   "app/(root)/inversores/cartas/investor-letters.ts": 2,

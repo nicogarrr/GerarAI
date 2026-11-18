@@ -79,6 +79,9 @@ class Candidate:
     # Valor con método (capex normalizado / DCF multietapa): la etiqueta del
     # motor viaja con la cifra para que nunca se lea como un dato reportado.
     method_label: str | None = None
+    # Avisos del motor (tope P/B, NAV llevado a 0...): el valor se sirve con el
+    # aviso visible, nunca con el tope escondido.
+    warnings: tuple[str, ...] = ()
     # Vigencia de la tesis frente a sus insumos y al motor (solo candidatos
     # tesis). None = sin evidencia en ningún sentido (no desplaza: la cifra
     # revisada no se esconde por no poder comprobar); False = desactualizada
@@ -314,12 +317,15 @@ def _reading(source: str, candidate: Candidate, *, stale: bool, rule: str) -> di
         label += " · con inputs estimados"
     if candidate.method_label and source != "tesis":
         label += f" · {candidate.method_label}"
+    if candidate.warnings and source != "tesis":
+        label += " · con avisos del modelo"
     return {
         "value": round(candidate.value, 4),
         "source": source,
         "label": label,
         **({"estimated_inputs": list(candidate.estimated_inputs)} if candidate.estimated_inputs else {}),
         **({"method_label": candidate.method_label} if candidate.method_label else {}),
+        **({"warnings": list(candidate.warnings)} if candidate.warnings and source != "tesis" else {}),
         # Una tesis publicada es una cifra final; el motor solo si es publicable.
         "publishable": source != "motor_orientativo",
         "as_of": candidate.as_of.isoformat() if candidate.as_of else None,
@@ -501,6 +507,34 @@ def _estimated_inputs(payload: object) -> tuple[str, ...]:
     return tuple(str(i.get("metric")) for i in items if isinstance(i, dict) and i.get("metric"))
 
 
+WARNING_MAX_ITEMS = 6
+WARNING_MAX_CHARS = 240
+
+
+def _engine_warnings(payload: object) -> tuple[str, ...]:
+    """Detalles de los avisos que el motor dejó en su resultado (texto ya en español).
+
+    Solo cuentan los ``detail`` de tipo texto no vacío; se deduplican (orden de
+    aparición), se recortan a ``WARNING_MAX_CHARS`` y se limitan a ``WARNING_MAX_ITEMS``.
+    """
+    if not isinstance(payload, dict):
+        return ()
+    items = payload.get("warnings") or []
+    if not isinstance(items, list):
+        return ()
+    out: list[str] = []
+    for item in items:
+        detail = item.get("detail") if isinstance(item, dict) else None
+        if not isinstance(detail, str):
+            continue
+        text = detail.strip()[:WARNING_MAX_CHARS].rstrip()
+        if text and text not in out:
+            out.append(text)
+        if len(out) >= WARNING_MAX_ITEMS:
+            break
+    return tuple(out)
+
+
 def _method_label(payload: object) -> str | None:
     """Etiqueta del método con que el motor estimó la cifra (si la hay)."""
     if not isinstance(payload, dict):
@@ -627,6 +661,7 @@ def persisted_engine_readings(
             publishable=model.status == "final",
             estimated_inputs=_estimated_inputs(payload),
             method_label=_method_label(payload),
+            warnings=_engine_warnings(payload),
         )
     if gaps is not None:
         models_by_company = {int(model.company_id): model for model in models}
@@ -777,6 +812,7 @@ def resolve_fair_value(
                     value=value,
                     as_of=today,
                     publishable=bool(result.get("publishable")),
+                    warnings=_engine_warnings(result),
                 )
             elif result.get("status") == "insufficient_data":
                 # El motor respondio: con los datos actuales no hay cifra.

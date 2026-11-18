@@ -19,7 +19,7 @@ import {GlobalBrain} from '@/components/brain/GlobalBrain';
 // app: pequeño abajo a la derecha, plegado, y se abre a demanda.
 it('starts collapsed: no embedded panel, only the docked trigger, which asks the library',async()=>{
  Element.prototype.scrollTo=vi.fn();
- render(<><a href="/portfolio">Cartera</a><LibraryChat scope="letters" authors={['Buffett']}/><GlobalBrain userId="fixture"/></>);
+ render(<><a href="/portfolio">Cartera</a><LibraryChat scope="letters" authors={['Buffett']} label="Preguntar a la biblioteca"/><GlobalBrain userId="fixture"/></>);
  const trigger=await screen.findByRole('button',{name:'Abrir el cerebro'});
  await waitFor(()=>expect(trigger).toHaveAttribute('title','Pregunta a la biblioteca'));
  expect(screen.queryByRole('region',{name:'Cerebro GerarAI'})).toBeNull();
@@ -38,7 +38,7 @@ it('starts collapsed: no embedded panel, only the docked trigger, which asks the
 
 it('the page button and the BottomNav open the same floating panel with the library context',async()=>{
  Element.prototype.scrollTo=vi.fn();
- render(<><LibraryChat scope="library"/><GlobalBrain userId="fixture"/></>);
+ render(<><LibraryChat scope="library" label="Preguntar a la biblioteca"/><GlobalBrain userId="fixture"/></>);
  await screen.findByRole('button',{name:'Abrir el cerebro'});
  fireEvent.click(screen.getByRole('button',{name:'Preguntar a la biblioteca'}));
  expect(await screen.findByRole('dialog',{name:'Cerebro GerarAI'},{timeout:10000})).toHaveTextContent('Biblioteca · Doctrina');
@@ -51,7 +51,7 @@ it('the page button and the BottomNav open the same floating panel with the libr
 },20000);
 
 it('SSR carries no portal target or reserved panel height',()=>{
- const html=renderToString(<LibraryChat scope="library"/>);
+ const html=renderToString(<LibraryChat scope="library" label="Preguntar a la biblioteca"/>);
  expect(html).not.toContain('brain-library-slot');
  expect(html).not.toContain('h-[min(780px,80dvh)]');
 });

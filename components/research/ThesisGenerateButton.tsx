@@ -189,7 +189,14 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
                             : progressText ?? (phaseLabel ?? (job?.status === 'dispatch_failed' ? t('research.thesisGenerate.waitingQueue') : job?.status === 'retrying' ? t('research.thesisGenerate.retrying') : job?.status === 'running' ? t('research.thesisGenerate.preparing') : t('research.thesisGenerate.queued')))}
                     </span>
                 ) : null}
+                <Link
+                    href="/knowledge?tab=subir"
+                    className="inline-flex min-h-[44px] items-center text-sm font-medium text-teal-300 underline decoration-teal-700 underline-offset-4 hover:text-teal-200 sm:min-h-0"
+                >
+                    {t('research.thesisGenerate.addEvidence')}
+                </Link>
             </div>
+            <p className="text-xs text-gray-500">{t('research.thesisGenerate.evidenceHint')}</p>
             {startedHere && job?.status === 'succeeded' ? (
                 <p className="text-sm text-teal-300">
                     {t('research.thesisGenerate.generated', { version: job.result?.version ?? '?' })}

@@ -315,7 +315,7 @@ export type ResearchSourceAudit = {
   required_fixes: string[];
 };
 
-type ResearchClaimEvidence = {
+export type ResearchClaimEvidence = {
   id: number;
   claim_id: number;
   document_id: number | null;

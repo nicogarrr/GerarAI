@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -16,6 +17,7 @@ from scripts.retitle_sec_news_es import (
     _is_sec_url,
     _plan_row,
     _strip_ticker_prefixes,
+    _write_backup_durable,
     main,
 )
 
@@ -99,6 +101,19 @@ def test_plan_row_solo_texto_compuesto():
         summary="Apple anuncia resultados", metadata_={},
     )
     assert _plan_row(row_otro, "AAPL") is None
+
+
+# ---------- backup durable (portabilidad) ----------
+
+
+def test_backup_durable_sin_o_directory(tmp_path, monkeypatch):
+    """O_DIRECTORY no existe en win32: el backup se escribe igual, sin el
+    fsync del directorio. Se simula tambien en Linux para fijar el fallback."""
+    monkeypatch.delattr(os, "O_DIRECTORY", raising=False)
+    backup = tmp_path / "backup.json"
+    payload = [{"old": {"title": "X"}}]
+    _write_backup_durable(str(backup), payload)
+    assert json.loads(backup.read_text(encoding="utf-8")) == payload
 
 
 # ---------- end-to-end con BD ----------

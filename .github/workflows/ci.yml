@@ -271,14 +271,6 @@ jobs:
       # extra `dev` y pytest/pytest-xdist del extra `test`, todos fijados por
       # el lock. ruff y pyright corren en el job aparte `backend-lint`.
       - run: uv sync --frozen --extra test --extra dev --no-install-project
-      # TODO(#fixes): 14 tests preexistentes en rojo en el base del que parte
-      # esta rama -- 13 en tests/test_retitle_sec_news_es.py y 1 en
-      # tests/test_company_snapshot_batch.py. NO son fallos de CI: en
-      # ubuntu-latest pasan. Los 13 mueren en el `os.O_DIRECTORY` de
-      # data-engine/scripts/retitle_sec_news_es.py:206, que no existe en win32,
-      # asi que solo se ven en el `pytest` de un venv de Windows. Dejarlos
-      # anotados para que la ronda de fixes los haga portables y no parezca un
-      # fallo nuevo cuando se arreglen.
       - name: Redis local para tests de admision atomica
         run: sudo apt-get update && sudo apt-get install -y redis-server
       # xdist -n 2 --dist worksteal: la suite son ~2400 ficheros y el job tarda

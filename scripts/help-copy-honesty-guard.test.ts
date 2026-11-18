@@ -7,6 +7,11 @@
  * modulos en ingles («Decision Journal», «what must be true»,
  * «Expectation vs Reality»).
  *
+ * La ficha tiene seis pestañas (Resumen/Tesis/Finanzas/Valoración/
+ * Seguimiento/Fuentes): la tesis se genera en «Tesis» y el modelo
+ * fundamental vive en la sección «Modelo fundamental a largo plazo»
+ * de «Valoración». No hay pestaña «Modelo» ni boton «Generar modelo».
+ *
  * Ejecucion: node --experimental-strip-types --test scripts/help-copy-honesty-guard.test.ts
  */
 import { describe, it } from 'node:test';
@@ -15,13 +20,27 @@ import { readFileSync } from 'node:fs';
 
 // Las afirmaciones visibles viven en el diccionario; los enlaces siguen en JSX.
 const source = readFileSync('components/help/HelpTabs.tsx', 'utf8') + '\n' + readFileSync('lib/i18n/messages/es/help.json', 'utf8');
+const enSource = readFileSync('lib/i18n/messages/en/help.json', 'utf8');
 
 describe('help copy honesty guard (F138/F238/F244)', () => {
-  it('nombra la pestaña y el boton reales del modelo', () => {
-    assert.equal(source.includes('«Model»'), false, 'la pestaña real es «Modelo»');
-    assert.equal(source.includes('Generate model'), false, 'el boton real es «Generar modelo»');
-    assert.match(source, /«Modelo»/);
-    assert.match(source, /«Generar modelo»/);
+  it('nombra la pestaña y el boton reales de la tesis y la valoracion', () => {
+    for (const gone of ['«Model»', '«Modelo»', 'Generate model', '«Generar modelo»']) {
+      assert.equal(source.includes(gone), false, `referencia retirada: ${gone}`);
+    }
+    assert.match(source, /«Tesis»/);
+    assert.match(source, /«Generar tesis»/);
+    assert.match(source, /«Valoración»/);
+    assert.match(source, /«Modelo fundamental a largo plazo»/);
+  });
+
+  it('la guia inglesa usa los nombres reales', () => {
+    for (const gone of ['«Model»', 'Generate model', 'The «Model» tab']) {
+      assert.equal(enSource.includes(gone), false, `referencia retirada: ${gone}`);
+    }
+    assert.match(enSource, /«Thesis»/);
+    assert.match(enSource, /«Generate thesis»/);
+    assert.match(enSource, /«Valuation»/);
+    assert.match(enSource, /«Long-term fundamental model»/);
   });
 
   it('no envia la exportacion de la tesis a /export', () => {

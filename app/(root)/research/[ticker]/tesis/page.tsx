@@ -491,8 +491,18 @@ export default async function ThesisReadingPage({ params, searchParams }: PagePr
         ) : !published ? (
           <div className="mt-10">
             <EmptyState
-              action={latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>{t('research.thesisDoc.reviewVersion', { version: latest.version })}</EmptyLink> : <EmptyLink href={`/research/${encoded}`}>{t('research.thesisDoc.generateFirst')}</EmptyLink>}
-              description={latest ? t('research.thesisDoc.notPublishedDescription', { version: latest.version, status: statusLabel(latest.status, t, locale) }) : t('research.thesisDoc.noneDescription', { ticker })}
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  {latest ? <EmptyLink href={`/research/${encoded}?view=thesis`}>{t('research.thesisDoc.reviewVersion', { version: latest.version })}</EmptyLink> : <EmptyLink href={`/research/${encoded}`}>{t('research.thesisDoc.generateFirst')}</EmptyLink>}
+                  <EmptyLink href="/knowledge?tab=subir">{t('research.thesisGenerate.addEvidence')}</EmptyLink>
+                </div>
+              }
+              description={
+                <>
+                  {latest ? t('research.thesisDoc.notPublishedDescription', { version: latest.version, status: statusLabel(latest.status, t, locale) }) : t('research.thesisDoc.noneDescription', { ticker })}
+                  {' '}{t('research.thesisGenerate.evidenceHint')}
+                </>
+              }
               title={t('research.thesisDoc.noPublishedTitle', { ticker })}
               titleAs="h1"
             />

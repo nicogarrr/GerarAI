@@ -54,7 +54,8 @@ export default async function TermsPage() {
                     <h2 className="text-xl font-semibold text-gray-100">{t('landing.terminos.s3.title')}</h2>
                     <p>
                         {t('landing.terminos.s3.pPre')}{' '}
-                        <Link className="text-teal-300 underline" href="/security">/security</Link>
+                        <Link className="text-teal-300 underline" href="/security">/security</Link>{' '}
+                        <span className="text-xs text-gray-500">{t('landing.securityLinkNote')}</span>
                         {t('landing.terminos.s3.pPost')}
                     </p>
                 </section>
@@ -105,7 +106,8 @@ export default async function TermsPage() {
                     <h2 className="text-xl font-semibold text-gray-100">{t('landing.terminos.s8.title')}</h2>
                     <p>
                         {t('landing.terminos.s8.pPre')}{' '}
-                        <Link className="text-teal-300 underline" href="/security">/security</Link>
+                        <Link className="text-teal-300 underline" href="/security">/security</Link>{' '}
+                        <span className="text-xs text-gray-500">{t('landing.securityLinkNote')}</span>
                         {t('landing.terminos.s8.pMid')}{' '}
                         <Link className="text-teal-300 underline" href="/privacidad">{t('landing.terminos.s8.pLink')}</Link>
                         {t('landing.terminos.s8.pPost')}

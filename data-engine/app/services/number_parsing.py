@@ -92,6 +92,23 @@ def parse_machine_decimal(value: object) -> Decimal | None:
         return None
 
 
+def parse_finite_decimal(value: object) -> Decimal | None:
+    """Finite ``Decimal`` from a machine-shaped value, or ``None``.
+
+    ``parse_machine_decimal`` accepts NaN and infinities because
+    ``Decimal(str(...))`` parses them; a persisted NaN then poisons every
+    comparison and aggregate downstream. Several ingestion paths (Damodaran
+    ERP, ESEF shares, Yahoo fundamentals) carried the same local helper that
+    adds exactly that guard; this is the single copy. ``None``, empty or
+    non-numeric input means "no data" and returns ``None`` - booleans too
+    (``str(True)`` is not a number).
+    """
+    parsed = parse_machine_decimal(value)
+    if parsed is None or not parsed.is_finite():
+        return None
+    return parsed
+
+
 def find_number_tokens(text: object) -> list[str]:
     """Every numeric token in free text, in order of appearance.
 

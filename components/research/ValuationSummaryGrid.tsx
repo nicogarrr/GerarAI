@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import FairValueWarnings from '@/components/research/FairValueWarnings';
 import { isUnofficialSource } from '@/lib/research/source-quality';
 import { useEffect, useState } from 'react';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
@@ -32,6 +33,9 @@ function Evidence({ evidence }: { evidence: HealthEvidence[] }) {
   const format = useFormat();
   const { formatMarketDate } = format;
   // El id interno del hecho queda en el «title» (diagnóstico), no en el texto.
+  // Sin etiqueta de proveedor visible (orden de Nico, 31-oct): la procedencia
+  // vive en la pestaña Fuentes; #5747 la reintrodujo vía sourceDisplay y se
+  // retiró de nuevo (18-nov). El aviso de calidad (no oficial) se conserva.
   // Táctil: cada evidencia enlaza a su fuente; la fila entera es el enlace a
   // min-h-8 (32 px, WCAG 2.5.8 pide 24). No se usa el pseudo-elemento
   // before:-inset-* aquí: con filas de 18-20 px de paso dos zonas de 44 px se
@@ -73,6 +77,7 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
     <dl className="mt-3 space-y-3 text-sm">
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.fairValue')}</dt><dd className="text-gray-100">{fair.value != null && fair.currency && isValidCurrencyCode(fair.currency) ? formatPrice(fair.value, fair.currency) : na}</dd>
         <dd className="text-xs text-gray-400">{valuationSummaryText(fair.label, locale)}{fair.as_of ? ` · ${formatMarketDate(fair.as_of)}` : ''}{fair.stale ? ` · ${t('researchShared.valuationSummary.reviewAge')}` : ''}</dd>
+        {fair.warnings?.length ? <dd><FairValueWarnings warnings={fair.warnings} label={t('research.fairValueModelWarnings')} /></dd> : null}
         {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{readableMissingReason(valuationSummaryText(fair.reason, locale), locale)}</dd> : null}
         {baseRate ? <dd className="text-xs text-gray-500">{baseRate}</dd> : null}</div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd></div>

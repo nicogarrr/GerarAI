@@ -9,8 +9,8 @@ type LibraryChatProps = {
   authors?: string[];
   documentId?: number;
   documentTitle?: string;
-  /** Texto del botón compacto; por defecto «Preguntar a la biblioteca». */
-  label?: string;
+  /** Texto del botón compacto; lo pasa la página con t(), como en /inversores/cartas. */
+  label: string;
   className?: string;
 };
 
@@ -25,7 +25,7 @@ type LibraryChatProps = {
  * un botón compacto que abre ese mismo Cerebro flotante. No hay un segundo
  * asistente: es el mismo panel, con la misma conversación.
  */
-export function LibraryChat({ scope = 'letters', authors = [], documentId, documentTitle, label = 'Preguntar a la biblioteca', className = '' }: LibraryChatProps) {
+export function LibraryChat({ scope = 'letters', authors = [], documentId, documentTitle, label, className = '' }: LibraryChatProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   // El botón llega en el HTML del servidor, clicable antes de hidratar: el
   // script inline del layout (lib/early-open) retiene ese clic y GlobalBrain

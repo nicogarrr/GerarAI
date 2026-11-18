@@ -85,6 +85,15 @@ test('paper trading i18n: nota de valoracion sin nombre de proveedor', () => {
     assert.match(en, /live quote/);
 });
 
+test('resumen de valoracion: evidencia sin nombre de proveedor visible', () => {
+    // #5747 reintrodujo sourceDisplay como texto en las dos ramas (enlace y
+    // sin enlace) de Evidence; la retirada global de etiquetas lo prohibe.
+    const view = read('components/research/ValuationSummaryGrid.tsx');
+    assert.doesNotMatch(view, /sourceDisplay\(|from '\@\/lib\/research\/source-display'/, 'la evidencia del resumen no pinta la etiqueta de fuente');
+    assert.match(view, /isUnofficialSource\(f\.source_type\)/, 'el aviso de calidad (no oficial) se conserva');
+    assert.match(view, /title=\{t\('researchShared\.valuationSummary\.fact'/, 'el title de diagnóstico con el id del hecho se conserva');
+});
+
 test('etiquetas de cotizacion: sin prefijo de proveedor', () => {
     const valuation = read('lib/market/demo-valuation.ts');
     assert.doesNotMatch(valuation, /\$\{source\} · /, 'quoteLabel ya no prefija el nombre de la fuente');

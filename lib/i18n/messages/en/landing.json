@@ -10,6 +10,7 @@
     "skipLink": "Skip to content",
     "wordmarkAria": "GerarAI, home"
   },
+  "securityLinkNote": "(sign-in required)",
   "header": {
     "signIn": "Sign in",
     "signUp": "Create account",

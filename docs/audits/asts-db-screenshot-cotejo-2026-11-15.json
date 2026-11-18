@@ -1,0 +1,25 @@
+{
+  "checked_on": "2026-11-15",
+  "screenshot_sha256": "587b43909023aa77cd5f730b004093330e40fb5878e72bdc94a537653802521d",
+  "caption": "Figure 3: ASTS Model Summary",
+  "visible_source_footer": "Source: Deutsche Bank estimates, company information.",
+  "report_date": null,
+  "original_report_url": null,
+  "verification": "Screenshot visually checked; bank report remains unverified.",
+  "existing_numeric_fields_checked": 24,
+  "existing_numeric_discrepancies": 0,
+  "additional_fields": {
+    "capex_usd_millions": {
+      "2025": 1064.7,
+      "2027E": 1900,
+      "2028E": 1500,
+      "2029E": 1920,
+      "2030E": 2300
+    },
+    "cumulative_commercial_satellites": {
+      "2025": 6
+    }
+  },
+  "unchanged_2026E_capex": 1584.2,
+  "limitations": "Screenshot has no report date or original bank URL. It does not establish actual results, funding sufficiency, or original report authenticity."
+}

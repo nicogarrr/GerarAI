@@ -14,16 +14,16 @@ describe('isolated ASTS screenshot scenario', () => {
     render(<AstsBankSupplement ticker="asts" locale={locale} t={createTranslator(locale)} />);
     const appendix = screen.getByTestId('asts-bank-supplement');
     expect(screen.getByRole('note').textContent).toMatch(locale === 'es' ? /sin verificar contra el informe original/ : /not verified against the original report/);
-    expect(screen.getByRole('note').textContent).toMatch(locale === 'es' ? /la captura no está disponible para cotejo/ : /the screenshot is unavailable for comparison/);
-    expect(screen.getByRole('note').textContent).toMatch(locale === 'es' ? /no se ha comprobado visualmente la tabla/ : /the table has not been visually checked/);
+    expect(screen.getByRole('note').textContent).toMatch(locale === 'es' ? /cotejada visualmente el 15\/11\/2026/ : /visually checked on 15 Nov 2026/);
+    expect(screen.getByRole('note').textContent).not.toMatch(/no está disponible|unavailable/);
     for (const row of data.rows) {
       const card = screen.getByRole('region', { name: String(row.year) });
       expect(within(card).getByRole('heading').textContent).toBe(String(row.year) + (row.year > 2025 ? 'E' : ''));
-      for (const value of [row.revenue, row.adjustedEbitda, row.fcf]) {
+      for (const value of [row.revenue, row.adjustedEbitda, row.fcf, row.capex]) {
         expect(card.textContent).toContain(new Intl.NumberFormat(locale, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value));
       }
     }
-    expect(appendix.textContent).toMatch(locale === 'es' ? /No transcrito/ : /Not transcribed/);
+    expect(appendix.textContent).not.toMatch(/No transcrito|Not transcribed/);
     expect(appendix.textContent).toMatch(locale === 'es' ? /no capital asegurado/ : /not secured capital/);
     expect(appendix.textContent).toContain('73%');
     expect(appendix.textContent).toContain('80,3%'.replace(',', locale === 'es' ? ',' : '.'));
@@ -35,7 +35,10 @@ describe('isolated ASTS screenshot scenario', () => {
   it('does not invent report date or original source URL and does not round stored money', () => {
     expect(data.reportDate).toBeNull();
     expect(data.originalReportUrl).toBeNull();
-    expect(data.verification).toBe('unverified_screenshot');
+    expect(data.verification).toBe('screenshot_visually_checked_report_unverified');
+    expect(data.screenshotCheckedOn).toBe('2026-11-15');
+    expect(data.rows.map(row => row.capex)).toEqual([1064.7, 1584.2, 1900, 1500, 1920, 2300]);
+    expect(data.rows.map(row => row.satellites)).toEqual([6, 15, 65, 125, 215, 340]);
     expect(data.rows[5]).toMatchObject({ revenue: 4490.3, adjustedEbitda: 3606.5, fcf: 683.4, satellites: 340 });
     expect(data.rows[1].capex).toBe(1584.2);
     expect(data.rows.slice(1, 4).reduce((a, row) => a + row.fcf, 0)).toBeCloseTo(-4572.5);

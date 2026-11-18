@@ -283,7 +283,12 @@ def test_filing_failure_is_best_effort(monkeypatch):
     def boom(filing):
         raise RuntimeError("xml roto")
 
-    stats = form144_monitor.scan(db, client=None, fetcher=boom, delay_seconds=0.01, sleeper=lambda s: None)
+    # Exercise the filing-error path without a real SEC listing request.
+    # A failed listing would stop before boom and test the wrong branch.
+    monkeypatch.setattr("httpx.Client.get", Mock(side_effect=AssertionError("unexpected live HTTP")))
+    fetcher = Mock(side_effect=boom)
+    stats = form144_monitor.scan(db, client=_FakeClient(), fetcher=fetcher, delay_seconds=0.01, sleeper=lambda s: None)
+    fetcher.assert_called_once()
     assert stats["filings_new"] == 0
     assert any("form144_filing_error" in e for e in stats["errors"])
     assert stats["status"] == "partial"
