@@ -79,6 +79,7 @@ import { DeferredAnalystTargets, DeferredAnalystHistory } from '@/components/res
 import { WhatToBelieveSection } from '@/components/research/WhatToBelieveSection';
 import { WhatToBelieveSkeleton } from '@/components/research/WhatToBelieveView';
 import { DcaHitRatesSection } from '@/components/research/DcaHitRatesSection';
+import { FichaHeaderAnalystBlocks } from '@/components/research/FichaHeaderAnalystBlocks';
 import { SotpBreakdownSection } from '@/components/research/SotpBreakdownSection';
 import { SotpBreakdownSkeleton } from '@/components/research/SotpBreakdownSkeleton';
 import { sotpVariantParam } from '@/lib/research/sotp';
@@ -1980,9 +1981,16 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
           {/* Ancla del comando GP del buscador (`ASTS GP` -> #grafico). */}
           {headerMarket ? <div id="grafico" className="scroll-mt-6"><Suspense fallback={<CompanyHeaderQuoteSkeleton compact={activeView !== 'overview'} />}><CompanyHeaderQuote compact={activeView !== 'overview'} snapshot={headerMarket} initialQuote={headerQuotePromise} /></Suspense></div> : null}
           <ChangesSinceVisit ticker={ticker} />
-          <div className="scroll-mt-6" id="analistas"><MobileCollapse deferMount title={t('research.fichaAnalystTargetsTitle')}><DeferredAnalystTargets initial={overviewAnalystsPromise} symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></MobileCollapse></div>
-          <div className="scroll-mt-6" id="historial-analistas"><MobileCollapse deferMount title={t('research.fichaAnalystHistoryTitle')}><DeferredAnalystHistory symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} /></MobileCollapse></div>
-          <MobileCollapse title={t('research.fichaDcaSignalsTitle')}><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>
+          {/* Analistas/historial/DCA solo en Resumen y Finanzas: en el resto
+              de pestañas empujaban el contenido propio ~1588px abajo (medido
+              por Piloto en Tesis, móvil). La puerta vive en
+              FichaHeaderAnalystBlocks + showAnalystBlocks (testeables). */}
+          <FichaHeaderAnalystBlocks
+            activeView={activeView}
+            analystTargets={<div className="scroll-mt-6" id="analistas"><MobileCollapse deferMount title={t('research.fichaAnalystTargetsTitle')}><DeferredAnalystTargets initial={overviewAnalystsPromise} symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} currency={company.currency} /></MobileCollapse></div>}
+            analystHistory={<div className="scroll-mt-6" id="historial-analistas"><MobileCollapse deferMount title={t('research.fichaAnalystHistoryTitle')}><DeferredAnalystHistory symbol={quoteSymbolFor({ exchange: company.exchange ?? undefined, currency: company.currency ?? undefined }, ticker) ?? ticker} /></MobileCollapse></div>}
+            dca={<MobileCollapse title={t('research.fichaDcaSignalsTitle')}><Suspense fallback={null}><DcaHitRatesSection ticker={ticker} /></Suspense></MobileCollapse>}
+          />
         </header>
         {sections.filter((section) => section.id && section.title).length > 1 ? (
           // Sumario local de la pestaña (anclas dentro de la página): nunca
