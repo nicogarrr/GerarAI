@@ -1,10 +1,9 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { fairValueWarnings } from '@/lib/research/fair-value-warnings';
 import { mapFairValues } from '@/lib/portfolio/holding-signals';
 
-vi.mock('@/lib/i18n/client', () => ({ useT: () => () => 'Model warnings' }));
 import FairValueWarnings from '@/components/research/FairValueWarnings';
 
 const warning = 'P/B justificado 4,2x acotado a 3x (techo del modelo).';
@@ -31,11 +30,11 @@ describe('fair-value warning boundary', () => {
 
 describe('FairValueWarnings', () => {
   it.each([undefined, null, [], ['', null, {}]])('renders nothing without valid warnings: %s', (warnings) => {
-    const { container } = render(<FairValueWarnings warnings={warnings} />);
+    const { container } = render(<FairValueWarnings label="Model warnings" warnings={warnings} />);
     expect(container).toBeEmptyDOMElement();
   });
   it('shows every warning in a quiet wrapping list, not hidden behind a hover or live alert', () => {
-    render(<FairValueWarnings warnings={[warning, 'NAV llevado a 0.']} />);
+    render(<FairValueWarnings label="Model warnings" warnings={[warning, 'NAV llevado a 0.']} />);
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
     const list = screen.getByRole('list', { name: 'Model warnings' });
     expect(list).toHaveClass('text-xs', 'break-words', 'min-w-0');
@@ -44,7 +43,7 @@ describe('FairValueWarnings', () => {
     expect(screen.getByText(warning)).toBeVisible();
   });
   it('escapes HTML from the API and does not make links or execute it', () => {
-    const { container } = render(<FairValueWarnings warnings={['<img src=x onerror=alert(1)>']} />);
+    const { container } = render(<FairValueWarnings label="Model warnings" warnings={['<img src=x onerror=alert(1)>']} />);
     expect(container.querySelector('img')).toBeNull();
     expect(screen.getByText('<img src=x onerror=alert(1)>')).toBeVisible();
   });
