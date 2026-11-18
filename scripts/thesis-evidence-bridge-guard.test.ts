@@ -44,6 +44,7 @@ describe('puente tesis → evidencia (hallazgo de accesibilidad/findability)', (
         // El id de petición lo genera el helper con fallback (contextos sin
         // crypto.randomUUID) y se pasa tal cual a la generación.
         assert.match(BTN, /const requestId = newRequestId\(\);/);
+        assert.match(BTN, /function newRequestId\(\): string\s*\{[\s\S]*?crypto\.randomUUID\(\)[\s\S]*?Date\.now\(\)[\s\S]*?Math\.random\(\)/);
         assert.match(BTN, /startThesisJob\(ticker, true, requestId\)/);
         assert.match(BTN, /disabled=\{busy \|\| !availability\.canStart\}/);
         assert.doesNotMatch(BTN, /disabled=\{[^}]*(evidence|document)/i);
