@@ -20,6 +20,16 @@ INDEX = "ix_facts_tenant_company_count"
 TABLE = "financial_facts"
 
 
+def _schema(bind) -> str:
+    # Bind DDL to the namespace of the table resolved by regclass, not to
+    # the first same-named index found along search_path.
+    return bind.execute(sa.text(
+        "SELECT n.nspname FROM pg_class t "
+        "JOIN pg_namespace n ON n.oid=t.relnamespace "
+        "WHERE t.oid=cast(:table_name AS regclass)"
+    ), {"table_name": TABLE}).scalar_one()
+
+
 def _invalid(bind) -> bool:
     # Resolve the table through the migration connection's search_path, never
     # drop a same-named index belonging to another table/schema.
@@ -36,10 +46,11 @@ def upgrade() -> None:
         # PostgreSQL disallows CONCURRENTLY inside a transaction. Alembic's
         # block commits prior work, then runs each DDL in autocommit mode.
         with op.get_context().autocommit_block():
+            schema = _schema(bind)
             if _invalid(bind):
-                op.drop_index(INDEX, table_name=TABLE,
+                op.drop_index(INDEX, table_name=TABLE, schema=schema,
                               postgresql_concurrently=True, if_exists=True)
-            op.create_index(INDEX, TABLE, ["tenant_id", "company_id"],
+            op.create_index(INDEX, TABLE, ["tenant_id", "company_id"], schema=schema,
                             postgresql_concurrently=True, if_not_exists=True)
         return
     existing = {index["name"] for index in sa.inspect(bind).get_indexes(TABLE)}
@@ -48,9 +59,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    if op.get_bind().dialect.name == "postgresql":
+    bind = op.get_bind()
+    if bind.dialect.name == "postgresql":
         with op.get_context().autocommit_block():
-            op.drop_index(INDEX, table_name=TABLE,
+            op.drop_index(INDEX, table_name=TABLE, schema=_schema(bind),
                           postgresql_concurrently=True, if_exists=True)
         return
     op.drop_index(INDEX, table_name=TABLE, if_exists=True)

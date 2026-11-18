@@ -121,7 +121,13 @@ larger all-or-nothing transaction or claim its failure rolls earlier DDL back.
 
 Reentry uses IF NOT EXISTS. A same-named INVALID index on financial_facts,
 resolved through search_path, is dropped concurrently then recreated. The
-catalog check is scoped by target table, not merely index name. A valid
+catalog check is scoped by target table, not merely index name. PostgreSQL
+resolves the target table OID through regclass and its exact namespace through
+pg_class/pg_namespace. Repair DROP, CREATE and downgrade DROP all pass that
+schema explicitly to Alembic, which quotes identifiers. Version3 only scoped
+the catalog check: its unqualified repair DROP could delete an unrelated
+same-named index earlier in search_path and leave the INVALID target intact.
+Version4 fixes that demonstrated cross-schema bug. A valid
 same-named index is retained; operator should verify its definition before
 migration if there is possible schema drift. This patch does not delete
 existing single-column or health indexes.
@@ -143,9 +149,19 @@ read/write latency and errors; use the tested downgrade for index rollback.
   duplicate company rows across tenants. No catalog tampering.
 - Unit double verifies exact concurrent/autocommit flags and keys on invalid
   repair. It is not evidence of production lock timing.
-- Whole0138 file:27/27 lines and8/8 branches,100% separately. Operations plus
-  chain tests14 passed,3 skips (SQLite invalid state plus2 existing CI-only
-  chain checks). PostgreSQL cases were EXECUTED with explicit local URL.
+- Two-schema PostgreSQL search_path collision regression: a valid foreign
+  same-named index precedes the target table's schema. Both absent and INVALID
+  target cases build the correct nonunique index, preserve the foreign index
+  OID and rows, and downgrade only the target index. A mixed-case foreign
+  schema with spaces also tests identifier quoting.
+- Regression test fails against v3. Mutants removing schema from repair DROP,
+  CREATE or downgrade DROP all fail the collision/exact-kwargs tests. The
+  CREATE mutant is caught by exact kwargs, not by the collision test alone:
+  an unqualified table name still resolves to the target in this fixture.
+- Whole0138 file:31/31 lines and8/8 branches,100% separately. Operations plus
+  chain tests16 passed,5 skips (three PostgreSQL-only cases on SQLite plus2
+  existing CI-only chain checks). PostgreSQL cases were EXECUTED with explicit
+  local URL on PG16.2. The independent Auditor's original repro was on PG14.
 - Full actual Alembic PG chain: empty DB to0137, upgrade head0138, downgrade
   to0137, re-upgrade head. All4 commands passed on disposable database.
 - Whole entities.py inherited branch suite:1812/1814 lines (99.89%),18/18

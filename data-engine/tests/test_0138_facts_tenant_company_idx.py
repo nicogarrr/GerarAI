@@ -115,11 +115,12 @@ def test_pg_invalid_branch_uses_concurrent_autocommit_and_exact_keys(monkeypatch
         drop_index=Mock(), create_index=Mock())
     monkeypatch.setattr(migration, 'op', operations)
     monkeypatch.setattr(migration, '_invalid', lambda bind: True)
+    monkeypatch.setattr(migration, '_schema', lambda bind: 'target_schema')
     migration.upgrade()
-    operations.drop_index.assert_called_once_with(migration.INDEX, table_name='financial_facts',
+    operations.drop_index.assert_called_once_with(migration.INDEX, table_name='financial_facts', schema='target_schema',
         postgresql_concurrently=True, if_exists=True)
     operations.create_index.assert_called_once_with(migration.INDEX, 'financial_facts',
-        ['tenant_id', 'company_id'], postgresql_concurrently=True, if_not_exists=True)
+        ['tenant_id', 'company_id'], schema='target_schema', postgresql_concurrently=True, if_not_exists=True)
     assert entered == ['enter', 'exit']
 
 
@@ -129,3 +130,48 @@ def test_orm_index_matches_migration():
     index = next(i for i in FinancialFact.__table__.indexes if i.name == migration.INDEX)
     assert [column.name for column in index.columns] == ['tenant_id', 'company_id']
     assert not index.unique
+
+
+@pytest.mark.parametrize('invalid', [False, True])
+def test_pg_search_path_collision_preserves_foreign_index(connection, invalid):
+    conn, table = connection
+    if conn.dialect.name != 'postgresql':
+        pytest.skip('PostgreSQL namespaces only')
+    target = migration._schema(conn)
+    conn.commit()
+    # Mixed case and spaces also exercise dialect identifier quoting.
+    foreign = 'Foreign Index ' + uuid4().hex
+    quote = conn.dialect.identifier_preparer.quote_schema
+    conn.execute(CreateSchema(foreign))
+    try:
+        conn.exec_driver_sql('CREATE TABLE ' + quote(foreign) + '.other_table(id int)')
+        conn.exec_driver_sql('CREATE INDEX ix_facts_tenant_company_count ON ' + quote(foreign) + '.other_table(id)')
+        conn.exec_driver_sql('SET search_path TO ' + quote(foreign) + ',' + quote(target))
+        index_ref = quote(foreign) + '.ix_facts_tenant_company_count'
+        oid = conn.execute(sa.text('SELECT cast(:name AS regclass)::oid'), {'name': index_ref}).scalar_one()
+        conn.commit()
+        conn.execution_options(isolation_level='AUTOCOMMIT')
+        if invalid:
+            with pytest.raises(sa.exc.IntegrityError):
+                conn.exec_driver_sql('CREATE UNIQUE INDEX CONCURRENTLY ix_facts_tenant_company_count ON '
+                                     + quote(target) + '.financial_facts(company_id)')
+            conn.rollback()
+            assert migration._invalid(conn)
+            conn.rollback()
+        run(conn, migration.upgrade)
+        assert not migration._invalid(conn)
+        indexes = {i['name']: i for i in sa.inspect(conn).get_indexes('financial_facts', schema=target)}
+        assert indexes[migration.INDEX]['column_names'] == ['tenant_id', 'company_id']
+        assert not indexes[migration.INDEX]['unique']
+        assert conn.execute(sa.text('SELECT cast(:name AS regclass)::oid'), {'name': index_ref}).scalar_one() == oid
+        assert conn.execute(sa.select(sa.func.count()).select_from(table)).scalar_one() == 2
+        conn.commit()
+        run(conn, migration.downgrade)
+        assert migration.INDEX not in {i['name'] for i in sa.inspect(conn).get_indexes('financial_facts', schema=target)}
+        assert conn.execute(sa.text('SELECT cast(:name AS regclass)::oid'), {'name': index_ref}).scalar_one() == oid
+        conn.commit()
+    finally:
+        conn.rollback()
+        conn.exec_driver_sql('SET search_path TO ' + quote(target))
+        conn.execute(DropSchema(foreign, cascade=True))
+        conn.commit()
