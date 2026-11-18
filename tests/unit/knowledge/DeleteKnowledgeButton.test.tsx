@@ -44,12 +44,18 @@ describe('DeleteKnowledgeButton confirmation', () => {
     });
 
     it('si la acción lanza, avisa y no deja el botón en «Eliminando…»', async () => {
-        const onDelete = vi.fn().mockRejectedValue(new Error('boom'));
+        const onDelete = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ success: true });
         render(<DeleteKnowledgeButton {...props} onDelete={onDelete} />);
         fireEvent.click(screen.getByRole('button', { name: props.ariaLabel }));
         fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo eliminar. Inténtalo de nuevo.');
         expect(m.error).toHaveBeenCalledWith('No se pudo eliminar. Inténtalo de nuevo.');
         expect(screen.getByRole('button', { name: props.ariaLabel })).toBeEnabled();
+
+        // El reintento tras la excepción sí completa el borrado.
+        fireEvent.click(screen.getByRole('button', { name: props.ariaLabel }));
+        fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+        await waitFor(() => expect(onDelete).toHaveBeenCalledTimes(2));
+        await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
     });
 });

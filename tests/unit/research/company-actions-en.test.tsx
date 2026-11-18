@@ -66,4 +66,62 @@ describe('company page actions in English', () => {
         fireEvent.click(screen.getByRole('button', { name: '+ Alert' }));
         await waitFor(() => expect(mocks.success).toHaveBeenCalledWith('Alert created: MSFT price above $1,234.50'));
     });
+
+    function renderQuickAlert(currency = 'USD') {
+        render(<LocaleProvider locale="en"><QuickAlertPopoverBody ticker="MSFT" currency={currency} /></LocaleProvider>);
+        return {
+            input: screen.getByRole('textbox', { name: `Target price in ${currency}` }),
+            button: screen.getByRole('button', { name: '+ Alert' }),
+        };
+    }
+
+    it.each(['', '0', '-1', 'abc'])('quick alert rejects invalid threshold %j before calling the action', async (value) => {
+        mocks.create.mockResolvedValue({ ok: true });
+        const { input, button } = renderQuickAlert('EUR');
+        await waitFor(() => expect(button).toBeEnabled());
+        fireEvent.change(input, { target: { value } });
+        fireEvent.click(button);
+        expect(mocks.error).toHaveBeenCalledWith('Enter a valid target price');
+        expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    it('quick alert rejects an invalid percentage threshold without calling the action', async () => {
+        mocks.create.mockResolvedValue({ ok: true });
+        render(<LocaleProvider locale="en"><QuickAlertPopoverBody ticker="MSFT" /></LocaleProvider>);
+        fireEvent.keyDown(screen.getByRole('combobox', { name: 'Alert type' }), { key: 'ArrowDown' });
+        fireEvent.click(await screen.findByRole('option', { name: 'Price change %' }));
+        const button = screen.getByRole('button', { name: '+ Alert' });
+        await waitFor(() => expect(button).toBeEnabled());
+        fireEvent.click(button);
+        expect(mocks.error).toHaveBeenCalledWith('Enter a valid target change');
+        expect(mocks.create).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['duplicate', 'info', 'You already have this alert set up.'],
+        ['validation', 'error', 'That target is outside the allowed range.'],
+    ] as const)('quick alert shows the backend reason for %s without a false success', async (cause, channel, message) => {
+        mocks.create.mockResolvedValue({ ok: false, cause, message });
+        const { input, button } = renderQuickAlert();
+        await waitFor(() => expect(button).toBeEnabled());
+        fireEvent.change(input, { target: { value: '42' } });
+        fireEvent.click(button);
+        await waitFor(() => expect(mocks[channel]).toHaveBeenCalledWith(message));
+        expect(mocks[channel === 'info' ? 'error' : 'info']).not.toHaveBeenCalled();
+        expect(mocks.success).not.toHaveBeenCalled();
+        expect(input).toHaveValue('42');
+    });
+
+    it('quick alert formats the success toast with the selected currency', async () => {
+        mocks.create.mockResolvedValue({ ok: true });
+        const { input, button } = renderQuickAlert('EUR');
+        await waitFor(() => expect(button).toBeEnabled());
+        fireEvent.change(input, { target: { value: '12.5' } });
+        fireEvent.click(button);
+        await waitFor(() => expect(mocks.success).toHaveBeenCalledWith('Alert created: MSFT price above €12.50'));
+        expect(mocks.create).toHaveBeenCalledWith({
+            symbol: 'MSFT', type: 'price_above', condition: { operator: '>', value: 12.5 },
+        });
+        expect(input).toHaveValue('');
+    });
 });
