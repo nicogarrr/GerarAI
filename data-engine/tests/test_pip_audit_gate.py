@@ -283,3 +283,9 @@ def test_missing_or_unknown_requires_python_stays_red(tmp_path, capsys):
 def test_real_project_pyproject_accepts_ci_interpreter():
     assert gate.check_interpreter(gate._PYPROJECT, (3, 12, 9), stderr=None) is True
     assert gate.check_interpreter(gate._PYPROJECT, (3, 10, 12), stderr=None) is False
+
+
+def test_pyproject_with_non_utf8_bytes_stays_red(tmp_path):
+    file = tmp_path / "pyproject.toml"
+    file.write_bytes(b'[project]\nrequires-python = ">=3.12\xff\xfe"\n')
+    assert gate.check_interpreter(file, (3, 12, 9), stderr=None) is False

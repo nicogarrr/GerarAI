@@ -53,7 +53,8 @@ def check_interpreter(pyproject=_PYPROJECT, version_info=sys.version_info, stder
         match = re.search(
             r'(?m)^requires-python\s*=\s*"([^"]+)"', pyproject.read_text(encoding="utf-8")
         )
-    except OSError as exc:
+    except (OSError, UnicodeDecodeError) as exc:
+        # Un pyproject ilegible o con bytes no UTF-8 tampoco es evidencia: rojo.
         print(f"pip-audit: cannot read {pyproject}: {exc}", file=stderr)
         return False
     if not match:
