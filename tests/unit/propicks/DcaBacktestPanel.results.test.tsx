@@ -56,6 +56,16 @@ describe('DcaBacktestPanel: formulario', () => {
     });
 });
 
+describe('DcaBacktestPanel: frontera de la aportacion', () => {
+    it('aportacion 0: alerta de base positiva y no llama al backend', async () => {
+        render(<DcaBacktestPanel />);
+        fireEvent.change(screen.getByLabelText(/aportación base/i), { target: { value: '0' } });
+        fireEvent.submit(form());
+        expect(await screen.findByRole('alert')).toHaveTextContent('Introduce una aportación base mayor que 0.');
+        expect(getDcaBacktest).not.toHaveBeenCalled();
+    });
+});
+
 describe('DcaBacktestPanel: resultado', () => {
     it('un error del servicio se muestra como alerta y no pinta tabla', async () => {
         await run(null, 'backend caido');
