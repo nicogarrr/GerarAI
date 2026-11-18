@@ -256,7 +256,7 @@ async function ThemeBottleneckSection({
   return (
     <p className="mt-3 border-t border-gray-800 pt-2 text-xs text-gray-400">
       {t('themes.page.bottleneck')}{' '}
-      <Link className="text-teal-300 underline hover:text-teal-200" href="/cuellos">
+      <Link className="relative text-teal-300 underline before:absolute before:-inset-3.5 before:content-[''] hover:text-teal-200" href="/cuellos">
         {bottleneckThemeName(bottleneck, t)}
       </Link>
     </p>

@@ -16,7 +16,10 @@ export default async function New13fSection({ promise, t }: {
         {result.unavailable ? <p role="status" className="mt-2 text-xs text-gray-400">{t('watchlist.new13f.unavailable')}</p> : (
             <ul className="mt-2 space-y-2">
                 {rows.map(row => <li key={row.ticker} className="flex min-w-0 items-baseline gap-3">
-                    <Link href={`/research/${encodeURIComponent(row.ticker)}`} className="shrink-0 font-mono text-sm font-bold text-gray-200">{row.ticker}</Link>
+                    {/* Táctil: la fila mide 28 px de paso (texto 20 + hueco 8), así que 44 px
+                        solaparía el ticker vecino. -my-1.5/py-1.5 da 32 px (WCAG 2.5.8 pide 24)
+                        sin cambiar el ritmo visual. */}
+                    <Link href={`/research/${encodeURIComponent(row.ticker)}`} className="-my-1.5 shrink-0 py-1.5 font-mono text-sm font-bold text-gray-200">{row.ticker}</Link>
                     <New13fSummary data={row} />
                 </li>)}
             </ul>

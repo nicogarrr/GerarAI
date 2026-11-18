@@ -329,7 +329,9 @@ export default async function ScreenerPage({ searchParams }: { searchParams?: Pr
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4">
                           <span className="shrink-0 text-xs text-gray-500 md:hidden">{t('screener.colName')}</span>
-                          <Link href={`/research/${r.symbol}`} className="max-w-[180px] truncate text-right text-gray-300 hover:text-teal-200 md:max-w-[220px] md:text-left" title={r.name}>{r.name}</Link>
+                          {/* Mismo destino que el ticker (ya 44 px): el nombre amplía su zona
+                              táctil con el pseudo-elemento (48 px efectivos dentro de la tarjeta). */}
+                          <Link href={`/research/${r.symbol}`} className="relative max-w-[180px] truncate text-right text-gray-300 before:absolute before:-inset-3.5 before:content-[''] hover:text-teal-200 md:max-w-[220px] md:text-left" title={r.name}>{r.name}</Link>
                         </td>
                         <td className="flex items-center justify-between gap-3 py-1 md:table-cell md:py-3 md:pr-4 md:text-right">
                           <span className="text-xs text-gray-500 md:hidden">{t('screener.colPrice')}</span>

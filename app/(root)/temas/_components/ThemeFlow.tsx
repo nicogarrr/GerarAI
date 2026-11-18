@@ -94,7 +94,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <p className="text-sm font-semibold text-gray-100">
                 {spender.ticker ? (
-                  <Link className="text-teal-300 hover:text-teal-200" href={`/research/${spender.ticker}`}>
+                  <Link className="relative text-teal-300 before:absolute before:-inset-3.5 before:content-[''] hover:text-teal-200" href={`/research/${spender.ticker}`}>
                     {spender.label}
                   </Link>
                 ) : (
