@@ -332,7 +332,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         verifiedOn: '2026-11-18',
     },
     'ENG.MC': {
-        name: 'Enagás',
+        name: 'Enag\u00e1s',
         section: { url: 'https://www.enagas.es/es/accionistas-inversores/', labelKey: 'investorRelations' },
         events: [],
         verifiedOn: '2026-11-18',
