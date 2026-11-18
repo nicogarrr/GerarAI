@@ -41,7 +41,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import Company, ConnectorState, Document
@@ -92,10 +92,13 @@ def _freshness_map(db: Session, company_ids: list[int]) -> dict[int, datetime | 
     fresh: dict[int, datetime | None] = {}
     if not company_ids:
         return fresh
-    stmt = select(Document).where(
+    # Titulo EXACTO de la compania (igual que last_sec_refresh): un LIKE por
+    # prefijo recogeria Documents de otro ticker (renombrados) y, en SQLite,
+    # variantes en minusculas.
+    stmt = select(Document).join(Company, Company.id == Document.company_id).where(
         Document.company_id.in_(company_ids),
         Document.source_type == "SEC",
-        Document.title.like("SEC XBRL facts - %"),
+        Document.title == ("SEC XBRL facts - " + func.upper(Company.ticker)),
     )
     for doc in db.scalars(stmt).all():
         if doc.company_id in fresh:

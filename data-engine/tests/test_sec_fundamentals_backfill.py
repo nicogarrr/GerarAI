@@ -206,3 +206,84 @@ def test_batch_reuses_attempt_marks_without_extra_writes(db):
     n_states = db.scalar(select(func.count()).select_from(ConnectorState).where(
         ConnectorState.connector == CONNECTOR, ConnectorState.company_id == reused.id))
     assert n_states == 1
+
+
+def test_freshness_map_equals_last_sec_refresh_for_every_edge_case(db):
+    """Oraculo: el lote devuelve lo mismo que last_sec_refresh por compania,
+    tambien con titulo de otro ticker, documento de otra fuente, fecha naive,
+    fecha invalida o no-string, y varios Documents con el titulo exacto."""
+    from app.services.sec_fundamentals_backfill import _freshness_map
+    from app.services.tracked_financial_refresh import last_sec_refresh
+
+    now = datetime.now(UTC)
+
+    def doc(company, title, meta, source="SEC"):
+        db.add(Document(company_id=company.id, source_type=source, title=title,
+                        source_url=f"https://example.test/{title}", metadata_=meta))
+        db.commit()
+
+    def stamp(days):
+        return {"last_refreshed_at": (now - timedelta(days=days)).isoformat()}
+
+    cases = {name: _company(db, name) for name in
+             ("EXACT", "NAIVE", "BADDATE", "NONSTR", "NOMETA", "RENAMED", "WRONGFIRST",
+              "OTHERSRC", "LOWER", "DUPFRESHFIRST")}
+    doc(cases["EXACT"], "SEC XBRL facts - EXACT", stamp(2))
+    doc(cases["NAIVE"], "SEC XBRL facts - NAIVE",
+        {"last_refreshed_at": (now - timedelta(days=2)).replace(tzinfo=None).isoformat()})
+    doc(cases["BADDATE"], "SEC XBRL facts - BADDATE", {"last_refreshed_at": "no-es-fecha"})
+    doc(cases["NONSTR"], "SEC XBRL facts - NONSTR", {"last_refreshed_at": 12345})
+    doc(cases["NOMETA"], "SEC XBRL facts - NOMETA", None)
+    doc(cases["RENAMED"], "SEC XBRL facts - OLDTICKER", stamp(1))
+    doc(cases["WRONGFIRST"], "SEC XBRL facts - OTHERTICKER", stamp(40))
+    doc(cases["WRONGFIRST"], "SEC XBRL facts - WRONGFIRST", stamp(1))
+    doc(cases["OTHERSRC"], "SEC XBRL facts - OTHERSRC", stamp(1), source="OTHER")
+    doc(cases["LOWER"], "sec xbrl facts - LOWER", stamp(1))
+    doc(cases["DUPFRESHFIRST"], "SEC XBRL facts - DUPFRESHFIRST", stamp(1))
+    doc(cases["DUPFRESHFIRST"], "SEC XBRL facts - DUPFRESHFIRST", stamp(40))
+
+    batch = _freshness_map(db, [c.id for c in cases.values()])
+    for name, company in cases.items():
+        assert batch.get(company.id) == last_sec_refresh(db, company), name
+
+
+def test_batch_attempt_mark_from_another_feed_falls_back_to_query(db):
+    """Una marca precargada de otro feed no se reutiliza: se consulta la del
+    FEED y, si no existe, se crea (sin tocar la ajena)."""
+    from app.services.sec_fundamentals_backfill import _record_attempt
+
+    company = _company(db, "OTHERFEED")
+    other = ConnectorState(tenant_id="tenant-test", connector=CONNECTOR,
+                           company_id=company.id, feed_url="otro-feed",
+                           metadata_={"status": "ok"})
+    own_mark = ConnectorState(tenant_id="tenant-test", connector=CONNECTOR,
+                              company_id=company.id, feed_url=FEED,
+                              metadata_={"status": "skipped"})
+    db.add_all([other, own_mark])
+    db.commit()
+    states = {company.id: other}
+    _record_attempt(db, company, now=datetime.now(UTC), status="error", reason="x", states=states)
+    assert other.metadata_ == {"status": "ok"} and not other.consecutive_errors
+    own = db.scalar(select(ConnectorState).where(
+        ConnectorState.connector == CONNECTOR, ConnectorState.company_id == company.id,
+        ConnectorState.feed_url == FEED))
+    assert own is own_mark and states[company.id] is own_mark and own.consecutive_errors == 1
+    n = db.scalar(select(func.count()).select_from(ConnectorState).where(
+        ConnectorState.connector == CONNECTOR, ConnectorState.company_id == company.id))
+    assert n == 2  # sin fila duplicada para el FEED
+
+
+def test_mark_survives_rollback_of_a_later_company(db):
+    first = _company(db, "AAFIRST")
+    _company(db, "BBLATER")
+
+    async def refresher(session, company):
+        if company.ticker == "BBLATER":
+            raise RuntimeError("boom")
+        return {"status": "ok"}
+
+    asyncio.run(backfill_sec_fundamentals_async(db, max_companies=10, refresher=refresher, pause_s=0))
+    db.expire_all()
+    state = _attempt_state(db, first)
+    assert state is not None and state.metadata_["status"] == "ok"
+    assert state.last_success_at is not None
