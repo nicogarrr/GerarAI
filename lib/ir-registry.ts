@@ -153,8 +153,19 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     KRKNF: {
         name: 'Kraken Robotics',
         section: { url: 'https://krakenrobotics.com/investors/press-releases/', labelKey: 'pressReleases' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            // La empresa anuncia fecha y webcast del T3 2026 en su nota oficial del 5-nov
+            // (no hay pagina de evento dedicada; la nota lleva el enlace de registro).
+            {
+                date: '2026-11-24',
+                period: 'T3 2026',
+                url: 'https://www.krakenrobotics.com/news-releases/kraken-robotics-announces-102-million-in-new-orders/',
+                assets: [
+                    { kind: 'webcast', url: 'https://event.choruscall.com/mediaframe/webcast.html?webcastid=BIq8txT9', source: 'https://www.krakenrobotics.com/news-releases/kraken-robotics-announces-102-million-in-new-orders/' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-18',
     },
     BABA: {
         name: 'Alibaba Group',
@@ -462,9 +473,18 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     },
     SKYH: {
         name: 'Sky Harbour',
-        section: { url: 'https://ir.skyharbour.group/', labelKey: 'investorRelations' },
-        events: [],
-        verifiedOn: '2026-11-15',
+        section: { url: 'https://ir.skyharbour.group/events-and-presentations/events/default.aspx', labelKey: 'eventsAndPresentations' },
+        events: [
+            {
+                date: '2026-11-10',
+                period: 'T3 2026',
+                url: 'https://ir.skyharbour.group/events-and-presentations/events/event-details/2026/Sky-Harbour-2026-Third-Quarter-Earnings-Call-and-Webinar/default.aspx',
+                assets: [
+                    { kind: 'webcast', url: 'https://events.q4inc.com/attendee/316822008', source: 'https://ir.skyharbour.group/events-and-presentations/events/default.aspx' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-18',
     },
 };
 

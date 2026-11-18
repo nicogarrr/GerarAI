@@ -25,6 +25,13 @@
       "source": "https://investors.frpdev.com/quarterly-reports"
     }
   },
+  "KRKNF": {
+    "2026-11-24": {
+      "kind": "webcast",
+      "url": "https://event.choruscall.com/mediaframe/webcast.html?webcastid=BIq8txT9",
+      "source": "https://www.krakenrobotics.com/news-releases/kraken-robotics-announces-102-million-in-new-orders/"
+    }
+  },
   "META": {
     "2026-10-21": {
       "kind": "webcast",
@@ -44,6 +51,13 @@
       "kind": "webcast",
       "url": "https://events.q4inc.com/attendee/238759897/guest",
       "source": "https://ir.rexfordindustrial.com/news-events/events-webcasts/detail/20261023-third-quarter-2026-earnings-conference-call"
+    }
+  },
+  "SKYH": {
+    "2026-11-10": {
+      "kind": "webcast",
+      "url": "https://events.q4inc.com/attendee/316822008",
+      "source": "https://ir.skyharbour.group/events-and-presentations/events/default.aspx"
     }
   },
   "TSLA": {

@@ -195,6 +195,21 @@ describe('irLinksFor', () => {
         expect(irLinksFor(ticker, '2026-12-31')?.eventPage, ticker).toBeNull();
     });
 
+    it('KRKNF lleva el webcast oficial anunciado para el 2026-11-24', () => {
+        // Regresion 2026-11-18: posicion de cartera sin evento registrado para su T3 2026.
+        const live = irLiveAssetFor('KRKNF', '2026-11-24');
+        expect(live?.asset.kind).toBe('webcast');
+        expect(live?.asset.url).toContain('choruscall.com');
+        expect(irLiveAssetFor('KRKNF', '2026-11-25')).toBeNull();
+    });
+
+    it('SKYH enlaza su evento y webcast del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('SKYH', '2026-11-10');
+        expect(exact?.eventPage?.period).toBe('T3 2026');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['webcast']);
+        expect(irLinksFor('SKYH', '2026-11-11')?.eventPage).toBeNull();
+    });
+
     it('BABA lleva el directo oficial anunciado para el 2026-11-19', () => {
         // Regresion 2026-11-18: el evento existia sin assets, asi que ni el chip
         // "Ver directo oficial" ni el aviso del dia llevaban el enlace.
