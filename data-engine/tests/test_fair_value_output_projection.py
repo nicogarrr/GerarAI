@@ -21,6 +21,7 @@ from app.services.fair_value_service import (
     _as_date,
     _engine_block,
     _engine_value,
+    _engine_warnings,
     _estimated_inputs,
     _method_label,
 )
@@ -68,7 +69,7 @@ def _legacy_readings(db: Session, company_ids: Iterable[int], *, gaps: dict[int,
             adr = bool(payload.get('adr_ratio')) and (not isinstance(payload.get('listed_share_values'), dict))
             payload_gaps.setdefault(company_id, ENGINE_GAP_ADR if adr else ENGINE_GAP_NON_POSITIVE)
             continue
-        out[company_id] = Candidate(value=value, as_of=_as_date(model.created_at), publishable=model.status == 'final', estimated_inputs=_estimated_inputs(output.output_payload), method_label=_method_label(output.output_payload))
+        out[company_id] = Candidate(value=value, as_of=_as_date(model.created_at), publishable=model.status == 'final', estimated_inputs=_estimated_inputs(output.output_payload), method_label=_method_label(output.output_payload), warnings=_engine_warnings(output.output_payload))
     if gaps is not None:
         models_by_company = {int(model.company_id): model for model in models}
         for company_id in ids:
@@ -109,6 +110,9 @@ def _compare(session, ids):
      'valuation_label': 'DCF multietapa'},
     {'expected_value': 100, 'estimated_inputs': {}, 'valuation_label': 42},
     {'expected_value': 100, 'estimated_inputs': 'bad', 'valuation_label': ''},
+    {'expected_value': 100, 'warnings': [{'code': 'pb_cap_applied', 'detail': 'P/B acotado'}, {}, 'bad', {'detail': 7}]},
+    {'expected_value': 100, 'warnings': 'bad'},
+    {'expected_value': 100, 'warnings': {}},
 ])
 def test_full_candidate_and_gap_parity(db, payload):
     session, _ = db
@@ -176,3 +180,22 @@ def test_tenant_latest_block_no_output_and_multiple_scenarios(db):
         session.info['tenant_id'] = tenant
         _compare(session, ids)
     assert fvs.persisted_engine_readings(session, []) == ({}, {})
+
+
+def test_engine_warnings_reach_the_reading_with_visible_label(db):
+    session, _ = db
+    company = _company(session, 'WARNFAIR')
+    _output(session, company, {'expected_value': 100,
+                               'warnings': [{'code': 'pb_cap_applied', 'detail': 'P/B justificado 5,30x acotado a 3,00x (techo del modelo).'}]})
+    session.commit()
+    session.info['tenant_id'] = 2
+    out, _blocks = fvs.persisted_engine_readings(session, [company.id])
+    candidate = out[company.id]
+    assert candidate.warnings == ('P/B justificado 5,30x acotado a 3,00x (techo del modelo).',)
+    reading = fvs._reading('motor', candidate, stale=False, rule='x')
+    assert reading['warnings'] == list(candidate.warnings)
+    assert reading['label'].endswith('con avisos del modelo')
+    clean = fvs._reading('motor', fvs.Candidate(value=1.0, as_of=None), stale=False, rule='x')
+    assert 'warnings' not in clean and 'avisos' not in clean['label']
+    thesis = fvs._reading('tesis', fvs.Candidate(value=1.0, as_of=None, thesis_version=2, warnings=('a',)), stale=False, rule='x')
+    assert 'warnings' not in thesis
