@@ -2,10 +2,11 @@ import { Layers } from 'lucide-react';
 import Link from 'next/link';
 
 import { MutationForm } from '@/components/forms/MutationForm';
+import { DeleteSotpResultButton } from '@/components/research/DeleteSotpResultButton';
 import SotpAgentsButton from '@/components/research/SotpAgentsButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { deleteSotpResult, saveSotpResult } from '@/lib/actions/sotp.actions';
+import { saveSotpResult } from '@/lib/actions/sotp.actions';
 import { formatNumberForInput, formatUserDate } from '@/lib/format';
 import { getFormat, getLocale, getT } from '@/lib/i18n/server';
 import { SOTP_EXTRA_DILUTION, SOTP_EXTRA_PARTS, SOTP_EXTRA_SCENARIOS, getSotp, type SotpCompaniesHouse, type SotpModel, type SotpResponse, type SotpSource, type SotpVariantKey, type SotpWhy } from '@/lib/research/sotp';
@@ -423,11 +424,7 @@ function SotpEditor({ model, t, locale, ticker, saved, versions, fromAgents = fa
         </fieldset>
         <Button className="w-fit" type="submit">{t('research.sotp.save')}</Button>
       </MutationForm>
-      {saved ? (
-        <MutationForm action={deleteSotpResult.bind(null, ticker)} className="mt-3" successMessage={t('research.sotp.deleted')}>
-          <Button className="w-fit" type="submit" variant="outline">{t('research.sotp.delete')}</Button>
-        </MutationForm>
-      ) : null}
+      {saved ? <DeleteSotpResultButton ticker={ticker} /> : null}
     </details>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -23,17 +24,35 @@ export function DeleteKnowledgeButton({
     ariaLabel: string;
     confirmTitle: string;
     confirmDescription: string;
-    onDelete: () => Promise<{ success: boolean }>;
+    onDelete: () => Promise<{ success: boolean; message?: string }>;
     className?: string;
 }) {
     const t = useT();
     const [state, setState] = useState<'idle' | 'deleting' | 'error'>('idle');
     const [confirmOpen, setConfirmOpen] = useState(false);
+    const [reason, setReason] = useState<string | null>(null);
 
     const handleDelete = async () => {
         setState('deleting');
-        const result = await onDelete();
-        setState(result.success ? 'idle' : 'error');
+        setReason(null);
+        try {
+            const result = await onDelete();
+            if (result.success) return;
+            // El backend devuelve el motivo (p. ej. 409: la colección aún tiene
+            // documentos): no lo sustituyas por un genérico.
+            const message = result.message?.trim() ? result.message : t('knowledge.delete.error');
+            setReason(message);
+            setState('error');
+            toast.error(message);
+        } catch {
+            // Un throw no puede dejar el botón trabado en «Eliminando…».
+            const message = t('knowledge.delete.error');
+            setReason(message);
+            setState('error');
+            toast.error(message);
+        } finally {
+            setState((current) => (current === 'deleting' ? 'idle' : current));
+        }
     };
 
     return (
@@ -50,8 +69,8 @@ export function DeleteKnowledgeButton({
                 <Trash2 aria-hidden="true" className="h-4 w-4" />
                 {state === 'deleting' ? t('knowledge.delete.deleting') : t('common.actions.delete')}
             </Button>
-            {state === 'error' ? (
-                <span className="text-xs text-red-400" role="alert">{t('knowledge.delete.error')}</span>
+            {state === 'error' && reason ? (
+                <span className="text-xs text-red-400" role="alert">{reason}</span>
             ) : null}
             <ConfirmDialog
                 open={confirmOpen}

@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+
+const m = vi.hoisted(() => ({ remove: vi.fn(), success: vi.fn(), error: vi.fn() }));
+vi.mock('@/lib/actions/sotp.actions', () => ({ saveSotpResult: vi.fn(), deleteSotpResult: m.remove }));
+vi.mock('sonner', () => ({ toast: { success: m.success, error: m.error } }));
+vi.mock('@/lib/toast', () => ({ showErrorToast: vi.fn() }));
 
 import { SotpBreakdownView } from '@/components/research/SotpBreakdownSection';
 import { createFormatters } from '@/lib/format';
@@ -126,6 +131,21 @@ describe('SotpBreakdownView', () => {
     render(<SotpBreakdownView data={withStatus} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="ASTS" />);
     expect(screen.getByTestId('sotp-no-agents').textContent).toBe('Sin propuesta de los agentes todavía. Último intento: falta el escenario bajista');
     expect(screen.getByRole('button', { name: 'Generar con expertos' })).toBeTruthy();
+  });
+
+  it('el borrado del modelo guardado exige confirmación antes de mutar', async () => {
+   m.remove.mockResolvedValue({ ok: true });
+   const saved = { ...data, origin: 'saved' } as SotpResponse;
+   render(<SotpBreakdownView data={saved} t={createTranslator('es')} fmt={createFormatters('es')} locale="es" ticker="ASTS" />);
+   fireEvent.click(screen.getByRole('button', { name: 'Borrar mi desglose' }));
+   expect(screen.getByRole('dialog')).toHaveTextContent('¿Borrar el desglose guardado?');
+   expect(m.remove).not.toHaveBeenCalled();
+   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+   expect(m.remove).not.toHaveBeenCalled();
+   fireEvent.click(screen.getByRole('button', { name: 'Borrar mi desglose' }));
+   fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+   await waitFor(() => expect(m.remove).toHaveBeenCalledWith('ASTS', expect.any(FormData)));
   });
 });
 

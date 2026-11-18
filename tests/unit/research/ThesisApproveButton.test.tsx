@@ -31,13 +31,23 @@ describe('manual thesis approval controls',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Aprobar tesis'}));fireEvent.click(screen.getByRole('button',{name:'Publicar igualmente'}));await waitFor(()=>expect(m.refresh).toHaveBeenCalledOnce());
  });
  it.each(['removed',undefined])('rejection reports removal honestly and preserves older publication (%s)',async status=>{
-  m.approve.mockResolvedValue({decision:'rejected',version:3,knowledge_sync:status?{status}:undefined});render(<ThesisApproveButton ticker="TEST" olderPublishedVersion={2}/>);
-  fireEvent.click(screen.getByRole('button',{name:'Rechazar'}));await waitFor(()=>expect(m.refresh).toHaveBeenCalledOnce());
+  m.approve.mockResolvedValue({decision:'rejected',version:3,knowledge_sync:status?{status}:undefined});render(<ThesisApproveButton ticker="TEST" latestVersion={3} olderPublishedVersion={2}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Rechazar'}));expect(screen.getByRole('alert')).toHaveTextContent('Rechazar la v3 cambia su estado a rechazada y la retira de la Biblioteca.');expect(m.approve).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Rechazar igualmente'}));await waitFor(()=>expect(m.refresh).toHaveBeenCalledOnce());
   expect(m.success).toHaveBeenCalledWith(status==='removed'?'Tesis v3 rechazada y retirada de la Biblioteca':'Tesis v3 rechazada');expect(m.info).toHaveBeenCalledWith('La v2 sigue publicada: rechazar solo afecta a la última versión.');
+ });
+ it('requiere confirmación para rechazar y puede cancelar sin efectos',()=>{
+  render(<ThesisApproveButton ticker="TEST" latestVersion={3}/>);
+  fireEvent.click(screen.getByRole('button',{name:'Rechazar'}));
+  expect(screen.getByRole('alert')).toHaveTextContent('Rechazar la v3 cambia su estado a rechazada y la retira de la Biblioteca.');
+  expect(m.approve).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button',{name:'Cancelar'}));
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(m.approve).not.toHaveBeenCalled();
  });
  it('blocks both decisions while pending and allows failed request retry',async()=>{
   let reject!:(e:Error)=>void;const error=Error('Offline');m.approve.mockReturnValueOnce(new Promise((_,r)=>reject=r)).mockResolvedValueOnce({decision:'rejected',version:3});
-  render(<ThesisApproveButton ticker="TEST"/>);fireEvent.click(screen.getByRole('button',{name:'Rechazar'}));expect(screen.getByRole('button',{name:'Rechazando…'})).toBeDisabled();expect(screen.getByRole('button',{name:'Aprobar tesis'})).toBeDisabled();
+  render(<ThesisApproveButton ticker="TEST"/>);fireEvent.click(screen.getByRole('button',{name:'Rechazar'}));fireEvent.click(screen.getByRole('button',{name:'Rechazar igualmente'}));expect(screen.getByRole('button',{name:'Rechazando…'})).toBeDisabled();expect(screen.getByRole('button',{name:'Aprobar tesis'})).toBeDisabled();
   await act(async()=>reject(error));expect(m.error).toHaveBeenCalledWith(error,{onRetry:expect.any(Function)});expect(m.refresh).not.toHaveBeenCalled();
   await act(async()=>m.error.mock.calls[0][1].onRetry());expect(m.refresh).toHaveBeenCalledOnce();expect(m.info).not.toHaveBeenCalled();
  });
