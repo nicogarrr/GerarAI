@@ -233,7 +233,11 @@ jobs:
   backend:
     name: Backend quality
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # 40 y no 30: pytest -n 2 tarda ~19 min en un run normal (runs 44275659393 y
+    # 44271944606 del 18-nov: job 20m39s y 19m40s) y un run lento llego al
+    # 95% a los 30 min y se cancelo (#5877). Margen para la varianza del
+    # runner; no sustituye al --dist worksteal de abajo.
+    timeout-minutes: 40
     services:
       qdrant:
         image: qdrant/qdrant:v1.19.2
@@ -277,8 +281,10 @@ jobs:
       # fallo nuevo cuando se arreglen.
       - name: Redis local para tests de admision atomica
         run: sudo apt-get update && sudo apt-get install -y redis-server
-      # xdist -n 2: la suite son ~11 min single-process y el runner tiene 2
-      # vCPU. Los tests que necesitan Qdrant VIVO (marker `services`, solo
+      # xdist -n 2 --dist worksteal: la suite son ~2400 ficheros y el job tarda
+      # ~19 min con 2 vCPU (medido 18-nov). worksteal reparte por robo de trabajo
+      # en vez de por lotes fijos, asi un worker no se queda con los tests
+      # lentos mientras el otro espera. Los tests que necesitan Qdrant VIVO (marker `services`, solo
       # test_rag_activation.py) van aparte y sin xdist, en el paso de RAG
       # activation, que sigue siendo fail-closed contra el service.
       # El resto de tests que importan qdrant_client usan fakes en memoria.
@@ -316,7 +322,7 @@ jobs:
             echo "Redis quota tests skipped: redis-server must be available" >&2
             exit 1
           fi
-      - run: uv run --frozen python -m pytest -n 2 -m "not services"
+      - run: uv run --frozen python -m pytest -n 2 --dist worksteal -m "not services"
       - run: uv run --frozen python scripts/run_financial_evals.py
 
   evals:
