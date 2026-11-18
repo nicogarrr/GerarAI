@@ -370,24 +370,37 @@ def test_actor_en_taxonomia_mantenimiento():
 PG_URL = os.environ.get("GERARAI_TEST_PG_URL")
 
 
-def _pg_session(url):
-    """Sesion PG con esquema completo y tenant, idempotente (merge)."""
+@pytest.fixture()
+def pg_env():
+    """Sesion PG con esquema completo y tenant, idempotente (merge).
+
+    v5: fixture con yield que cierra la sesion y el engine al terminar.
+    Sin el cierre, la sesion quedaba con una transaccion viva y sus locks
+    (ACCESS SHARE de las lecturas del inventario) bloqueaban el DROP TABLE
+    CASCADE del siguiente test PG: repro del auditor, los dos tests juntos
+    se colgaban 120 s (con lock_timeout=8s: 26 pass / 1 fail,
+    QueryCanceled en DROP TABLE connector_states CASCADE).
+    """
     import sqlalchemy as sa
     from sqlalchemy.orm import Session as PgSession
 
     from app.models.entities import Base
 
-    engine = sa.create_engine(url, poolclass=sa.pool.NullPool)
-    Base.metadata.create_all(engine)
+    engine = sa.create_engine(PG_URL, poolclass=sa.pool.NullPool)
     session = PgSession(engine)
-    session.merge(Tenant(id=1, external_id="owner"))  # idempotente al repetir
-    session.commit()
-    session.info["tenant_id"] = 1
-    return engine, session
+    try:
+        Base.metadata.create_all(engine)
+        session.merge(Tenant(id=1, external_id="owner"))  # idempotente al repetir
+        session.commit()
+        session.info["tenant_id"] = 1
+        yield engine, session
+    finally:
+        session.close()
+        engine.dispose()
 
 
 @pytest.mark.skipif(not PG_URL, reason="sin GERARAI_TEST_PG_URL (PG real)")
-def test_pg_rollback_intermedio_no_deja_capas_sin_timeout():
+def test_pg_rollback_intermedio_no_deja_capas_sin_timeout(pg_env):
     """Con una capa rota en medio, el timeout sigue activo despues (v3/v4).
 
     En PG real: set_config(is_local=true) + error + rollback deja SHOW
@@ -399,7 +412,7 @@ def test_pg_rollback_intermedio_no_deja_capas_sin_timeout():
 
     from app.services.data_health_service import inventory
 
-    engine, pg_db = _pg_session(PG_URL)
+    engine, pg_db = pg_env
     with engine.begin() as conn:
         conn.execute(sa.text("DROP TABLE documents CASCADE"))
     snap = inventory(pg_db, statement_timeout_ms=15000)
@@ -415,7 +428,7 @@ def test_pg_rollback_intermedio_no_deja_capas_sin_timeout():
 
 
 @pytest.mark.skipif(not PG_URL, reason="sin GERARAI_TEST_PG_URL (PG real)")
-def test_pg_rollback_en_conectores_y_propick_conserva_timeout():
+def test_pg_rollback_en_conectores_y_propick_conserva_timeout(pg_env):
     """Rollback en los dos ultimos bloques: el limite se reaplica (v4).
 
     Sin las tablas connector_states ni propick, ambos bloques hacen
@@ -425,7 +438,7 @@ def test_pg_rollback_en_conectores_y_propick_conserva_timeout():
 
     from app.services.data_health_service import inventory
 
-    engine, pg_db = _pg_session(PG_URL)
+    engine, pg_db = pg_env
     with engine.begin() as conn:
         conn.execute(sa.text("DROP TABLE connector_states CASCADE"))
         conn.execute(sa.text("DROP TABLE IF EXISTS propick_candidates CASCADE"))
