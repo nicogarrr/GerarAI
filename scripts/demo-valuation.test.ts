@@ -144,6 +144,49 @@ test('opciones: huecos honestos — fuente caída, contrato ausente, sin operaci
     assert.match(overCap.note ?? '', /límite de 10/);
 });
 
+test('opciones: precio válido SIN hora => N/D con motivo propio (una prima sin hora no se puede etiquetar)', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2 };
+    const row = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: null }, fetchFailed: false }]]),
+    } as never).rows[0] as ValuedPosition;
+    // Hay PRECIO pero no su hora: la etiqueta "diferida" necesita la hora,
+    // asi que la fila es N/D. El motivo NO puede ser "sin operacion
+    // registrada" (la hay): es un hueco distinto de la fuente.
+    assert.equal(row.status, 'sin-cotizacion');
+    assert.equal(row.marketValue, null);
+    assert.match(row.note ?? '', /sin hora/i);
+    assert.doesNotMatch(row.note ?? '', /Sin operación registrada/);
+});
+
+test('opciones: aviso visible si la última operación tiene más de 1 día hábil', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5 };
+    const value = (lastTradeTime: string, nowMs: number): ValuedPosition =>
+        valuePositions([option], {}, {
+            optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime }, fetchFailed: false }]]),
+            optionPremiumNowMs: nowMs,
+        } as never).rows[0] as ValuedPosition;
+    // 2026-11-16T20:00Z = lunes 16 nov, 15:00 en Nueva York (EST, UTC-5).
+    const monday = Date.parse('2026-11-16T20:00:00Z');
+    // Viernes 13 -> lunes 16: 1 día hábil transcurrido, SIN aviso.
+    const fresh = value('2026-11-13T15:47:43', monday);
+    assert.equal(fresh.status, 'valorada');
+    assert.equal(fresh.note, null);
+    // Jueves 12 -> lunes 16: 2 días hábiles (vie 13 + lun 16), CON aviso.
+    const stale = value('2026-11-12T15:47:43', monday);
+    assert.equal(stale.status, 'valorada');
+    assert.equal(stale.marketValue, 460);
+    assert.match(stale.note ?? '', /día hábil/);
+    // El caso del auditor: operación del martes 10 consultada el miércoles 18.
+    const auditor = value('2026-11-10T10:05:00', Date.parse('2026-11-18T20:00:00Z'));
+    assert.match(auditor.note ?? '', /día hábil/);
+    // Mismo día: sin aviso. Sin reloj inyectado: no se juzga frescura.
+    assert.equal(value('2026-11-16T14:00:00', monday).note, null);
+    const noClock = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-10T10:05:00' }, fetchFailed: false }]]),
+    } as never).rows[0] as ValuedPosition;
+    assert.equal(noClock.note, null);
+});
+
 test('divisa: sin verificar => N/D; no coincide => N/D; GBp u otras => N/D; nunca por sufijo ni ausencia', () => {
     for (const currency of [null, undefined, '', 'GBp', 'CHF']) {
         const r = valuePositions([asts], { ASTS: { ...live, currency } });

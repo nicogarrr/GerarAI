@@ -515,6 +515,76 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
         expect(cacheGetChain).toHaveBeenCalledWith('ASTS');
     });
 
+    it('opción PUT en USD -> valorada con la prima DEL PUT, nunca con la del call del mismo strike', async () => {
+        state = stateWith(100000, 500, [
+            { instrumentKey: 'O:ASTS:2027-01-15:put:25:100', name: 'ASTS Put', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1, realizedPnl: 0 },
+        ]);
+        cacheGetChain.mockResolvedValue({
+            chain: new Map([
+                ['ASTS|2027-01-15|call|25000', { lastTradePrice: 9.99, lastTradeTime: '2026-11-17T15:47:43' }],
+                ['ASTS|2027-01-15|put|25000', { lastTradePrice: 1.1, lastTradeTime: '2026-11-17T15:47:43' }],
+            ]),
+            fetchFailed: false,
+            retryAfterSeconds: null,
+            fetchedAt: 222,
+            saturated: false,
+        });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        // 2 contratos x 1,10 x 100 = 220 (put); con la prima del call serían 1998.
+        expect(valuation.rows[0]).toMatchObject({ status: 'valorada', price: 1.1, marketValue: 220, unrealizedPnl: 20 });
+        expect(cacheGetQuote).not.toHaveBeenCalled();
+        expect(cacheGetChain).toHaveBeenCalledWith('ASTS');
+    });
+
+    it('más de 10 subyacentes de opción: solo se consultan 10 y el 11.º sale no-consultada con el límite', async () => {
+        const underlyings = Array.from({ length: 11 }, (_, i) => `U${String(i + 1).padStart(2, '0')}`);
+        state = stateWith(100000, 500, underlyings.map((u) => ({
+            instrumentKey: `O:${u}:2027-01-15:call:30:100`, name: `${u} Call`, kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 1, realizedPnl: 0,
+        })));
+        cacheGetChain.mockImplementation(async (u: string) => ({
+            chain: new Map([[`${u}|2027-01-15|call|30000`, { lastTradePrice: 2, lastTradeTime: '2026-11-17T15:47:43' }]]),
+            fetchFailed: false,
+            retryAfterSeconds: null,
+            fetchedAt: 222,
+            saturated: false,
+        }));
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.coverage).toEqual({ valued: 10, total: 11 });
+        expect(cacheGetChain).toHaveBeenCalledTimes(10);
+        expect(cacheGetChain).not.toHaveBeenCalledWith('U11');
+        const notQueriedRow = valuation.rows.find((r) => r.instrumentKey === 'O:U11:2027-01-15:call:30:100');
+        expect(notQueriedRow).toMatchObject({ status: 'no-consultada', marketValue: null });
+        expect(String(notQueriedRow?.note)).toMatch(/límite de 10/);
+    });
+
+    it('opción en EUR -> N/D por divisa y su subyacente NO se consulta a la fuente de primas', async () => {
+        state = stateWith(100000, 500, [
+            { instrumentKey: 'O:EURCO:2027-01-15:call:30:100', name: 'EURCO Call', kind: 'opcion', currency: 'EUR', quantity: 1, avgCost: 1, realizedPnl: 0 },
+            { instrumentKey: 'O:ASTS:2027-01-15:call:30:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 1, realizedPnl: 0 },
+        ]);
+        cacheGetChain.mockImplementation(async (u: string) => ({
+            chain: new Map([[`${u}|2027-01-15|call|30000`, { lastTradePrice: 2, lastTradeTime: '2026-11-17T15:47:43' }]]),
+            fetchFailed: false,
+            retryAfterSeconds: null,
+            fetchedAt: 222,
+            saturated: false,
+        }));
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        const eurRow = valuation.rows.find((r) => r.instrumentKey === 'O:EURCO:2027-01-15:call:30:100');
+        const usdRow = valuation.rows.find((r) => r.instrumentKey === 'O:ASTS:2027-01-15:call:30:100');
+        expect(eurRow).toMatchObject({ status: 'divisa-no-coincide', marketValue: null });
+        expect(usdRow).toMatchObject({ status: 'valorada', marketValue: 200 });
+        expect(cacheGetChain).toHaveBeenCalledTimes(1);
+        expect(cacheGetChain).toHaveBeenCalledWith('ASTS');
+        expect(cacheGetChain).not.toHaveBeenCalledWith('EURCO');
+    });
+
     it('opción con la fuente de primas caída -> N/D y quoteFetchFailed con su Retry-After', async () => {
         state = stateWith(100000, 500, [
             { instrumentKey: 'O:ASTS:2027-01-15:call:30:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5, realizedPnl: 0 },

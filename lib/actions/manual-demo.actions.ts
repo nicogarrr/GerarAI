@@ -1032,6 +1032,9 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
                 optionPremiums,
                 optionsNotQueried,
                 optionUnderlyingLimit: MAX_OPTION_UNDERLYINGS,
+                // Reloj para el aviso de prima envejecida (>1 día hábil desde
+                // la última operación del contrato, civil de Nueva York).
+                optionPremiumNowMs: Date.now(),
             }),
             // min(fetchedAt): la cotización más vieja servida manda (cambio
             // de semántica documentado arriba: antes era Date.now() siempre).

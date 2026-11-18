@@ -155,6 +155,44 @@ export function parseListingCurrencies(payload: unknown): Map<string, string> {
     return map;
 }
 
+const NY_DATE_FORMAT = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' });
+
+/** Fecha civil de Nueva York (yyyy-mm-dd) de un instante; null si no es finito. */
+export function nyCivilDate(nowMs: number): string | null {
+    if (!Number.isFinite(nowMs)) return null;
+    const parts = NY_DATE_FORMAT.formatToParts(new Date(nowMs));
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    const date = `${get('year')}-${get('month')}-${get('day')}`;
+    return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null;
+}
+
+const CIVIL_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_BUSINESS_DAY_SPAN = 3_700; // ~10 años: tope defensivo del bucle.
+
+/**
+ * Días hábiles (lunes-viernes) transcurridos desde la fecha civil de la
+ * última operación hasta la de referencia, AMBAS en Nueva York: el mismo
+ * día cuenta 0; del viernes al lunes cuenta 1. Los festivos de mercado no
+ * se conocen sin calendario oficial, así que no se descuentan (el aviso de
+ * prima envejecida puede llegar algo más tarde tras un festivo: se documenta
+ * y no se inventa). null si alguna fecha no es civil válida.
+ */
+export function businessDaysSinceTrade(tradeDate: string, referenceDate: string): number | null {
+    if (!CIVIL_DATE_RE.test(tradeDate) || !CIVIL_DATE_RE.test(referenceDate)) return null;
+    const from = Date.parse(`${tradeDate}T00:00:00Z`);
+    const to = Date.parse(`${referenceDate}T00:00:00Z`);
+    if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return null;
+    let days = 0;
+    for (let ms = from + 86_400_000; ms <= to && days <= MAX_BUSINESS_DAY_SPAN; ms += 86_400_000) {
+        const dow = new Date(ms).getUTCDay();
+        if (dow !== 0 && dow !== 6) days += 1;
+    }
+    return days;
+}
+
+/** Más de 1 día hábil desde la última operación => prima envejecida (aviso visible). */
+export const STALE_PREMIUM_BUSINESS_DAYS = 1;
+
 const TIME_FORMATS = {
     es: new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
     en: new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }),
@@ -234,6 +272,7 @@ function valueOptionPosition(
     optionUnderlyingLimit: number,
     t: ReturnType<typeof createTranslator>,
     locale: Locale,
+    optionPremiumNowMs: number | undefined,
 ): ValuedPosition {
     // Las primas de la delayed quotes API de CBOE son USD (propiedad de la
     // fuente, no inferida del simbolo): otra divisa => N/D sin conversion.
@@ -257,12 +296,30 @@ function valueOptionPosition(
         return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionContractNotFound'));
     }
     const { lastTradePrice, lastTradeTime } = lookup.quote;
-    if (lastTradePrice === null || !Number.isFinite(lastTradePrice) || lastTradePrice < 0 || lastTradeTime === null) {
+    if (lastTradePrice === null || !Number.isFinite(lastTradePrice) || lastTradePrice < 0) {
         return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionNoTrades'));
+    }
+    if (lastTradeTime === null) {
+        // Precio SIN hora: la etiqueta "diferida" necesita la hora real de la
+        // operación, así que la fila es N/D con su motivo propio (no es "sin
+        // operación registrada": hay precio).
+        return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionNoTradeTime'));
     }
     const marketValue = cents(position.quantity * lastTradePrice * OPTION_MULTIPLIER);
     const cost = position.quantity * position.avgCost * OPTION_MULTIPLIER;
     const pnl = cents(marketValue - cost);
+    // Prima envejecida: la última operación del contrato tiene más de 1 día
+    // hábil (civil de Nueva York, sin calendario de festivos). La fila SIGUE
+    // valorada (el dato es real) pero el aviso es visible, nunca escondido:
+    // una cadena poco líquida puede mezclar operaciones de días distintos.
+    let note: string | null = null;
+    if (optionPremiumNowMs !== undefined) {
+        const referenceDate = nyCivilDate(optionPremiumNowMs);
+        const elapsed = referenceDate === null ? null : businessDaysSinceTrade(lastTradeTime.slice(0, 10), referenceDate);
+        if (elapsed !== null && elapsed > STALE_PREMIUM_BUSINESS_DAYS) {
+            note = t('paperTrading.valuation.rowNotes.optionStalePremium');
+        }
+    }
     return {
         instrumentKey: position.instrumentKey,
         name: position.name,
@@ -277,7 +334,7 @@ function valueOptionPosition(
         avgCost: position.avgCost,
         currencyBasis: 'cboe',
         quoteLabel: optionQuoteLabel(lastTradeTime, locale),
-        note: null,
+        note,
     };
 }
 
@@ -298,6 +355,11 @@ export function valuePositions(
         optionsNotQueried?: ReadonlySet<string>;
         /** Tope aplicado, para el motivo "limite de N". */
         optionUnderlyingLimit?: number;
+        /**
+         * Reloj (epoch ms) para el aviso de prima envejecida: sin él no se
+         * juzga la frescura de la última operación (camino antiguo/tests).
+         */
+        optionPremiumNowMs?: number;
     } = {},
 ): DemoValuation {
     const locale: Locale = options.locale ?? DEFAULT_LOCALE;
@@ -311,6 +373,7 @@ export function valuePositions(
                 options.optionUnderlyingLimit ?? 0,
                 t,
                 locale,
+                options.optionPremiumNowMs,
             );
         }
         const symbol = symbolFromKey(position.instrumentKey);

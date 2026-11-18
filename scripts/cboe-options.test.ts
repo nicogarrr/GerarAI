@@ -112,6 +112,58 @@ test('caché: fallo con Retry-After frena el reintento; vencida la ventana reint
     assert.equal(fetches, 2, 'vencida la ventana se reintenta');
 });
 
+test('caché: borde EXACTO del TTL (en ttlMs se sirve, en ttlMs+1 se revalida)', async () => {
+    let clock = 1_000_000;
+    const cache = createCboeChainCache({ now: () => clock, ttlMs: 60_000 });
+    let fetches = 0;
+    const fetcher = async (): Promise<CboeChainAttempt> => {
+        fetches += 1;
+        return okAttempt(cboePayload);
+    };
+    const first = await cache.getChain('ASTS', fetcher);
+    const fetchedAt = first.fetchedAt;
+    assert.equal(fetches, 1);
+    clock = (fetchedAt as number) + 60_000;
+    await cache.getChain('ASTS', fetcher);
+    assert.equal(fetches, 1, 'con antigüedad == TTL la entrada sigue viva');
+    clock = (fetchedAt as number) + 60_001;
+    await cache.getChain('ASTS', fetcher);
+    assert.equal(fetches, 2, 'con antigüedad == TTL+1 ms se revalida');
+});
+
+test('caché: el Retry-After del proveedor se respeta pero ACOTADO a 300 s', async () => {
+    let clock = 0;
+    const cache = createCboeChainCache({ now: () => clock });
+    let fetches = 0;
+    const failing = async (): Promise<CboeChainAttempt> => {
+        fetches += 1;
+        return { chain: null, fetchFailed: true, retryAfterSeconds: 999 };
+    };
+    await cache.getChain('ASTS', failing);
+    assert.equal(fetches, 1);
+    clock += 299_000;
+    const blocked = await cache.getChain('ASTS', failing);
+    assert.equal(fetches, 1, 'dentro de la ventana acotada no se reintenta');
+    assert.ok((blocked.retryAfterSeconds ?? Infinity) <= 300, 'la espera restante nunca supera el tope de 300 s');
+    clock += 2_000;
+    await cache.getChain('ASTS', failing);
+    assert.equal(fetches, 2, 'a los 301 s se reintenta aunque el proveedor pidió 999 s');
+});
+
+test('cboeContractKey: el strike se REDONDEA al milésimo OCC (un suelo rompería strikes de 3 decimales)', () => {
+    // 45.29 * 1000 = 45289.99999999999 en coma flotante: con Math.floor la
+    // clave sería 45289 y el contrato real 45290 saldría N/D. Round es
+    // CORRECTO: el strike OCC lleva exactamente 3 decimales.
+    const parsed = parseOccSymbol('ASTS261120C00045290');
+    assert.ok(parsed);
+    assert.equal(cboeContractKey('ASTS', '2026-11-20', 'call', 45.29), cboeContractKey(parsed.underlying, parsed.expiry, parsed.callPut, parsed.strike));
+    assert.match(cboeContractKey('ASTS', '2026-11-20', 'call', 45.29), /\|45290$/);
+    // Un strike por ENCIMA de la precisión OCC se aproxima al milésimo más
+    // cercano (elección registrada: redondeo, no suelo ni techo).
+    assert.match(cboeContractKey('ASTS', '2026-11-20', 'call', 45.0005), /\|45001$/);
+    assert.match(cboeContractKey('ASTS', '2026-11-20', 'call', 45.0004), /\|45000$/);
+});
+
 test('caché: saturación de concurrencia = degradado inmediato sin fetch ni bloqueo', async () => {
     const cache = createCboeChainCache({ maxInflight: 2 });
     let fetches = 0;

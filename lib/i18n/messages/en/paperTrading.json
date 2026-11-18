@@ -55,7 +55,9 @@
       "optionNoQuote": "No quote for the contract's premium (the lookup failed or the underlying is out of coverage; your trade prices are not used).",
       "optionContractNotFound": "Contract not found in the options chain (expired, adjusted or nonexistent): N/A.",
       "optionNoTrades": "No recorded trade for the contract: N/A (no premium is made up).",
-      "optionNotQueried": "Not checked: limit of {limit} option underlyings per request."
+      "optionNotQueried": "Not checked: limit of {limit} option underlyings per request.",
+      "optionNoTradeTime": "The source publishes a price with no trade time: N/A (without its time the premium cannot be labelled).",
+      "optionStalePremium": "The contract's last trade is more than 1 business day old: the premium may not reflect the current price."
     },
     "quoteLabels": {
       "live": "{time} (Madrid time) · live",

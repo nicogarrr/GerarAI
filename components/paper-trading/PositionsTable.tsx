@@ -117,6 +117,10 @@ function ValuationCells({ row, currency, ti, f }: { row: ValuedPosition | null; 
             <TableCell className="hidden text-right md:table-cell">
                 <span className="block">{f.formatMoney(row.marketValue, currency)}</span>
                 <span className="block max-w-56 text-xs whitespace-normal text-gray-500">{row.quoteLabel}</span>
+                {/* Aviso de dato envejecido en una fila VALORADA (p.ej. prima de
+                    opción con más de 1 día hábil): visible, nunca solo en un
+                    tooltip; el tono ámbar es el de los avisos del panel. */}
+                {row.note ? <span className="block max-w-56 text-xs whitespace-normal text-amber-300">{row.note}</span> : null}
             </TableCell>
             <TableCell className={`hidden text-right md:table-cell ${pnlTone(row.unrealizedPnl)}`}>
                 <span className="block">{f.formatMoney(row.unrealizedPnl, currency)}</span>
@@ -145,6 +149,7 @@ function MobileValuation({ row, currency, ti, f }: { row: ValuedPosition | null;
                 pnl: `${f.formatMoney(row.unrealizedPnl, currency)}${row.unrealizedPct !== null ? ` (${f.formatNumber(row.unrealizedPct, { maximumFractionDigits: 1 })} %)` : ''}`,
                 quoteLabel: row.quoteLabel ?? '',
             })}
+            {row.note ? <span className="block text-amber-300">{row.note}</span> : null}
         </span>
     );
 }

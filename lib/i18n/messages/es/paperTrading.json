@@ -55,7 +55,9 @@
       "optionNoQuote": "Sin cotización de la prima del contrato (falló la consulta o el subyacente está fuera de cobertura; no se usa el precio de tus operaciones).",
       "optionContractNotFound": "Contrato no encontrado en la cadena de opciones (vencido, ajustado o inexistente): N/D.",
       "optionNoTrades": "Sin operación registrada del contrato: N/D (no se inventa una prima).",
-      "optionNotQueried": "No consultada: límite de {limit} subyacentes de opciones por consulta."
+      "optionNotQueried": "No consultada: límite de {limit} subyacentes de opciones por consulta.",
+      "optionNoTradeTime": "La fuente publica un precio sin hora de operación: N/D (sin su hora no se puede etiquetar la prima).",
+      "optionStalePremium": "La última operación del contrato tiene más de 1 día hábil: la prima puede no reflejar el precio actual."
     },
     "quoteLabels": {
       "live": "{time} (hora de Madrid) · en vivo",
