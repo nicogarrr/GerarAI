@@ -1,6 +1,7 @@
 """Explicit on-demand refresh, persisted reads, no provider work in GET."""
 from __future__ import annotations
 
+import asyncio
 import hashlib
 from datetime import UTC, date, datetime, timedelta
 
@@ -11,6 +12,9 @@ from sqlalchemy.orm import Session
 from app.core.tenancy import tenant_filters
 from app.models import Company, ConnectorState
 from app.services.cnmv_mapping import resolve_issuer
+from app.services.connectors.amf_vad import aggregate_by_isin as amf_aggregate_by_isin
+from app.services.connectors.amf_vad import fetch_current as fetch_amf_vad_current
+from app.services.connectors.amf_vad import rows_for_isin as amf_rows_for_isin
 from app.services.connectors.cnmv_shorts import fetch_positions
 from app.services.connectors.short_interest import fetch_short_interest, fetch_short_volume
 from app.services.data_health_service import utc
@@ -98,6 +102,44 @@ async def refresh_shorts(db: Session, company: Company) -> dict:
                 raise ValueError("Future FINRA trade date")
             payload = {**row, "short_interest": interest, "source": "FINRA", "kind": "OFICIAL", "ratio_kind": "DERIVADO",
                        "note": "Volumen corto diario fuera de bolsa, no posiciones abiertas ni porcentaje total del mercado. No implica sentimiento bajista por sí solo."}
+        elif exchange in {"EURONEXT PARIS", "EPA", "PAR", "XPAR", "SBF"}:
+            # AMF VAD: posiciones cortas netas públicas por TITULAR (>=0,5%,
+            # UE 236/2012; Francia no adoptó el régimen agregado SSR 2025).
+            # El fichero es el mismo para todas las empresas: cacheado por
+            # proceso (6 h); el sync connector corre en hilo para no bloquear
+            # el loop (pacer global "amf", 1 req/s entre procesos).
+            if not (company.isin or "").strip():
+                raise ValueError("empresa FR sin ISIN: no se puede cuadrar identidad VAD")
+            rows = await asyncio.to_thread(fetch_amf_vad_current)
+            vigentes = amf_rows_for_isin(rows, company.isin)
+            agregado = amf_aggregate_by_isin(vigentes)
+            payload = {
+                "source": "AMF-VAD",
+                "kind": "OFICIAL",
+                "licence": "AMF - Licence Ouverte v2.0",
+                "delay": "publicación diaria hábil AMF, ~T+2",
+                "threshold": "posiciones cortas netas >=0,5% del capital, públicas con titular (UE 236/2012)",
+                "isin": company.isin.strip().upper(),
+                "positions": [
+                    {
+                        "holder": row.holder_name,
+                        "lei": row.holder_lei,
+                        "percent": row.ratio_pct,
+                        "position_date": row.position_start.isoformat(),
+                        "publication_date": row.publication_start.isoformat(),
+                    }
+                    for row in vigentes
+                ],
+                # Suma de titulares: DERIVADO del dato oficial por titular.
+                "public_total_percent": agregado.get(company.isin.strip().upper()),
+                "ratio_kind": "DERIVADO",
+                "source_url": "https://www.data.gouv.fr/datasets/historique-des-positions-courtes-nettes-sur-actions-rendues-publiques-depuis-le-1er-novembre-2012",
+                "note": (
+                    "Posiciones cortas netas públicas por titular (AMF, >=0,5%): "
+                    "solo lo declarado público, no el total del mercado. Sin filas "
+                    "vigentes no es 0: es N/D."
+                ),
+            }
         else:
             state.last_error = "UnsupportedMarket"
             state.consecutive_errors = (state.consecutive_errors or 0) + 1
@@ -147,9 +189,11 @@ def emit_shorts_increase(db: Session, company: Company, previous: dict, current:
     parts = None
     message = None
     source_url = None
-    if current.get("source") == "CNMV" and previous.get("source") == "CNMV":
+    if (current.get("source") in {"CNMV", "AMF-VAD"}
+            and previous.get("source") == current.get("source")):
         # Same set of public holders avoids treating disclosure-threshold entry
         # as a real increase in the market's total open short interest.
+        fuente = current["source"]  # CNMV (ES) o AMF-VAD (FR): mismo régimen 0,5%
         old = {r["holder"]: r for r in previous.get("positions", [])}
         new = {r["holder"]: r for r in current.get("positions", [])}
         valid_dates = bool(old and old.keys() == new.keys())
@@ -180,9 +224,9 @@ def emit_shorts_increase(db: Session, company: Company, previous: dict, current:
             before = previous.get("public_total_percent")
             after = current.get("public_total_percent")
             if before is not None and after is not None and after > before:
-                message = (f"{company.ticker}: suma de posiciones cortas públicas CNMV "
+                message = (f"{company.ticker}: suma de posiciones cortas públicas {fuente} "
                            f"{format_number_es(before, 4)}% → {format_number_es(after, 4)}% (fechas de posición {min(observation_dates)} a {max(observation_dates)}). Mismos titulares; solo posiciones públicas >=0,5%, no el total del mercado.")
-                parts = ["CNMV", *[f"{k}:{v['position_date']}:{v['percent']}" for k, v in sorted(new.items())]]
+                parts = [fuente, *[f"{k}:{v['position_date']}:{v['percent']}" for k, v in sorted(new.items())]]
                 source_url = current.get("source_url")
     interest = current.get("short_interest")
     if isinstance(interest, dict):
