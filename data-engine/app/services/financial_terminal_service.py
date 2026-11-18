@@ -127,10 +127,15 @@ class FinancialTerminalService:
         )
         document_ids = {fact.source_id for fact in facts if fact.source_id}
         documents = {
-            document.id: document
-            for document in db.scalars(
-                select(Document).where(Document.id.in_(document_ids))
-            ).all()
+            row.id: row
+            for row in db.execute(
+                select(
+                    Document.id,
+                    Document.title,
+                    Document.source_url,
+                    Document.metadata_["segment"].label("segment"),
+                ).where(Document.id.in_(document_ids), *tenant_filters(db, Document))
+            )
         } if document_ids else {}
         series: dict[str, list[dict[str, Any]]] = defaultdict(list)
         # Deduplicacion con criterio explicito: un (metrica, periodo, segmento)
@@ -149,7 +154,7 @@ class FinancialTerminalService:
             if periodicity != "all" and frequency != periodicity:
                 continue
             document = documents.get(fact.source_id)
-            segment = str((document.metadata_ or {}).get("segment") or "consolidated") if document else "consolidated"
+            segment = str(document.segment or "consolidated") if document else "consolidated"
             key = (fact.metric, fact.period, segment, frequency)
             rank = (
                 SOURCE_PRIORITY.get(fact.source_type or "", 50),
