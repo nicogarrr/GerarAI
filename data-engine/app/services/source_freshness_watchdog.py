@@ -106,7 +106,8 @@ def _previous_status(
 ) -> str | None:
     """Estado previo de la fuente: memoria del proceso y, si no, el episodio
     durable persistido (supera reinicios y cambios de dia)."""
-    key = (row.get("layer"), row.get("source") or "")
+    key: tuple[str, str] = (str(row.get("layer") or ""),
+                            str(row.get("source") or ""))
     previous: str | None = None
     if durable_states:
         previous = durable_states.get(key)

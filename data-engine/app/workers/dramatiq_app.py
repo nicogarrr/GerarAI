@@ -5925,8 +5925,11 @@ def dispatch_source_freshness_watchdog(
     """Alerta in-app al operador cuando una fuente de datos envejece (stale).
 
     Reusa el inventario del panel de salud de datos (misma politica de edad
-    por capa) y persiste una ResearchAlert por fuente y dia. Nace de FMP e
-    yahoo_intraday paradas desde el 2/7-oct-2026 sin que nadie lo viera.
+    por capa) y persiste una ResearchAlert por fuente y dia. Nace del
+    incidente del 1-nov-2026: dos fuentes llevaban paradas desde el
+    2/7-oct-2026 sin que nadie lo viera (detalle y nombres en
+    tests/test_source_freshness_watchdog.py). No llama a ningun proveedor:
+    solo lee el inventario en base de datos.
     """
     actor_name = "dispatch_source_freshness_watchdog"
     db = None
