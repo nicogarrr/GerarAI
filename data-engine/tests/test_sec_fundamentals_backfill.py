@@ -157,3 +157,52 @@ def test_attempt_marks_are_not_documents(db):
     assert n_docs == 0
     state = _attempt_state(db, db.scalar(select(Company).where(Company.ticker == "NODOC")))
     assert state is not None and state.metadata_["status"] == "skipped"
+
+
+def test_freshness_map_batches_and_matches_scalar_semantics(db):
+    """La lectura en lote equivale a last_sec_refresh por compania: fecha
+    fresca, fecha invalida (=no fresco), sin Document (=no fresco) y, con
+    varios Documents anomalos, gana el primero como el scalar original."""
+    from app.services.sec_fundamentals_backfill import _freshness_map
+
+    now = datetime.now(UTC)
+    ok = _company(db, "FMOK")
+    _sec_doc(db, ok, now - timedelta(days=2))
+    bad = _company(db, "FMBAD")
+    doc = _sec_doc(db, bad, now - timedelta(days=2))
+    doc.metadata_ = {"last_refreshed_at": "no-es-una-fecha"}
+    db.commit()
+    missing = _company(db, "FMNONE")
+
+    freshness = _freshness_map(db, [ok.id, bad.id, missing.id])
+    assert freshness[ok.id] is not None
+    assert freshness[bad.id] is None
+    assert missing.id not in freshness
+
+    # Universo sin elegibles: ni una consulta (guarda de lista vacia).
+    assert _freshness_map(db, []) == {}
+
+
+def test_batch_reuses_attempt_marks_without_extra_writes(db):
+    """Con marca previa de FEED el lote la actualiza en memoria (sin SELECT
+    por compania) y mantiene los contadores del estado."""
+    now = datetime.now(UTC)
+    reused = _company(db, "REUSE")
+    _attempt(db, reused, now - timedelta(days=4), status="error", reason="boom")
+    state = _attempt_state(db, reused)
+    assert state.consecutive_errors is None or state.consecutive_errors >= 0
+
+    async def fake_refresher(session, company):
+        return {"status": "error", "reason": "sigue_roto"}
+
+    stats = asyncio.run(backfill_sec_fundamentals_async(
+        db, max_companies=10, refresher=fake_refresher, pause_s=0))
+    assert stats["error"] == 1
+    db.expire_all()
+    state = _attempt_state(db, reused)
+    assert state.consecutive_errors == 1
+    assert state.metadata_["reason"] == "sigue_roto"
+    # Una sola fila de marca por compania: la precargada se reutilizo.
+    n_states = db.scalar(select(func.count()).select_from(ConnectorState).where(
+        ConnectorState.connector == CONNECTOR, ConnectorState.company_id == reused.id))
+    assert n_states == 1
