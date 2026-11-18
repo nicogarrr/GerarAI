@@ -1,12 +1,15 @@
 """Review gates for the document-only terminal projection."""
 import inspect
 import os
+import re
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import create_engine, event, select, text
+from sqlalchemy import create_engine, event, select
 from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy.schema import CreateSchema, DropSchema
+from sqlalchemy.sql import quoted_name
 
 import app.core.database as coredb
 import app.core.tenancy as tenancy
@@ -92,9 +95,12 @@ def postgres_db():
     if not url:
         pytest.skip('Set TERMINAL_TEST_POSTGRES_URL for a disposable PostgreSQL database')
     engine = create_engine(url)
-    schema = 'terminal_review_' + uuid4().hex
+    raw_schema = 'terminal_review_' + uuid4().hex
+    if re.fullmatch(r'terminal_review_[0-9a-f]{32}', raw_schema) is None:
+        raise ValueError('Invalid temporary schema identifier')
+    schema = quoted_name(raw_schema, quote=True)
     with engine.begin() as conn:
-        conn.execute(text(f'CREATE SCHEMA {schema}'))
+        conn.execute(CreateSchema(schema))
     scoped_engine = engine.execution_options(schema_translate_map={None: schema})
     try:
         Base.metadata.create_all(scoped_engine, tables=[Tenant.__table__, Company.__table__,
@@ -106,7 +112,7 @@ def postgres_db():
             yield session
     finally:
         with engine.begin() as conn:
-            conn.execute(text(f'DROP SCHEMA {schema} CASCADE'))
+            conn.execute(DropSchema(schema, cascade=True))
         engine.dispose()
 
 
