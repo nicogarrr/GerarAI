@@ -117,6 +117,17 @@ for (const vp of [
 
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto("/portfolio", { waitUntil: "networkidle", timeout: 60000 });
+    // P14 (18-nov-2026): los graficos de Resumen montan al acercarse al
+    // viewport (LazyMount + IntersectionObserver; el donut asoma a ~1178px
+    // y este viewport llega a 900). Sin scroll el donut no se descarga
+    // nunca y la espera del SVG agotaba los 60 s en el caso movil-768.
+    // Ojo: el salto al PIE de la pagina no basta — la pagina es mucho mas
+    // alta que dos viewports y el donut queda a media pagina, fuera del
+    // tramo final visible. Hay que llevar el ELEMENTO al viewport: el
+    // ancla es la leyenda (#portfolio-allocation-legend), que siempre
+    // renderiza porque vive fuera del LazyMount; centrada, la caja de
+    // 200px del donut justo encima entra seguro en los 900px de alto.
+    await page.locator("#portfolio-allocation-legend").evaluate((el) => el.scrollIntoView({ block: "center" }));
     // Espera por estado: el donut (dynamic import propio) monta su SVG.
     await page.waitForSelector(".recharts-responsive-container svg", { timeout: 60000 });
     await page.waitForTimeout(4000);

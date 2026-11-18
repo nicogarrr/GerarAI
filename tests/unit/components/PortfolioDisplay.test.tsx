@@ -75,7 +75,7 @@ describe('PortfolioAllocation', () => {
         expect(screen.getByText('Añade posiciones para ver la distribución')).toBeInTheDocument();
     });
 
-    it('pesos suman 100 entre las valoradas; sin valor o valoración suspendida queda fuera y se avisa', () => {
+    it('pesos suman 100 entre las valoradas; sin valor o valoración suspendida queda fuera y se avisa', async () => {
         render(<PortfolioAllocation holdings={[holding('AAA', 300), holding('BBB', 100), holding('CCC', 0, { valueMissing: true }), holding('DDD', 50, { valuationHold: { reason: 'suspensión', effectiveDate: '2026-10-01' } })]} baseCurrency="EUR" />);
         const legend = document.getElementById('portfolio-allocation-legend')!;
         expect(legend.textContent).toMatch(/AAA.*75,0\s?%/);
@@ -83,7 +83,8 @@ describe('PortfolioAllocation', () => {
         expect(legend.textContent).not.toContain('CCC');
         expect(legend.textContent).not.toContain('DDD');
         expect(screen.getByText(/Distribución incompleta: 2 posiciones sin valor/)).toBeInTheDocument();
-        expect(screen.getByTestId('donut')).toHaveAttribute('data-currency', 'EUR');
+        // El donut se monta en el próximo frame (LazyMount): findBy, no getBy.
+        expect(await screen.findByTestId('donut')).toHaveAttribute('data-currency', 'EUR');
         expect(screen.getByText('Posiciones').previousSibling!.textContent).toBe('2');
     });
 
@@ -112,14 +113,14 @@ describe('PortfolioAllocation', () => {
         expect(screen.queryByText('Posiciones')).not.toBeInTheDocument();
     });
 
-    it('caja negativa se muestra como margen en rojo y fuera del donut', () => {
+    it('caja negativa se muestra como margen en rojo y fuera del donut', async () => {
         render(<PortfolioAllocation holdings={[holding('AAA', 100)]} cash={-2500} baseCurrency="EUR" />);
         const label = screen.getByText('Caja (margen)');
         expect(label).toBeInTheDocument();
         const row = label.parentElement!;
         expect(row.textContent).toMatch(/-\s?2\.?500/);
         expect(row.querySelector('.text-red-400')).not.toBeNull();
-        expect(screen.getByTestId('donut')).toHaveAttribute('data-n', '1');
+        expect(await screen.findByTestId('donut')).toHaveAttribute('data-n', '1');
     });
 
     it('caja positiva y caja 0', () => {
