@@ -949,7 +949,9 @@ class PortfolioIntelligenceService:
                 db,
                 currencies={transaction.currency for transaction in all_transactions},
                 base_currency=base,
-                as_of_max=max((t.trade_date for t in all_transactions), default=None) or date.today(),
+                # trade_date es NOT NULL y all_transactions no esta vacio aqui:
+                # max() siempre devuelve fecha, sin fallback.
+                as_of_max=max(t.trade_date for t in all_transactions),
             )
             if all_transactions
             else {}
@@ -1357,7 +1359,7 @@ class PortfolioIntelligenceService:
             db,
             currencies={t.currency for t in transactions} | {p.currency for p, _ in rows},
             base_currency=base,
-            as_of_max=date.today(),
+            as_of_max=local_today(),
         )
 
         prior_prices: dict[int, Any] = _prior_closes(db, company_ids, cutoff)
@@ -1678,7 +1680,7 @@ class PortfolioIntelligenceService:
                 db,
                 currencies={position.currency for position, _ in rows if position.currency} | {base_currency},
                 base_currency=base_currency,
-                as_of_max=date.today(),
+                as_of_max=local_today(),
             )
             if rows
             else {}
@@ -1733,7 +1735,7 @@ class PortfolioIntelligenceService:
             # acciones x3 desde el inicio) frente a un retorno de 5 anos, y la
             # atribucion salia con dilucion de -212 % o multiplos absurdos.
             window_start = (prices[0].date if prices else cutoff).year
-            window_end = (prices[-1].date if prices else date.today()).year
+            window_end = (prices[-1].date if prices else local_today()).year
             by_metric = {
                 metric: self._window_facts(rows_, window_start, window_end)
                 for metric, rows_ in all_facts.get(company.id, {}).items()
