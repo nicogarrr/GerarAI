@@ -277,3 +277,38 @@ def test_single_resolve_recalculates_live_only_when_thesis_is_displaced(db, monk
     out = fvs.resolve_fair_value(db, fresh, live=True, today=TODAY)
     assert calls == ["LIVEYES"]  # la tesis vigente no paga el cálculo
     assert (out["value"], out["source"]) == (150.0, "tesis")
+
+
+def test_live_engine_warnings_reach_user_reading_and_thesis_label_is_unchanged(db, monkeypatch):
+    displaced = _company(db, "WLIVEYES")
+    _thesis(db, displaced, basis={"engine_version": "valuation-engines-v1"})
+    fresh = _company(db, "WLIVENO")
+    _thesis(db, fresh, basis={"engine_version": MODEL_VERSION})
+    db.commit()
+    long_detail = "x" * 500
+
+    def fake_value_company(self, db_, company_):
+        return {
+            "publishable": True, "expected_value": 90.0, "base_value": 90.0,
+            "warnings": [
+                {"detail": " P/B acotado a 3,00x. "}, {"detail": "P/B acotado a 3,00x."},
+                {"detail": 7}, {"detail": "   "}, {"detail": long_detail}, "bad",
+            ],
+        }
+
+    from app.services.valuation_service import ValuationService
+
+    monkeypatch.setattr(ValuationService, "value_company", fake_value_company)
+    out = fvs.resolve_fair_value(db, displaced, live=True, today=TODAY)
+    assert out["source"] == "motor"
+    assert out["warnings"] == ["P/B acotado a 3,00x.", "x" * fvs.WARNING_MAX_CHARS]
+    assert out["label"].endswith("con avisos del modelo")
+    thesis_out = fvs.resolve_fair_value(db, fresh, live=True, today=TODAY)
+    assert thesis_out["source"] == "tesis"
+    assert "warnings" not in thesis_out and "avisos" not in thesis_out["label"]
+
+
+def test_engine_warnings_cap_count_and_ignore_non_text():
+    items = [{"detail": f"aviso {i}"} for i in range(20)]
+    assert len(fvs._engine_warnings({"warnings": items})) == fvs.WARNING_MAX_ITEMS
+    assert fvs._engine_warnings({"warnings": [{"detail": 7}, {"detail": None}]}) == ()
