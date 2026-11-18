@@ -13,8 +13,9 @@ CSV por corrida). Si la API o el esquema del recurso cambian, lanza
 AMFVADParseError: un fallo de resolución NUNCA se presenta como «sin cortos».
 
 Verificado en vivo 18-nov-2026: CSV de 5,2 MB con 41.620 filas (histórico
-completo desde 2012; no hay endpoint «solo vigentes»), 2.767 posiciones
-abiertas publicadas sobre 81 ISINs, máx. fecha de posición 13-nov con
+completo desde 2012; no hay endpoint «solo vigentes»), 2.767 filas
+abiertas brutas (antes de deduplicar por titular e ISIN; 207 titulares
+vigentes únicos en 81 ISINs, medido por el Auditor), máx. fecha de posición 13-nov con
 fichero publicado el 17-nov (retraso T+2 hábil). Formato: punto y coma,
 comillas, UTF-8, sin BOM, fechas ISO. Una actualización de posición es una
 FILA NUEVA del mismo (titular, ISIN): la posición vigente de un titular es
