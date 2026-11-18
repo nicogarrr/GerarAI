@@ -215,3 +215,48 @@ def test_unapplied_split_keeps_raw_closes_and_quantities(db):
     # Sin ajuste: la serie es la cruda (1000-1000-500-520); el -50 % del split
     # sin aplicar es visible y real para este libro (cantidad sin reescalar).
     assert [row["value_base"] for row in result.series] == [1000.0, 1000.0, 500.0, 520.0]
+
+
+def test_mixed_currency_ledger_keeps_prices_and_converts_each_flow(db):
+    # La empresa cotiza en USD y la posicion esta en USD, pero el broker
+    # registro la segunda compra en EUR. Antes, la divisa de la ULTIMA
+    # operacion pisaba la de la posicion para TODO: los cierres en USD ya no
+    # casaban con la unidad destino (EUR) y se descartaban silenciosamente,
+    # con lo que la reconstruccion devolvia status "ok" con la serie VACIA.
+    # Y cada flujo debe convertirse con la divisa de SU operacion (la pata
+    # EUR al tipo EUR, no toda al tipo de la ultima).
+    from app.models.entities import FXRate
+
+    company = Company(
+        ticker="USDCo", name="USDCo", exchange="NASDAQ", currency="USD", sector="T",
+        industry="I", company_type="holding", valuation_model="unassigned",
+        special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.commit()
+    for offset, close in enumerate([10, 10, 11, 12]):
+        db.add(MarketPrice(company_id=company.id, date=D0 + timedelta(days=offset),
+                           close=Decimal(close), adj_close=Decimal(close), source="t"))
+    db.add(Transaction(company_id=company.id, trade_date=D0, action="buy",
+                       quantity=Decimal("10"), price=Decimal("10"), fees=Decimal("0"),
+                       currency="USD", raw_payload={}))
+    db.add(Transaction(company_id=company.id, trade_date=D0 + timedelta(days=2), action="buy",
+                       quantity=Decimal("10"), price=Decimal("9.9"), fees=Decimal("0"),
+                       currency="EUR", raw_payload={}))
+    db.add(Position(company_id=company.id, quantity=Decimal("20"), currency="USD",
+                    market_value=Decimal("240"), market_value_base=Decimal("216"), as_of=D0))
+    for offset in range(4):
+        db.add(FXRate(base_currency="EUR", quote_currency="USD",
+                      rate_date=D0 + timedelta(days=offset), rate=Decimal("0.90")))
+    db.commit()
+
+    res = PortfolioReconstructionService().build(db)
+
+    assert res.status == "ok"
+    assert res.series, "la serie no puede salir vacia con precios y libro presentes"
+    # 20 titulos x 12 USD x 0,90 EUR/USD = 216,0 EUR.
+    assert res.series[-1]["value_base"] == pytest.approx(216.0, rel=1e-9)
+    # La subida 10 -> 11 (+10 %) con la compra EUR en medio no se contamina
+    # con el flujo: retorno del dia 3 = (198 - 99) / 90 - 1 = 0,1.
+    day3 = D0 + timedelta(days=2)
+    assert res.returns[day3] == pytest.approx(0.1, rel=1e-9)
