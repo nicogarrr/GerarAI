@@ -131,19 +131,28 @@ class GlobalPacer:
         client = self._client()
         if client is not None:
             try:
-                now_ms = int(self._wall() * 1000)
-                # El cliente Redis es sincrono: fuera del event loop para que un
-                # Redis lento (hasta socket_timeout) no pare todas las rutas.
-                wait_ms = await asyncio.to_thread(
-                    client.eval,
-                    _CLAIM_SLOT_LUA, 2, self._slot_key, self._cooldown_key,
-                    now_ms, interval_ms, self._slot_ttl_ms,
-                )
-                wait = max(0.0, float(wait_ms) / 1000.0)
-                if wait > 0:
-                    dormir = self._sleep_async if self._sleep_async is not None else asyncio.sleep
+                dormir = self._sleep_async if self._sleep_async is not None else asyncio.sleep
+                while True:
+                    now_ms = int(self._wall() * 1000)
+                    # El cliente Redis es sincrono: fuera del event loop para que un
+                    # Redis lento (hasta socket_timeout) no pare todas las rutas.
+                    wait_ms = await asyncio.to_thread(
+                        client.eval,
+                        _CLAIM_SLOT_LUA, 2, self._slot_key, self._cooldown_key,
+                        now_ms, interval_ms, self._slot_ttl_ms,
+                    )
+                    wait = max(0.0, float(wait_ms) / 1000.0)
+                    if wait <= 0:
+                        return
                     await dormir(wait)
-                return
+                    # El hueco se reservo ANTES de dormir: si durante la espera
+                    # llego un Retry-After (cool_down), el hueco viejo ya no vale.
+                    # Se RE-RESERVA un hueco nuevo (el Lua lo calcula tras el
+                    # cooldown y detras de los huecos ya reservados): reutilizar
+                    # el viejo soltaria a todos los durmientes a la vez al
+                    # expirar el cooldown, perdiendo la separacion global.
+                    if await asyncio.to_thread(self.blocked_for) <= 0:
+                        return
             except Exception as exc:  # noqa: BLE001 - Redis caido: pacing local
                 logger.warning("global pacer %s: Redis unavailable, fallback local: %s", self.key, exc)
         if not self._fallback_local:
@@ -174,23 +183,38 @@ class GlobalPacer:
         client = self._client()
         if client is not None:
             try:
-                wait_ms = client.eval(
-                    _CLAIM_SLOT_LUA, 2, self._slot_key, self._cooldown_key,
-                    int(self._wall() * 1000), int(self.min_interval_seconds * 1000), self._slot_ttl_ms,
-                )
-                if float(wait_ms) > 0:
+                while True:
+                    wait_ms = client.eval(
+                        _CLAIM_SLOT_LUA, 2, self._slot_key, self._cooldown_key,
+                        int(self._wall() * 1000), int(self.min_interval_seconds * 1000), self._slot_ttl_ms,
+                    )
+                    if float(wait_ms) <= 0:
+                        return
                     self._sleep(float(wait_ms) / 1000.0)
-                return
+                    # Mismo motivo que en wait(): un cooldown llegado durante la
+                    # espera invalida el hueco; se re-reserva uno nuevo para
+                    # conservar la separacion entre esperadores.
+                    if self.blocked_for() <= 0:
+                        return
             except Exception:
                 logger.warning("global pacer %s: Redis unavailable, fallback local", self.key, exc_info=True)
         if self._fallback_local:
-            with self._local_lock:
-                while True:
-                    remaining = max(self._local_next, self._local_blocked_until) - self._monotonic()
-                    if remaining <= 0:
-                        break
-                    self._sleep(remaining)
-                self._local_next = self._monotonic() + self.min_interval_seconds
+            # NUNCA dormir con _local_lock tomado (auditoria CNMV v5): un hilo
+            # esperando aqui bloqueaba cool_down()/wait() async (event loop) que
+            # toman el mismo lock. Igual que wait(): se RESERVA el hueco bajo el
+            # lock (solo lee/actualiza estado), se duerme FUERA y se revalida el
+            # cooldown por si llego un Retry-After mientras dormiamos.
+            while True:
+                with self._local_lock:
+                    now = self._monotonic()
+                    start = max(now, self._local_next, self._local_blocked_until)
+                    self._local_next = start + self.min_interval_seconds
+                    wait = start - now
+                if wait > 0:
+                    self._sleep(wait)
+                with self._local_lock:
+                    if self._monotonic() >= self._local_blocked_until:
+                        return
 
     def cool_down(self, seconds: float) -> None:
         """Marca un cooldown 429 (extend-only) visible por TODOS los procesos."""
@@ -232,7 +256,7 @@ class GlobalPacer:
         """Segundos de cooldown restantes (0 si no hay)."""
         remaining = 0.0
         with self._local_lock:
-            remaining = max(0.0, self._local_blocked_until - time.monotonic())
+            remaining = max(0.0, self._local_blocked_until - self._monotonic())
         client = self._client()
         if client is not None:
             try:
