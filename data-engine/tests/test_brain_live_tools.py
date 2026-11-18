@@ -412,3 +412,60 @@ def test_price_phrasings_do_not_hijack_stored_routes(question):
     from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
 
     assert not (_PRICE_ASK_RE.search(question) and not _PRICE_EXCLUDE_RE.search(question))
+
+
+def _routes_live(question):
+    from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
+
+    return bool(_PRICE_ASK_RE.search(question)) and not _PRICE_EXCLUDE_RE.search(question)
+
+
+@pytest.mark.parametrize("question", [
+    "KO stock price in my portfolio",
+    "KO share price for my holdings",
+    "KO stock price vs the price target",
+    "KO stock price against my cost basis",
+    "how much is KO worth",
+    "AAPL stock price forecast 2030",
+    "is AAPL stock price overvalued",
+    "stock price history of KO",
+    "KO stock price vs fair value",
+    "valor de la acción de KO según tu tesis",
+    "KO trading at 20x earnings",
+    "explain stock price in general",
+    "AAPL stock price prediction",
+    "previsión del valor de la acción de KO",
+    "KO stock price dividends",
+])
+def test_each_exclusion_blocks_an_otherwise_matching_ask(question):
+    assert not _routes_live(question)
+
+
+@pytest.mark.parametrize("question", [
+    "how much is KO trading at",
+    "KO stock price right now",
+    "valor de la acción de KO ahora",
+])
+def test_plain_asks_still_route_live(question):
+    assert _routes_live(question)
+
+
+@pytest.mark.parametrize("question", [
+    "AAPL stock price forecast 2030",
+    "stock price history of KO",
+    "valor de la acción de KO según tu tesis",
+])
+def test_forecast_history_thesis_never_call_provider(db, monkeypatch, question):
+    from app.services.extended_quote_service import extended_quote_service
+
+    company(db, "KO", "Coca-Cola")
+    company(db, "AAPL")
+    calls = []
+
+    async def spy(ticker):
+        calls.append(ticker)
+        return live_quote(ticker, 100.0)
+
+    monkeypatch.setattr(extended_quote_service, "get", spy)
+    assert asyncio.run(answer_live_question(db, question)) is None
+    assert calls == []

@@ -54,7 +54,7 @@ _PRICE_ASK_RE = re.compile(
     # Formas habituales sin «of»: «ASTS stock price», «AAPL share price»,
     # «price AAPL», «trading at», «valor de la acción».
     r"(?:stock|share)\s+price|price\s+(?=(?-i:[A-Z]{2,5})\b)|trading\s+at|"
-    r"valor\s+de\s+la\s+acci[oó]n|how\s+much\s+is\s+\w+\s+(?:trading|worth))\b"
+    r"valor\s+de\s+la\s+acci[oó]n|how\s+much\s+is\s+\w+\s+trading)\b"
 )
 # El coste de compra, la valoración y los fundamentales (PER/BPA) los
 # responden las rutas de datos guardados: no son una cotización en vivo.
@@ -66,7 +66,14 @@ _PRICE_EXCLUDE_RE = re.compile(
     # Preguntas mixtas con fundamentales (margen FCF, ingresos...): las
     # responde la ruta guardada, que contesta las dos partes con fuentes.
     r"\bmargen|fcf|free\s+cash|ingresos?|revenue|beneficio|deuda|crecimiento|"
-    r"ebitda|flujo|ventas|resultados\b"
+    r"ebitda|flujo|ventas|resultados\b|"
+    # Previsión, histórico, valoración o tesis: no piden la cotización de
+    # ahora; las responde la ruta guardada/LLM con fuentes.
+    r"\b(?:forecast\w*|predict\w*|prediction\w*|history|historical|evolution|outlook|"
+    r"fair\s+value|intrinsic|overvalued|undervalued|discount|premium|earnings|margins?|"
+    r"dividends?|growth|thesis|according|vs|versus|why|explain|drives?|"
+    r"seg[uú]n|hist[oó]ric\w*|predicci[oó]n|previsi[oó]n|tesis|dividendos?|"
+    r"sobrevalorad\w*|infravalorad\w*)\b"
 )
 _NEWS_ASK_RE = re.compile(
     r"(?i)\b(?:noticias?|novedades?|[úu]ltima\s+hora|qu[eé]\s+ha\s+pasado|"
