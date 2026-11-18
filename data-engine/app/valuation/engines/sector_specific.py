@@ -514,6 +514,39 @@ def _probabilities(values: list[SourcedValue], directional_quality: float = 0.0)
     return {"bear": tail - bull, "base": base, "bull": bull}
 
 
+PB_FLOOR = 0.25
+PB_CEILING = 3.0
+
+
+def _capped_pb(scenario: str, raw_pb: float, caps: list[dict]) -> float:
+    """P/B acotado a [0.25, 3.0]; si el tope muerde, lo deja anotado (aviso, no oculto)."""
+    applied = max(PB_FLOOR, min(PB_CEILING, raw_pb))
+    if applied != raw_pb:
+        caps.append(
+            {
+                "scenario": scenario,
+                "raw_pb": raw_pb,
+                "applied_pb": applied,
+                "bound": "floor" if applied == PB_FLOOR else "ceiling",
+            }
+        )
+    return applied
+
+
+def _cap_warnings(caps: list[dict]) -> list[dict]:
+    return [
+        {
+            "code": "pb_cap_applied",
+            "scenario": cap["scenario"],
+            "detail": (
+                f"P/B justificado {cap['raw_pb']:.2f}x acotado a {cap['applied_pb']:.2f}x "
+                f"({'suelo' if cap['bound'] == 'floor' else 'techo'} del modelo)."
+            ),
+        }
+        for cap in caps
+    ]
+
+
 def _pb_sensitivity_rows(
     *,
     book_per_share: float,
@@ -535,7 +568,8 @@ def _pb_sensitivity_rows(
         ("base_coe", cost_of_equity),
         ("high_coe", cost_of_equity + 0.015),
     ):
-        justified_pb = max(0.25, min(3.0, (roe - growth) / (cost - growth)))
+        raw_pb = (roe - growth) / (cost - growth)
+        justified_pb = max(PB_FLOOR, min(PB_CEILING, raw_pb))
         rows.append(
             {
                 "scenario": label,
@@ -543,6 +577,7 @@ def _pb_sensitivity_rows(
                 "roe": roe,
                 "growth": growth,
                 "justified_pb": justified_pb,
+                "pb_cap_applied": justified_pb != raw_pb,
                 "value_per_share": book_per_share * justified_pb * underwriting_factor,
             }
         )
@@ -610,6 +645,7 @@ def _result(
     sensitivity: dict | None = None,
     period_anchor: dict | None = None,
     estimated_inputs: list[dict] | None = None,
+    warnings: list[dict] | None = None,
 ) -> dict:
     expected = sum(scenario_values[name] * probabilities[name] for name in scenario_values)
     company = context.company
@@ -642,6 +678,8 @@ def _result(
     trace["comparable_price"] = comparable_price
     if estimated_inputs:
         trace["estimated_inputs"] = estimated_inputs
+    if warnings:
+        trace["warnings"] = warnings
     result = {
         "ticker": company.ticker,
         "model_type": company.valuation_model,
@@ -671,6 +709,8 @@ def _result(
         ),
         "trace": trace,
     }
+    if warnings:
+        result["warnings"] = warnings
     if estimated_inputs:
         # Mismo contrato que el puente de inputs del DCF: la tesis, el valor
         # justo y la API lo muestran etiquetado, nunca como dato oficial.
@@ -777,8 +817,9 @@ class BankValuationEngine(ValuationEngine):
             name: (scenario_roe, max(scenario_cost, scenario_growth + 0.005), scenario_growth)
             for name, (scenario_roe, scenario_cost, scenario_growth) in specs.items()
         }
+        pb_caps: list[dict] = []
         values = {
-            name: book_per_share * max(0.25, min(3.0, (scenario_roe - scenario_growth) / (scenario_cost - scenario_growth)))
+            name: book_per_share * _capped_pb(name, (scenario_roe - scenario_growth) / (scenario_cost - scenario_growth), pb_caps)
             for name, (scenario_roe, scenario_cost, scenario_growth) in specs.items()
         }
         available = [value for value in sourced.values() if value is not None]
@@ -800,10 +841,12 @@ class BankValuationEngine(ValuationEngine):
                 "book_per_share": book_per_share,
                 "scenario_roe_cost_growth": specs,
                 "growth_source": "financial_facts",
+                "pb_caps_applied": pb_caps,
             },
             sensitivity=sensitivity,
             period_anchor=resolved.as_trace(),
             estimated_inputs=estimated_input_items(context, sourced),
+            warnings=_cap_warnings(pb_caps),
         )
 
 
@@ -920,10 +963,11 @@ class InsurerValuationEngine(ValuationEngine):
             "bull": (roe.value + 0.02, max(cost_equity.value - 0.01, growth_value + 0.005), combined_ratio.value - 0.025),
         }
         values = {}
+        pb_caps: list[dict] = []
         for name, (scenario_roe, scenario_cost, scenario_combined) in specs.items():
             justified_pb = (scenario_roe - growth_value) / (scenario_cost - growth_value)
             underwriting_quality = max(0.75, min(1.25, 1 + (1 - scenario_combined) * 2))
-            values[name] = book_per_share * max(0.25, min(3.0, justified_pb)) * underwriting_quality
+            values[name] = book_per_share * _capped_pb(name, justified_pb, pb_caps) * underwriting_quality
         available = list(sourced.values())
         probabilities = _probabilities(available, 1 - combined_ratio.value)
         base_uw = max(0.75, min(1.25, 1 + (1 - combined_ratio.value) * 2))
@@ -945,10 +989,12 @@ class InsurerValuationEngine(ValuationEngine):
                 "book_per_share": book_per_share,
                 "scenario_roe_cost_combined_ratio": specs,
                 "growth_source": "financial_facts",
+                "pb_caps_applied": pb_caps,
             },
             sensitivity=sensitivity,
             period_anchor=resolved.as_trace(),
             estimated_inputs=estimated_input_items(context, sourced),
+            warnings=_cap_warnings(pb_caps),
         )
 
 
