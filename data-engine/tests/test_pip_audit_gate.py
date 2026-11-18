@@ -229,3 +229,9 @@ def test_cpu_base_transport_retry_is_still_bounded(tmp_path):
 )
 def test_cpu_skips_are_exact_not_generic_allowlist(text):
     assert gate.cpu_base_requirements(text) == []
+
+
+def test_cpu_skips_with_nonzero_exit_do_not_start_secondary_audit(tmp_path):
+    rc, calls, delays = exercise(tmp_path, [result(1, CPU_REPORT)])
+    assert rc == 1 and len(calls) == 1 and not delays
+    assert not (tmp_path / "cpu-base-requirements.txt").exists()
