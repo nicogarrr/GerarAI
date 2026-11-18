@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -105,9 +106,11 @@ class DrillEnvironment:
         self.drill_id = f"drill{os.getpid()}{uuid.uuid4().hex[:4]}"
         self.containers: dict[str, str] = {}
         self.volumes: dict[str, str] = {}
-        self.pg_port = free_port()
-        self.minio_port = free_port()
-        self.qdrant_port = free_port()
+        # Docker asigna y reserva cada puerto al crear su binding. Una sonda
+        # bind(0) seguida de close deja una carrera y puede repetir el puerto.
+        self.pg_port = 0
+        self.minio_port = 0
+        self.qdrant_port = 0
         self.app_port = free_port()
         # El pin del compose es la fuente de verdad; `--minio-image` solo cambia
         # el REGISTRO (mismo release tag) en hosts donde quay.io no responde.
@@ -138,13 +141,29 @@ class DrillEnvironment:
         """`docker run` con las OPCIONES antes de la imagen y el COMANDO despues."""
         name = f"cavaai-{self.drill_id}-{service}"
         require_tool_docker()
+        # Un fallo de red puede dejar el contenedor creado: cleanup tambien
+        # debe recoger ese recurso propio del drill.
+        self.containers[service] = name
         run(
             ["docker", "run", "-d", "--name", name, *options, image, *command],
             timeout=600,
             what=f"docker run {service}",
         )
-        self.containers[service] = name
         return name
+
+    def _published_port(self, service: str, container_port: int) -> int:
+        """Lee el binding que Docker ya ha reservado; solo se admite loopback."""
+        result = run(
+            ["docker", "port", self.containers[service], f"{container_port}/tcp"],
+            timeout=30,
+            what=f"docker port {service}",
+        )
+        match = re.fullmatch(r"127\.0\.0\.1:([0-9]+)", result.stdout.strip())
+        if match is None:
+            raise FailClosedError(f"{service}: binding loopback de Docker invalido")
+        port = int(match.group(1))
+        require(1 <= port <= 65535, f"{service}: puerto de Docker fuera de rango")
+        return port
 
     def _volume(self, service: str) -> str:
         name = f"cavaai-{self.drill_id}-{service}-data"
@@ -169,7 +188,7 @@ class DrillEnvironment:
             "-v",
             f"{pg_volume}:/var/lib/postgresql/data",
             "-p",
-            f"127.0.0.1:{self.pg_port}:5432",
+            "127.0.0.1::5432",
         ]
         if self.pg_memory:
             options += ["--memory", self.pg_memory, "--memory-swap", self.pg_memory]
@@ -181,6 +200,7 @@ class DrillEnvironment:
         minio_volume = self._volume("minio")
         qdrant_volume = self._volume("qdrant")
         self._run_container("postgres", POSTGRES_IMAGE, self._pg_options(pg_volume), [])
+        self.pg_port = self._published_port("postgres", 5432)
         self._run_container(
             "minio",
             self.minio_image,
@@ -188,7 +208,7 @@ class DrillEnvironment:
                 "-v",
                 f"{minio_volume}:/data",
                 "-p",
-                f"127.0.0.1:{self.minio_port}:9000",
+                "127.0.0.1::9000",
                 "-e",
                 f"MINIO_ROOT_USER={MINIO_USER}",
                 "-e",
@@ -196,6 +216,7 @@ class DrillEnvironment:
             ],
             ["server", "--address", ":9000", "/data"],
         )
+        self.minio_port = self._published_port("minio", 9000)
         self._run_container(
             "qdrant",
             QDRANT_IMAGE,
@@ -203,10 +224,11 @@ class DrillEnvironment:
                 "-v",
                 f"{qdrant_volume}:/qdrant/storage",
                 "-p",
-                f"127.0.0.1:{self.qdrant_port}:6333",
+                "127.0.0.1::6333",
             ],
             [],
         )
+        self.qdrant_port = self._published_port("qdrant", 6333)
         self.wait_ready()
 
     def wait_ready(self, timeout: int = 300) -> None:
