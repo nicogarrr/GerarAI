@@ -464,7 +464,12 @@ export function RecordDetail({
                         {description && <CardDescription className="mt-0.5 text-sm text-gray-500">{description}</CardDescription>}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
+                {/* flex-wrap: a 320px «Refrescar» + la acción (p.ej. «Editar plan»,
+                    109+8+135 ≈ 253px de min-content) desbordaban la tarjeta — medido en
+                    prod 18-nov-2026: la pista del grid de /plan se iba a 301px sobre 288
+                    disponibles. Al envolver, el min-content pasa a ser el botón más ancho
+                    y en escritorio (sm:flex-row) sigue en una fila. */}
+                <div className="flex flex-wrap items-center gap-2">
                     {fetchRecord && (
                         <Button
                             variant="ghost"

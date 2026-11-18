@@ -111,7 +111,11 @@ export default function PlanContributionDialog({
     return (
         <Dialog open={open} onOpenChange={(next) => { setOpen(next); if (!next) setError(null); }}>
             <DialogTrigger asChild>
-                <Button type="button" className="min-h-[44px] gap-2">
+                {/* h-auto + whitespace-normal: «Registrar aportación» en nowrap medía
+                    ~213px de min-content y, dentro del EmptyState (p-8) de RecordList,
+                    desbordaba /plan a 320px (pista del grid 327px, medido en prod
+                    18-nov-2026). Romper el texto en dos líneas mantiene min-h 44px. */}
+                <Button type="button" className="h-auto min-h-[44px] gap-2 whitespace-normal py-2 text-center">
                     <PiggyBank className="h-4 w-4" aria-hidden="true" />
                     {t('plan.contribution.trigger')}
                 </Button>
