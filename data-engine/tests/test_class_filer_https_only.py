@@ -63,3 +63,24 @@ def test_fetchers_use_the_strict_opener():
         source = inspect.getsource(fetch)
         assert "_OPENER.open" in source
         assert "urlopen" not in source
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "https://data.sec.gov:8443/Archives/edgar/data/123/acc/x_htm.xml",
+        "https://data.sec.gov:badport/x",
+        "https://www.sec.gov:8080/x",
+    ],
+)
+def test_redirects_to_non_default_port_are_rejected(target):
+    import urllib.error
+
+    with pytest.raises(urllib.error.HTTPError):
+        _redirect(target)
+
+
+def test_redirect_to_explicit_443_is_followed():
+    target = "https://data.sec.gov:443/submissions/CIK0001234567.json"
+    forwarded = _redirect(target)
+    assert forwarded is not None and forwarded.full_url == target
