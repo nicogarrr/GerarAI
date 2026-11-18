@@ -26,6 +26,7 @@ from app.workers.dramatiq_app import (
     dispatch_insider_alerts,
     dispatch_macro_reminders,
     dispatch_queue_watchdog,
+    dispatch_source_freshness_watchdog,
     dispatch_source_health_watchdog,
     dispatch_tracked_news_alerts,
     evaluate_alert_rules,
@@ -560,6 +561,12 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # antiguo + tasa de drenaje medida entre ticks). Cada 5 min.
     _register(scheduler, partial(enqueue_for_all_tenants, dispatch_queue_watchdog),
               "interval", job_id="queue_watchdog", minutes=5)
+    # Watchdog de frescura de fuentes: alerta in-app cuando una fuente entra
+    # en stale segun la politica de edad del panel de salud (FMP/yahoo_intraday
+    # estuvieron paradas semanas en oct-2026 sin aviso). Cada 60 min basta:
+    # los techos de frescura son de dias.
+    _register(scheduler, partial(enqueue_for_all_tenants, dispatch_source_freshness_watchdog),
+              "interval", job_id="source_freshness_watchdog", minutes=60)
     # Watchdog de conexiones Postgres: alerta in-app si hay sesiones 'idle in
     # transaction' o consultas activas envejecidas, o si el servidor se acerca
     # a max_connections (el 503 del 15-nov-2026 no lo vio nadie). Cada 5 min.
