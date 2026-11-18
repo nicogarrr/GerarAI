@@ -43,7 +43,11 @@ describe('GlobalBrainPanel: render al teclear', () => {
         markdownRenders.mockClear();
 
         const box = screen.getByLabelText('Pregunta al cerebro');
-        const text = '¿cómo va mi cartera?';
+        // 9 pulsaciones bastan para pinear la propiedad (ninguna repinta el
+        // markdown); 21 caracteres multiplicaban el coste CPU del test sin
+        // anadir cobertura (medido 18-nov-2026: ~45 ms por pulsacion bajo
+        // contencion, el test rozaba el timeout de 5 s en el gate).
+        const text = '¿cómo va?';
         for (let k = 1; k <= text.length; k++) fireEvent.change(box, { target: { value: text.slice(0, k) } });
 
         expect(box).toHaveValue(text);

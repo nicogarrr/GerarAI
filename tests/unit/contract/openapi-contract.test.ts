@@ -54,18 +54,27 @@ it('flags static missing endpoints but records unresolved dynamic patterns separ
 }, 30_000);
 
 // El modo CLI usado arriba debe fallar cerrado, no devolver exito con derivas.
+// Escanea una raiz fixture minima (--root): la comprobacion del exito/deriva
+// no necesita el grafo real, y cargarlo aqui duplicaba el spawn pesado del
+// test anterior (medido 18-nov-2026: 4 s aislado, 8 s en paralelo, >30 s con
+// el runner saturado - el timeout del spawn mataba el test, no una deriva).
 it('CLI exits nonzero and reports drift for an incompatible OpenAPI', () => {
   const root = mkdtempSync(join(tmpdir(), 'contract-cli-'));
   try {
+    mkdirSync(join(root, 'lib'));
     const spec = join(root, 'openapi.json');
     writeFileSync(spec, JSON.stringify({ paths: {} }));
+    writeFileSync(join(root, 'lib', 'fixture.ts'), `
+      declare function researchRequest(path: string): void;
+      researchRequest('/api/this-endpoint-does-not-exist');
+    `);
     const result = spawnSync(process.execPath, [
-      resolve('scripts/contract-drift.mjs'), '--json', '--openapi', spec,
+      resolve('scripts/contract-drift.mjs'), '--json', '--root', root, '--openapi', spec,
     ], { encoding: 'utf8', timeout: 30_000 });
     expect(result.error).toBeUndefined();
     expect(result.status).toBe(1);
     const report = JSON.parse(result.stdout);
-    expect(report.summary.calls).toBeGreaterThan(250);
+    expect(report.summary.calls).toBeGreaterThan(0);
     expect(report.summary.open).toBeGreaterThan(0);
     expect(report.open).toContainEqual(expect.objectContaining({ kind: 'ENDPOINT_NOT_IN_SPEC' }));
   } finally {
