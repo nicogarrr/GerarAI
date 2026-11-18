@@ -283,9 +283,16 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             <div>
                                 <CardTitle className="text-lg font-semibold text-gray-100">
                                     {ti('insider.signals.title')} ·{' '}
+                                    {/* Enlace inline aislado dentro del título: pseudo-expansión
+                                        before:-inset-y-3.5/-x-1.5 (patrón de /temas). La caja del enlace
+                                        mide ~20px (Auditoría 18-nov-2026, Chrome): con -inset-y-2 el área
+                                        efectiva medida era 36px y con -inset-y-3 ~43px por el redondeo de
+                                        borde del barrido; ±14px dan ~48px medidos. No hay otro destino
+                                        interactivo en la cabecera (encima padding p-6, debajo descripción
+                                        no interactiva). */}
                                     <Link
                                         href={`/research/${encodeURIComponent(initialTicker)}`}
-                                        className="font-mono text-teal-300 hover:text-teal-200 hover:underline"
+                                        className="relative font-mono text-teal-300 before:absolute before:-inset-x-1.5 before:-inset-y-3.5 before:content-[''] hover:text-teal-200 hover:underline"
                                     >
                                         {initialTicker}
                                     </Link>
@@ -365,11 +372,14 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                     <span className="text-xs text-gray-500">{ti('insider.multiReporter')}</span>
                                                 ) : null}
                                                 {secLink(signal.source_url) ? (
+                                                    // Táctil móvil 44px (medido en prod 18-nov-2026: ~16px). Mismo
+                                                    // patrón en el enlace SEC de la lista de filings de abajo.
+                                                    // sm:min-h-0 devuelve el ritmo denso de escritorio.
                                                     <a
                                                         href={secLink(signal.source_url)!}
                                                         target="_blank"
                                                         rel="noopener noreferrer"
-                                                        className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
+                                                        className="inline-flex min-h-11 items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline sm:min-h-0"
                                                     >
                                                         {ti('insider.viewSecFiling')} <ExternalLink aria-hidden="true" className="h-3 w-3" />
                                                     </a>
@@ -412,7 +422,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                                                 href={secLink(filing.source_url)!}
                                                 target="_blank"
                                                 rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline"
+                                                className="inline-flex min-h-11 items-center gap-1 text-xs text-teal-300 hover:text-teal-200 hover:underline sm:min-h-0"
                                             >
                                                 {ti('insider.viewSecFiling')} <ExternalLink aria-hidden="true" className="h-3 w-3" />
                                             </a>
