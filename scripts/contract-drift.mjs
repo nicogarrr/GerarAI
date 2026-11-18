@@ -27,9 +27,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function loadArgs(argv) {
-  const args = { openapi: path.join(ROOT, 'data-engine', 'openapi.json'), json: false, allowlist: true };
+  const args = { root: ROOT, openapi: path.join(ROOT, 'data-engine', 'openapi.json'), json: false, allowlist: true };
   for (let i = 2; i < argv.length; i++) {
-    if (argv[i] === '--openapi') args.openapi = path.resolve(argv[++i]);
+    if (argv[i] === '--root') args.root = path.resolve(argv[++i]);
+    else if (argv[i] === '--openapi') args.openapi = path.resolve(argv[++i]);
     else if (argv[i] === '--json') args.json = true;
     else if (argv[i] === '--no-allowlist') args.allowlist = false;
   }
@@ -468,8 +469,8 @@ export function applyAllowlist(findings, entries) {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = loadArgs(process.argv);
-  const { stats, findings } = scanContract({ openapiPath: args.openapi });
-  const open = args.allowlist ? applyAllowlist(findings, loadAllowlist()) : findings;
+  const { stats, findings } = scanContract({ root: args.root, openapiPath: args.openapi });
+  const open = args.allowlist ? applyAllowlist(findings, loadAllowlist(args.root)) : findings;
   const summary = {
     calls: stats.calls, typed: stats.typed, untyped: stats.untyped,
     unmatchedPatterns: stats.unmatchedCount, findings: findings.length,
