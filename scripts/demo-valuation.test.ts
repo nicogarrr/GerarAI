@@ -97,6 +97,53 @@ test('opciones no se valoran con el subyacente', () => {
     assert.deepEqual(r.coverage, { valued: 0, total: 1 });
 });
 
+test('opciones SÍ se valoran con la prima REAL del contrato (CBOE): multiplicador 100, PyG y etiqueta diferida', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5 };
+    const optionPremiums = new Map([
+        ['O:ASTS:2026-12-18:call:50:100', { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-17T15:47:43' }, fetchFailed: false }],
+    ]);
+    const r = valuePositions([option], {}, { optionPremiums });
+    const row = r.rows[0];
+    assert.equal(row.status, 'valorada');
+    assert.equal(row.price, 2.3);
+    // 2 contratos x 2,30 x 100 = 460; coste 2 x 1,50 x 100 = 300; PyG 160.
+    assert.equal(row.marketValue, 460);
+    assert.equal(row.unrealizedPnl, 160);
+    assert.equal(row.currencyBasis, 'cboe');
+    assert.match(row.quoteLabel ?? '', /última operación .*15:47 \(hora de Nueva York\) · diferida/);
+    assert.deepEqual(r.coverage, { valued: 1, total: 1 });
+    assert.deepEqual(r.totals, [{ currency: 'USD', marketValue: 460, unrealizedPnl: 160, costBasis: 300, valuedPositions: 1 }]);
+});
+
+test('opciones: huecos honestos — fuente caída, contrato ausente, sin operación, divisa no USD, sobre el tope', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2 };
+    const failed = valuePositions([option], {}, { optionPremiums: new Map([[option.instrumentKey, { quote: null, fetchFailed: true }]]) }).rows[0];
+    assert.equal(failed.status, 'sin-cotizacion');
+    assert.match(failed.note ?? '', /falló la consulta/);
+    const missing = valuePositions([option], {}, { optionPremiums: new Map([[option.instrumentKey, { quote: null, fetchFailed: false }]]) }).rows[0];
+    assert.equal(missing.status, 'sin-cotizacion');
+    assert.match(missing.note ?? '', /Contrato no encontrado/);
+    const noTrades = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: null, lastTradeTime: null }, fetchFailed: false }]]),
+    }).rows[0];
+    assert.equal(noTrades.status, 'sin-cotizacion');
+    assert.match(noTrades.note ?? '', /Sin operación registrada/);
+    // En EUR no se valora aunque haya prima: las primas de la fuente son USD, sin conversión.
+    const eurOption = valuePositions([{ ...option, currency: 'EUR' as const }], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-17T15:47:43' }, fetchFailed: false }]]),
+    }).rows[0];
+    assert.equal(eurOption.status, 'divisa-no-coincide');
+    assert.equal(eurOption.marketValue, null);
+    // Por encima del tope de subyacentes: no consultada con el límite en el motivo.
+    const overCap = valuePositions([option], {}, {
+        optionPremiums: new Map(),
+        optionsNotQueried: new Set(['ASTS']),
+        optionUnderlyingLimit: 10,
+    }).rows[0];
+    assert.equal(overCap.status, 'no-consultada');
+    assert.match(overCap.note ?? '', /límite de 10/);
+});
+
 test('divisa: sin verificar => N/D; no coincide => N/D; GBp u otras => N/D; nunca por sufijo ni ausencia', () => {
     for (const currency of [null, undefined, '', 'GBp', 'CHF']) {
         const r = valuePositions([asts], { ASTS: { ...live, currency } });

@@ -668,6 +668,9 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
     // se registran path y cabeceras para verificar la identidad firmada.
     let backend: Record<string, unknown> = {};
     let backendCalls: Array<{ path: string; headers: Record<string, string> }> = [];
+    // Cadenas de opciones de CBOE (delayed quotes), por subyacente.
+    let cboe: Record<string, unknown> = {};
+    let cboeCalls: string[] = [];
     const realNow = Date.now;
     let skewMs = 0;
     beforeEach(() => {
@@ -682,10 +685,21 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         listing = [{ symbol: 'BBVA', currency: 'USD' }, { symbol: 'T00', currency: 'USD' }];
         backend = {};
         backendCalls = [];
+        cboe = {};
+        cboeCalls = [];
         process.env.FINNHUB_API_KEY = 'guard-key';
         globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
             const url = String(input);
             urls.push(url);
+            if (url.startsWith('https://cdn.cboe.com/api/global/delayed_quotes/options/')) {
+                const symbol = decodeURIComponent(url.split('/options/')[1].replace(/\.json(\?.*)?$/, ''));
+                cboeCalls.push(symbol);
+                const c = cboe[symbol];
+                if (c instanceof Error) throw c;
+                if (c instanceof Response) return c;
+                if (!c) return new Response('{}', { status: 404 });
+                return new Response(JSON.stringify(c), { status: 200 });
+            }
             if (url.startsWith('http://backend.invalid')) {
                 const u = new URL(url);
                 backendCalls.push({ path: u.pathname, headers: (init?.headers ?? {}) as Record<string, string> });
@@ -819,6 +833,76 @@ describe('valoración bajo demanda (getManualDemoValuation)', () => {
         const rows = v.valuation.rows;
         assert.equal(rows.filter((x) => x.status === 'no-consultada').length, 2);
         assert.match(rows.find((x) => x.status === 'no-consultada')?.note ?? '', /límite de 25/);
+    });
+
+    const CALL = { underlying: 'ASTS', callPut: 'call', strike: 30, expiry: '2027-01-15', multiplier: 100, deliverable: 'acciones', adjusted: false };
+    const buyOption = (over: Record<string, unknown> = {}) => ({
+        instrument: { kind: 'opcion', contract: CALL, name: 'ASTS Call' },
+        side: 'buy',
+        openClose: 'open',
+        quantity: 2,
+        price: 1.5,
+        currency: 'USD',
+        fee: 0,
+        executedAt: NOW - 60_000,
+        clientOrderId: oid(),
+        ...over,
+    });
+    const cboeChain = (lastPrice: number | null, lastTime: string | null) => ({
+        data: {
+            symbol: 'ASTS',
+            options: [{ option: 'ASTS270115C00030000', last_trade_price: lastPrice, last_trade_time: lastTime, bid: 1.4, ask: 1.6 }],
+        },
+    });
+    const withUsdCash = async () => {
+        await actions.convertManualDemoCurrency({ from: 'EUR', to: 'USD', amount: 1000, rate: 1.1, executedAt: NOW - 120_000, clientOrderId: oid() });
+    };
+
+    it('opción en USD: se valora con la prima REAL de CBOE (x100), no con el subyacente; una descarga por subyacente', async () => {
+        await withUsdCash();
+        const o = await actions.placeManualOrder(buyOption());
+        assert.equal(o.ok && o.outcome, 'filled');
+        cboe = { ASTS: cboeChain(2.3, '2026-11-17T15:47:43') };
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        const row = r.valuation.rows[0];
+        assert.equal(row.status, 'valorada');
+        // 2 contratos x 2,30 x 100 = 460; coste 2 x 1,50 x 100 = 300; PyG 160.
+        assert.equal(row.marketValue, 460);
+        assert.equal(row.currencyBasis, 'cboe');
+        assert.deepEqual(r.valuation.coverage, { valued: 1, total: 1 });
+        assert.deepEqual(cboeCalls, ['ASTS']);
+        // Ninguna llamada a Finnhub por la opción (el subyacente no es su precio).
+        assert.deepEqual(g.__GUARD_QUOTE_CALLS__, []);
+        // Segunda valoración: la cadena se sirve de caché (sin nueva descarga).
+        await actions.getManualDemoValuation();
+        assert.deepEqual(cboeCalls, ['ASTS']);
+    });
+
+    it('opción: CBOE caído o contrato ausente => N/D con motivo, nunca el precio del fill ni del subyacente', async () => {
+        await withUsdCash();
+        await actions.placeManualOrder(buyOption());
+        cboe = { ASTS: new Error('cboe caido') };
+        let r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.valuation.rows[0].status, 'sin-cotizacion');
+        assert.equal(r.valuation.rows[0].marketValue, null);
+        assert.match(r.valuation.rows[0].note, /falló la consulta/);
+        assert.deepEqual(cboeCalls, ['ASTS']);
+        // Contrato no listado en la cadena (vencido/ajustado): N/D con su motivo.
+        // (El backoff anti-estampida del fallo es de 1 s: se espera a que venza
+        // para que esta segunda consulta llegue de verdad a la fuente.)
+        await new Promise((resolve) => setTimeout(resolve, 1100));
+        cboe = { ASTS: { data: { symbol: 'ASTS', options: [] } } };
+        r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.valuation.rows[0].status, 'sin-cotizacion');
+        assert.match(r.valuation.rows[0].note, /Contrato no encontrado/);
+        assert.deepEqual(cboeCalls, ['ASTS', 'ASTS']);
+    });
+
+    it('opción en EUR: N/D sin conversión y SIN llamar a CBOE (sus primas son USD)', async () => {
+        await actions.placeManualOrder(buyOption({ currency: 'EUR' }));
+        const r = (await actions.getManualDemoValuation()) as unknown as VResult;
+        assert.equal(r.valuation.rows[0].status, 'divisa-no-coincide');
+        assert.deepEqual(cboeCalls, []);
     });
 
     it('llamadas concurrentes comparten una sola descarga del listado (inflight)', async () => {

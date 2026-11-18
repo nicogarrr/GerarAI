@@ -66,6 +66,65 @@ describe('valuePositions - honestidad de la valoración', () => {
         expect(row.price).toBeNull();
     });
 
+    it('opción valorada con la prima REAL del contrato (CBOE, multiplicador 100, etiqueta diferida)', () => {
+        const option = pos({ kind: 'opcion', instrumentKey: 'O:ASTS:2026-12-18:call:50:100', quantity: 2, avgCost: 1.5 });
+        const optionPremiums = new Map([
+            ['O:ASTS:2026-12-18:call:50:100', { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-17T15:47:43' }, fetchFailed: false }],
+        ]);
+        const v = valuePositions([option], { ASTS: q() }, { optionPremiums });
+        const row = v.rows[0];
+        expect(row).toMatchObject({
+            status: 'valorada', price: 2.3, marketValue: 460, unrealizedPnl: 160, currencyBasis: 'cboe', note: null,
+        });
+        expect(row.unrealizedPct).toBeCloseTo((160 / 300) * 100, 6);
+        expect(row.quoteLabel).toBe('última operación 17 nov, 15:47 (hora de Nueva York) · diferida');
+        expect(v.totals).toEqual([{ currency: 'USD', marketValue: 460, unrealizedPnl: 160, costBasis: 300, valuedPositions: 1 }]);
+        expect(v.coverage).toEqual({ valued: 1, total: 1 });
+    });
+
+    it('opción SIN consulta de prima no se valoran con el subyacente aunque haya cotización', () => {
+        const option = pos({ kind: 'opcion', instrumentKey: 'O:ASTS:2026-12-18:call:50:100' });
+        // Mapa presente pero sin entrada para este contrato: equivale a no consultada.
+        const row = valuePositions([option], { ASTS: q() }, { optionPremiums: new Map() }).rows[0];
+        expect(row.status).toBe('opcion-no-valorada');
+        expect(row.marketValue).toBeNull();
+    });
+
+    it('opción: fallo de la fuente, contrato no encontrado y sin operación son N/D con motivo propio', () => {
+        const option = pos({ kind: 'opcion', instrumentKey: 'O:ASTS:2026-12-18:call:50:100' });
+        const failed = valuePositions([option], {}, { optionPremiums: new Map([[option.instrumentKey, { quote: null, fetchFailed: true }]]) }).rows[0];
+        expect(failed.status).toBe('sin-cotizacion');
+        expect(failed.note).toContain('falló la consulta');
+        const missing = valuePositions([option], {}, { optionPremiums: new Map([[option.instrumentKey, { quote: null, fetchFailed: false }]]) }).rows[0];
+        expect(missing.status).toBe('sin-cotizacion');
+        expect(missing.note).toContain('Contrato no encontrado');
+        const noTrades = valuePositions([option], {}, {
+            optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: null, lastTradeTime: null }, fetchFailed: false }]]),
+        }).rows[0];
+        expect(noTrades.status).toBe('sin-cotizacion');
+        expect(noTrades.note).toContain('Sin operación registrada');
+    });
+
+    it('opción en EUR: N/D sin conversión (las primas de la fuente son USD)', () => {
+        const option = pos({ kind: 'opcion', instrumentKey: 'O:ASTS:2026-12-18:call:50:100', currency: 'EUR' });
+        const row = valuePositions([option], {}, {
+            optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-17T15:47:43' }, fetchFailed: false }]]),
+        }).rows[0];
+        expect(row.status).toBe('divisa-no-coincide');
+        expect(row.marketValue).toBeNull();
+    });
+
+    it('opción por encima del tope de subyacentes: no consultada con el límite en el motivo', () => {
+        const option = pos({ kind: 'opcion', instrumentKey: 'O:ASTS:2026-12-18:call:50:100' });
+        const row = valuePositions([option], {}, {
+            optionPremiums: new Map(),
+            optionsNotQueried: new Set(['ASTS']),
+            optionUnderlyingLimit: 10,
+        }).rows[0];
+        expect(row.status).toBe('no-consultada');
+        expect(row.note).toContain('límite de 10');
+    });
+
     it('símbolo irreconocible, no consultado y divisa sin verificar tienen su estado propio', () => {
         const v = valuePositions(
             [pos({ instrumentKey: 'X:??' }), pos({ instrumentKey: 'A:NVDA' }), pos({ instrumentKey: 'A:META' })],
@@ -142,7 +201,7 @@ describe('valuePositions - inglés (Ajustes → Idioma)', () => {
     it('motivos sin valorar y etiquetas de cotización en inglés', () => {
         const en = { locale: 'en' as const };
         const v = valuePositions(
-            [pos({ kind: 'opcion', instrumentKey: 'O:ASTS' }), pos({ instrumentKey: 'A:NOQ' }), pos({ instrumentKey: 'A:EURX' }), pos({ instrumentKey: 'A:GBP' })],
+            [pos({ kind: 'opcion', instrumentKey: 'O:ASTS:2026-12-18:call:50:100' }), pos({ instrumentKey: 'A:NOQ' }), pos({ instrumentKey: 'A:EURX' }), pos({ instrumentKey: 'A:GBP' })],
             { EURX: q({ currency: 'EUR' }), GBP: q({ currency: 'GBP' }) },
             en,
         );

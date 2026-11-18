@@ -30,7 +30,7 @@
     "withTotals": " Los totales suman solo las valoradas, por divisa:",
     "noTotals": " Sin totales: ninguna posición tiene cotización.",
     "totalLine": "{currency}: valor {marketValue} · PyG no realizada {unrealized}",
-    "note": "Las opciones no se valoran (no hay cotización de su prima). Solo se valora con cotización en vivo o de cierre y con divisa verificada en el listado o declarada por el servicio de cotizaciones; el resto sale N/D. Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito). También puedes solicitar una actualización con el botón",
+    "note": "Las opciones se valoran con la última prima negociada del contrato (dato diferido; la cotización del subyacente NO es su precio). Las acciones se valoran con cotización en vivo o de cierre y divisa verificada en el listado o declarada por el servicio de cotizaciones; el resto sale N/D. Se actualiza aproximadamente cada minuto mientras esta pestaña está visible (si el proveedor falla, espera más a propósito). También puedes solicitar una actualización con el botón",
     "asOf": " · consultado a las {time} (hora de Madrid)",
     "refreshing": "Consultando…",
     "refresh": "Actualizar cotizaciones",
@@ -51,13 +51,18 @@
       "noQuote": "Sin cotización disponible de las fuentes admitidas (no se usa el precio de tus operaciones).",
       "sourceNotApproved": "Sin cotización disponible de las fuentes admitidas.",
       "currencyUnknown": "Divisa de la cotización desconocida: N/D.",
-      "currencyMismatch": "La cotización está en {quote} y la posición en {position}; no hay conversión: N/D."
+      "currencyMismatch": "La cotización está en {quote} y la posición en {position}; no hay conversión: N/D.",
+      "optionNoQuote": "Sin cotización de la prima del contrato (falló la consulta o el subyacente está fuera de cobertura; no se usa el precio de tus operaciones).",
+      "optionContractNotFound": "Contrato no encontrado en la cadena de opciones (vencido, ajustado o inexistente): N/D.",
+      "optionNoTrades": "Sin operación registrada del contrato: N/D (no se inventa una prima).",
+      "optionNotQueried": "No consultada: límite de {limit} subyacentes de opciones por consulta."
     },
     "quoteLabels": {
       "live": "{time} (hora de Madrid) · en vivo",
       "close": "cierre del {date}",
       "lastClose": "último cierre, dato de {date} {time}",
-      "unknownClose": "cierre de fecha desconocida"
+      "unknownClose": "cierre de fecha desconocida",
+      "optionLastTrade": "última operación {date}, {time} (hora de Nueva York) · diferida"
     }
   },
   "account": {

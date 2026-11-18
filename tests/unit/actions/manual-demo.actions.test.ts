@@ -4,7 +4,7 @@ const {
     requireAuthenticatedUser, connectToDatabase,
     accountFindOne, accountCreate, accountFindOneAndUpdate,
     tradeFind, tradeFindOne, tradeCreate,
-    computeManualDemoAccount, docsToLedger, cacheGetQuote,
+    computeManualDemoAccount, docsToLedger, cacheGetQuote, cacheGetChain,
 } = vi.hoisted(() => ({
     requireAuthenticatedUser: vi.fn<(...args: any[]) => any>(),
     connectToDatabase: vi.fn<(...args: any[]) => any>(),
@@ -17,6 +17,7 @@ const {
     computeManualDemoAccount: vi.fn<(...args: any[]) => any>(),
     docsToLedger: vi.fn<(...args: any[]) => any>(() => ({ entries: [], violations: [] })),
     cacheGetQuote: vi.fn<(...args: any[]) => any>(),
+    cacheGetChain: vi.fn<(...args: any[]) => any>(),
 }));
 
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
@@ -31,6 +32,10 @@ vi.mock('@/lib/paper-trading/ledger-adapter', () => ({ docsToLedger }));
 vi.mock('@/lib/market/quote-cache', () => ({
     createQuoteCache: () => ({ getQuote: cacheGetQuote }),
     combineAbortSignals: (s: AbortSignal) => s,
+}));
+vi.mock('@/lib/market/cboe-options', async (importActual) => ({
+    ...(await importActual<typeof import('@/lib/market/cboe-options')>()),
+    createCboeChainCache: () => ({ getChain: cacheGetChain }),
 }));
 vi.mock('@/lib/market/quote-freshness', async (importActual) => ({
     ...(await importActual<typeof import('@/lib/market/quote-freshness')>()),
@@ -486,6 +491,40 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
         expect(valuation.coverage).toEqual({ valued: 1, total: 1 });
         expect(valuation.rows[0]).toMatchObject({ status: 'valorada', marketValue: 300 });
         vi.unstubAllGlobals();
+    });
+
+    it('opción en USD -> valorada con la prima REAL de CBOE (x100), sin tocar Finnhub', async () => {
+        state = stateWith(100000, 500, [
+            { instrumentKey: 'O:ASTS:2027-01-15:call:30:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5, realizedPnl: 0 },
+        ]);
+        cacheGetChain.mockResolvedValue({
+            chain: new Map([['ASTS|2027-01-15|call|30000', { lastTradePrice: 2.3, lastTradeTime: '2026-11-17T15:47:43' }]]),
+            fetchFailed: false,
+            retryAfterSeconds: null,
+            fetchedAt: 222,
+            saturated: false,
+        });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, asOf: 222 });
+        const valuation = (result as { valuation: { coverage: { valued: number; total: number }; rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.rows[0]).toMatchObject({ status: 'valorada', marketValue: 460, unrealizedPnl: 160, currencyBasis: 'cboe' });
+        expect(valuation.coverage).toEqual({ valued: 1, total: 1 });
+        // El subyacente no es la prima: ninguna consulta de cotización de acciones.
+        expect(cacheGetQuote).not.toHaveBeenCalled();
+        expect(cacheGetChain).toHaveBeenCalledWith('ASTS');
+    });
+
+    it('opción con la fuente de primas caída -> N/D y quoteFetchFailed con su Retry-After', async () => {
+        state = stateWith(100000, 500, [
+            { instrumentKey: 'O:ASTS:2027-01-15:call:30:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5, realizedPnl: 0 },
+        ]);
+        cacheGetChain.mockResolvedValue({ chain: null, fetchFailed: true, retryAfterSeconds: 45, fetchedAt: null, saturated: false });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true, retryAfterSeconds: 45 });
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.rows[0]).toMatchObject({ status: 'sin-cotizacion', marketValue: null });
     });
 
     it('todas las cotizaciones fallan -> quoteFetchFailed con el Retry-After del proveedor', async () => {

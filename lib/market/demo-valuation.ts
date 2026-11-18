@@ -24,8 +24,14 @@
  *   'USD' exactos se
  *   valoran. Sin divisa verificada => N/D. Si no coincide con la divisa de
  *   la posicion => N/D (sin conversion).
- * - Opciones: la cotizacion del subyacente NO es la prima del contrato, asi
- *   que no se valoran. Se listan como "no valorada" con el motivo.
+ * - Opciones: la cotizacion del subyacente NO es la prima del contrato.
+ *   Se valoran SOLO con la prima real del contrato: la ultima operacion
+ *   publicada por la delayed quotes API de CBOE (lib/market/cboe-options.ts,
+ *   dato diferido, etiquetado con su hora de Nueva York). Sin cadena
+ *   consultable, contrato no encontrado o contrato sin operacion registrada
+ *   => N/D con el motivo: NUNCA se inventa una prima (ni bid/ask, ni el
+ *   precio del ultimo fill). Las primas de CBOE son USD (propiedad de la
+ *   fuente): una opcion en otra divisa sale N/D sin conversion.
  * - Los totales suman SOLO las posiciones valoradas, por divisa, y se
  *   acompanan de la cobertura "N de M".
  */
@@ -34,6 +40,8 @@
 import { DEFAULT_LOCALE, type Locale } from '../i18n/locale.ts';
 // @ts-expect-error TS5097
 import { createTranslator } from '../i18n/translate.ts';
+// @ts-expect-error TS5097
+import { parseOptionKey } from '../paper-trading/types.ts';
 
 export type ValuationCurrency = 'EUR' | 'USD';
 
@@ -76,7 +84,7 @@ export type ValuedPosition = {
     /** Coste medio por unidad con el que se valoro (para detectar valoracion caducada). */
     avgCost: number;
     /** Origen de la divisa de la cotizacion; null si no hay valoracion. */
-    currencyBasis: 'finnhub-listado' | 'backend-yahoo' | null;
+    currencyBasis: 'finnhub-listado' | 'backend-yahoo' | 'cboe' | null;
     /** Etiqueta de fuente/hora por fila; null si no hay cotizacion. */
     quoteLabel: string | null;
     /** Motivo legible cuando no esta valorada. */
@@ -117,6 +125,23 @@ export function resolveQuoteCurrency(quote: ValuationQuote, locale: Locale = DEF
     const key = quote.source === 'Yahoo Finance' ? 'paperTrading.valuation.rowNotes.currencyNotVerifiedBackend' : 'paperTrading.valuation.rowNotes.currencyNotVerifiedListing';
     return { currency: null, basis: null, reason: t(key) };
 }
+
+/** Prima real de un contrato de opcion (CBOE saneada en lib/market/cboe-options.ts). */
+export type OptionPremiumQuote = {
+    /** Ultimo precio negociado (prima por accion); null si nunca negocio. */
+    lastTradePrice: number | null;
+    /** Hora de la ultima operacion "yyyy-mm-ddThh:mm:ss" (Nueva York, naive); null sin operacion. */
+    lastTradeTime: string | null;
+};
+
+/**
+ * Resultado de consultar la prima de UN contrato (clave = instrumentKey):
+ * - undefined: ni se intento (camino antiguo/sin consulta) => 'opcion-no-valorada'.
+ * - { fetchFailed: true }: la fuente fallo o no cubre el subyacente => 'sin-cotizacion'.
+ * - { quote: null }: cadena consultada y el contrato NO esta (vencido, ajustado, inexistente).
+ * - { quote }: cadena consultada y contrato encontrado (puede no tener operacion: N/D honesto).
+ */
+export type OptionPremiumLookup = { quote: OptionPremiumQuote | null; fetchFailed: boolean } | undefined;
 
 /** Mapa simbolo -> divisa del listado US de Finnhub (/stock/symbol); ignora entradas sin simbolo o divisa. */
 export function parseListingCurrencies(payload: unknown): Map<string, string> {
@@ -185,6 +210,77 @@ function unvalued(position: ValuationPosition, status: ValuationStatus, note: st
 
 const cents = (n: number): number => Math.round(n * 100) / 100;
 
+/** Etiqueta de la ultima operacion de una opcion: fecha civil + hora TAL CUAL las publica la fuente (Nueva York), sin conversion. */
+export function optionQuoteLabel(lastTradeTime: string, locale: Locale = DEFAULT_LOCALE): string {
+    const t = createTranslator(locale);
+    const [datePart, timePartRaw] = lastTradeTime.split('T');
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(datePart ?? '') ? shortDate(new Date(`${datePart}T12:00:00Z`), locale) : (datePart ?? '');
+    const time = (timePartRaw ?? '').slice(0, 5);
+    return t('paperTrading.valuation.quoteLabels.optionLastTrade', { date, time });
+}
+
+/** Multiplicador fase 1 (contrato estandar OCC): igual que lib/paper-trading/options.ts. */
+const OPTION_MULTIPLIER = 100;
+
+/**
+ * Rama de opciones de valuePositions: valora SOLO con la prima real del
+ * contrato; cualquier hueco se queda en N/D con su motivo, nunca con la
+ * cotizacion del subyacente ni con el precio del ultimo fill.
+ */
+function valueOptionPosition(
+    position: ValuationPosition,
+    lookup: OptionPremiumLookup,
+    optionsNotQueried: ReadonlySet<string> | undefined,
+    optionUnderlyingLimit: number,
+    t: ReturnType<typeof createTranslator>,
+    locale: Locale,
+): ValuedPosition {
+    // Las primas de la delayed quotes API de CBOE son USD (propiedad de la
+    // fuente, no inferida del simbolo): otra divisa => N/D sin conversion.
+    if (position.currency !== 'USD') {
+        return unvalued(position, 'divisa-no-coincide', t('paperTrading.valuation.rowNotes.currencyMismatch', { quote: 'USD', position: position.currency }));
+    }
+    const parsed = parseOptionKey(position.instrumentKey);
+    if (!parsed) return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.noSymbol'));
+    if (optionsNotQueried?.has(parsed.underlying.toUpperCase())) {
+        return unvalued(position, 'no-consultada', t('paperTrading.valuation.rowNotes.optionNotQueried', { limit: optionUnderlyingLimit }));
+    }
+    if (lookup === undefined) {
+        // Ni se intento consultar la prima (camino sin consulta): la regla
+        // historica de la demo es no valerse del subyacente.
+        return unvalued(position, 'opcion-no-valorada', t('paperTrading.valuation.rowNotes.optionNotValued'));
+    }
+    if (lookup.fetchFailed) {
+        return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionNoQuote'));
+    }
+    if (lookup.quote === null) {
+        return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionContractNotFound'));
+    }
+    const { lastTradePrice, lastTradeTime } = lookup.quote;
+    if (lastTradePrice === null || !Number.isFinite(lastTradePrice) || lastTradePrice < 0 || lastTradeTime === null) {
+        return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionNoTrades'));
+    }
+    const marketValue = cents(position.quantity * lastTradePrice * OPTION_MULTIPLIER);
+    const cost = position.quantity * position.avgCost * OPTION_MULTIPLIER;
+    const pnl = cents(marketValue - cost);
+    return {
+        instrumentKey: position.instrumentKey,
+        name: position.name,
+        kind: 'opcion',
+        currency: position.currency,
+        quantity: position.quantity,
+        status: 'valorada',
+        price: lastTradePrice,
+        marketValue,
+        unrealizedPnl: pnl,
+        unrealizedPct: cost > 0 ? (pnl / cost) * 100 : null,
+        avgCost: position.avgCost,
+        currencyBasis: 'cboe',
+        quoteLabel: optionQuoteLabel(lastTradeTime, locale),
+        note: null,
+    };
+}
+
 /**
  * Valora cada posicion con `quotes` (clave = simbolo en mayusculas). Un
  * simbolo ausente del mapa o con null cuenta como "sin cotizacion".
@@ -192,13 +288,30 @@ const cents = (n: number): number => Math.round(n * 100) / 100;
 export function valuePositions(
     positions: ValuationPosition[],
     quotes: Record<string, ValuationQuote | null | undefined>,
-    options: { notQueried?: ReadonlySet<string>; currencyUnverified?: ReadonlySet<string>; locale?: Locale } = {},
+    options: {
+        notQueried?: ReadonlySet<string>;
+        currencyUnverified?: ReadonlySet<string>;
+        locale?: Locale;
+        /** Primas reales por instrumentKey (CBOE); ver OptionPremiumLookup. */
+        optionPremiums?: ReadonlyMap<string, OptionPremiumLookup>;
+        /** Subyacentes de opcion por ENCIMA del tope por consulta (no se pidieron). */
+        optionsNotQueried?: ReadonlySet<string>;
+        /** Tope aplicado, para el motivo "limite de N". */
+        optionUnderlyingLimit?: number;
+    } = {},
 ): DemoValuation {
     const locale: Locale = options.locale ?? DEFAULT_LOCALE;
     const t = createTranslator(locale);
     const rows: ValuedPosition[] = positions.map((position) => {
         if (position.kind === 'opcion') {
-            return unvalued(position, 'opcion-no-valorada', t('paperTrading.valuation.rowNotes.optionNotValued'));
+            return valueOptionPosition(
+                position,
+                options.optionPremiums?.get(position.instrumentKey),
+                options.optionsNotQueried,
+                options.optionUnderlyingLimit ?? 0,
+                t,
+                locale,
+            );
         }
         const symbol = symbolFromKey(position.instrumentKey);
         if (!symbol) return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.noSymbol'));
@@ -272,9 +385,12 @@ export function valuePositions(
             costBasis: 0,
             valuedPositions: 0,
         };
+        // Coste con el MISMO multiplicador que la fila (opciones x100: el
+        // coste medio es prima por acción, como en la contabilidad FIFO).
+        const mult = position.kind === 'opcion' ? OPTION_MULTIPLIER : 1;
         total.marketValue = cents(total.marketValue + row.marketValue);
         total.unrealizedPnl = cents(total.unrealizedPnl + row.unrealizedPnl);
-        total.costBasis = cents(total.costBasis + position.quantity * position.avgCost);
+        total.costBasis = cents(total.costBasis + position.quantity * position.avgCost * mult);
         total.valuedPositions += 1;
         byCurrency.set(position.currency, total);
     });
