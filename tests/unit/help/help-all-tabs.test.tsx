@@ -13,12 +13,12 @@ describe('HelpTabs: todos los paneles usan el locale',()=>{
   render(<LocaleProvider locale={locale}><HelpTabs/></LocaleProvider>);
   expect(screen.getByRole('tablist',{name:en?'Help sections':'Secciones de la ayuda'})).toBeInTheDocument();
   activate(en?'Documentation':'Documentación');
-  expect(screen.getByRole('heading',{name:en?'First steps: model → thesis → decision':'Primeros pasos: modelo → tesis → decisión'})).toBeInTheDocument();
+  expect(screen.getByRole('heading',{name:en?'First steps: thesis → valuation → decision':'Primeros pasos: tesis → valoración → decisión'})).toBeInTheDocument();
   expect(screen.getByRole('link',{name:en?'Portfolio':'Cartera'})).toHaveAttribute('href','/portfolio');
   expect(screen.getByRole('link',{name:'/export'})).toHaveAttribute('href','/export');
   expect(screen.getByText(en?'3. Decision.':'3. Decisión.')).toBeInTheDocument();
   expect(screen.getByText(en?'Glossary and methodology':'Glosario y metodología')).toBeInTheDocument();
-  expect(screen.queryByText(en?'Primeros pasos: modelo → tesis → decisión':'First steps: model → thesis → decision')).not.toBeInTheDocument();
+  expect(screen.queryByRole('heading',{name:en?'Primeros pasos: tesis → valoración → decisión':'First steps: thesis → valuation → decision'})).not.toBeInTheDocument();
   activate(en?'Contact':'Contacto');
   expect(screen.getByText(en?'Questions or suggestions? Email us.':'¿Tienes preguntas o sugerencias? Escríbenos por email.')).toBeInTheDocument();
   expect(screen.getByRole('link',{name:new RegExp('help@example.invalid')})).toHaveAttribute('href','mailto:help@example.invalid');
