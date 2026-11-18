@@ -13,6 +13,7 @@ import { isBlankPortfolio } from '@/lib/portfolio-blank';
 import { hasCostBasis } from '@/lib/portfolio-insight';
 import { windowNav } from '@/lib/portfolio-nav';
 import AddTransactionButton from '@/components/portfolio/AddTransactionButton';
+import LazyMount from '@/components/ui/lazy-mount';
 import PortfolioAllocation from '@/components/portfolio/PortfolioAllocation';
 const NavChartLoading = () => {
     const ti = useT();
@@ -168,7 +169,11 @@ function NavChartBody({ promise, chartPeriod, totalGain, baseCurrency }: { promi
                     {ti('portfolio.tabs.noChart')}
                 </div>
             ) : (
-            <PortfolioNavChart data={chartData} positive={totalGain >= 0} currency={baseCurrency} />
+            // Justo bajo el pliegue a 390px (top 864px medido): recharts no
+            // se descarga hasta que el gráfico asoma al viewport.
+            <LazyMount className="h-full" fallback={<NavChartLoading />}>
+                <PortfolioNavChart data={chartData} positive={totalGain >= 0} currency={baseCurrency} />
+            </LazyMount>
             )}
         </div>
         {chartData.length >= 2 && scores.history?.rebuild_reset_date ? (

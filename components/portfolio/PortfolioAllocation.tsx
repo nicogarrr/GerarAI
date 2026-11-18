@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import type { PortfolioHolding } from '@/lib/actions/portfolio.actions';
 import { PieChart as PieChartIcon } from 'lucide-react';
 import { useT, useFormat } from '@/lib/i18n/client';
+import LazyMount from '@/components/ui/lazy-mount';
 // Datos y colores desde módulos ligeros: importar valores de
 // './PortfolioAllocationChart' metía recharts en la carga inicial de /portfolio.
 import { COLORS } from './allocation-colors';
@@ -84,7 +85,11 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
                 {/* Pie Chart - Más grande */}
                 <div className="relative h-[200px] w-[200px] flex-shrink-0 sm:h-[250px] sm:w-[250px]">
                     {chartData.length > 0 ? (
-                        <PortfolioAllocationChart chartData={chartData} currency={baseCurrency} />
+                        // Bajo el pliegue a 390px (top 1178px medido): recharts
+                        // no se descarga hasta que el donut asoma al viewport.
+                        <LazyMount className="h-full w-full" fallback={<AllocationChartLoading />}>
+                            <PortfolioAllocationChart chartData={chartData} currency={baseCurrency} />
+                        </LazyMount>
                     ) : (
                         <div className="flex h-full w-full items-center justify-center rounded-full border border-gray-800">
                             <span className="px-6 text-center text-sm text-gray-500">
