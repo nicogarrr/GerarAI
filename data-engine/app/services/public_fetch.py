@@ -11,8 +11,12 @@ from __future__ import annotations
 
 import ipaddress
 import socket
+import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from datetime import UTC
+from email.utils import parsedate_to_datetime
+from http.cookies import SimpleCookie
 
 try:
     # API privada de httpcore (no hay equivalente publico en httpx para
@@ -357,3 +361,206 @@ async def fetch_public_url_async(
                         )
                 return bytes(content), response.headers.get("content-type"), target.url
     raise ValueError(f"Too many redirects (maximum {MAX_REDIRECTS})")
+
+
+_STRIP_RESPONSE_HEADERS = {"content-encoding", "content-length", "transfer-encoding", "set-cookie"}
+
+
+_FORBIDDEN_SESSION_HEADERS = frozenset({"cookie", "authorization", "proxy-authorization", "host"})
+
+
+@dataclass
+class _StoredCookie:
+    coded_value: str  # tal como lo emitio el servidor (con comillas si las llevaba)
+    secure: bool
+    path: str
+    expires_at: float | None  # epoch; None = cookie de sesion (vive lo que la sesion)
+
+
+def _default_cookie_path(request_path: str) -> str:
+    """RFC 6265 5.1.4: directorio de la ruta de la peticion."""
+    if not request_path.startswith("/") or request_path.count("/") == 1:
+        return "/"
+    return request_path[: request_path.rindex("/")]
+
+
+def _path_matches(request_path: str, cookie_path: str) -> bool:
+    """RFC 6265 5.1.4 path-match."""
+    if request_path == cookie_path:
+        return True
+    if not request_path.startswith(cookie_path):
+        return False
+    return cookie_path.endswith("/") or request_path[len(cookie_path)] == "/"
+
+
+class PublicSession:
+    """Sesion HTTP acotada para portales publicos con POST y cookie de sesion
+    (p. ej. ASP.NET WebForms con ``__VIEWSTATE``).
+
+    Mismas garantias que ``fetch_public_url``: cada salto se valida contra
+    ``allowed_url`` y contra la politica de IP publica, la IP validada se fija
+    en la conexion (Host/SNI originales), las redirecciones se siguen a mano
+    (maximo ``MAX_REDIRECTS``) y el cuerpo tiene tope duro de bytes.
+
+    Cabeceras: ``extra_headers`` NO admite Cookie, Authorization,
+    Proxy-Authorization ni Host (ValueError): un valor estatico viajaria a
+    cualquier host de la allowlist en una redireccion y se saltaria la jar.
+    Las cookies solo salen de la jar.
+
+    Cookies (subconjunto declarado de RFC 6265): "host-only": una cookie se
+    guarda para el host EXACTO que la emitio y solo se reenvia a ese host,
+    nunca a otro (aunque este en la allowlist). Se respetan Secure (no sale
+    por http), Path (o la ruta por defecto; path-match RFC 6265), Max-Age
+    (tiene prioridad; <=0 borra) y Expires (pasado borra). El valor se guarda
+    y reenvia tal como lo emitio el servidor (``coded_value``, con comillas),
+    asi un ';' dentro de comillas no se reinterpreta como otra cookie. NO se
+    implementa: Domain (se ignora), SameSite, HttpOnly (irrelevante sin
+    navegador), limites de numero/tamano de cookies, listas de sufijos
+    publicos. La sesion vive lo que viva el objeto: no se persiste nada.
+
+    Devuelve ``httpx.Response`` ya leida (``.text``, ``.headers``,
+    ``.status_code``, ``raise_for_status()``). No lanza por status >=400: el
+    llamador decide (p. ej. leer Retry-After antes de ``raise_for_status``).
+    Un POST redirigido con 301/302/303 pasa a GET sin cuerpo; con 307/308 se
+    rechaza (reenviar un cuerpo a otro destino no se hace en silencio).
+    """
+
+    def __init__(
+        self,
+        *,
+        allowed_url: Callable[[str], bool],
+        user_agent: str | None = None,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        max_bytes: int = DEFAULT_MAX_BYTES,
+        extra_headers: dict[str, str] | None = None,
+        clock: Callable[[], float] = time.time,
+    ) -> None:
+        self._allowed_url = allowed_url
+        self._timeout = timeout
+        self._max_bytes = max_bytes
+        self._clock = clock
+        self._headers = {"User-Agent": user_agent or USER_AGENT, "Accept": "*/*"}
+        for name, value in (extra_headers or {}).items():
+            if name.lower() in _FORBIDDEN_SESSION_HEADERS:
+                raise ValueError(f"PublicSession does not accept the {name!r} header")
+            self._headers[name] = value
+        self._cookies: dict[str, dict[tuple[str, str], _StoredCookie]] = {}
+
+    def __enter__(self) -> PublicSession:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._cookies.clear()
+
+    def get(self, url: str) -> httpx.Response:
+        return self._request("GET", url, None)
+
+    def post(self, url: str, data: dict[str, str]) -> httpx.Response:
+        return self._request("POST", url, data)
+
+    def _cookie_header(self, host: str, https: bool, path: str = "/") -> str | None:
+        now = self._clock()
+        jar = self._cookies.get(host, {})
+        sendable = []
+        for (name, cookie_path), cookie in list(jar.items()):
+            if cookie.expires_at is not None and cookie.expires_at <= now:
+                del jar[(name, cookie_path)]
+            elif (https or not cookie.secure) and _path_matches(path, cookie_path):
+                sendable.append((name, cookie_path, cookie))
+        # RFC 6265 5.4: rutas mas largas primero.
+        sendable.sort(key=lambda item: -len(item[1]))
+        pairs = [f"{name}={cookie.coded_value}" for name, _path, cookie in sendable]
+        return "; ".join(pairs) if pairs else None
+
+    def _store_cookies(self, host: str, response: httpx.Response, request_path: str = "/") -> None:
+        now = self._clock()
+        for raw in response.headers.get_list("set-cookie"):
+            cookie: SimpleCookie = SimpleCookie()
+            cookie.load(raw)  # el parser descarta en silencio lo ilegible
+            for name, morsel in cookie.items():
+                path = morsel["path"] or _default_cookie_path(request_path)
+                jar = self._cookies.setdefault(host, {})
+                expires_at = self._expiry(morsel, now)
+                if expires_at is not None and expires_at <= now:
+                    jar.pop((name, path), None)
+                else:
+                    jar[(name, path)] = _StoredCookie(
+                        morsel.coded_value, bool(morsel["secure"]), path, expires_at
+                    )
+
+    @staticmethod
+    def _expiry(morsel: Any, now: float) -> float | None:
+        max_age = _int_or_none(morsel["max-age"])
+        if max_age is not None:  # Max-Age manda sobre Expires
+            return now + max_age
+        raw_expires = morsel["expires"]
+        if raw_expires:
+            try:
+                parsed = parsedate_to_datetime(raw_expires)
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=UTC)
+                return parsed.timestamp()
+            except (TypeError, ValueError):
+                return None
+        return None
+
+    def _request(self, method: str, url: str, data: dict[str, str] | None) -> httpx.Response:
+        for _ in range(MAX_REDIRECTS + 1):
+            if not self._allowed_url(url):
+                raise ValueError("Public session URL denied by source policy")
+            target = _resolve_public_url(url)
+            host = (urlparse(target.url).hostname or "").lower()
+            headers = {**self._headers, "Host": target.host_header}
+            request_path = urlparse(target.url).path or "/"
+            cookie = self._cookie_header(host, target.url.lower().startswith("https:"), request_path)
+            if cookie:
+                headers["Cookie"] = cookie
+            with httpx.Client(
+                timeout=self._timeout,
+                follow_redirects=False,
+                transport=httpx.HTTPTransport(trust_env=False),
+            ) as client:
+                _connect_pinned_httpcore(client=client, target=target)
+                with client.stream(
+                    method,
+                    target.request_url,
+                    headers=headers,
+                    data=data,
+                    extensions={"sni_hostname": target.sni_hostname},
+                ) as response:
+                    self._store_cookies(host, response, request_path)
+                    next_url = _redirect_target(response, target.url)
+                    if next_url is not None:
+                        if method == "POST":
+                            if response.status_code not in {301, 302, 303}:
+                                raise ValueError(
+                                    "Public session refuses to resend a POST body on a 307/308 redirect"
+                                )
+                            method, data = "GET", None
+                        url = next_url
+                        continue
+                    content_length = _parse_content_length(response.headers.get("content-length"))
+                    if content_length is not None and content_length > self._max_bytes:
+                        raise ValueError(
+                            f"Remote document exceeds {self._max_bytes // (1024 * 1024)}MB limit"
+                        )
+                    content = _read_limited(response.iter_bytes(), self._max_bytes)
+                    kept = [
+                        (k, v)
+                        for k, v in response.headers.multi_items()
+                        if k.lower() not in _STRIP_RESPONSE_HEADERS
+                    ]
+                    return httpx.Response(
+                        response.status_code,
+                        headers=kept,
+                        content=content,
+                        request=httpx.Request(method, target.url),
+                    )
+        raise ValueError(f"Too many redirects (maximum {MAX_REDIRECTS})")
+
+
+def _int_or_none(value: object) -> int | None:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
