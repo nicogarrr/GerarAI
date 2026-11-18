@@ -8,11 +8,11 @@
       "divisa": "Divisas"
     },
     "notes": {
-      "indice": "Nivel del índice en puntos.",
-      "futuro": "Futuros sobre índices USA, en puntos.",
-      "accion": "Selección de valores del IBEX 35. No es un ranking por volumen: sin una fuente gratuita de «más negociadas» no sostenemos esa etiqueta.",
-      "materia": "Futuros de referencia en dólares.",
-      "divisa": "Tipo de cambio entre divisas."
+      "indice": "Nivel del índice en puntos. Muestra medida el 18-nov-2026 (una medición puntual, no una latencia garantizada): S&P 500, Nasdaq y Dow Jones sin retraso apreciable (segundos) en sesión; VIX e índices europeos con unos 15 min de retraso (al abrir la sesión europea, los primeros ~15 min aún muestran el cierre anterior); el Russell 2000 no llegó a actualizarse durante la medición.",
+      "futuro": "Futuros sobre índices USA, en puntos. Muestra medida el 18-nov-2026 (una medición puntual, no una latencia garantizada): los cuatro futuros del panel rondaban unos 10 min de retraso; la medición fina, tomada solo en ES=F (E-mini S&P 500), dio un retraso constante de 603-609 s entre muestras.",
+      "accion": "Selección de valores del IBEX 35. No es un ranking por volumen: sin una fuente gratuita de «más negociadas» no sostenemos esa etiqueta. Muestra medida el 18-nov-2026 (una medición puntual, no una latencia garantizada): la fuente gratuita los publicaba con unos 15 min de retraso; al abrir la sesión, los primeros ~15 min aún muestran el cierre anterior.",
+      "materia": "Futuros de referencia en dólares. Muestra medida el 18-nov-2026 (una medición puntual, no una latencia garantizada): la fuente gratuita los publicaba con unos 10 min de retraso.",
+      "divisa": "Tipo de cambio entre divisas. Muestra medida el 18-nov-2026 (una medición puntual, no una latencia garantizada): sin retraso apreciable (segundos)."
     },
     "premarket": "premercado",
     "postmarket": "postmercado",
@@ -22,7 +22,7 @@
     "refresh": "Actualizar ahora",
     "groupEmpty": "No hay datos disponibles ahora. Se reintenta cada minuto.",
     "footer": "Cada fila muestra la hora que informa el proveedor y su antigüedad al consultar la fuente (hora de Madrid); el panel se actualiza cada minuto. No son datos oficiales de mercado ni sirven para operar con garantías.",
-    "tableCaption": "Cotizaciones en directo: {group}",
+    "tableCaption": "Cotizaciones: {group}",
     "columns": {
       "instrument": "Instrumento",
       "price": "Precio",
@@ -31,6 +31,6 @@
     "providerUnavailable": "Proveedor de cotizaciones no disponible. Se reintenta cada minuto."
   },
   "metaTitle": "Mercados",
-  "metaDescription": "Índices, futuros, acciones del IBEX 35, materias primas y divisas con la hora real de cada cotización y su fuente.",
+  "metaDescription": "Índices, futuros, acciones del IBEX 35, materias primas y divisas con la hora que informa la fuente y la antigüedad de cada cotización.",
   "pageDescription": "Índices, futuros, acciones, materias primas y divisas, actualizado cada minuto."
 }

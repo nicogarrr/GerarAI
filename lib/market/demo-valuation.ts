@@ -252,9 +252,49 @@ const cents = (n: number): number => Math.round(n * 100) / 100;
 export function optionQuoteLabel(lastTradeTime: string, locale: Locale = DEFAULT_LOCALE): string {
     const t = createTranslator(locale);
     const [datePart, timePartRaw] = lastTradeTime.split('T');
-    const date = /^\d{4}-\d{2}-\d{2}$/.test(datePart ?? '') ? shortDate(new Date(`${datePart}T12:00:00Z`), locale) : (datePart ?? '');
+    // Defensivo: una fecha con forma pero inexistente ("2026-99-99") produce
+    // Invalid Date y formatearla lanza RangeError (auditor 18-nov-2026); el
+    // saneado ya la descarta, pero la etiqueta nunca debe romper la valoración.
+    const probe = /^\d{4}-\d{2}-\d{2}$/.test(datePart ?? '') ? new Date(`${datePart}T12:00:00Z`) : null;
+    const date = probe && Number.isFinite(probe.getTime()) ? shortDate(probe, locale) : (datePart ?? '');
     const time = (timePartRaw ?? '').slice(0, 5);
     return t('paperTrading.valuation.quoteLabels.optionLastTrade', { date, time });
+}
+
+const NAIVE_DT_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(:(\d{2}))?$/;
+
+/** "yyyy-mm-ddThh:mm(:ss)" con fecha civil real y hora 0-23/minuto/segundo 0-59. */
+export function isValidNaiveDateTime(value: string): boolean {
+    const m = NAIVE_DT_RE.exec(value);
+    if (!m) return false;
+    const [, yy, mm, dd, hh, mi, , ss] = m;
+    const year = Number(yy);
+    const month = Number(mm);
+    const day = Number(dd);
+    if (month < 1 || month > 12 || day < 1 || day > 31) return false;
+    if (Number(hh) > 23 || Number(mi) > 59 || (ss !== undefined && Number(ss) > 59)) return false;
+    const probe = new Date(Date.UTC(year, month - 1, day));
+    return probe.getUTCFullYear() === year && probe.getUTCMonth() === month - 1 && probe.getUTCDate() === day;
+}
+
+const NY_DATETIME_FORMAT = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+});
+
+/** Fecha-hora civil de Nueva York "yyyy-mm-ddThh:mm:ss" de un instante; null si no es finito. */
+export function nyCivilDateTime(nowMs: number): string | null {
+    if (!Number.isFinite(nowMs)) return null;
+    const parts = NY_DATETIME_FORMAT.formatToParts(new Date(nowMs));
+    const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '';
+    const dt = `${get('year')}-${get('month')}-${get('day')}T${get('hour')}:${get('minute')}:${get('second')}`;
+    return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(dt) ? dt : null;
 }
 
 /** Multiplicador fase 1 (contrato estandar OCC): igual que lib/paper-trading/options.ts. */
@@ -296,7 +336,9 @@ function valueOptionPosition(
         return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionContractNotFound'));
     }
     const { lastTradePrice, lastTradeTime } = lookup.quote;
-    if (lastTradePrice === null || !Number.isFinite(lastTradePrice) || lastTradePrice < 0) {
+    // Prima 0: el tick mínimo es 0,01, así que 0 no es una operación real
+    // (auditor 18-nov-2026: una fila valorada a 0 dibuja una PyG de -100 %).
+    if (lastTradePrice === null || !Number.isFinite(lastTradePrice) || lastTradePrice <= 0) {
         return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionNoTrades'));
     }
     if (lastTradeTime === null) {
@@ -304,6 +346,23 @@ function valueOptionPosition(
         // operación, así que la fila es N/D con su motivo propio (no es "sin
         // operación registrada": hay precio).
         return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionNoTradeTime'));
+    }
+    if (!isValidNaiveDateTime(lastTradeTime)) {
+        // Forma "yyyy-mm-ddThh:mm(:ss)" pero valor inexistente (2026-99-99...):
+        // el saneado ya la anula; aquí se re-valida para que un dato crudo
+        // nunca llegue a la etiqueta ni a una fila valorada (auditor 18-nov-2026).
+        return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionNoTradeTime'));
+    }
+    if (optionPremiumNowMs !== undefined) {
+        // Operación con fecha-hora FUTURA (comparación lexicográfica de
+        // fecha-hora civil naive de Nueva York: ambas cero-padded ISO): dato
+        // inválido de la fuente, N/D con aviso (auditor 18-nov-2026). Sin
+        // reloj inyectado no se puede juzgar y no se inventa el fallo.
+        const nowNy = nyCivilDateTime(optionPremiumNowMs);
+        const tradeNy = lastTradeTime.length === 16 ? `${lastTradeTime}:00` : lastTradeTime;
+        if (nowNy !== null && tradeNy > nowNy) {
+            return unvalued(position, 'sin-cotizacion', t('paperTrading.valuation.rowNotes.optionFutureTradeTime'));
+        }
     }
     const marketValue = cents(position.quantity * lastTradePrice * OPTION_MULTIPLIER);
     const cost = position.quantity * position.avgCost * OPTION_MULTIPLIER;

@@ -122,3 +122,36 @@ describe('robustez', () => {
         expect(await getManualDemoHistory()).toMatchObject({ ok: false, message: expect.stringContaining('Inténtalo de nuevo') });
     });
 });
+
+describe('cursor y límite: entradas que faltaban (cobertura auditor 18-nov-2026)', () => {
+    it('cursor que no es cadena -> rechazado, no reinterpretado', async () => {
+        expect(await getManualDemoHistory({ before: 42 })).toMatchObject({ ok: false, field: 'before' });
+        expect(await getManualDemoHistory({ before: true })).toMatchObject({ ok: false, field: 'before' });
+        expect(tradeFind).not.toHaveBeenCalled();
+    });
+
+    it('límite: cadena numérica se acepta; no numérica, cero y sobre el tope se acotan', async () => {
+        seedFind([]);
+        await getManualDemoHistory({ limit: '25' });
+        expect(capturedLimit).toBe(26); // limit+1 para hasMore
+        await getManualDemoHistory({ limit: 'abc' });
+        expect(capturedLimit).toBe(201); // no numérica: defecto 200
+        await getManualDemoHistory({ limit: '  ' });
+        expect(capturedLimit).toBe(201); // cadena vacía: defecto
+        await getManualDemoHistory({ limit: 0 });
+        expect(capturedLimit).toBe(2); // mínimo 1
+        await getManualDemoHistory({ limit: -5 });
+        expect(capturedLimit).toBe(2);
+        await getManualDemoHistory({ limit: 9999 });
+        expect(capturedLimit).toBe(501); // tope 500
+        await getManualDemoHistory({ limit: Number.NaN });
+        expect(capturedLimit).toBe(201);
+    });
+
+    it('entrada no objeto (cadena) -> página por defecto', async () => {
+        seedFind([]);
+        const result = await getManualDemoHistory('texto suelto');
+        expect(result).toMatchObject({ ok: true, hasMore: false });
+        expect(capturedLimit).toBe(201);
+    });
+});

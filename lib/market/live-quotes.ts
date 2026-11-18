@@ -349,6 +349,19 @@ export function yahooChartRequest(symbol: string): { url: string; init: RequestI
  * los ~40 devolvieron precio y timestamp; re-verificados 15-nov-2026:
  * 38/38 OK, ver scripts/verify-live-markets.mjs). Anadir uno nuevo exige la
  * misma verificacion y actualizar el guard live-quotes-guard.test.ts.
+ *
+ * Retraso del feed gratuito MEDIDO 18-nov-2026 (scripts/verify-live-markets.mjs;
+ * lo afirman las notas de cada grupo, pin: live-markets-delay-notes-guard.test.ts):
+ * - Futuros USA (ES/NQ/YM/RTY) y materias (GC/SI/HG/CL/BZ/NG): ~10 min,
+ *   estable entre muestras (603-609 s a las 08:05-08:07 CET; ~10 min a las 15:36).
+ * - Acciones .MC e indices europeos (^IBEX, ^STOXX50E, ^GDAXI, ^FTSE, ^FCHI):
+ *   ~15-16 min en sesion (10:12 y 15:36 CET); a las 09:11-09:13, a 11-13 min
+ *   de la apertura, aun mostraban el cierre anterior (edad ~15,5 h): es el
+ *   mismo retraso de ~15 min, no un fallo aparte.
+ * - Indices USA ^GSPC/^IXIC/^DJI: sin retraso apreciable (2-6 s a las 15:36 CET).
+ *   ^VIX: ~15 min. ^RUT: no se actualizo en la medicion (17 h). ^N225: sesion
+ *   cerrada en ambas ventanas de medicion (no medido en sesion).
+ * - Divisas: sin retraso apreciable (1-36 s a las 08:05; 11 s a las 15:36).
  * Decimales por instrumento (21-oct-2026): cruces sin JPY a 4 (un pip),
  * cruces con JPY a 3; resto a 2.
  * ------------------------------------------------------------------ */

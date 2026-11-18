@@ -57,7 +57,8 @@
       "optionNoTrades": "Sin operación registrada del contrato: N/D (no se inventa una prima).",
       "optionNotQueried": "No consultada: límite de {limit} subyacentes de opciones por consulta.",
       "optionNoTradeTime": "La fuente publica un precio sin hora de operación: N/D (sin su hora no se puede etiquetar la prima).",
-      "optionStalePremium": "La última operación del contrato tiene más de 1 día hábil: la prima puede no reflejar el precio actual."
+      "optionStalePremium": "La última operación del contrato tiene más de 1 día hábil: la prima puede no reflejar el precio actual.",
+      "optionFutureTradeTime": "La fuente publica una operación con fecha futura: dato inválido, N/D."
     },
     "quoteLabels": {
       "live": "{time} (hora de Madrid) · en vivo",

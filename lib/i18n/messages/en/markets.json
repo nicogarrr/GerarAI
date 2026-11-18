@@ -8,11 +8,11 @@
       "divisa": "Currencies"
     },
     "notes": {
-      "indice": "Index level in points.",
-      "futuro": "Futures on US indices, in points.",
-      "accion": "A selection of IBEX 35 stocks. It is not a volume ranking: without a free source for «most traded» we do not use that label.",
-      "materia": "Benchmark futures in dollars.",
-      "divisa": "Exchange rate between currencies."
+      "indice": "Index level in points. Sample measured Nov 18, 2026 (a one-off measurement, not a guaranteed latency): S&P 500, Nasdaq and Dow Jones with no appreciable delay (seconds) in session; VIX and European indices about 15 min delayed (in the first ~15 min of the European session rows still show the previous close); the Russell 2000 had not updated during the measurement.",
+      "futuro": "Futures on US indices, in points. Sample measured Nov 18, 2026 (a one-off measurement, not a guaranteed latency): the panel's four futures were about 10 min delayed; the fine-grained measurement, taken only on ES=F (E-mini S&P 500), showed a constant 603-609 s delay across samples.",
+      "accion": "A selection of IBEX 35 stocks. It is not a volume ranking: without a free source for «most traded» we do not use that label. Sample measured Nov 18, 2026 (a one-off measurement, not a guaranteed latency): the free feed published them about 15 min delayed; in the first ~15 min of the session rows still show the previous close.",
+      "materia": "Benchmark futures in dollars. Sample measured Nov 18, 2026 (a one-off measurement, not a guaranteed latency): the free feed published them about 10 min delayed.",
+      "divisa": "Exchange rate between currencies. Sample measured Nov 18, 2026 (a one-off measurement, not a guaranteed latency): no appreciable delay (seconds)."
     },
     "premarket": "pre-market",
     "postmarket": "after-hours",
@@ -22,7 +22,7 @@
     "refresh": "Refresh now",
     "groupEmpty": "Data is not available right now. Retrying every minute.",
     "footer": "Each row shows the time reported by the provider and how old it was when the source was checked (Madrid time); the panel refreshes every minute. This is not official market data and is not meant for trading with guarantees.",
-    "tableCaption": "Live quotes: {group}",
+    "tableCaption": "Quotes: {group}",
     "columns": {
       "instrument": "Instrument",
       "price": "Price",
@@ -31,6 +31,6 @@
     "providerUnavailable": "Quote provider unavailable. Retrying every minute."
   },
   "metaTitle": "Markets",
-  "metaDescription": "Indices, futures, IBEX 35 stocks, commodities and currencies, with the real time of each quote and its source.",
+  "metaDescription": "Indices, futures, IBEX 35 stocks, commodities and currencies with the source-reported time and age of each quote.",
   "pageDescription": "Indices, futures, stocks, commodities and currencies, updated every minute."
 }
