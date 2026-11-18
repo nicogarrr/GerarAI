@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import FairValueWarnings from '@/components/research/FairValueWarnings';
 import { isUnofficialSource } from '@/lib/research/source-quality';
 import { useEffect, useState } from 'react';
 import { getValuationSummaries } from '@/lib/actions/valuation-summary.actions';
@@ -76,6 +77,7 @@ export function ValuationSummaryCard({ item, quote }: { item: ValuationSummary; 
     <dl className="mt-3 space-y-3 text-sm">
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.fairValue')}</dt><dd className="text-gray-100">{fair.value != null && fair.currency && isValidCurrencyCode(fair.currency) ? formatPrice(fair.value, fair.currency) : na}</dd>
         <dd className="text-xs text-gray-400">{valuationSummaryText(fair.label, locale)}{fair.as_of ? ` · ${formatMarketDate(fair.as_of)}` : ''}{fair.stale ? ` · ${t('researchShared.valuationSummary.reviewAge')}` : ''}</dd>
+        {fair.warnings?.length ? <dd><FairValueWarnings warnings={fair.warnings} /></dd> : null}
         {fair.value == null && fair.reason ? <dd className="text-xs text-gray-400">{readableMissingReason(valuationSummaryText(fair.reason, locale), locale)}</dd> : null}
         {baseRate ? <dd className="text-xs text-gray-500">{baseRate}</dd> : null}</div>
       <div><dt className="text-gray-400">{t('researchShared.valuationSummary.margin')}</dt><dd className="text-gray-100">{margin === null ? na : formatPercent(margin)}</dd></div>

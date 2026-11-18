@@ -15,6 +15,18 @@ export const item: ValuationSummary = {
 const quote = { symbol: 'DEMO', price: 80, currency: 'USD' };
 
 describe('shared valuation', () => {
+  it('keeps each model warning visible beside fair value, without changing value or margin', () => {
+    const warnings = ['P/B cap applied.', 'NAV floored to zero.'];
+    const { unmount } = render(<ValuationSummaryCard item={{ ...item, fair_value: { ...item.fair_value, warnings } }} quote={quote} />);
+    const list = screen.getByTestId('fair-value-warnings');
+    expect(list.closest('dd')?.parentElement).toHaveTextContent('100');
+    for (const warning of warnings) expect(screen.getByText(warning)).toBeVisible();
+    expect(safetyMargin(80, 'USD', { ...item.fair_value, warnings })).toBeCloseTo(.2);
+    unmount();
+    render(<ValuationSummaryCard item={item} quote={quote} />);
+    expect(screen.queryByTestId('fair-value-warnings')).toBeNull();
+  });
+
   it('shows the cash-burn base rate beside the fair value, only when present', () => {
     const msg = 'Punto de partida: la empresa aún pierde dinero y quema caja.';
     const { unmount } = render(<ValuationSummaryCard item={{ ...item, base_rate: { message_es: msg, message_en: 'Starting point.' } }} quote={quote} />);
