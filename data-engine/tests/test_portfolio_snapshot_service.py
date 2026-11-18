@@ -310,3 +310,30 @@ def test_cash_is_not_carried_forward_across_an_fx_conversion(db):
     assert snapshot.cash_value_base == Decimal("0")
     assert snapshot.pricing_coverage < Decimal("1")
     assert snapshot.metadata_["cash_carried_forward"] == []
+
+
+def test_capture_default_date_is_madrid_not_utc(db, monkeypatch):
+    """Prod corre TZ=UTC (local_date.py): entre las 00:00 y la 01:00/02:00 de
+    Madrid, date.today() del servidor aun es ayer. Una captura sin as_of a esa
+    hora pisaba la foto del dia anterior y dejaba el dia de Madrid sin foto;
+    los lectores (proactividad, plan) filtran por local_today()."""
+    import app.services.portfolio_snapshot_service as snapshot_module
+    from app.core.local_date import local_today
+
+    madrid_today = local_today()
+    utc_still_yesterday = madrid_today - timedelta(days=1)
+
+    class _UtcDate(date):
+        @classmethod
+        def today(cls):
+            return utc_still_yesterday
+
+    monkeypatch.setattr(snapshot_module, "date", _UtcDate)
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=madrid_today)
+    db.add(CashBalance(currency="EUR", balance=Decimal("500"), as_of=madrid_today))
+    db.commit()
+
+    snapshot = snapshot_module.PortfolioSnapshotService().capture(db)
+    assert snapshot.snapshot_date == madrid_today
+    assert snapshot.pricing_coverage == Decimal("1")
