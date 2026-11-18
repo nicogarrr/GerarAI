@@ -144,6 +144,8 @@
     "createdAt": " · creada el {date}",
     "regenerate": "Regenerar enlace",
     "deactivate": "Desactivar",
+    "deactivateConfirmTitle": "¿Desactivar la suscripción?",
+    "deactivateConfirmDescription": "El enlace actual dejará de funcionar en los calendarios que lo están usando. Podrás crear uno nuevo, pero habrá que volver a suscribirlos.",
     "regenerateNote": "Por seguridad el enlace no se puede volver a mostrar: regenerarlo crea uno nuevo y el anterior deja de funcionar. Para cambiar el filtro, desactiva y crea una suscripción nueva.",
     "create": "Crear suscripción",
     "providerAria": "Proveedor de calendario",
@@ -159,6 +161,7 @@
     "linkAria": "Enlace de suscripción",
     "copied": "Copiado",
     "copy": "Copiar",
+    "copyFailed": "No se pudo copiar el enlace. Cópialo manualmente desde el campo.",
     "linkNote": "El enlace solo se muestra al crearlo. Quien lo tenga ve tu calendario de resultados: si se pierde, genera uno nuevo (el anterior deja de funcionar).",
     "feedName": "GerarAI · Resultados"
   },

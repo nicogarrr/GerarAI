@@ -5,6 +5,7 @@ import re
 from datetime import date
 from decimal import Decimal
 from typing import Any
+from urllib.parse import quote
 
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session
@@ -115,6 +116,37 @@ _MONTHS_ES = (
     "ene", "feb", "mar", "abr", "may", "jun",
     "jul", "ago", "sep", "oct", "nov", "dic",
 )
+
+# Vistas canónicas de la ficha para las fuentes internas del Cerebro. Deben
+# existir en lib/research/research-views.ts: `news` no está en MODULES/TABS y
+# asView('news') cae en `overview`; la vista de noticias es `noticias`.
+_RESEARCH_SOURCE_VIEWS = {
+    "thesis_version": "thesis",
+    "thesis_section": "thesis",
+    "claim": "thesis",
+    "claim_evidence": "thesis",
+    "financial_fact": "financials",
+    "news_event": "noticias",
+}
+
+
+def _internal_source_url(
+    kind: str,
+    *,
+    ticker: str | None = None,
+    knowledge_document_id: int | None = None,
+    requires_update: bool = False,
+) -> str | None:
+    """Ruta real que abre una fuente interna, o None si no hay enlace fiable."""
+    if kind == "knowledge_chunk":
+        # Explorador de fragmentos: lib/knowledge/document-ticker.ts.
+        if isinstance(knowledge_document_id, int) and knowledge_document_id > 0:
+            return f"/knowledge?document={knowledge_document_id}"
+        return None
+    view = "seguimiento" if kind == "news_event" and requires_update else _RESEARCH_SOURCE_VIEWS.get(kind)
+    if not view or not ticker:
+        return None
+    return f"/research/{quote(ticker, safe='')}?view={view}"
 
 
 def _fmt_number_es(number: float, digits: int = 2) -> str:
@@ -1950,12 +1982,33 @@ class ChatService:
             ))
         return sources, lines, citations
 
-    def _source_entry(self, kind: str, source_id: int | str | None, title: str, **extra) -> dict:
+    def _fill_internal_url(self, source: dict) -> dict:
+        """Completa la ruta de biblioteca de un source que no trae URL propia."""
+        if source.get("url"):
+            return source
+        url = _internal_source_url(
+            str(source.get("type") or ""),
+            knowledge_document_id=source.get("knowledge_document_id"),
+        )
+        return {**source, "url": url} if url else source
+
+    def _source_entry(
+        self, kind: str, source_id: int | str | None, title: str,
+        *, ticker: str | None = None, **extra,
+    ) -> dict:
         payload = {
             "type": kind,
             "id": source_id,
             "title": title,
         }
+        url = _internal_source_url(
+            kind,
+            ticker=ticker,
+            knowledge_document_id=extra.get("knowledge_document_id"),
+            requires_update=bool(extra.get("requires_update")),
+        )
+        if url is not None and extra.get("url") is None:
+            payload["url"] = url
         payload.update({key: value for key, value in extra.items() if value is not None})
         return payload
 
@@ -4243,7 +4296,7 @@ class ChatService:
             f"- Investment doctrine, not a company fact: {item['text']} "
             f"[knowledge_chunk:{item['id']}]" for item in library_context
         ]
-        sources: list[dict] = list(library_context)
+        sources: list[dict] = [self._fill_internal_url(item) for item in library_context]
         proposed_actions: list[str] = []
 
         if company:
@@ -4262,7 +4315,7 @@ class ChatService:
                 item for item in company_library_context(db, company, question)
                 if item["id"] not in seen_library
             ]
-            sources.extend(own_documents)
+            sources.extend(self._fill_internal_url(item) for item in own_documents)
             own_document_lines = [
                 (
                     f"- User's own document about {company.ticker} ({item['title']}), "
@@ -4295,6 +4348,7 @@ class ChatService:
                         "thesis_version",
                         thesis.id,
                         f"Tesis {company.ticker} v{thesis.version}",
+                        ticker=company.ticker,
                         # El LLM ve este campo y lo copia en la respuesta:
                         # siempre la etiqueta en castellano, nunca el enum.
                         status=_THESIS_STATUS_ES.get(
@@ -4308,6 +4362,7 @@ class ChatService:
                         "thesis_section",
                         section.id,
                         section.title,
+                        ticker=company.ticker,
                         section_key=section.section_key,
                         confidence=_decimal_to_float(section.confidence),
                     )
@@ -4319,6 +4374,7 @@ class ChatService:
                         fact.id,
                         f"{_METRIC_LABELS_ES.get(fact.metric, fact.metric)} "
                         f"({_fmt_period_es(fact.period, fact.fiscal_year, fact.fiscal_quarter)})",
+                        ticker=company.ticker,
                         metric=fact.metric,
                         value=_decimal_to_float(fact.value),
                         unit=fact.unit,
@@ -4333,6 +4389,7 @@ class ChatService:
                         "claim",
                         claim.id,
                         _short(claim.statement, 120),
+                        ticker=company.ticker,
                         status=claim.status,
                         materiality_score=claim.materiality_score,
                         confidence=_decimal_to_float(claim.confidence),
@@ -4344,6 +4401,7 @@ class ChatService:
                             "claim_evidence",
                             evidence.id,
                             _human_evidence_title(evidence.summary),
+                            ticker=company.ticker,
                             claim_id=claim.id,
                             evidence_type=evidence.evidence_type,
                             document_id=evidence.document_id,
@@ -4478,6 +4536,7 @@ class ChatService:
                         "financial_fact",
                         market_cap_fact.id,
                         f"{_METRIC_LABELS_ES['market_cap']} {market_cap_fact.period}",
+                        ticker=company.ticker,
                         metric=market_cap_fact.metric,
                         value=_decimal_to_float(market_cap_fact.value),
                         unit=market_cap_fact.unit,
@@ -4492,6 +4551,7 @@ class ChatService:
                         "news_event",
                         event.id,
                         event.title,
+                        ticker=company.ticker,
                         event_type=event.event_type,
                         materiality_score=event.materiality_score,
                         impact_direction=event.impact_direction,

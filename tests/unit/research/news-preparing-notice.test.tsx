@@ -9,6 +9,10 @@ vi.mock('next/headers', () => ({ cookies: async () => ({ get: () => (mocks.local
 vi.mock('@/components/research/DcaPreparingRefresh', () => ({ default: () => <span data-testid="refresh" /> }));
 import { NewsPreparingNotice } from '@/components/research/NewsPreparingNotice';
 
+function expectBothNewsNotices(source: string): void {
+  expect(source.match(/<NewsPreparingNotice\s/g)?.length ?? 0).toBe(2);
+}
+
 describe('NewsPreparingNotice', () => {
   beforeEach(() => { mocks.preparing.mockReset(); mocks.locale = 'es'; });
 
@@ -37,8 +41,15 @@ describe('NewsPreparingNotice', () => {
     expect(screen.queryByTestId('refresh')).not.toBeInTheDocument();
   });
 
+  it('acepta JSX en varias líneas pero sigue exigiendo las dos instancias', () => {
+    expectBothNewsNotices('<NewsPreparingNotice ticker="A" /><NewsPreparingNotice\n ticker="B" />');
+    expectBothNewsNotices('<NewsPreparingNotice\r\n ticker="A" /><NewsPreparingNotice\t ticker="B" />');
+    expect(() => expectBothNewsNotices('<NewsPreparingNotice\n ticker="A" />')).toThrow();
+    expect(() => expectBothNewsNotices('<NewsPreparingNoticeOther /><NewsPreparingNoticeOther />')).toThrow();
+  });
+
   it('la ficha lo usa en «Últimas noticias» y en la sección de noticias vacías', () => {
     const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
-    expect(page.match(/<NewsPreparingNotice /g)?.length).toBe(2);
+    expectBothNewsNotices(page);
   });
 });

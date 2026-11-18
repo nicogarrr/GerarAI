@@ -144,6 +144,8 @@
     "createdAt": " · created on {date}",
     "regenerate": "Regenerate link",
     "deactivate": "Deactivate",
+    "deactivateConfirmTitle": "Deactivate the subscription?",
+    "deactivateConfirmDescription": "The current link will stop working in the calendars that use it. You can create a new one, but those calendars will need to subscribe again.",
     "regenerateNote": "For security the link cannot be shown again: regenerating creates a new one and the previous one stops working. To change the filter, deactivate and create a new subscription.",
     "create": "Create subscription",
     "providerAria": "Calendar provider",
@@ -159,6 +161,7 @@
     "linkAria": "Subscription link",
     "copied": "Copied",
     "copy": "Copy",
+    "copyFailed": "Could not copy the link. Copy it manually from the field.",
     "linkNote": "The link is only shown when created. Anyone who has it can see your earnings calendar: if it is lost, generate a new one (the previous one stops working).",
     "feedName": "GerarAI · Earnings"
   },

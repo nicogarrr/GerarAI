@@ -131,6 +131,7 @@
     "messagesAria": "Brain messages",
     "copy": "Copy",
     "copied": "Copied",
+    "copyFailed": "Could not copy",
     "suggestedAria": "Suggested questions",
     "preparingAnalysis": "Preparing the analysis (it can take up to 90 seconds).",
     "writing": "GerarAI is writing the answer.",

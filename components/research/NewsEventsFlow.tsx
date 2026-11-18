@@ -39,6 +39,13 @@ function fichaNewsPageHref(ticker: string, page: number): string {
   return `/research/${encodeURIComponent(ticker)}${text ? `?${text}` : ''}#noticias`;
 }
 
+/** Sentido noticia → cambio: una noticia material abre el seguimiento de la
+ *  ficha, donde viven los cambios de tesis que disparó (el inverso de
+ *  «Últimos cambios» en la ficha). */
+function reviewHref(ticker: string): string {
+  return `/research/${encodeURIComponent(ticker)}?view=seguimiento`;
+}
+
 const PAGER_LINK = 'inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-700 bg-black/30 px-4 py-2 text-sm font-medium text-gray-200 hover:border-teal-600 hover:text-teal-200';
 const PAGER_OFF = 'inline-flex min-h-11 min-w-11 items-center rounded-lg border border-gray-900 px-4 py-2 text-sm text-gray-700';
 
@@ -367,7 +374,19 @@ export async function NewsEventsFlow({
                   </td>
                   <td className="block text-gray-300 md:table-cell md:py-2.5">
                     <span className="block text-xs text-gray-500 md:hidden">{t('research.flow.colStatus')}</span>
-                    {event.requires_update ? <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">{t('research.flow.review')}</span> : null}
+                    {event.requires_update ? (
+                      event.ticker ? (
+                        <Link
+                          aria-label={`${t('research.flow.review')}: ${t('research.fichaLatestChanges')}`}
+                          className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300 hover:text-amber-200"
+                          href={reviewHref(event.ticker)}
+                        >
+                          {t('research.flow.review')}
+                        </Link>
+                      ) : (
+                        <span className="rounded-full bg-amber-950/60 px-2 py-0.5 text-xs text-amber-300">{t('research.flow.review')}</span>
+                      )
+                    ) : null}
                     <NewsSecondOrder eventId={event.id} subjectTicker={event.ticker} summary={t('research.flow.viewContext')}>
                       <ContextAndCoverage event={event} t={t} locale={locale} />
                     </NewsSecondOrder>
