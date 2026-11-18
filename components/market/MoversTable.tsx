@@ -42,7 +42,7 @@ export async function MoversTable({ rows, caption, tickerSets, showVolume = fals
                 {row.name && row.name.trim().toUpperCase() !== row.ticker.trim().toUpperCase() ? (
                   <div className="max-w-20 truncate text-xs text-gray-500" title={row.name}>{row.name}</div>
                 ) : null}
-                {showVolume ? <div className="mt-1 text-[10px] text-gray-500 sm:hidden">{t('movers.table.volShort')} {row.volume == null ? NA : formatCompact(row.volume, { maximumFractionDigits: 1 })}</div> : null}
+                {showVolume ? <div className="mt-1 text-xs text-gray-500 sm:hidden">{t('movers.table.volShort')} {row.volume == null ? NA : formatCompact(row.volume, { maximumFractionDigits: 1 })}</div> : null}
                 <TickerContextBadges
                   portfolioTickers={tickerSets.portfolioTickers}
                   ticker={row.ticker}

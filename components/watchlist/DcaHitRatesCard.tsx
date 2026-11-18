@@ -106,12 +106,12 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                                 const avg = dcaPercent(cell.avg_return, locale);
                                 return (
                                     <div key={cell.horizon_months} role="cell" className="rounded bg-gray-900/60 px-2 py-1 tabular-nums text-gray-200 sm:bg-transparent sm:px-1 sm:py-0 sm:text-right">
-                                        <span className="block text-[10px] font-medium text-gray-500 sm:hidden">
+                                        <span className="block text-xs font-medium text-gray-500 sm:hidden">
                                             {cell.horizon_months === 1 ? ti('watchlist.hitRates.afterOne') : ti('watchlist.hitRates.afterOther', { count: INT.format(cell.horizon_months) })}
                                         </span>
                                         {pct ?? <span className="text-gray-500">—</span>}
                                         {!compact && cell.months > 0 ? (
-                                            <span className="block text-[10px] text-gray-500">
+                                            <span className="block text-xs text-gray-500">
                                                 {cell.months === 1 ? ti('watchlist.hitRates.casesOne') : ti('watchlist.hitRates.casesOther', { count: INT.format(cell.months) })}{avg ? ` · ${ti('watchlist.hitRates.average', { avg })}` : ''}
                                             </span>
                                         ) : null}
