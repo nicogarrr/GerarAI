@@ -196,8 +196,8 @@ describe('irLinksFor', () => {
     });
 
     it('cubre las posiciones y watchlist registradas el 2026-11-18', () => {
-        // Guard anti-regresion: NVDA y los 4X DCA sin entrada propia (CHTR, HIMS, NAUT, RXRX) + AMD.
-        for (const ticker of ['NVDA', 'CHTR', 'HIMS', 'NAUT', 'RXRX', 'AMD']) {
+        // Guard anti-regresion: NVDA y los 4X DCA sin entrada propia (CHTR, HIMS, NAUT, NFLX, RXRX) + AMD.
+        for (const ticker of ['NVDA', 'CHTR', 'HIMS', 'NAUT', 'NFLX', 'RXRX', 'AMD']) {
             expect(irLinksFor(ticker, '2026-11-18')?.section.url, ticker).toMatch(/^https:\/\//);
         }
     });

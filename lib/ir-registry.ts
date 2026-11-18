@@ -301,6 +301,12 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         events: [],
         verifiedOn: '2026-11-18',
     },
+    NFLX: {
+        name: 'Netflix',
+        section: { url: 'https://ir.netflix.net/investor-news-and-events/financial-releases/2026/default.aspx', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
     RXRX: {
         name: 'Recursion Pharmaceuticals',
         section: { url: 'https://ir.recursion.com/', labelKey: 'investorRelations' },
