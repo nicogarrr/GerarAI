@@ -18,7 +18,7 @@ function Metric({ label, value, footnote }: { label: string; value: string; foot
         <div className="rounded-lg border border-gray-700/50 bg-gray-900/50 p-3">
             <div className="mb-1 text-xs text-gray-500">{label}</div>
             <div className="text-lg font-bold text-gray-100">{value}</div>
-            {footnote && <div className="mt-1 text-[11px] text-gray-500">{footnote}</div>}
+            {footnote && <div className="mt-1 text-xs text-gray-500">{footnote}</div>}
         </div>
     );
 }

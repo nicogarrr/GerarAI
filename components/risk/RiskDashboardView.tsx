@@ -438,19 +438,19 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                                         {positionLink(position)}
                                         <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2">
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colName')}</dt>
+                                                <dt className="text-xs uppercase tracking-wide text-gray-500">{t('risk.positions.colName')}</dt>
                                                 <dd className="break-words text-sm text-gray-300">{formatRecordValue(position.name)}</dd>
                                             </div>
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colSector')}</dt>
+                                                <dt className="text-xs uppercase tracking-wide text-gray-500">{t('risk.positions.colSector')}</dt>
                                                 <dd className="break-words text-sm text-gray-400">{positionSectorText(t, position, f.locale)}</dd>
                                             </div>
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{t('risk.positions.colValue')}</dt>
+                                                <dt className="text-xs uppercase tracking-wide text-gray-500">{t('risk.positions.colValue')}</dt>
                                                 <dd className="break-words text-right text-sm text-gray-200">{positionValueText(t, f, position, baseCurrency)}</dd>
                                             </div>
                                             <div className="min-w-0">
-                                                <dt className="text-[11px] uppercase tracking-wide text-gray-500">{weightLabel}</dt>
+                                                <dt className="text-xs uppercase tracking-wide text-gray-500">{weightLabel}</dt>
                                                 <dd className="break-words text-right text-sm font-semibold text-gray-100">{weightText(t, f, position)}</dd>
                                             </div>
                                         </dl>

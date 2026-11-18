@@ -110,7 +110,7 @@ export default function GemsView() {
                                     </span>
                                 <span className="text-sm font-bold text-teal-300">
                                     {formatNumber(gem.score, { maximumFractionDigits: 1 })}
-                                    <span className="text-[11px] font-medium text-teal-400/80">/100</span>
+                                    <span className="text-xs font-medium text-teal-400/80">/100</span>
                                 </span>
                             </span>
                         </div>
@@ -122,7 +122,7 @@ export default function GemsView() {
                                         <span className="text-gray-400">{gemReasonLabel(reason.key, locale)}</span>
                                         <span className="font-medium text-gray-100">{gemReasonValue(reason, locale)}</span>
                                     </div>
-                                    <div className="text-[11px] text-gray-500">{reason.source}</div>
+                                    <div className="text-xs text-gray-500">{reason.source}</div>
                                 </li>
                             ))}
                         </ul>
