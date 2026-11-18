@@ -1982,13 +1982,37 @@ def backfill_finnhub_profiles(
     profile2) para el universo: nombre real, exchange, divisa, pais de
     domicilio y market_cap de proveedor fechado con la sesion de la quote.
 
-    Presupuesto: como mucho `max_companies` companias por ejecucion con
-    pausa tras cada llamada (plan gratuito = 60 llamadas/min). La marca de
-    reanudacion es un Document ``finnhub_profile`` por compania; las
-    respuestas vacias no se reconsultan en 30 dias. Nunca inventa datos:
-    sin clave o sin respuesta queda contado, nada escrito.
+    Presupuesto: como mucho `max_companies` companias por ejecucion, con
+    cada llamada reservando su hueco en el pacer global compartido de
+    Finnhub (~50/min entre TODOS los carriles; plan gratuito = 60/min). La
+    marca de reanudacion es un Document ``finnhub_profile`` por compania;
+    las respuestas vacias no se reconsultan en 30 dias. Nunca inventa datos:
+    sin clave o sin respuesta queda contado, nada escrito. Un 429 propaga
+    el cooldown compartido y reencola el resto de la pasada tras la ventana
+    (mismo patron que refresh_valuation_metrics), en vez de martillear la
+    cuota agotada.
     """
+    from app.services.connectors.finnhub import finnhub_blocked_for
     from app.services.finnhub_profile_backfill import FinnhubProfileBackfill
+    from app.workers.rate_limit_retry import retries_exhausted
+
+    # Cooldown 429 compartido: reencolar tras la ventana en vez de ocupar un
+    # hilo del carril finnhub haciendo llamadas condenadas al 429.
+    blocked = finnhub_blocked_for()
+    if blocked > 0:
+        if retries_exhausted():
+            # Otro Retry iria a dead-letter; el cron de manana retoma por el
+            # Document de reanudacion de cada empresa pendiente.
+            return {
+                "status": "skipped",
+                "actor": "backfill_finnhub_profiles",
+                "reason": "rate_limited_retries_exhausted",
+            }
+        delay_ms = int(blocked * 1000) + _retry_jitter_ms()
+        raise dramatiq.Retry(
+            f"Finnhub en cooldown 429: reintento tras {delay_ms // 1000}s",
+            delay=delay_ms,
+        )
 
     try:
         db = _session(tenant_id, user_id)
@@ -2000,10 +2024,23 @@ def backfill_finnhub_profiles(
             result = service.backfill(db, max_companies=max_companies)
         finally:
             service.close()
-        return {"actor": "backfill_finnhub_profiles", **result}
     except Exception as exc:
         _rollback(db)
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
+    finally:
+        db.close()
+    if result.get("reason") == "finnhub_429":
+        # 429 a mitad de pasada: lo ya procesado tiene su Document y no se
+        # repite; el resto se reencola tras la ventana marcada por el pacer.
+        if retries_exhausted():
+            return {"actor": "backfill_finnhub_profiles", **result}
+        delay_seconds = result.get("retry_after_seconds") or finnhub_blocked_for() or 60.0
+        delay_ms = int(delay_seconds * 1000) + _retry_jitter_ms()
+        raise dramatiq.Retry(
+            f"Finnhub 429 en backfill de perfiles: reintento tras {delay_ms // 1000}s",
+            delay=delay_ms,
+        )
+    return {"actor": "backfill_finnhub_profiles", **result}
 
 
 # Carril externa (2 hilos): backfill_sec_fundamentals dura 7,5-10,6 min por

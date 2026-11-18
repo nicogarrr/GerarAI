@@ -4,7 +4,12 @@ PR-D resto: el perfil de compania (nombre real, exchange, divisa, pais de
 domicilio) y el market cap de proveedor solo llegaban por caminos on-demand
 (cobertura ~0,1%). Este barrido diario rellena el universo respetando el
 rate limit del plan gratuito de Finnhub (60 llamadas/min): como mucho
-`max_companies` companias por ejecucion y una pausa tras CADA llamada.
+`max_companies` companias por ejecucion y CADA llamada reservando su hueco
+en el pacer global compartido (~50/min entre TODOS los carriles; antes un
+sleep propio de 1,05 s marcaba ~57/min solo este barrido e invisible para
+los demas carriles, y un 429 no cortaba nada: hasta 600 llamadas contra la
+ventana cerrada). Un 429 propaga el cooldown compartido y corta la corrida;
+lo no procesado queda sin Document y lo retoma el cron de manana.
 
 Veracidad:
 - Solo se escribe lo que la API devuelve; una respuesta vacia se registra
@@ -22,7 +27,6 @@ Veracidad:
 from __future__ import annotations
 
 import logging
-import time
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
@@ -38,6 +42,8 @@ from app.services.company_enrichment_service import (
     profile_ir_url,
     sector_for_industry,
 )
+from app.services.connectors.base import UpstreamRateLimited, retry_after_seconds
+from app.services.connectors.finnhub import finnhub_pacer
 
 logger = logging.getLogger(__name__)
 
@@ -65,9 +71,13 @@ def _quote_session_date(payload: dict[str, Any], today: date) -> date | None:
 
 
 class FinnhubProfileBackfill:
-    def __init__(self, settings=None, client: httpx.Client | None = None) -> None:
+    def __init__(self, settings=None, client: httpx.Client | None = None, pacer=None) -> None:
         self.settings = settings or get_settings()
         self._client = client or httpx.Client(timeout=15)
+        # Pacer GLOBAL compartido (precios, valoracion, IR y este backfill
+        # reservan el mismo hueco ~50/min). Inyectable en tests; el real
+        # es el singleton del conector.
+        self._pacer = pacer if pacer is not None else finnhub_pacer()
 
     def close(self) -> None:
         self._client.close()
@@ -76,8 +86,26 @@ class FinnhubProfileBackfill:
         key = getattr(self.settings, "finnhub_api_key", None)
         if not key:
             return None
+        # Hueco global ANTES de cada llamada: con su propio sleep(1.05) el
+        # backfill solo marcaba ~57/min y, sumado a los demas carriles, el
+        # agregado superaba la cuota FREE de 60/min y todos comian 429.
+        self._pacer.wait_sync()
         try:
             resp = self._client.get(url, params={"symbol": ticker, "token": key})
+            if resp.status_code == 429:
+                # La ventana es del proveedor y la respetan TODOS los
+                # procesos: quien la ve primero la propaga (cool_down en el
+                # llamante) y la corrida se corta aqui. Seguir llamando con
+                # la ventana cerrada solo mantiene la cuota agotada.
+                raise UpstreamRateLimited(
+                    f"Finnhub 429 en backfill de perfiles ({url})",
+                    # La ventana del proveedor NUNCA se acorta: no es un
+                    # reintento inline (ahi cabe el cap), es el cooldown
+                    # compartido que respetan todos los procesos. Un
+                    # Retry-After de 2 dias se propaga como 2 dias
+                    # (objecion del auditor 1, contraejemplo medido).
+                    retry_after=retry_after_seconds(resp, cap=float("inf")) or None,
+                )
             if resp.status_code == 200:
                 return resp.json()
         except httpx.HTTPError as exc:
@@ -102,7 +130,6 @@ class FinnhubProfileBackfill:
         db,
         *,
         max_companies: int = 300,
-        sleep_between_calls: float = 1.05,
         recheck_days: int = 30,
         today: date | None = None,
     ) -> dict[str, Any]:
@@ -111,17 +138,39 @@ class FinnhubProfileBackfill:
         if not getattr(self.settings, "finnhub_api_key", None):
             return {"status": "sin_clave", "detail": "FINNHUB_API_KEY no configurada"}
 
+        blocked = float(self._pacer.blocked_for() or 0.0)
+        if blocked > 0:
+            # Cooldown 429 vigente (lo marco cualquier carril): cero llamadas.
+            # El Document de reanudacion de cada empresa pendiente sigue sin
+            # escribirse, asi que el cron de manana retoma exactamente aqui.
+            return {
+                "status": "skipped",
+                "reason": "finnhub_cooldown_429",
+                "blocked_for_seconds": int(blocked),
+                "procesadas": 0,
+            }
+
         since = datetime.now(UTC) - timedelta(days=recheck_days)
         companies = list(db.scalars(select(Company).order_by(Company.ticker)).all())
         checked = self._recently_checked(db, [c.id for c in companies], since)
         pending = [c for c in companies if c.id not in checked][:max_companies]
 
         stats = {"ok": 0, "sin_datos": 0, "error": 0, "market_cap": 0}
+        attended = 0
+        rate_limited: UpstreamRateLimited | None = None
         for company in pending:
-            quote = self._get(QUOTE_URL, company.ticker)
-            time.sleep(sleep_between_calls)
-            profile = self._get(PROFILE_URL, company.ticker)
-            time.sleep(sleep_between_calls)
+            try:
+                quote = self._get(QUOTE_URL, company.ticker)
+                profile = self._get(PROFILE_URL, company.ticker)
+            except UpstreamRateLimited as exc:
+                rate_limited = exc
+                # La proteccion compartida se publica AL DETECTAR el 429,
+                # antes del commit: si el commit falla, el cooldown ya
+                # frena a todos los procesos (objecion del auditor 1,
+                # contraejemplo medido con commit roto).
+                self._pacer.cool_down(exc.retry_after or 60.0)
+                break
+            attended += 1
             if profile is None and quote is None:
                 stats["error"] += 1
                 continue  # error de transporte: sin Document, reintento manana
@@ -244,14 +293,29 @@ class FinnhubProfileBackfill:
             stats["ok" if profile else "sin_datos"] += 1
 
         db.commit()
-        return {
+        result = {
             "status": "ok",
             "date": today.isoformat(),
-            "procesadas": len(pending),
-            "pendientes_tras_run": len(companies) - len(checked) - len(pending),
+            # Empresas atendidas de verdad (con Document o error de
+            # transporte contado); con corte por 429 NO incluye las que
+            # quedaron sin tocar: esas siguen pendientes para manana.
+            "procesadas": attended,
+            "pendientes_tras_run": len(companies) - len(checked) - attended,
             "presupuesto": max_companies,
             **stats,
         }
+        if rate_limited is not None:
+            # El cooldown ya se publico al detectar el 429 (antes del
+            # commit); aqui solo se reporta. Ventana del proveedor sin
+            # acortar; suelo 60 s si no mando Retry-After util.
+            window = rate_limited.retry_after or 60.0
+            result.update({
+                "status": "partial",
+                "reason": "finnhub_429",
+                "retry_after_seconds": rate_limited.retry_after,
+                "cooldown_seconds": window,
+            })
+        return result
 
 
 def backfill_finnhub_profiles(db, **kwargs) -> dict[str, Any]:

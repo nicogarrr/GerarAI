@@ -184,13 +184,18 @@ class GlobalPacer:
             except Exception:
                 logger.warning("global pacer %s: Redis unavailable, fallback local", self.key, exc_info=True)
         if self._fallback_local:
-            with self._local_lock:
-                while True:
+            # La siesta va FUERA del lock y se revalida al despertar:
+            # dormir con el mutex tomado bloqueaba blocked_for() y
+            # cool_down() de los demas carriles del proceso durante toda
+            # la espera (objecion del auditor 1, contraejemplo medido con
+            # un sondeo desde otro hilo).
+            while True:
+                with self._local_lock:
                     remaining = max(self._local_next, self._local_blocked_until) - self._monotonic()
                     if remaining <= 0:
-                        break
-                    self._sleep(remaining)
-                self._local_next = self._monotonic() + self.min_interval_seconds
+                        self._local_next = self._monotonic() + self.min_interval_seconds
+                        return
+                self._sleep(remaining)
 
     def cool_down(self, seconds: float) -> None:
         """Marca un cooldown 429 (extend-only) visible por TODOS los procesos."""
