@@ -12,7 +12,7 @@ describe('LibraryChat: el Cerebro queda acoplado abajo a la derecha', () => {
     afterEach(() => markBrainReady(false));
 
     it('el HTML del servidor no reserva ningún panel incrustado', () => {
-        const html = renderToString(<LibraryChat scope="library" />);
+        const html = renderToString(<LibraryChat scope="library" label="Preguntar a la biblioteca" />);
         expect(html).not.toContain('h-[min(780px,80dvh)]');
         expect(html).not.toContain('min-h-[520px]');
         expect(html).not.toContain('brain-library-slot');
@@ -22,7 +22,7 @@ describe('LibraryChat: el Cerebro queda acoplado abajo a la derecha', () => {
     });
 
     it('el marcador oculto lleva el contexto saneado de la carta', () => {
-        const { container } = render(<LibraryChat scope="letters" authors={['Buffett']} documentId={7} documentTitle="Carta 1987" />);
+        const { container } = render(<LibraryChat scope="letters" authors={['Buffett']} documentId={7} documentTitle="Carta 1987" label="Preguntar a la biblioteca" />);
         const marker = container.querySelector<HTMLElement>('#brain-library-context');
         expect(marker).not.toBeNull();
         expect(marker!.hidden).toBe(true);
@@ -34,7 +34,7 @@ describe('LibraryChat: el Cerebro queda acoplado abajo a la derecha', () => {
         const seen: unknown[] = [];
         const listener = vi.fn((e: Event) => seen.push((e as CustomEvent).detail));
         window.addEventListener('gerarai:open-brain', listener);
-        render(<LibraryChat scope="library" />);
+        render(<LibraryChat scope="library" label="Preguntar a la biblioteca" />);
         fireEvent.click(screen.getByRole('button', { name: 'Preguntar a la biblioteca' }));
         window.removeEventListener('gerarai:open-brain', listener);
         expect(seen).toEqual([{ knowledge: { scope: 'library', authors: [] } }]);

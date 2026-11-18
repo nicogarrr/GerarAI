@@ -104,6 +104,8 @@ export const NAV_SECTIONS: NavSection[] = [{
   ],
 }];
 
+// Convención /portfolio: la sección (NAV_SECTIONS) se llama «Cartera» y la
+// pestaña dentro de ella (ROUTE_CATALOG) «Resumen». Contextos distintos.
 export const ROUTE_CATALOG: NavSection[] = [
   {
     titleKey: 'nav.sections.principal',

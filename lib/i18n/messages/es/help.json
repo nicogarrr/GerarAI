@@ -40,7 +40,7 @@
       "text": "Pesos, concentración (top 1 y top 5) y exposición por sector y factor. No calcula VaR, drawdown ni volatilidad: son métricas de estructura de cartera."
     },
     "item4": {
-      "title": "Screener",
+      "title": "Explorar acciones",
       "text": "Universo de grandes capitalizaciones con perfiles y precios reales para partir de candidatos verificables."
     },
     "item5": {
@@ -56,7 +56,7 @@
       "text": "Operaciones de personas vinculadas (Form 4 de la SEC) con señales por cluster de compra."
     },
     "item8": {
-      "title": "Knowledge y búsqueda",
+      "title": "Biblioteca y búsqueda",
       "text": "Biblioteca de principios de inversión e índice semántico que se reconstruye desde Postgres."
     },
     "item9": {
