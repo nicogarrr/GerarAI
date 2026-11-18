@@ -16,7 +16,7 @@ import httpx
 import pytest
 from bs4 import BeautifulSoup
 
-from app.services.connectors import cnmv_nod, cnmv_pacer
+from app.services.connectors import cnmv_nod, cnmv_pacer, cnmv_ps
 
 FIXTURE = (
     Path(__file__).parent / "fixtures" / "cnmv" / "nod_results_2026-11.html"
@@ -34,6 +34,7 @@ def test_pacer_is_single_shared_instance():
     # Un solo modulo = una sola instancia: el fallback local sin Redis tambien
     # es unico para todo cnmv.es (antes NOD y PS doblaban el ritmo real).
     assert cnmv_nod._pacer is cnmv_pacer.cnmv_pacer
+    assert cnmv_ps._pacer is cnmv_pacer.cnmv_pacer
     assert cnmv_nod._pacer.key == "cnmv"
 
 
