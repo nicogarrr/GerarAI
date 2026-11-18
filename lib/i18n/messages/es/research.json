@@ -1,4 +1,5 @@
 {
+  "fairValueModelWarnings": "Avisos del modelo de valor razonable",
   "sources": "Fuentes",
   "notAvailable": "fecha no disponible",
   "fichaTerminalEmpty": "Sin datos del terminal financiero todavía: se cargan con los financieros de la empresa.",

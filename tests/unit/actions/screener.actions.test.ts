@@ -108,6 +108,11 @@ describe('getFairValueReading: la misma cifra en todas las páginas', () => {
         expect(researchRequest).toHaveBeenCalledWith('/api/valuation/AAPL/fair-value', { cache: 'no-store' });
     });
 
+    it('preserva los avisos de la lectura sin cambiar la cifra', async () => {
+        researchRequest.mockResolvedValue({ value: 42, source: 'motor', warnings: ['Model cap applied', null, 'Model cap applied'] });
+        expect(await getFairValueReading('AAPL')).toMatchObject({ value: 42, source: 'motor', warnings: ['Model cap applied'] });
+    });
+
     it('sin valor, valor <= 0 o fuente desconocida -> null (nunca un número inventado)', async () => {
         researchRequest.mockResolvedValue({ value: null, source: 'tesis' });
         expect(await getFairValueReading('AAPL')).toBeNull();

@@ -1,4 +1,5 @@
 {
+  "fairValueModelWarnings": "Fair-value model warnings",
   "fichaTerminalEmpty": "No financial terminal data yet: it loads with the company's financials.",
   "fichaDirectivaEmpty": "No management commitments recorded yet.",
   "fichaSecNoticias": "News",

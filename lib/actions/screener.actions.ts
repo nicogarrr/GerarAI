@@ -1,5 +1,7 @@
 'use server';
 
+import { fairValueWarnings } from '@/lib/research/fair-value-warnings';
+
 import { cache } from 'react';
 import { requireAuthenticatedUser } from '@/lib/auth/require-user';
 import { jsonBody, researchRequest } from '@/lib/research/client';
@@ -141,6 +143,7 @@ export const getScreenerStocksRealWithStatus = cache(
 export type FairValueSource = 'tesis' | 'motor' | 'motor_orientativo';
 
 export type FairValueReading = {
+  warnings?: string[];
   value: number;
   /** true = valoracion final (tesis publicada o motor publicable); false =
    *  orientacion del motor: el numero existe pero algun input no es trazable
@@ -173,17 +176,20 @@ export const getFairValueReading = cache(
         source?: string | null;
         label?: string | null;
         publishable?: boolean;
+        warnings?: unknown;
         as_of?: string | null;
       }>(`/api/valuation/${encodeURIComponent(symbol)}/fair-value`, { cache: 'no-store' });
       const value = data?.value ?? null;
       const source = FAIR_VALUE_SOURCES.find((s) => s === data?.source);
       if (value == null || !(value > 0) || !source) return null;
+      const warnings = fairValueWarnings(data?.warnings);
       return {
         value,
         publishable: data?.publishable === true,
         source,
         label: data?.label || 'Valor justo',
         asOf: data?.as_of ?? null,
+        ...(warnings.length ? { warnings } : {}),
       };
     } catch {
       return null;
