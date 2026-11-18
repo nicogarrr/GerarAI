@@ -30,11 +30,13 @@ formato del flujo antiguo, conservado solo como referencia.
 
 Los flujos activos hoy son: `scripts/ops/pg-daily-backup.sh` (Postgres diario
 con restauracion estricta verificada, mas abajo), `scripts/mongo-backup.sh`
-(Mongo Atlas cifrado, seccion propia mas abajo) y el backup diario de Garage,
-que vive solo en la VM y aun no tiene script en este repo (brecha abierta:
-codificarlo y verificar copia y restore por separado, como pide
-`docs/MINIO_RETIREMENT.md`). `scripts/ops/check-backup-freshness.sh` vigila la
-frescura de los tres pilares y alerta por cron si uno envejece.
+(Mongo Atlas cifrado, seccion propia mas abajo), `scripts/ops/qdrant-snapshot.sh`
+(snapshot diario de Qdrant por coleccion via API loopback, con retencion) y el
+backup diario de Garage, que vive solo en la VM y aun no tiene script en este
+repo (brecha abierta: codificarlo y verificar copia y restore por separado,
+como pide `docs/MINIO_RETIREMENT.md`).
+`scripts/ops/check-backup-freshness.sh` vigila la frescura de los cuatro
+pilares y alerta por cron si uno envejece.
 
 Referencia del flujo legacy (NO ejecutar): los equivalentes en bash eran
 `scripts/backup.sh` y `scripts/restore.sh` (contrato: Postgres `pg_dump -Fc`,

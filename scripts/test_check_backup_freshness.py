@@ -23,7 +23,8 @@ class FreshnessTests(unittest.TestCase):
         self.pg = self.root / 'pg'
         self.mongo = self.root / 'mongo'
         self.garage = self.root / 'garage'
-        for d in (self.pg, self.mongo, self.garage):
+        self.qdrant = self.root / 'qdrant'
+        for d in (self.pg, self.mongo, self.garage, self.qdrant):
             d.mkdir()
 
     def _touch(self, path: Path, age_hours: float):
@@ -34,7 +35,7 @@ class FreshnessTests(unittest.TestCase):
     def run_case(self, **env_over):
         env = dict(os.environ,
                    PG_DIR=str(self.pg), MONGO_DIR=str(self.mongo),
-                   GARAGE_DIR=str(self.garage))
+                   GARAGE_DIR=str(self.garage), QDRANT_DIR=str(self.qdrant))
         env.update(env_over)
         return subprocess.run(['bash', str(SCRIPT)], env=env,
                               capture_output=True, text=True)
@@ -43,6 +44,7 @@ class FreshnessTests(unittest.TestCase):
         self._touch(self.pg / 'pg-daily-20261118T020000-1.sql.gz.verified', 5)
         self._touch(self.mongo / 'mongo-20261118-040000.archive.gz.age', 4)
         self._touch(self.garage / 'garage-20261118.tar.gz', 3)
+        self._touch(self.qdrant / 'knowledge_rag_v2-20261118.snapshot', 2)
 
     def test_todo_fresco_es_ok(self):
         self._fresh_set()
@@ -51,6 +53,20 @@ class FreshnessTests(unittest.TestCase):
         self.assertIn('OK postgres', r.stdout)
         self.assertIn('OK mongo', r.stdout)
         self.assertIn('OK garage', r.stdout)
+        self.assertIn('OK qdrant', r.stdout)
+
+    def test_qdrant_viejo_alerta(self):
+        self._fresh_set()
+        self._touch(self.qdrant / 'knowledge_rag_v2-20261118.snapshot', 50)
+        r = self.run_case()
+        self.assertEqual(r.returncode, 1)
+        self.assertIn('ALERTA qdrant', r.stdout)
+
+    def test_qdrant_off_explicito_no_alerta(self):
+        self._fresh_set()
+        r = self.run_case(QDRANT_CHECK='off')
+        self.assertEqual(r.returncode, 0)
+        self.assertIn('QDRANT_CHECK=off', r.stdout)
 
     def test_pg_viejo_alerta_con_edad_medida(self):
         self._fresh_set()
@@ -82,7 +98,8 @@ class FreshnessTests(unittest.TestCase):
         # vigilar y eso es exactamente lo que hay que avisar.
         self._touch(self.pg / 'pg-daily-20261118T020000-1.sql.gz.verified', 5)
         self._touch(self.mongo / 'mongo-20261118-040000.archive.gz.age', 4)
-        env = dict(os.environ, PG_DIR=str(self.pg), MONGO_DIR=str(self.mongo))
+        env = dict(os.environ, PG_DIR=str(self.pg), MONGO_DIR=str(self.mongo),
+                   QDRANT_DIR=str(self.qdrant))
         env.pop('GARAGE_DIR', None)
         r = subprocess.run(['bash', str(SCRIPT)], env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 1)
@@ -113,11 +130,11 @@ class FreshnessTests(unittest.TestCase):
         # El chequeo no crea, borra ni modifica nada.
         self._fresh_set()
         antes = {p: (p.stat().st_mtime_ns, p.read_bytes()) for d in
-                 (self.pg, self.mongo, self.garage) for p in d.iterdir()}
+                 (self.pg, self.mongo, self.garage, self.qdrant) for p in d.iterdir()}
         r = self.run_case()
         self.assertEqual(r.returncode, 0)
         despues = {p: (p.stat().st_mtime_ns, p.read_bytes()) for d in
-                   (self.pg, self.mongo, self.garage) for p in d.iterdir()}
+                   (self.pg, self.mongo, self.garage, self.qdrant) for p in d.iterdir()}
         self.assertEqual(antes, despues)
 
 

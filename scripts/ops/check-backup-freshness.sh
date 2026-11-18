@@ -16,12 +16,15 @@
 #   - garage: el backup diario vive hoy SOLO en la VM (sin script en el repo),
 #     asi que hay que declarar GARAGE_DIR (y si hace falta GARAGE_PATTERN).
 #     Sin GARAGE_DIR el chequeo ALERTA: un pilar sin vigilar es el fallo.
+#   - qdrant: snapshots *.snapshot de scripts/ops/qdrant-snapshot.sh.
 #
 # Variables (todas opcionales salvo la vigilancia de garage):
 #   PG_DIR (defecto ~/backups)          PG_MAX_AGE_H (defecto 26)
 #   MONGO_DIR (defecto ~/backups-mongo) MONGO_MAX_AGE_H (defecto 26)
 #   GARAGE_DIR (sin defecto)            GARAGE_PATTERN (defecto 'garage-*')
 #   GARAGE_MAX_AGE_H (defecto 26)       GARAGE_CHECK=off lo desactiva a sabiendas
+#   QDRANT_DIR (defecto ~/backups/qdrant)  QDRANT_PATTERN (defecto '*.snapshot')
+#   QDRANT_MAX_AGE_H (defecto 26)       QDRANT_CHECK=off lo desactiva a sabiendas
 #
 # Uso: ./scripts/ops/check-backup-freshness.sh
 # Cron sugerido (host): 30 8 * * * /ruta/check-backup-freshness.sh || avisar
@@ -37,8 +40,12 @@ GARAGE_MAX_AGE_H="${GARAGE_MAX_AGE_H:-26}"
 GARAGE_DIR="${GARAGE_DIR:-}"
 GARAGE_PATTERN="${GARAGE_PATTERN:-garage-*}"
 GARAGE_CHECK="${GARAGE_CHECK:-on}"
+QDRANT_DIR="${QDRANT_DIR:-$HOME/backups/qdrant}"
+QDRANT_PATTERN="${QDRANT_PATTERN:-*.snapshot}"
+QDRANT_MAX_AGE_H="${QDRANT_MAX_AGE_H:-26}"
+QDRANT_CHECK="${QDRANT_CHECK:-on}"
 
-for var in PG_MAX_AGE_H MONGO_MAX_AGE_H GARAGE_MAX_AGE_H; do
+for var in PG_MAX_AGE_H MONGO_MAX_AGE_H GARAGE_MAX_AGE_H QDRANT_MAX_AGE_H; do
   eval "valor=\${${var}}"
   es_entero "${valor}" || { echo "[backup-freshness] ${var} debe ser un entero de horas (p. ej. 26)"; exit 2; }
 done
@@ -79,5 +86,10 @@ elif [ -z "${GARAGE_DIR}" ]; then
   fail=1
 else
   check_pillar garage "${GARAGE_DIR}" "${GARAGE_PATTERN}" "${GARAGE_MAX_AGE_H}" || fail=1
+fi
+if [ "${QDRANT_CHECK}" = "off" ]; then
+  echo "[backup-freshness] qdrant: chequeo desactivado explicitamente (QDRANT_CHECK=off)"
+else
+  check_pillar qdrant "${QDRANT_DIR}" "${QDRANT_PATTERN}" "${QDRANT_MAX_AGE_H}" || fail=1
 fi
 exit "${fail}"
