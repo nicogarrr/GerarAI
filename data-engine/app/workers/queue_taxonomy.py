@@ -73,6 +73,7 @@ ACTOR_CLASS: dict[str, str] = {
     "ingest_letters_corpus": INGESTA,
     "ingest_sec_bottleneck_filings": INGESTA,
     "ingest_spy_daily": INGESTA,
+    "ingest_cnmv_nod_daily": INGESTA,  # NOD CNMV: cabeceras diarias, 0 EUR
     "ingest_uk_pdmr_filings": INGESTA,
     "refresh_bottlenecks": INGESTA,
     "refresh_earnings_calendar": INGESTA,

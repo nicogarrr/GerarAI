@@ -8,13 +8,18 @@ mismo cnmv_pacer que NOD y PS."""
 
 import asyncio
 import time
+from datetime import date
 from email.utils import formatdate
 from pathlib import Path
 
 import httpx
 import pytest
 
-from app.services.connectors import cnmv, cnmv_pacer
+from app.services.connectors import cnmv, cnmv_nod, cnmv_pacer
+
+NOD_FIXTURE = (Path(__file__).parent / "fixtures" / "cnmv" / "nod_results_2026-11.html").read_text(
+    encoding="utf-8"
+)
 
 
 async def _noop_wait():
@@ -28,6 +33,24 @@ def cooldowns(monkeypatch):
     monkeypatch.setattr(cnmv_pacer.cnmv_pacer, "wait_sync", lambda: None)
     monkeypatch.setattr(cnmv_pacer.cnmv_pacer, "wait", _noop_wait)
     return calls
+
+
+def test_one_pacer_instance_for_all_cnmv_connectors():
+    assert cnmv_nod._pacer is cnmv_pacer.cnmv_pacer
+
+
+def test_nod_retry_after_http_date_marks_cooldown(cooldowns):
+    """Repro del auditor: 429 con Retry-After HTTP-date a +3600 s."""
+    future = formatdate(time.time() + 3600, usegmt=True)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"Retry-After": future}, text="lento")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with pytest.raises(httpx.HTTPStatusError):
+        cnmv_nod.fetch_entries(date(2026, 11, 17), date(2026, 11, 18), client=client)
+    assert len(cooldowns) == 1
+    assert 3500.0 < cooldowns[0] <= 3600.0  # integro, no recortado
 
 
 def test_shared_parser_numeric_absent_past_date_and_garbage(cooldowns):
