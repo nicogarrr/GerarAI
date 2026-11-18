@@ -9,6 +9,7 @@ import { isValidCurrencyCode, type Formatters } from '@/lib/format';
 import { useFormat, useLocale, useT } from '@/lib/i18n/client';
 import { intlLocale } from '@/lib/i18n/locale';
 import { metricLabel } from '@/lib/research/metric-labels';
+import { sourceDisplay } from '@/lib/research/source-display';
 import { readableMissingReason } from '@/lib/research/missing-reason';
 
 export type SummaryQuote = { symbol: string; price: number | null; currency: string | null };
@@ -39,10 +40,10 @@ function Evidence({ evidence }: { evidence: HealthEvidence[] }) {
   return <ul className="mt-1 space-y-1 text-xs text-gray-400">{evidence.map(f => <li key={f.fact_id} title={t('researchShared.valuationSummary.fact', { id: f.fact_id })}>
     {f.source_url.startsWith('https://') ? (
       <a className="-mx-1 flex min-h-8 w-full items-center rounded px-1 underline" href={f.source_url} target="_blank" rel="noopener noreferrer">
-        <span>{metricLabel(f.metric, locale)}: {evidenceValue(f.value, f.unit, format)}{' · '}{formatMarketDate(f.period_end)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}</span>
+        <span>{metricLabel(f.metric, locale)}: {evidenceValue(f.value, f.unit, format)}{' · '}{formatMarketDate(f.period_end)}{' · '}{sourceDisplay(f.source_type, locale)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}</span>
       </a>
     ) : (
-      <span className="flex min-h-8 items-center">{`${metricLabel(f.metric, locale)}: ${evidenceValue(f.value, f.unit, format)}`}{' · '}{formatMarketDate(f.period_end)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}</span>
+      <span className="flex min-h-8 items-center">{`${metricLabel(f.metric, locale)}: ${evidenceValue(f.value, f.unit, format)}`}{' · '}{formatMarketDate(f.period_end)}{' · '}{sourceDisplay(f.source_type, locale)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}</span>
     )}
   </li>)}</ul>;
 }
