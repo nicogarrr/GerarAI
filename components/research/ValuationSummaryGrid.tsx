@@ -32,9 +32,18 @@ function Evidence({ evidence }: { evidence: HealthEvidence[] }) {
   const format = useFormat();
   const { formatMarketDate } = format;
   // El id interno del hecho queda en el «title» (diagnóstico), no en el texto.
+  // Táctil: cada evidencia enlaza a su fuente; la fila entera es el enlace a
+  // min-h-8 (32 px, WCAG 2.5.8 pide 24). No se usa el pseudo-elemento
+  // before:-inset-* aquí: con filas de 18-20 px de paso dos zonas de 44 px se
+  // solaparían y un toque podría abrir la fuente de la fila vecina.
   return <ul className="mt-1 space-y-1 text-xs text-gray-400">{evidence.map(f => <li key={f.fact_id} title={t('researchShared.valuationSummary.fact', { id: f.fact_id })}>
-    {f.source_url.startsWith('https://') ? <a className="underline" href={f.source_url} target="_blank" rel="noopener noreferrer">{metricLabel(f.metric, locale)}: {evidenceValue(f.value, f.unit, format)}</a> : `${metricLabel(f.metric, locale)}: ${evidenceValue(f.value, f.unit, format)}`}
-    {' · '}{formatMarketDate(f.period_end)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}
+    {f.source_url.startsWith('https://') ? (
+      <a className="-mx-1 flex min-h-8 w-full items-center rounded px-1 underline" href={f.source_url} target="_blank" rel="noopener noreferrer">
+        <span>{metricLabel(f.metric, locale)}: {evidenceValue(f.value, f.unit, format)}{' · '}{formatMarketDate(f.period_end)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}</span>
+      </a>
+    ) : (
+      <span className="flex min-h-8 items-center">{`${metricLabel(f.metric, locale)}: ${evidenceValue(f.value, f.unit, format)}`}{' · '}{formatMarketDate(f.period_end)}{isUnofficialSource(f.source_type) ? <span> · {t('research.facts.unofficial')}</span> : null}</span>
+    )}
   </li>)}</ul>;
 }
 
