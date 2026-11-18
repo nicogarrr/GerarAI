@@ -207,3 +207,449 @@ def test_reconcile_periodo_solo_ano_sin_fy_ni_trimestre(db):
     [promise] = service.reconcile(db, company)
     assert promise.status == "met"
     assert promise.actual_value == Decimal("120")
+
+
+def test_target_ignora_ano_inicial_y_respeta_cualificador():
+    # MEDIDO: antes devolvia ("==", 2026): el ano del encabezado se tomaba como
+    # objetivo y el veredicto comparaba el hecho contra 2026.
+    operator, target = ManagementCredibilityService._target(
+        "For 2026, we expect revenue of at least $5 billion"
+    )
+    assert operator == ">="
+    assert target == Decimal("5000000000")
+
+
+@pytest.mark.parametrize(
+    ("text", "target"),
+    [
+        ("Revenue at least $200 million in FY2026", "200000000"),
+        ("capex of approximately $1.2 billion", "1200000000"),
+        ("hasta 300 mil millones de deuda", "300000000000"),
+        # Un billon espanol son 10^12, no 10^9 (billion ingles).
+        ("deuda de 2 billones", "2000000000000"),
+        ("buybacks above 750 thousand", "750000"),
+        ("Revenue at least €200 in FY2026", "200"),
+        # Sobrevive al mutante k->1: la k son miles.
+        ("5k employees", "5000"),
+        ("5 MILLION", "5000000"),
+    ],
+)
+def test_target_escala_magnitudes(text, target):
+    _operator, parsed = ManagementCredibilityService._target(text)
+    assert parsed == Decimal(target)
+
+
+@pytest.mark.parametrize(
+    ("text", "operator", "target"),
+    [
+        ("al menos 200 millones", ">=", "200000000"),
+        ("hasta 200 millones de usuarios", "<=", "200000000"),
+        # 'más de'/'menos de' son estrictos en espanol.
+        ("más de 5 mil millones de ingresos en 2026", ">", "5000000000"),
+        ("menos de 300 mn de capex", "<", "300000000"),
+        ("aproximadamente 10 million subscribers", "==", "10000000"),
+        ("less than $300mn of capex", "<=", "300000000"),
+        ("capex below $1.5bn in FY2027", "<=", "1500000000"),
+    ],
+)
+def test_target_cualificadores_es_y_abreviaturas(text, operator, target):
+    assert ManagementCredibilityService._target(text) == (operator, Decimal(target))
+
+
+@pytest.mark.parametrize(
+    ("text", "target"),
+    [
+        # Coma decimal ES.
+        ("ingresos de 2,5 mil millones", "2500000000"),
+        ("ingresos de 2,5 millones", "2500000"),
+        # Punto de millares ES.
+        ("ingresos de 1.500 millones", "1500000000"),
+        # Coma de millares EN.
+        ("a total of $1,200 million", "1200000000"),
+        # Decimal EN intacto.
+        ("margin up to 15.5", "15.5"),
+    ],
+)
+def test_target_separadores_es_y_en(text, target):
+    _operator, parsed = ManagementCredibilityService._target(text)
+    assert parsed == Decimal(target)
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        # El numero del formulario no es un objetivo.
+        "10-K filed",
+        # Regresion aceptada y declarada: un ano pelado sin cualificador ni
+        # magnitud se descarta; 'deliver 2000 vehicles' queda sin objetivo
+        # antes que inventarlo.
+        "deliver 2000 vehicles",
+    ],
+)
+def test_target_sin_objetivo_inventado(text):
+    assert ManagementCredibilityService._target(text) == (None, None)
+
+
+def test_target_cualificador_salva_ano_pelado():
+    assert ManagementCredibilityService._target("deliver at least 2000 vehicles") == (
+        ">=",
+        Decimal("2000"),
+    )
+
+
+def test_target_salta_trimestre_sin_cualificador_delante():
+    # El 3 de Q3 no es el objetivo; manda la cifra real.
+    assert ManagementCredibilityService._target("Q3 revenue of $1.2 billion") == (
+        "==",
+        Decimal("1200000000"),
+    )
+
+
+def test_target_semestre_y_medio_ano_no_son_objetivo():
+    assert ManagementCredibilityService._target("2H26 revenue at least $3bn") == (
+        ">=",
+        Decimal("3000000000"),
+    )
+    assert ManagementCredibilityService._target("H1 revenue of $5 billion") == (
+        "==",
+        Decimal("5000000000"),
+    )
+
+
+def test_target_cualificador_gana_a_cifra_previa_sin_cualificador():
+    # Aunque aparezca despues, la cifra con cualificador manda sobre cualquier
+    # numero previo pelado.
+    assert ManagementCredibilityService._target(
+        "In 2026 we expect approximately $5.5 billion"
+    ) == ("==", Decimal("5500000000"))
+
+
+def test_target_rango_no_es_un_objetivo():
+    # "between $4 and $5 billion": un rango no cabe en (operador, objetivo);
+    # sin objetivo declarado antes que un == contra el extremo inferior.
+    assert ManagementCredibilityService._target("EBITDA between $4 and $5 billion") == (
+        None,
+        None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "target"),
+    [
+        # FAV: el idioma de la magnitud decide el separador (x1000 de por medio).
+        ("$2.145 billion", "2145000000"),
+        ("$0.250", "0.250"),
+        ("1.250 millones", "1250000000"),
+        ("1,250 million", "1250000000"),
+        # Dos separadores: el ultimo es el decimal.
+        ("revenue of $1,234,567.89", "1234567.89"),
+        ("ingresos de 1.234.567,89", "1234567.89"),
+    ],
+)
+def test_target_separador_segun_idioma_de_la_magnitud(text, target):
+    _operator, parsed = ManagementCredibilityService._target(text)
+    assert parsed == Decimal(target)
+
+
+def test_target_ambiguo_sin_magnitud_es_none():
+    # "12.000": decimal EN o millares ES; sin magnitud no se inventa la escala.
+    assert ManagementCredibilityService._target("12.000") == (None, None)
+
+
+def test_parse_number_rechaza_basura():
+    from app.services.management_credibility_service import _parse_number
+
+    assert _parse_number("abc") is None
+
+
+def test_target_salta_trimestre_suelto():
+    # Mata el mutante que quita el salto de FY/Q/H suelto: el 3 de 'Q 3' no es
+    # el objetivo.
+    assert ManagementCredibilityService._target("Q 3 revenue of 100") == (
+        "==",
+        Decimal("100"),
+    )
+
+
+def test_target_semestre_pegado_sin_cualificador():
+    # Mata el mutante que quita _HALF_PREFIX_RE: el 2 de '2H26' no es el
+    # objetivo aunque no haya cualificador que mande.
+    assert ManagementCredibilityService._target("2H26 revenue of $3 billion") == (
+        "==",
+        Decimal("3000000000"),
+    )
+
+
+def test_target_cualificador_manda_sobre_cifra_previa_sin_cualificador():
+    # Mata el mutante de 'el cualificador manda': 200 tiendas no es el
+    # objetivo de la promesa de ingresos.
+    assert ManagementCredibilityService._target(
+        "200 stores and revenue at least $5 billion"
+    ) == (">=", Decimal("5000000000"))
+
+
+def test_target_ignora_el_digito_del_trimestre():
+    # El 3 de "Q3" no es el objetivo; la cifra real es la de los satelites.
+    assert ManagementCredibilityService._target(
+        "In Q3 2026 we will launch 3 satellites"
+    ) == ("==", Decimal("3"))
+
+
+def test_target_ano_con_cualificador_si_cuenta():
+    # Un ano solo se descarta cuando no lleva cualificador ni magnitud: una
+    # cifra explicita tras 'above' es el objetivo aunque parezca ano.
+    operator, target = ManagementCredibilityService._target("above 2026 units")
+    assert operator == ">="
+    assert target == Decimal("2026")
+
+
+def test_import_normaliza_la_metrica(db):
+    # MEDIDO: claim.metric cruda ('Revenue') se guardaba tal cual y nunca casaba
+    # con el hecho ('revenue'), dejando la promesa abierta para siempre.
+    company = _company(db)
+    transcript = Transcript(company_id=company.id, title="Q4 call", period="Q4 2025")
+    db.add(transcript)
+    db.flush()
+    db.add(
+        CallClaim(
+            transcript_id=transcript.id,
+            speaker="CEO",
+            speaker_role="ceo",
+            claim="Revenue at least 200 in FY2026",
+            claim_type="guidance",
+            metric=" Revenue ",
+            period="FY2026",
+        )
+    )
+    db.commit()
+    [row] = ManagementCredibilityService().import_call_claims(db, company)
+    assert row.metric == "revenue"
+
+
+def test_reconcile_ignora_hechos_no_reportados(db):
+    # Un hecho estimado/derivado no puede dar un veredicto: la promesa queda
+    # abierta hasta que exista la cifra reportada.
+    company = _company(db)
+    fact = FinancialFact(
+        company_id=company.id,
+        metric="revenue",
+        value=Decimal("120"),
+        unit="USD",
+        period="FY2025",
+        fiscal_year=2025,
+        fiscal_quarter="FY",
+        source_type="estimated",
+        is_reported=False,
+    )
+    db.add(fact)
+    service = ManagementCredibilityService()
+    service.register(
+        db,
+        company,
+        promise="Revenue >= 100 en FY2025",
+        promise_date=date(2024, 2, 1),
+        expected_period="FY2025",
+        metric="revenue",
+        operator=">=",
+        target_value=Decimal("100"),
+        unit="USD",
+    )
+    [promise] = service.reconcile(db, company)
+    assert promise.status == "open"
+    assert promise.actual_fact_id is None
+
+
+def test_reconcile_aproximado_dentro_del_cinco_porciento_es_met(db):
+    company = _company(db)
+    fact = FinancialFact(
+        company_id=company.id,
+        metric="revenue",
+        value=Decimal("103"),
+        unit="USD",
+        period="FY2025",
+        fiscal_year=2025,
+        fiscal_quarter="FY",
+        source_type="filing",
+    )
+    db.add(fact)
+    service = ManagementCredibilityService()
+    service.register(
+        db,
+        company,
+        promise="Revenue of approximately 100 in FY2025",
+        promise_date=date(2024, 2, 1),
+        expected_period="FY2025",
+        metric="revenue",
+        operator="==",
+        target_value=Decimal("100"),
+        unit="USD",
+        approximate=True,
+    )
+    [promise] = service.reconcile(db, company)
+    assert promise.status == "met"
+
+
+def test_reconcile_igual_pelada_dentro_del_cinco_porciento_es_partial(db):
+    # Sin cualificador aproximado, "==" no es 'met' por cercania: la cifra
+    # exacta o parcial (auditoria FAV: 'Revenue of $5 billion' con 4,8 mil
+    # millones no puede salir cumplida).
+    company = _company(db)
+    fact = FinancialFact(
+        company_id=company.id,
+        metric="revenue",
+        value=Decimal("103"),
+        unit="USD",
+        period="FY2025",
+        fiscal_year=2025,
+        fiscal_quarter="FY",
+        source_type="filing",
+    )
+    db.add(fact)
+    service = ManagementCredibilityService()
+    service.register(
+        db,
+        company,
+        promise="Revenue of 100 in FY2025",
+        promise_date=date(2024, 2, 1),
+        expected_period="FY2025",
+        metric="revenue",
+        operator="==",
+        target_value=Decimal("100"),
+        unit="USD",
+    )
+    [promise] = service.reconcile(db, company)
+    assert promise.status == "partial"
+
+
+def test_reconcile_aproximado_fuera_del_cinco_porciento_es_missed(db):
+    company = _company(db)
+    fact = FinancialFact(
+        company_id=company.id,
+        metric="revenue",
+        value=Decimal("90"),
+        unit="USD",
+        period="FY2025",
+        fiscal_year=2025,
+        fiscal_quarter="FY",
+        source_type="filing",
+    )
+    db.add(fact)
+    service = ManagementCredibilityService()
+    service.register(
+        db,
+        company,
+        promise="Revenue of approximately 100 in FY2025",
+        promise_date=date(2024, 2, 1),
+        expected_period="FY2025",
+        metric="revenue",
+        operator="==",
+        target_value=Decimal("100"),
+        unit="USD",
+        approximate=True,
+    )
+    [promise] = service.reconcile(db, company)
+    assert promise.status == "missed"
+
+
+def test_import_marca_aproximada_solo_con_cualificador_aproximado(db):
+    company = _company(db)
+    transcript = Transcript(company_id=company.id, title="Q4 call", period="Q4 2025")
+    db.add(transcript)
+    db.flush()
+    db.add_all(
+        [
+            CallClaim(
+                transcript_id=transcript.id,
+                speaker="CEO",
+                speaker_role="ceo",
+                claim="Revenue of about 100 in FY2026",
+                claim_type="guidance",
+                metric="revenue",
+                period="FY2026",
+            ),
+            CallClaim(
+                transcript_id=transcript.id,
+                speaker="CFO",
+                speaker_role="cfo",
+                claim="Revenue of 100 in FY2026",
+                claim_type="guidance",
+                metric="revenue",
+                period="FY2026",
+            ),
+        ]
+    )
+    db.commit()
+    created = ManagementCredibilityService().import_call_claims(db, company)
+    by_promise = {row.promise: row for row in created}
+    assert by_promise["Revenue of about 100 in FY2026"].metadata_["approximate"] is True
+    assert by_promise["Revenue of 100 in FY2026"].metadata_["approximate"] is False
+
+
+def test_target_decimal_con_punto_y_magnitud_es():
+    # Magnitud espanola con decimal EN: el punto no siempre es de millares.
+    assert ManagementCredibilityService._target("margen de 15.5 millones") == (
+        "==",
+        Decimal("15500000"),
+    )
+
+
+def test_rangos_es_y_otros_no_son_objetivo_unico():
+    """FAV v3 (nota 1): un rango no cabe en (operador, objetivo); None honesto
+    igual que "between $4 and $5 billion"."""
+    service = ManagementCredibilityService
+    assert service._target("EBITDA entre 4 y 5 mil millones") == (None, None)
+    assert service._target("EBITDA de 4 a 5 mil millones de euros") == (None, None)
+    assert service._target("EBITDA $4-$5 billion") == (None, None)
+    assert service._target("EBITDA 4 to 5 billion") == (None, None)
+
+
+def test_rango_no_traga_un_objetivo_normal():
+    """El detector de rangos no debe apagar cifras sueltas legitimas."""
+    service = ManagementCredibilityService
+    assert service._target("revenue of $4.5 billion") == ("==", Decimal("4.5e9"))
+    assert service._target("crecer a 5 millones de usuarios") == ("==", Decimal("5000000"))
+    assert service._target("alrededor de 5 millones") == ("==", Decimal("5000000"))
+
+
+def test_semestre_sin_ano_no_es_objetivo():
+    """FAV v3 (nota 2): "2H" sin ano tambien es un periodo, no la cifra 2;
+    el objetivo es la cifra del crecimiento."""
+    service = ManagementCredibilityService
+    assert service._target("growth in 2H of 8%") == ("==", Decimal("8"))
+    # "1H" suelto igual; y "2H26" sigue sin ser objetivo.
+    assert service._target("growth in 1H of 5%") == ("==", Decimal("5"))
+    assert service._target("2H26 revenue of $3 billion") == ("==", Decimal("3000000000"))
+
+
+def test_ano_cualificado_tampoco_es_objetivo():
+    """FAV v4: "ventas de 5 millones hasta 2027" tomaba el año cualificado
+    ("hasta 2027") como objetivo y perdia la cifra. "hasta" + año que cierra
+    plazo (fin, puntuacion o conector) no es objetivo; con sustantivo de
+    unidad la cifra SI es el objetivo (contrato Release v5)."""
+    service = ManagementCredibilityService
+    assert service._target("ventas de 5 millones hasta 2027") == ("==", Decimal("5000000"))
+    assert service._target("ventas hasta 2027 de 5 millones") == ("==", Decimal("5000000"))
+    # Sin otra cifra, un plazo solo no es un objetivo numerico (casos 3-5).
+    assert service._target("hasta 2027") == (None, None)
+    assert service._target("de aquí hasta 2027") == (None, None)
+    assert service._target("hasta 2027 inclusive") == (None, None)
+    assert service._target("hasta 1999") == (None, None)
+    assert service._target("hasta 2099") == (None, None)
+    # Caso 6: "hasta" + cifra con pinta de año + sustantivo de unidad es
+    # cantidad objetivo, no plazo.
+    assert service._target("hasta 2000 vehículos") == ("<=", Decimal("2000"))
+    assert service._target("hasta 2000 unidades") == ("<=", Decimal("2000"))
+    # Variante Cerebro: a/y/e NO cierran plazo; la cifra sigue siendo el
+    # objetivo como en v4 (nunca ==3000 por tragar el conector).
+    assert service._target("hasta 2000 y 3000 unidades") == ("<=", Decimal("2000"))
+    assert service._target("hasta 2000 a 3000 unidades") == ("<=", Decimal("2000"))
+    assert service._target("vendemos hasta 2000 e incluimos 300") == ("<=", Decimal("2000"))
+    assert service._target("hasta 2000 a nivel global") == ("<=", Decimal("2000"))
+    # Casos buenos de Cerebro con guion y "de" tras el año.
+    assert service._target("hasta 2025 - 2027 de 5 millones") == ("==", Decimal("5000000"))
+    assert service._target("hasta 2025 de 12 millones") == ("==", Decimal("12000000"))
+    # Coste declarado: "en/de" + sustantivo se lee como plazo (sin objetivo).
+    assert service._target("hasta 2000 en tiendas") == (None, None)
+    assert service._target("hasta 2000 de clientes") == (None, None)
+    # El cualificador sobre la CIFRA sigue mandando sobre el año pelado.
+    assert service._target("crecer hasta 5 millones en 2027") == ("<=", Decimal("5000000"))
