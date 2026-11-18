@@ -1,10 +1,80 @@
 """Fail-closed pip-audit gate with bounded retries for PyPI read timeouts only."""
 
 import json
+import re
 import subprocess
 import sys
 import time
 from pathlib import Path
+
+_PYPROJECT = Path(__file__).resolve().parents[1] / "data-engine" / "pyproject.toml"
+
+
+def _version_tuple(text):
+    return tuple(int(part) for part in text.strip().split("."))
+
+
+def _satisfies_requires_python(version_info, specifier):
+    """Minimal comparator for the project's own requires-python forms
+    (>=, >, <=, <, ==, != over numeric tuples). Anything else raises:
+    an unknown constraint must not silently disable the guard."""
+    operators = (
+        (">=", lambda a, b: a >= b),
+        ("<=", lambda a, b: a <= b),
+        ("!=", lambda a, b: a != b),
+        ("==", lambda a, b: a == b),
+        (">", lambda a, b: a > b),
+        ("<", lambda a, b: a < b),
+    )
+    current = tuple(version_info)[:3]
+    for clause in specifier.split(","):
+        clause = clause.strip()
+        for symbol, compare in operators:
+            if clause.startswith(symbol):
+                if not compare(current, _version_tuple(clause[len(symbol):])):
+                    return False
+                break
+        else:
+            raise ValueError(f"requires-python clause not understood: {clause!r}")
+    return True
+
+
+def check_interpreter(pyproject=_PYPROJECT, version_info=sys.version_info, stderr=None):
+    """The gate audits a FRESH resolution of requirements.txt, which depends on
+    the interpreter: under a different Python pip resolves different versions
+    (measured 18-nov-2026: under 3.10 it resolves an old fastembed chain ->
+    pillow 12.3.0 with ~40 advisories that are NOT the deployed set, while
+    under 3.12, the project's requires-python, the resolution is clean).
+    Only an interpreter inside the project's requires-python is valid
+    evidence; anything else is red, never a misleading green or a false red."""
+    if stderr is None:
+        stderr = sys.stderr
+    try:
+        match = re.search(
+            r'(?m)^requires-python\s*=\s*"([^"]+)"', pyproject.read_text(encoding="utf-8")
+        )
+    except OSError as exc:
+        print(f"pip-audit: cannot read {pyproject}: {exc}", file=stderr)
+        return False
+    if not match:
+        print(f"pip-audit: no requires-python in {pyproject}", file=stderr)
+        return False
+    specifier = match.group(1)
+    try:
+        satisfied = _satisfies_requires_python(version_info, specifier)
+    except (ValueError, TypeError) as exc:
+        print(f"pip-audit: unparseable requires-python {specifier!r}: {exc}", file=stderr)
+        return False
+    if not satisfied:
+        current = ".".join(str(part) for part in tuple(version_info)[:3])
+        print(
+            f"pip-audit: interpreter {current} is outside the project requires-python "
+            f"{specifier!r}: a requirements resolution under this Python is not valid "
+            "evidence. Run the gate with the project's Python.",
+            file=stderr,
+        )
+        return False
+    return True
 
 
 def inspect_report(text):
@@ -97,7 +167,11 @@ def run_audit(
     budget=600,
     _requirements="data-engine/requirements.txt",
     _base_only=False,
+    _pyproject=_PYPROJECT,
+    _version_info=sys.version_info,
 ):
+    if not check_interpreter(pyproject=_pyproject, version_info=_version_info):
+        return 1
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     deadline = clock() + budget

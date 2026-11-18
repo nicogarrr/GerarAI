@@ -235,3 +235,51 @@ def test_cpu_skips_with_nonzero_exit_do_not_start_secondary_audit(tmp_path):
     rc, calls, delays = exercise(tmp_path, [result(1, CPU_REPORT)])
     assert rc == 1 and len(calls) == 1 and not delays
     assert not (tmp_path / "cpu-base-requirements.txt").exists()
+
+
+def pyproject(tmp_path, spec='>=3.12,<3.13'):
+    file = tmp_path / "pyproject.toml"
+    file.write_text(f'[project]\nrequires-python = "{spec}"\n')
+    return file
+
+
+def test_interpreter_outside_requires_python_stays_red_without_auditing(tmp_path, capsys):
+    rc, calls, delays = exercise(
+        tmp_path, [result()], _pyproject=pyproject(tmp_path), _version_info=(3, 10, 12)
+    )
+    assert rc == 1 and calls == [] and delays == []
+    assert "3.10.12" in capsys.readouterr().err
+
+
+def test_interpreter_inside_requires_python_audits(tmp_path):
+    rc, calls, _ = exercise(
+        tmp_path, [result()], _pyproject=pyproject(tmp_path), _version_info=(3, 12, 9)
+    )
+    assert rc == 0 and len(calls) == 1
+
+
+def test_interpreter_boundaries_of_requires_python(tmp_path):
+    spec = '>=3.12,<3.13'
+    low = gate.check_interpreter(pyproject(tmp_path, spec), (3, 11, 9), stderr=None)
+    high = gate.check_interpreter(pyproject(tmp_path, spec), (3, 13, 0), stderr=None)
+    inside = gate.check_interpreter(pyproject(tmp_path, spec), (3, 12, 9), stderr=None)
+    assert low is False and high is False and inside is True
+    # Sin cota superior, un Python mayor satisface la restriccion.
+    assert gate.check_interpreter(pyproject(tmp_path, '>=3.12.1'), (3, 13, 0), stderr=None) is True
+    assert gate.check_interpreter(pyproject(tmp_path, '>=3.12.1'), (3, 12, 0), stderr=None) is False
+
+
+def test_missing_or_unknown_requires_python_stays_red(tmp_path, capsys):
+    missing = tmp_path / "nope.toml"
+    assert gate.check_interpreter(missing, (3, 12, 9), stderr=None) is False
+    weird = pyproject(tmp_path, "~=3.12")
+    assert gate.check_interpreter(weird, (3, 12, 9), stderr=None) is False
+    empty = pyproject(tmp_path, "")
+    file = tmp_path / "pyproject.toml"
+    file.write_text("[project]\n")
+    assert gate.check_interpreter(file, (3, 12, 9), stderr=None) is False
+
+
+def test_real_project_pyproject_accepts_ci_interpreter():
+    assert gate.check_interpreter(gate._PYPROJECT, (3, 12, 9), stderr=None) is True
+    assert gate.check_interpreter(gate._PYPROJECT, (3, 10, 12), stderr=None) is False
