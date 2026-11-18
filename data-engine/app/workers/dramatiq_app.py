@@ -5917,6 +5917,47 @@ def dispatch_source_health_watchdog(
             db.close()
 
 
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
+def dispatch_db_connection_watchdog(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Alerta in-app al operador cuando Postgres se degrada (lado servidor).
+
+    Mide pg_stat_activity (sesiones 'idle in transaction' viejas, consultas
+    activas viejas, saturacion de max_connections) y persiste una
+    ResearchAlert por condicion y dia. Nace del 503 del 15-nov-2026 (pool
+    20+10 agotado sin que nadie lo viera). Coste ~0: una consulta agregada.
+    """
+    actor_name = "dispatch_db_connection_watchdog"
+    db = None
+    lease = None
+    try:
+        from app.services.db_connection_watchdog import emit_db_connection_alerts
+
+        db = _session(tenant_id, user_id)
+        lease = acquire_job_lease(
+            f"dispatch_db_connection_watchdog:{tenant_id}",
+            ttl_seconds=120,
+            redis_url=_lease_redis_url(),
+        )
+        if lease is None:
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        stats = emit_db_connection_alerts(db)
+        return {"status": "ok", "actor": actor_name, **stats}
+    except Exception as exc:
+        if db is not None:
+            _rollback(db)
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+    finally:
+        if lease is not None:
+            release_job_lease(
+                f"dispatch_db_connection_watchdog:{tenant_id}", lease, redis_url=_lease_redis_url()
+            )
+        if db is not None:
+            db.close()
+
+
 @dramatiq.actor(max_retries=2, min_backoff=30_000)
 # Ventana 5,5 h < cadencia 6 h: con la ventana igual a la cadencia, el tick
 # siguiente podia consumirse con el claim anterior aun fresco (jitter y

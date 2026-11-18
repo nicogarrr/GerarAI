@@ -21,6 +21,7 @@ from app.workers.dramatiq_app import (
     coalesced_send,
     collect_analyst_estimates,
     consolidate_memory,
+    dispatch_db_connection_watchdog,
     dispatch_earnings_reminders,
     dispatch_insider_alerts,
     dispatch_macro_reminders,
@@ -559,6 +560,11 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
     # antiguo + tasa de drenaje medida entre ticks). Cada 5 min.
     _register(scheduler, partial(enqueue_for_all_tenants, dispatch_queue_watchdog),
               "interval", job_id="queue_watchdog", minutes=5)
+    # Watchdog de conexiones Postgres: alerta in-app si hay sesiones 'idle in
+    # transaction' o consultas activas envejecidas, o si el servidor se acerca
+    # a max_connections (el 503 del 15-nov-2026 no lo vio nadie). Cada 5 min.
+    _register(scheduler, partial(enqueue_for_all_tenants, dispatch_db_connection_watchdog),
+              "interval", job_id="db_connection_watchdog", minutes=5)
     # F17: precios intradia de la cartera (Yahoo, retardo ~15 min declarado
     # en la UI) durante la sesion US. Ventana 13-21 UTC cubre EDT y EST.
     _register(
