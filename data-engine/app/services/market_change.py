@@ -33,8 +33,11 @@ def common_sessions(db: Session) -> tuple:
     empresas un dia, ~60-120 los siguientes) dejaba como unica sesion valida
     la de la carga y congelaba el ranking en una fecha vieja. Un cierre suelto
     de fin de semana o de un solo ticker tampoco define la sesion."""
+    # One row per (company_id, date), enforced by the NOT NULL columns and
+    # uq_market_price_company_date. With no joins, COUNT(*) is the exact
+    # company count and avoids sorting company IDs for COUNT(DISTINCT).
     rows = db.execute(
-        select(MarketPrice.date, func.count(func.distinct(MarketPrice.company_id)))
+        select(MarketPrice.date, func.count())
         .where(MarketPrice.source.in_(OFFICIAL_CLOSE_SOURCES), MarketPrice.date <= date.today())
         .group_by(MarketPrice.date)
         .order_by(MarketPrice.date.desc())
