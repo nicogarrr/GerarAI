@@ -70,6 +70,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
                 url: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast',
                 assets: [
                     { kind: 'presentacion', url: 'https://bn.brookfield.com/sites/brookfield-bn-v2/files/Brookfield-BN-IR-V2/2026/Q3/2026-q3-bn-supplemental.pdf', source: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast' },
+                    { kind: 'webcast', url: 'https://edge.media-server.com/mmc/p/a5qsvhzs', source: 'https://bn.brookfield.com/events-news/events-financial-calendar' },
                 ],
             },
             {
@@ -82,7 +83,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
                 ],
             },
         ],
-        verifiedOn: '2026-10-21',
+        verifiedOn: '2026-11-18',
     },
     TSLA: {
         name: 'Tesla',
@@ -139,24 +140,51 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         name: 'Georgia Capital',
         section: { url: 'https://georgiacapital.ge/investor-relations/financial-results', labelKey: 'resultsAndReports' },
         events: [
-            { date: '2026-10-28', period: 'T3 2026', url: 'https://georgiacapital.ge/news/company-news/1324-georgia-capital-plc-3q26-and-9m26-results' },
+            {
+                date: '2026-10-28',
+                period: 'T3 2026',
+                url: 'https://georgiacapital.ge/news/company-news/1324-georgia-capital-plc-3q26-and-9m26-results',
+                assets: [
+                    { kind: 'presentacion', url: 'https://app.georgiacapital.ge/static/file/202610290907-georgia-capital-plc-3q26-and-9m26-results-call-presentation.pdf', source: 'https://georgiacapital.ge/investor-relations/financial-results' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     KRKNF: {
         name: 'Kraken Robotics',
         section: { url: 'https://krakenrobotics.com/investors/press-releases/', labelKey: 'pressReleases' },
-        events: [],
-        verifiedOn: '2026-11-08',
+        events: [
+            // La empresa anuncia fecha y webcast del T3 2026 en su nota oficial del 5-nov
+            // (no hay pagina de evento dedicada; la nota lleva el enlace de registro).
+            {
+                date: '2026-11-24',
+                period: 'T3 2026',
+                url: 'https://www.krakenrobotics.com/news-releases/kraken-robotics-announces-102-million-in-new-orders/',
+                assets: [
+                    { kind: 'webcast', url: 'https://event.choruscall.com/mediaframe/webcast.html?webcastid=BIq8txT9', source: 'https://www.krakenrobotics.com/news-releases/kraken-robotics-announces-102-million-in-new-orders/' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-18',
     },
     BABA: {
         name: 'Alibaba Group',
         section: { url: 'https://www.alibabagroup.com/en-US/ir-financial-reports-quarterly-results', labelKey: 'quarterlyResults' },
         events: [
             // Anuncio oficial de la fecha (19 nov 2026, trimestre de septiembre).
-            { date: '2026-11-19', period: 'T3 2026', url: 'https://home.alibabagroup.com/en-US/document-2054756418245885952' },
+            {
+                date: '2026-11-19',
+                period: 'T3 2026',
+                url: 'https://home.alibabagroup.com/en-US/document-2054756418245885952',
+                assets: [
+                    // El propio anuncio: "a live webcast of the earnings conference call can be
+                    // accessed at https://www.alibabagroup.com/en/ir/earnings" (grabacion despues en el mismo enlace).
+                    { kind: 'webcast', url: 'https://www.alibabagroup.com/en/ir/earnings', source: 'https://home.alibabagroup.com/en-US/document-2054756418245885952' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-09',
+        verifiedOn: '2026-11-18',
     },
     BWMX: {
         name: 'Betterware de México',
@@ -226,9 +254,130 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         name: 'Ondas',
         section: { url: 'https://ir.ondas.com/financial-results', labelKey: 'quarterlyResults' },
         events: [
-            { date: '2026-11-12', period: 'T3 2026', url: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
+            {
+                date: '2026-11-12',
+                period: 'T3 2026',
+                url: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call',
+                assets: [
+                    { kind: 'presentacion', url: 'https://d1io3yog0oux5.cloudfront.net/_bfade721c20366831ed364c6d248d42e/ondas/db/603/4845/conference_call_presentation/Q3_2026_ER_Presentation_ONDS.pdf', source: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
+                    { kind: 'webcast', url: 'https://event.choruscall.com/mediaframe/webcast.html?webcastid=p2HHvXFF', source: 'https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-09',
+        verifiedOn: '2026-11-18',
+    },
+    NVDA: {
+        name: 'NVIDIA',
+        section: { url: 'https://investor.nvidia.com/financial-info/quarterly-results/', labelKey: 'quarterlyResults' },
+        events: [
+            // NVIDIA cierra su ejercicio fiscal en enero: es el T3 del ejercicio 2027.
+            {
+                date: '2026-11-17',
+                period: 'T3 fiscal 2027',
+                url: 'https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-3rd-Quarter-FY27-Financial-Results/default.aspx',
+                assets: [
+                    { kind: 'presentacion', url: 'https://s201.q4cdn.com/141608511/files/doc_financials/2027/Q327/NVDA-F3Q27-Quarterly-Presentation.pdf', source: 'https://investor.nvidia.com/financial-info/quarterly-results/default.aspx' },
+                    { kind: 'webcast', url: 'https://events.q4inc.com/attendee/902213296', source: 'https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-3rd-Quarter-FY27-Financial-Results/default.aspx' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-18',
+    },
+    CHTR: {
+        name: 'Charter Communications',
+        section: { url: 'https://ir.charter.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    HIMS: {
+        name: 'Hims & Hers Health',
+        section: { url: 'https://investors.hims.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    NAUT: {
+        name: 'Nautilus Biotechnology',
+        section: { url: 'https://investors.nautilus.bio/investor-relations/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    RXRX: {
+        name: 'Recursion Pharmaceuticals',
+        section: { url: 'https://ir.recursion.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    AMD: {
+        name: 'Advanced Micro Devices',
+        section: { url: 'https://ir.amd.com/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'SAN.MC': {
+        name: 'Banco Santander',
+        section: { url: 'https://www.santander.com/en/shareholders-and-investors/financial-and-economic-information/quarterly-results', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'IBE.MC': {
+        name: 'Iberdrola',
+        section: { url: 'https://www.iberdrola.com/accionistas-inversores/informacion-operativa-financiera/resultados', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'AENA.MC': {
+        name: 'Aena',
+        section: { url: 'https://www.aena.es/es/accionistas-e-inversores/informacion-economico-financiera/publicaciones-financieras-y-operativas.html', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'ENG.MC': {
+        name: 'Enag\u00e1s',
+        section: { url: 'https://www.enagas.es/es/accionistas-inversores/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'RED.MC': {
+        name: 'Redeia',
+        section: { url: 'https://www.redeia.com/es/accionistas-e-inversores/informacion-financiera', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'GEST.MC': {
+        name: 'Gestamp',
+        section: { url: 'https://www.gestamp.com/Accionistas-e-Inversores/Informacion-Economico-Financiera', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'PRM.MC': {
+        name: 'Prosegur',
+        section: { url: 'https://www.prosegur.com/accionistas-inversores', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'VIS.MC': {
+        name: 'Viscofan',
+        section: { url: 'https://www.viscofan.com/es/relacion-con-inversores/informacion-financiera-e-informe-anual', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'VID.MC': {
+        name: 'Vidrala',
+        section: { url: 'https://www.vidrala.com/en/investors/results-centre/', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'EBRO.MC': {
+        name: 'Ebro Foods',
+        section: { url: 'https://www.ebrofoods.es/informacion-para-accionistas-e-inversores/informacion-economico-financiera/informacion-publica-periodica/', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
+    'IBG.MC': {
+        name: 'Iberpapel',
+        section: { url: 'https://www.iberpapel.es/accionistas-e-inversores/', labelKey: 'investorRelations' },
+        events: [],
+        verifiedOn: '2026-11-18',
     },
     AMZN: {
         name: 'Amazon.com',
@@ -388,25 +537,52 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         section: { url: 'https://www.thewosgroupplc.com/news-media/', labelKey: 'pressReleases' },
         events: [
             // Su ejercicio fiscal cierra en abril: esto es el trading update del primer semestre FY27.
-            { date: '2026-11-10', period: 'S1 F2027', url: 'https://www.thewosgroupplc.com/media/fvknqdcx/h1-fy27-trading-update.pdf' },
+            {
+                date: '2026-11-10',
+                period: 'S1 F2027',
+                url: 'https://www.thewosgroupplc.com/media/fvknqdcx/h1-fy27-trading-update.pdf',
+                assets: [
+                    // Enlace "Webcast" del results centre oficial (replay del directo del trading update).
+                    { kind: 'webcast', url: 'https://stream.brrmedia.co.uk/broadcast/6ad77ddbe50bec7a2a7d1d40', source: 'https://www.thewosgroupplc.com/investors/results-centre/' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     'MICC.AS': {
         name: 'The Magnum Ice Cream Company',
         section: { url: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html', labelKey: 'resultsAndReports' },
         events: [
-            { date: '2026-10-29', period: 'T3 2026', url: 'https://news.magnumicecream.com/q3-2026-trading-update/' },
+            {
+                date: '2026-10-29',
+                period: 'T3 2026',
+                url: 'https://news.magnumicecream.com/q3-2026-trading-update/',
+                assets: [
+                    { kind: 'presentacion', url: 'https://assets.unileversolutions.com/v1/150971866.pdf?disposition=inline', source: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html' },
+                    // La empresa enlaza su propio webcast alojado en su canal oficial de YouTube.
+                    { kind: 'webcast', url: 'https://youtu.be/qyBdgRb1iik', source: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html' },
+                    { kind: 'transcripcion', url: 'https://assets.unileversolutions.com/v1/151013876.pdf?disposition=inline', source: 'https://corporate.magnumicecream.com/en/investors/results-and-presentations.html' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     'SFC.TO': {
         name: 'Sagicor Financial',
         section: { url: 'https://investors.sagicor.com/', labelKey: 'investorRelations' },
         events: [
-            { date: '2026-11-11', period: 'T3 2026', url: 'https://investors.sagicor.com/2026-11-11-Sagicor-Financial-Reports-Third-Quarter-2026-Results' },
+            {
+                date: '2026-11-11',
+                period: 'T3 2026',
+                url: 'https://investors.sagicor.com/2026-11-11-Sagicor-Financial-Reports-Third-Quarter-2026-Results',
+                assets: [
+                    { kind: 'presentacion', url: 'https://investors.sagicor.com/image/SFC+Results+Presentation+Q3+2026.pdf', source: 'https://investors.sagicor.com/' },
+                    // La portada IR enlaza "Q3 2026 Earnings Webcast" a este mp3 (grabacion de la llamada).
+                    { kind: 'grabacion', url: 'https://investors.sagicor.com/image/61971-261112163046.mp3', source: 'https://investors.sagicor.com/' },
+                ],
+            },
         ],
-        verifiedOn: '2026-11-15',
+        verifiedOn: '2026-11-18',
     },
     'ERF.PA': {
         name: 'Eurazeo',
@@ -419,9 +595,18 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
     },
     SKYH: {
         name: 'Sky Harbour',
-        section: { url: 'https://ir.skyharbour.group/', labelKey: 'investorRelations' },
-        events: [],
-        verifiedOn: '2026-11-15',
+        section: { url: 'https://ir.skyharbour.group/events-and-presentations/events/default.aspx', labelKey: 'eventsAndPresentations' },
+        events: [
+            {
+                date: '2026-11-10',
+                period: 'T3 2026',
+                url: 'https://ir.skyharbour.group/events-and-presentations/events/event-details/2026/Sky-Harbour-2026-Third-Quarter-Earnings-Call-and-Webinar/default.aspx',
+                assets: [
+                    { kind: 'webcast', url: 'https://events.q4inc.com/attendee/316822008', source: 'https://ir.skyharbour.group/events-and-presentations/events/default.aspx' },
+                ],
+            },
+        ],
+        verifiedOn: '2026-11-18',
     },
 };
 

@@ -11,11 +11,32 @@
       "source": "https://investors.ast-science.com/events"
     }
   },
+  "BABA": {
+    "2026-11-19": {
+      "kind": "webcast",
+      "url": "https://www.alibabagroup.com/en/ir/earnings",
+      "source": "https://home.alibabagroup.com/en-US/document-2054756418245885952"
+    }
+  },
+  "BN": {
+    "2026-11-12": {
+      "kind": "webcast",
+      "url": "https://edge.media-server.com/mmc/p/a5qsvhzs",
+      "source": "https://bn.brookfield.com/events-news/events-financial-calendar"
+    }
+  },
   "FRPH": {
     "2026-11-05": {
       "kind": "webcast",
       "url": "https://www.webcaster5.com/Webcast/Page/3158/54642",
       "source": "https://investors.frpdev.com/quarterly-reports"
+    }
+  },
+  "KRKNF": {
+    "2026-11-24": {
+      "kind": "webcast",
+      "url": "https://event.choruscall.com/mediaframe/webcast.html?webcastid=BIq8txT9",
+      "source": "https://www.krakenrobotics.com/news-releases/kraken-robotics-announces-102-million-in-new-orders/"
     }
   },
   "META": {
@@ -25,6 +46,27 @@
       "source": "https://investor.atmeta.com/investor-events/event-details/2026/Q3-2026-Earnings-Call/default.aspx"
     }
   },
+  "MICC.AS": {
+    "2026-10-29": {
+      "kind": "webcast",
+      "url": "https://youtu.be/qyBdgRb1iik",
+      "source": "https://corporate.magnumicecream.com/en/investors/results-and-presentations.html"
+    }
+  },
+  "NVDA": {
+    "2026-11-17": {
+      "kind": "webcast",
+      "url": "https://events.q4inc.com/attendee/902213296",
+      "source": "https://investor.nvidia.com/events-and-presentations/events-and-presentations/event-details/2026/NVIDIA-3rd-Quarter-FY27-Financial-Results/default.aspx"
+    }
+  },
+  "ONDS": {
+    "2026-11-12": {
+      "kind": "webcast",
+      "url": "https://event.choruscall.com/mediaframe/webcast.html?webcastid=p2HHvXFF",
+      "source": "https://ir.ondas.com/ir-calendar/detail/4846/third-quarter-2026-earnings-conference-call"
+    }
+  },
   "REXR": {
     "2026-10-22": {
       "kind": "webcast",
@@ -32,11 +74,25 @@
       "source": "https://ir.rexfordindustrial.com/news-events/events-webcasts/detail/20261023-third-quarter-2026-earnings-conference-call"
     }
   },
+  "SKYH": {
+    "2026-11-10": {
+      "kind": "webcast",
+      "url": "https://events.q4inc.com/attendee/316822008",
+      "source": "https://ir.skyharbour.group/events-and-presentations/events/default.aspx"
+    }
+  },
   "TSLA": {
     "2026-10-21": {
       "kind": "webcast",
       "url": "https://ir.tesla.com/webcast-2026-10-21",
       "source": "https://ir.tesla.com/"
+    }
+  },
+  "WOSG.L": {
+    "2026-11-10": {
+      "kind": "webcast",
+      "url": "https://stream.brrmedia.co.uk/broadcast/6ad77ddbe50bec7a2a7d1d40",
+      "source": "https://www.thewosgroupplc.com/investors/results-centre/"
     }
   }
 }

@@ -26,7 +26,7 @@ describe('irLiveAssetFor', () => {
     it('sin entrada, sin evento ese día o evento sin directo: null', () => {
         expect(irLiveAssetFor('ZZZZ', '2026-10-21')).toBeNull();
         expect(irLiveAssetFor('META', '2026-10-22')).toBeNull();
-        expect(irLiveAssetFor('BN', '2026-11-12')).toBeNull();
+        expect(irLiveAssetFor('BN', '2026-11-13')).toBeNull();
     });
 });
 
@@ -182,5 +182,75 @@ describe('irLinksFor', () => {
     it('los assets del evento llegan con su tipo', () => {
         const links = irLinksFor('BN', '2026-08-13');
         expect(links?.eventPage?.assets.map((a) => a.kind)).toEqual(['grabacion', 'transcripcion']);
+    });
+
+    it.each([
+        ['MICC.AS', '2026-10-29', ['presentacion', 'webcast', 'transcripcion']],
+        ['SFC.TO', '2026-11-11', ['presentacion', 'grabacion']],
+        ['WOSG.L', '2026-11-10', ['webcast']],
+        ['CGEO.L', '2026-10-28', ['presentacion']],
+    ])('los materiales verificados el 2026-11-18 de %s enlazan solo en su dia exacto', (ticker, date, kinds) => {
+        const exact = irLinksFor(ticker, date);
+        expect(exact?.eventPage?.assets.map((a) => a.kind), ticker).toEqual(kinds);
+        expect(irLinksFor(ticker, '2026-12-31')?.eventPage, ticker).toBeNull();
+    });
+
+    it('cubre las posiciones y watchlist registradas el 2026-11-18', () => {
+        // Guard anti-regresion: NVDA y los 4X DCA sin entrada propia (CHTR, HIMS, NAUT, RXRX) + AMD.
+        for (const ticker of ['NVDA', 'CHTR', 'HIMS', 'NAUT', 'RXRX', 'AMD']) {
+            expect(irLinksFor(ticker, '2026-11-18')?.section.url, ticker).toMatch(/^https:\/\//);
+        }
+    });
+
+    it('BN enlaza presentacion y webcast del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('BN', '2026-11-12');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
+        expect(irLiveAssetFor('BN', '2026-11-12')?.asset.url).toContain('edge.media-server.com');
+        expect(irLinksFor('BN', '2026-11-13')?.eventPage).toBeNull();
+    });
+
+    it('cubre los 11 tickers BME de la watchlist con seccion IR oficial', () => {
+        // Guard anti-regresion: BME anadidos a la watchlist el 2026-10-28.
+        for (const ticker of ['SAN.MC', 'IBE.MC', 'AENA.MC', 'ENG.MC', 'RED.MC', 'GEST.MC', 'PRM.MC', 'VIS.MC', 'VID.MC', 'EBRO.MC', 'IBG.MC']) {
+            expect(irLinksFor(ticker, '2026-11-18')?.section.url, ticker).toMatch(/^https:\/\//);
+        }
+    });
+
+    it('ONDS enlaza presentacion y webcast del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('ONDS', '2026-11-12');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
+        expect(irLinksFor('ONDS', '2026-11-13')?.eventPage).toBeNull();
+    });
+
+    it('NVDA enlaza presentacion y webcast del T3 fiscal 2027 solo ese dia', () => {
+        const exact = irLinksFor('NVDA', '2026-11-17');
+        expect(exact?.eventPage?.period).toBe('T3 fiscal 2027');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
+        expect(irLiveAssetFor('NVDA', '2026-11-17')?.asset.url).toContain('q4inc.com');
+        expect(irLinksFor('NVDA', '2026-11-18')?.eventPage).toBeNull();
+    });
+
+    it('KRKNF lleva el webcast oficial anunciado para el 2026-11-24', () => {
+        // Regresion 2026-11-18: posicion de cartera sin evento registrado para su T3 2026.
+        const live = irLiveAssetFor('KRKNF', '2026-11-24');
+        expect(live?.asset.kind).toBe('webcast');
+        expect(live?.asset.url).toContain('choruscall.com');
+        expect(irLiveAssetFor('KRKNF', '2026-11-25')).toBeNull();
+    });
+
+    it('SKYH enlaza su evento y webcast del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('SKYH', '2026-11-10');
+        expect(exact?.eventPage?.period).toBe('T3 2026');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['webcast']);
+        expect(irLinksFor('SKYH', '2026-11-11')?.eventPage).toBeNull();
+    });
+
+    it('BABA lleva el directo oficial anunciado para el 2026-11-19', () => {
+        // Regresion 2026-11-18: el evento existia sin assets, asi que ni el chip
+        // "Ver directo oficial" ni el aviso del dia llevaban el enlace.
+        const live = irLiveAssetFor('BABA', '2026-11-19');
+        expect(live?.asset.kind).toBe('webcast');
+        expect(live?.asset.url).toBe('https://www.alibabagroup.com/en/ir/earnings');
+        expect(irLiveAssetFor('BABA', '2026-11-20')).toBeNull();
     });
 });
