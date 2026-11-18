@@ -34,6 +34,12 @@ uv run pyright                       # 0 errores
 APP_ENV=test uv run pytest -n 2 -m "not services"
 ```
 
+> Esta es la comprobacion local MINIMA. La fuente de verdad de CI es
+> [`.github/workflows/ci.yml`](.github/workflows/ci.yml) (y
+> [`coverage.yml`](.github/workflows/coverage.yml) para cobertura): `backend`
+> anade `--dist worksteal` y `--durations=20` al `pytest` y corre ademas los
+> pasos fail-closed de RAG activation, cuota de Redis y `run_financial_evals.py`.
+
 Frontend, desde la raíz (los mismos pasos que el job de CI):
 
 ```bash

@@ -103,7 +103,7 @@ Detalle de los controles negativos por dataset:
 | Workflow | Job | Quando | Que ejecuta |
 |---|---|---|---|
 | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) | `evals` | cada push y cada PR, sin filtros | Los runners `run_rag_evals`, `run_valuation_evals`, `run_llm_evals`, `run_ingest_evals` y `run_evidence_evals` (los cinco son `required` en el bucle del job; `ci.yml` es la fuente de verdad de que runners son bloqueantes). Publica los logs `run_*_evals.log` como artefacto. |
-| `ci.yml` | `backend` | cada push y cada PR | Suite completa, ruff, pyright, el gate fail-closed de `tests/test_rag_activation.py` contra Qdrant real, y `run_financial_evals.py` como ultimo paso. |
+| `ci.yml` | `backend` | cada push y cada PR | Suite completa (`pytest -n 2 --dist worksteal -m "not services" --durations=20`), gates fail-closed de `tests/test_rag_activation.py` contra Qdrant real y de cuota de Redis, y `run_financial_evals.py` como ultimo paso. ruff y pyright corren en el job `backend-lint`. |
 | [`.github/workflows/coverage.yml`](../.github/workflows/coverage.yml) | `coverage` | push/PR que tocan `data-engine/**` | `run_coverage_gate.py` con `branch=True`, sin Qdrant (la medicion tiene que ser determinista). Publica `htmlcov/` y el `.coverage` como artefacto. |
 | [`llm-evals.yml`](../.github/workflows/llm-evals.yml) | `llm-layer-evals` | push/PR filtrados por paths de evals | `run_llm_evals.py` + contratos, sin `requirements.txt` ni red. |
 | [`ingest-evals.yml`](../.github/workflows/ingest-evals.yml) | `ingest-precision` | cada push y cada PR | `run_ingest_evals.py` + contratos de puerta y guardian de red. |
@@ -159,7 +159,7 @@ python scripts/run_coverage_gate.py --report
 | [`data-engine/evals/rag/README.md`](../data-engine/evals/rag/README.md) | De donde sale el corpus del golden set, las 5 puertas del RAG, las 6 metricas y el por que de cada umbral, y que se mediria con un LLM real. |
 | `data-engine/evals/llm/README.md`, `data-engine/evals/valuation/README.md`, `data-engine/evals/ingest/README.md` | **PENDIENTE**: todavia no existen. Los tres runners imprimen su cobertura por puerta, por capa/motor y por familia de fuente, que es la parte que estos README documentarian. |
 | [`data-engine/scripts/run_coverage_gate.py`](../data-engine/scripts/run_coverage_gate.py) | El gate, con las 10 situaciones en las que falla cerrado. |
-| [`data-engine/LOCKFILE.md`](../data-engine/LOCKFILE.md) | El lockfile (`uv.lock`) con las versiones exactas del arbol de dependencias y como regenerarlo (#765). Ruff y pyright van ademas pineados en los workflows (`ruff==0.16.10`, `pyright==1.1.414`) y las de runtime por rango en `data-engine/requirements.txt`, cuya paridad con `pyproject.toml` vigila el job `dep-parity`. |
+| [`data-engine/LOCKFILE.md`](../data-engine/LOCKFILE.md) | El lockfile (`uv.lock`) con las versiones exactas del arbol de dependencias y como regenerarlo (#765). Ruff y pyright van ademas pineados en los workflows (`ruff==0.17.4`, `pyright==1.1.414`) y las de runtime por rango en `data-engine/requirements.txt`, cuya paridad con `pyproject.toml` vigila el job `dep-parity`. |
 
 ## Evidencia literal de las cifras RAG
 

@@ -60,8 +60,9 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "data-engine/uv.lock"
       - run: uv sync --frozen --extra test --no-install-project
-      # pytest-randomly NO entra en el lock ni en requirements: instalado en
-      # ci.yml baraja el orden de TODOS los jobs. Solo aqui.
+      # pytest-randomly NO entra en el lock ni en requirements, y CI no lo
+      # instala ni lo invoca: solo se instala aqui para barajar el orden de
+      # ESTA suite. El orden de los jobs de ci.yml no depende de este plugin.
       - run: uv pip install "pytest-randomly==5.0.0"
       - name: Redis local para tests de admision atomica
         run: sudo apt-get update && sudo apt-get install -y redis-server

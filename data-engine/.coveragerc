@@ -72,7 +72,7 @@ omit =
 [report]
 # Suelo global, redondeado ABAJO. OJO con que numero es este: coverage.py
 # calcula fail_under sobre percent_covered de TODOS los ficheros medidos, sin
-# excluir exentos, asi que compara contra el 81.49% (no contra el 84.07% gateado
+# excluir exentos, asi que compara contra el 81.99% (no contra el 84.27% gateado
 # por el ratchet, que ya deja alembic fuera). Por eso aqui va 81 y no 84.
 # Es la red simple: `coverage report` y `pytest --cov` fallan solos por debajo de
 # 81 sin mirar el baseline. La red principal (ratchet por paquete, con el nombre
@@ -80,9 +80,10 @@ omit =
 # Sube solo, junto con la linea base; relajarlo a mano sin tocar
 # coverage_baseline.json deja las dos redes discrepantes.
 #
-# El 81.49% combina ramas: sentencias 83.39% + ramas 74.86%. El 83.39% de solo
-# sentencias es mas alto y menos honesto: pagamos branch=True para no gatear las
-# ramas seria tirar el dinero.
+# El 81.99% combina sentencias y ramas (branch = True). Gatear solo sentencias
+# daria una cifra mas alta y menos honesta: pagamos branch=True para no gatear
+# las ramas seria tirar el dinero. El desglose exacto no esta en el baseline:
+# sale en `python scripts/run_coverage_gate.py --report`.
 fail_under = 81
 show_missing = True
 skip_covered = False

@@ -267,7 +267,7 @@ jobs:
           enable-cache: true
           cache-dependency-glob: "data-engine/uv.lock"
       # Instalacion congelada desde uv.lock (mismo criterio que coverage.yml y
-      # llm-evals.yml, FIX-3.3/3.4): ruff==0.17.0 y pyright==1.1.414 salen del
+      # llm-evals.yml, FIX-3.3/3.4): ruff==0.17.4 y pyright==1.1.414 salen del
       # extra `dev` y pytest/pytest-xdist del extra `test`, todos fijados por
       # el lock. ruff y pyright corren en el job aparte `backend-lint`.
       - run: uv sync --frozen --extra test --extra dev --no-install-project
