@@ -105,7 +105,7 @@ export default function GemsView() {
                                 suelto («73,2») no decía qué era ni sobre cuánto
                                 (Tester 6). */}
                             <span className="shrink-0 rounded bg-gray-900 px-2 py-1 text-right">
-                                <span className="block text-[10px] font-medium uppercase tracking-wide text-gray-500">
+                                <span className="block text-xs font-medium uppercase tracking-wide text-gray-500">
                                         {t('propicks.gems.score')}
                                     </span>
                                 <span className="text-sm font-bold text-teal-300">

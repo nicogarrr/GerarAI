@@ -66,7 +66,7 @@ export default function ExtendedHoursLine({
             ? ` (${formatPercent(quote.change_percent, { fromRatio: false, digits: 2, signDisplay: 'always' })})`
             : '';
     return (
-        <Tag className="text-[10px] font-normal text-gray-500">
+        <Tag className="text-xs font-normal text-gray-500">
             {extendedQuoteLabel(quote, locale)}: {priceText}
             {changeText}
         </Tag>
