@@ -52,7 +52,14 @@ not provided; positions below are descending row-count ranks, not IDs.
 | 8 | 1,475,385 | 1,829 |
 | 9 | 1,431,743 | 1,757 |
 | 10 | 1,426,928 | 1,758 |
-| Remaining7 combined | 5,960,430 | Breakdown pending |
+| Remaining7 combined | 5,960,430 | See company counts below |
+
+Distinct-company counts for the remaining tenants, in the same descending
+row-count ranking:11=1,758;12=1,758;13=1,758;14=1,757;15=826;16=34;17=2.
+Individual row counts for ranks11-17 were not provided. Source evidence is
+Pilot's backup aggregate, supplied via Main as
+`facts-backup-aggregate-007b5967.json`: a sequential COPY aggregate of the
+previously restored09:54 CET dump, not a query against live production.
 
 The ten listed tenants total14,899,048 rows; adding the remaining7 matches
 20,859,478. Each large tenant has about1.4-1.7M rows across about1,800-2,100
@@ -61,7 +68,8 @@ selective relative to the complete facts table for a single company or a
 small company set. This distribution supports the index choice; it is not
 a planner/latency measurement, a guarantee for every company or IN-list, or
 evidence that the synthetic80% tenant scenario matches real skew. Per-company
-skew and the remaining tenants' company counts are not established here.
+skew is not measured. These aggregate distinct-company counts
+do not establish a within-tenant distribution of facts per company.
 
 These observations select a target; they do not prove that this index will
 remove the entire 2-6s snapshot time or establish a production improvement.
