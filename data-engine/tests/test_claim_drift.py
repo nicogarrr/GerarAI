@@ -182,9 +182,9 @@ def seed(db, *rows):
         seed_session.commit()
 
 
-def add_fact(db, company, tenant, value, *, metric="total_debt", unit=USD, period=PERIOD):
+def add_fact(db, company, tenant, value, *, metric="total_debt", unit=USD, period=PERIOD, source_type="sec"):
     seed(db, FinancialFact(tenant_id=tenant.id, company_id=company.id, metric=metric,
-                           value=Decimal(value), unit=unit, period=period, source_type="sec"))
+                           value=Decimal(value), unit=unit, period=period, source_type=source_type))
 
 
 def test_db_reader_flags_ko_stale_debt(saved):
@@ -365,3 +365,20 @@ def test_deterministic_answer_measures_historical_thesis_not_latest_fact(saved_n
     response = service._deterministic_answer(db, "Resume la tesis de KO", "company", "KO")
     assert "Tengo guardada la tesis v1" in response.answer
     assert ("cifra desactualizada, regenerar" in response.answer) is expected_warning
+
+
+@pytest.mark.parametrize("source_type", ["seed", "manual", "test", "dummy", "placeholder"])
+def test_db_reader_ignores_facts_that_are_not_real_sources(saved, source_type):
+    db, company, _rival, thesis, tenant, _other = saved
+    add_fact(db, company, tenant, 1, source_type=source_type)
+    assert thesis_claim_drift(db, thesis) == []
+
+
+def test_non_source_fact_does_not_mask_or_create_drift_next_to_a_real_one(saved):
+    db, company, _rival, thesis, tenant, _other = saved
+    add_fact(db, company, tenant, 1, source_type="seed")
+    add_fact(db, company, tenant, 45_436_000_000)  # hecho real distinto: sigue habiendo deriva, sin ambiguedad
+    [item] = thesis_claim_drift(db, thesis)
+    assert item["live_value"] == 45_436_000_000.0
+    add_fact(db, company, tenant, 42_120_000_000, metric="net_debt", source_type="test")  # otra metrica: ruido
+    assert len(thesis_claim_drift(db, thesis)) == 1
