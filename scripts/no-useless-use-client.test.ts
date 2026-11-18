@@ -82,6 +82,7 @@ const JUSTIFIED_USE_CLIENT: Record<string, string> = {
     'Client boundary uses refs, useEffect and MutationObserver to keep the active tab visible after client navigation.',
   'components/ai/AiAvailabilityNotice.tsx': 'Hooks de estado/efecto y actualización explícita antes de iniciar IA.',
   'components/research/DeferredAnalystPanels.tsx': 'useEffect/useState cargan analistas solo al montar el panel visible, con limpieza al cambiar de ticker',
+  'components/research/DeleteSotpResultButton.tsx': 'useState controls the confirmation dialog; useRef submits the mutation only after the user confirms; useT reads the client locale.',
   'components/alerts/EmailNotifications.tsx': 'useState/useEffect mantienen preferencias por usuario y onChange guarda el opt-in; useT consume el locale React',
   'components/LoadingState.tsx': 'useT lee el contexto de locale para estados de carga accesibles',
   'components/brain/BrainGuideAnswer.tsx': 'useT lee locale para el copy de respuestas guía (vacía/insuficiente) del Cerebro',
