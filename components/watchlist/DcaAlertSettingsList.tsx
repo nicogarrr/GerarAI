@@ -40,8 +40,8 @@ export default function DcaAlertSettingsList({ items }: { items: DcaSignalItem[]
                             {item.company_name ? <span className="max-w-[160px] truncate text-xs text-gray-400" title={item.company_name}>{item.company_name}</span> : null}
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5">
-                            {item.in_watchlist ? <span className="rounded border border-gray-600 px-1.5 text-[10px] text-gray-300">watchlist</span> : null}
-                            {item.in_portfolio ? <span className="rounded border border-teal-800 px-1.5 text-[10px] text-teal-300">{t('watchlist.dca.list.inPortfolio')}</span> : null}
+                            {item.in_watchlist ? <span className="rounded border border-gray-600 px-1.5 text-xs text-gray-300">watchlist</span> : null}
+                            {item.in_portfolio ? <span className="rounded border border-teal-800 px-1.5 text-xs text-teal-300">{t('watchlist.dca.list.inPortfolio')}</span> : null}
                             {item.state ? <DcaHitRatesPopover symbol={item.symbol} /> : <span className="text-xs text-gray-400">{t('watchlist.dca.list.notEvaluated')}</span>}
                             {item.state ? <DcaWatchCardToggle symbol={item.symbol} /> : null}
                         </div>

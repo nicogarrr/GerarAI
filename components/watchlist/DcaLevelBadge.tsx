@@ -113,7 +113,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
     return (
         <span className="inline-flex max-w-full flex-wrap items-center gap-1">
             {badge}
-            <span data-testid="dca-stale" className="text-[10px] leading-tight text-amber-400 whitespace-nowrap">
+            <span data-testid="dca-stale" className="text-xs leading-tight text-amber-400 whitespace-nowrap">
                 {staleText}
             </span>
         </span>
