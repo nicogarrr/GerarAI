@@ -39,7 +39,11 @@ def env(monkeypatch):
     service.results = results
     monkeypatch.setattr(fis, "all_rss_feeds", lambda: feeds)
     monkeypatch.setattr(fis, "FeedIngestionService", lambda: service)
-    monkeypatch.setattr(fis, "RSSFeed", SimpleNamespace)
+    monkeypatch.setattr(
+        fis,
+        "RSSFeed",
+        lambda url, ticker=None: SimpleNamespace(url=url, ticker=ticker, label=None, lane=None),
+    )
     db = _FakeDB()
     service.db = db
     monkeypatch.setattr(dramatiq_app, "_session", lambda tenant_id, user_id: db)
@@ -114,3 +118,86 @@ def test_error_permanente_de_sesion_sale_estructurado(env, monkeypatch):
     assert out["status"] == "error"
     assert out["actor"] == "refresh_rss_feeds"
     assert env.polls == 0
+
+
+class _CountingDB(_FakeDB):
+    """_FakeDB que cuenta commits, cierre y guarda lo commiteado en cada commit."""
+
+    def __init__(self):
+        super().__init__()
+        self.commits = 0
+        self.closed = False
+        self.committed_errors = []
+
+    def commit(self):
+        self.commits += 1
+        self.committed_errors.append({s.feed_url: s.last_error for s in self.states})
+
+    def close(self):
+        self.closed = True
+
+
+def _use_counting_db(monkeypatch):
+    db = _CountingDB()
+    rollbacks = []
+    monkeypatch.setattr(dramatiq_app, "_session", lambda t, u: db)
+    monkeypatch.setattr(dramatiq_app, "_rollback", lambda d: rollbacks.append(d))
+    return db, rollbacks
+
+
+def test_excepcion_hace_rollback_y_commitea_el_error(env, monkeypatch):
+    db, rollbacks = _use_counting_db(monkeypatch)
+    first = env.feeds[0].url
+
+    def boom(_db, result, **kwargs):
+        raise RuntimeError("fallo ingesta")
+
+    env.ingest_news_result = boom
+
+    dramatiq_app.refresh_rss_feeds.fn(tenant_id=1, user_id="u", feed_url=first)
+
+    assert rollbacks == [db]  # un rollback, sobre la sesion
+    # 1 commit previo al sondeo + 1 que persiste el error
+    assert db.commits == 2
+    assert db.committed_errors[-1][first] == "fallo ingesta"
+    assert db.committed_errors[0][first] is None
+
+
+def test_la_sesion_se_cierra_en_exito_y_en_excepcion(env, monkeypatch):
+    db, _ = _use_counting_db(monkeypatch)
+    dramatiq_app.refresh_rss_feeds.fn(tenant_id=1, user_id="u")
+    assert db.closed is True
+
+    db2, _ = _use_counting_db(monkeypatch)
+
+    def boom(_db, result, **kwargs):
+        raise RuntimeError("x")
+
+    env.ingest_news_result = boom
+    dramatiq_app.refresh_rss_feeds.fn(tenant_id=1, user_id="u")
+    assert db2.closed is True
+
+
+def test_error_externo_pasa_contexto_a_handle_actor_error(env, monkeypatch):
+    seen = {}
+
+    def fake_handle(actor_name, exc, **ctx):
+        seen.update(actor=actor_name, exc=exc, ctx=ctx)
+        return {"status": "error", "actor": actor_name}
+
+    def fail(tenant_id, user_id):
+        raise ValueError("sin sesion")
+
+    monkeypatch.setattr(dramatiq_app, "_session", fail)
+    monkeypatch.setattr(dramatiq_app, "_handle_actor_error", fake_handle)
+
+    dramatiq_app.refresh_rss_feeds.fn(tenant_id=7, user_id="u", feed_url="https://f.example/rss", ticker="aapl")
+
+    assert seen["actor"] == "refresh_rss_feeds"
+    assert isinstance(seen["exc"], ValueError)
+    assert seen["ctx"] == {
+        "tenant_id": 7,
+        "user_id": "u",
+        "feed_url": "https://f.example/rss",
+        "ticker": "aapl",
+    }
