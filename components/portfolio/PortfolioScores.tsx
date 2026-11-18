@@ -54,7 +54,7 @@ export default function PortfolioScores({ scores }: PortfolioScoresProps) {
                                             &mdash;
                                         </div>
                                         <div className="text-xs text-gray-400">{item.label}</div>
-                                        <div className="text-[10px] uppercase tracking-wide text-gray-500">
+                                        <div className="text-xs uppercase tracking-wide text-gray-500">
                                             {ti('portfolio.scoresExtra.noData')}
                                         </div>
                                     </>
