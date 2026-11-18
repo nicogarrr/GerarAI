@@ -71,6 +71,7 @@ from app.workers.dramatiq_app import (
     run_daily_research,
     run_propicks_funnel,
     scan_contradictions,
+    scan_form144_watchlist,
     scan_insider_watchlist,
     scan_schedule13dg_watchlist,
     sync_ibkr_flex,
@@ -508,6 +509,18 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         hour=22,
         minute=50,
         jitter=300,
+    )
+    # Form 144 (aviso de venta PROPUESTA, Rule 144): la venta suele
+    # ejecutarse el mismo dia de la presentacion, asi que la cadencia es
+    # horaria durante el dia; coste 0 (submissions JSON del emisor +
+    # presupuesto de descargas por corrida). Nunca se publica como venta.
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, scan_form144_watchlist),
+        "interval",
+        job_id="form144_watchlist_hourly",
+        hours=1,
+        jitter=180,
     )
     # Carteras de inversores (13F + Form 4): el 13F es trimestral (plazo de 45
     # dias) y los Form 4 de Trump/Bezos son poco frecuentes; semanal sobra y son
