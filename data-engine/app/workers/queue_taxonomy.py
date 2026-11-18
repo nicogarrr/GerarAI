@@ -123,6 +123,7 @@ ACTOR_CLASS: dict[str, str] = {
     "scan_contradictions": CALCULO,
     # mantenimiento: alertas, recordatorios, watchdogs
     "analyze_tracked_news_alert": MANTENIMIENTO,
+    "dispatch_db_connection_watchdog": MANTENIMIENTO,
     "dispatch_earnings_reminders": MANTENIMIENTO,
     "dispatch_insider_alerts": MANTENIMIENTO,
     "dispatch_macro_reminders": MANTENIMIENTO,
