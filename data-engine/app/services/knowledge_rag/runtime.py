@@ -4,14 +4,22 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from app.core.config import Settings, get_settings
 from app.services.knowledge_rag.chunking import ChunkConfig
 from app.services.knowledge_rag.embedding import LocalEmbedder
 from app.services.knowledge_rag.extract import extract_file
 from app.services.knowledge_rag.ingest import Extractor
-from app.services.knowledge_rag.rerank import FastembedReranker, RerankPostprocessor
 from app.services.knowledge_rag.store import KnowledgeStore
+
+if TYPE_CHECKING:
+    # Solo tipos: el import real de rerank es perezoso. rerank importa
+    # llama_index.core (~0,5 s medido en laboratorio) y lo pagaba el arranque
+    # del API (routes.knowledge_rag -> runtime) y de CADA worker dramatiq
+    # (knowledge_rag_actors -> runtime) aunque el reranker solo se construye
+    # al consultar la biblioteca con reranker configurado.
+    from app.services.knowledge_rag.rerank import FastembedReranker, RerankPostprocessor
 from app.services.knowledge_rag.tokens import TokenCounter, wordpiece_counter
 
 
@@ -69,11 +77,15 @@ def make_extractor(s: Settings) -> Extractor:
 def make_postprocessors(s: Settings, top_n: int) -> list[RerankPostprocessor]:
     if not s.knowledge_rag_reranker_model:
         return []
+    from app.services.knowledge_rag.rerank import RerankPostprocessor
+
     return [RerankPostprocessor(reranker=_reranker(s.knowledge_rag_reranker_model), top_n=top_n)]
 
 
 @lru_cache(maxsize=2)
 def _reranker(model: str) -> FastembedReranker:
+    from app.services.knowledge_rag.rerank import FastembedReranker
+
     return FastembedReranker(model)
 
 

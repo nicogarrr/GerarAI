@@ -4,15 +4,18 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Any
-
-from llama_index.core.postprocessor.types import BaseNodePostprocessor
-from llama_index.core.schema import NodeRelationship, NodeWithScore, QueryBundle, RelatedNodeInfo, TextNode
+from typing import TYPE_CHECKING, Any
 
 from app.services.hybrid_retrieval import FusedHit, RankedId, rrf_fuse
 from app.services.knowledge_rag.citations import Citation, format_context, verify_citation
 from app.services.knowledge_rag.embedding import Embedder
 from app.services.knowledge_rag.store import KnowledgeStore, SearchFilters, build_filter
+
+if TYPE_CHECKING:
+    # Solo tipos: llama_index.core cuesta ~0,5 s medido en laboratorio y lo
+    # pagaba el arranque del API (routes.knowledge_rag -> retrieval); el
+    # import real va dentro de search_knowledge, la unica funcion que lo usa.
+    from llama_index.core.postprocessor.types import BaseNodePostprocessor
 
 # parent_id -> (texto del padre, sha256 del padre)
 ParentResolver = Callable[[Sequence[str]], dict[str, tuple[str, str]]]
@@ -102,6 +105,16 @@ def search_knowledge(
             )
         )
     fused = _fuse_query_variants(per_query, k=rrf_k)
+    # Import perezoso (ver el bloque TYPE_CHECKING de cabecera): solo la
+    # búsqueda real necesita los tipos nodo de llama_index.
+    from llama_index.core.schema import (
+        NodeRelationship,
+        NodeWithScore,
+        QueryBundle,
+        RelatedNodeInfo,
+        TextNode,
+    )
+
     nodes: list[NodeWithScore] = []
     for hit in fused[:candidates]:
         p = payloads[hit.point_id]

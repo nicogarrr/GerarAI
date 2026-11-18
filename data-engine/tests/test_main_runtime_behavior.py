@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import nullcontext
 from types import SimpleNamespace
@@ -41,7 +42,7 @@ def test_lifespan_runs_only_environment_appropriate_steps(monkeypatch, pools, en
     monkeypatch.setattr(main, "SessionLocal", lambda: nullcontext(db))
     observed = {}
     for name in ("init_db", "configure_model_aliases", "validate_llm_configuration", "ensure_company_master",
-                 "apply_master_taxonomy_to_stubs", "_start_embedder_warmup"):
+                 "apply_master_taxonomy_to_stubs", "_start_embedder_warmup", "_start_pdf_warmup"):
         observed[name] = Mock()
         monkeypatch.setattr(main, name, observed[name])
     for module, name in ((pool_probe, "install"), (slow_query, "install"),
@@ -68,6 +69,7 @@ def test_lifespan_runs_only_environment_appropriate_steps(monkeypatch, pools, en
     assert observed["ensure_company_master"].call_count == (env != "production")
     assert observed["apply_master_taxonomy_to_stubs"].call_count == (env == "production")
     assert observed["_start_embedder_warmup"].call_count == (env == "production")
+    assert observed["_start_pdf_warmup"].call_count == (env == "production")
     assert observed[pool_probe.__name__].call_count == (env != "test")
     assert observed[slow_query.__name__].call_count == (env != "test")
     assert observed[gc_tuning.__name__].call_count == (env != "test")
@@ -117,6 +119,34 @@ def test_embedder_warmup_is_background_and_fallback_failure_is_nonfatal(monkeypa
     assert fallback.call_count == (not ready)
     if fallback_fails:
         assert "fallback embedder warmup skipped" in caplog.text
+
+
+@pytest.mark.parametrize("import_fails", [False, True])
+def test_pdf_warmup_is_background_and_failure_is_nonfatal(monkeypatch, import_fails, caplog):
+    """El calentado de matplotlib corre en un hilo daemon y un fallo del
+    import jamas rompe el arranque (el primer PDF lo pagaria, como antes)."""
+    import threading
+
+    if import_fails:
+        # sys.modules['matplotlib'] = None hace que `import matplotlib.pyplot`
+        # lance ImportError, el fallo que el warmup debe absorber.
+        monkeypatch.setitem(sys.modules, "matplotlib", None)
+    threads = []
+    real_thread = threading.Thread
+    def owned_thread(*args, **kwargs):
+        thread = real_thread(*args, **kwargs)
+        threads.append(thread)
+        return thread
+    monkeypatch.setattr(threading, "Thread", owned_thread)
+    main._start_pdf_warmup()
+    assert len(threads) == 1
+    for thread in threads:
+        thread.join(timeout=30)
+        assert not thread.is_alive() and thread.daemon
+    if import_fails:
+        assert "pdf matplotlib warmup skipped" in caplog.text
+    else:
+        assert sys.modules.get("matplotlib.pyplot") is not None
 
 
 @pytest.mark.parametrize("probe,status", [("_probe_qdrant", 200), ("_probe_qdrant", 503),

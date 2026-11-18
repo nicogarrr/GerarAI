@@ -16,14 +16,15 @@ import re
 import textwrap
 import unicodedata
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
-import matplotlib.pyplot as plt
-from matplotlib.axes import Axes
-from matplotlib.backends.backend_pdf import PdfPages
-from matplotlib.figure import Figure
-from matplotlib.patches import Rectangle
 from sqlalchemy import desc, select
 from sqlalchemy.orm import Session, selectinload
+
+if TYPE_CHECKING:
+    # Solo tipos: el import real es perezoso (ver _new_page/build_thesis_pdf).
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
 
 from app.core.local_date import local_today
 from app.models.entities import Claim, Portfolio, Position, ThesisSection, ThesisVersion
@@ -90,6 +91,13 @@ def _new_page() -> tuple[Figure, Axes]:
     (rectángulo de cabecera, líneas separadoras): la cabecera acababa ocupando
     media página y los textos por debajo del separador salían del área visible.
     """
+    # Import perezoso: matplotlib cuesta ~4 s en frío (font_manager escanea las
+    # fuentes del contenedor) y el API lo pagaba en CADA arranque aunque el PDF
+    # se exporta una vez al día. El primer PDF de un proceso frío lo paga él;
+    # el calentado en segundo plano del arranque (main._start_pdf_warmup) lo
+    # adelanta en producción.
+    import matplotlib.pyplot as plt
+
     fig = plt.figure(figsize=(8.27, 11.69), dpi=100)
     ax = fig.add_axes((0, 0, 1, 1))
     ax.set_axis_off()
@@ -100,6 +108,13 @@ def _new_page() -> tuple[Figure, Axes]:
 
 def build_thesis_pdf(data: ThesisPdfData) -> bytes:
     """Construye un documento PDF vectorial de alta calidad con branding GerarAI."""
+    # Import perezoso (mismo motivo que _new_page): el arranque del API no paga
+    # matplotlib; tras el primer import estas líneas son una consulta a
+    # sys.modules.
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_pdf import PdfPages
+    from matplotlib.patches import Rectangle
+
     buf = io.BytesIO()
 
     # Formato A4 estándar
