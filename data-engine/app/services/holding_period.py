@@ -23,10 +23,16 @@ def current_holding_starts(db: Session, company_ids: Iterable[int]) -> dict[int,
     ids = set(company_ids)
     if not ids:
         return {}
-    starts: dict[int, date] = {}
-    held: dict[int, Decimal] = {}
-    for company_id, trade_date, action, quantity in db.execute(
-        select(Transaction.company_id, Transaction.trade_date, Transaction.action, Transaction.quantity)
+    # Mismo orden de reproducción que rebuild_position (_replay_order): una
+    # venta que solo cabe gracias a una compra posterior del MISMO día se
+    # reproduce después de ella. Con el orden bruto de alta, esa tenencia
+    # pasaba por negativo y el «Desde» saltaba a la recompra: coste del lote
+    # antiguo con antigüedad «nueva» y bucket corto_plazo (medido).
+    from app.services.portfolio_ledger_service import _replay_order
+
+    rows_by_company: dict[int, list[Transaction]] = {cid: [] for cid in ids}
+    for transaction in db.scalars(
+        select(Transaction)
         .where(
             Transaction.company_id.in_(ids),
             func.lower(Transaction.action).in_(["buy", "sell"]),
@@ -34,13 +40,16 @@ def current_holding_starts(db: Session, company_ids: Iterable[int]) -> dict[int,
         )
         .order_by(Transaction.trade_date, Transaction.created_at, Transaction.id)
     ).all():
-        cid = int(company_id)
-        qty = Decimal(str(quantity))
-        before = held.get(cid, Decimal("0"))
-        if str(action).lower() == "buy":
-            if before <= 0:
-                starts[cid] = trade_date
-            held[cid] = before + qty
-        else:
-            held[cid] = before - qty
+        rows_by_company[int(transaction.company_id)].append(transaction)
+    starts: dict[int, date] = {}
+    for cid, rows in rows_by_company.items():
+        held = Decimal("0")
+        for transaction in _replay_order(rows):
+            qty = Decimal(str(transaction.quantity))
+            if str(transaction.action).lower() == "buy":
+                if held <= 0:
+                    starts[cid] = transaction.trade_date
+                held += qty
+            else:
+                held -= qty
     return starts

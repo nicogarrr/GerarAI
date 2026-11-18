@@ -110,7 +110,12 @@ def _replay_order(transactions: list[Transaction]) -> list[Transaction]:
         while index < len(transactions) and transactions[index].trade_date == day:
             transaction = transactions[index]
             index += 1
-            if transaction.action == "buy":
+            # La consulta de rebuild_position filtra buy/sell exactos, pero la
+            # de current_holding_starts (func.lower) admite mayúsculas: el
+            # orden debe interpretar la acción como esa consulta la filtra, o
+            # un 'BUY' no cubre la venta que sí cubre una compra y el «Desde»
+            # diverge del ledger (medido por el Auditor con 'BUY' 2026).
+            if str(transaction.action).lower() == "buy":
                 ordered.append(transaction)
                 held += transaction.quantity
                 while deferred and deferred[0].quantity <= held:
