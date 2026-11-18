@@ -186,6 +186,8 @@ describe('PortfolioTabs contenido', () => {
         const dates = Array.from({ length: 400 }, (_, i) => new Date(Date.UTC(2025, 8, 1) + i * 86400000).toISOString().slice(0, 10));
         const nav_ = dates.map((_, i) => 1000 + i);
         await renderTabs({ scores: { history: { dates, nav: nav_ } } });
+        // El gráfico se monta en el próximo frame (LazyMount): espera inicial.
+        await screen.findByTestId('nav-chart');
         const points = () => Number(screen.getByTestId('nav-chart').getAttribute('data-points'));
         const month = points();
         expect(month).toBeGreaterThan(0);
@@ -217,7 +219,7 @@ describe('Cartera: jerarquía y periodos honestos', () => {
         expect(screen.getByRole('button', { name: '1M' })).toBeDisabled();
         expect(screen.getByRole('button', { name: 'Todo' })).toBeEnabled();
         fireEvent.click(screen.getByRole('button', { name: 'Todo' }));
-        expect(screen.getByTestId('nav-chart')).toHaveAttribute('data-points', '2');
+        expect(await screen.findByTestId('nav-chart')).toHaveAttribute('data-points', '2');
         expect(screen.getByText('G/P desde compra:').closest('p')).toHaveTextContent(/25,00/);
     });
 });
