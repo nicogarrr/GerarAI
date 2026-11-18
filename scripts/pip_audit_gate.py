@@ -78,8 +78,12 @@ def check_interpreter(pyproject=_PYPROJECT, version_info=sys.version_info, stder
     return True
 
 
-def inspect_report(text):
-    """Return clean/vulnerable/invalid. Skipped or partial audits never pass."""
+def inspect_report(text, ignored_pins=None):
+    """Return clean/vulnerable/invalid. Skipped or partial audits never pass.
+
+    ignored_pins: {name: version} whose advisories are waived ONLY on that
+    exact resolved version. A vuln on any other package or version stays red,
+    so the waiver dies with the pin instead of covering the next one."""
     try:
         report = json.loads(text)
     except (ValueError, TypeError):
@@ -111,7 +115,8 @@ def inspect_report(text):
                 or not vuln["id"]
             ):
                 return "invalid"
-        vulnerable = vulnerable or bool(vulns)
+        if vulns and not (ignored_pins or {}).get(dep["name"]) == dep["version"]:
+            vulnerable = True
     return "vulnerable" if vulnerable else "clean"
 
 
@@ -170,6 +175,7 @@ def run_audit(
     _base_only=False,
     _pyproject=_PYPROJECT,
     _version_info=sys.version_info,
+    _ignored_pins=None,
 ):
     if not check_interpreter(pyproject=_pyproject, version_info=_version_info):
         return 1
@@ -218,7 +224,7 @@ def run_audit(
         if clock() >= deadline:
             print("pip-audit: total deadline exhausted", file=sys.stderr)
             return 1
-        report = inspect_report(result.stdout)
+        report = inspect_report(result.stdout, ignored_pins=_ignored_pins)
         if report == "clean" and result.returncode == 0:
             if _base_only:
                 expected = Path(_requirements).read_text().splitlines()
@@ -234,6 +240,18 @@ def run_audit(
             if not _base_only and result.returncode == 0
             else []
         )
+        if _ignored_pins and report == "clean":
+            waived = [
+                f"{dep['name']}=={dep['version']}"
+                for dep in json.loads(result.stdout)["dependencies"]
+                if dep.get("vulns")
+            ]
+            if waived:
+                print(
+                    "pip-audit: advisories cubiertos por excepcion temporal fijada: "
+                    + ", ".join(waived)
+                )
+            return 0
         if pins:
             requirements = output_dir / "cpu-base-requirements.txt"
             requirements.write_text("\n".join(pins) + "\n")
@@ -263,5 +281,31 @@ def run_audit(
     return 1  # pragma: no cover - loop always returns on attempt 3
 
 
+# EXCEPCIONES TEMPORALES (alta 18-nov-2026) para qa-agents/requirements.txt.
+# browser-use 0.13.14 fija CON == estas cuatro versiones con advisories;
+# browser-use 1.0.6 (16-nov-2026) solo resuelve mcp (==2.3.0) y sigue
+# fijando pillow==12.3.0: no hay version upstream que las corrija. La
+# superficie son los agentes QA de CI contra la instancia local de GerarAI
+# (no prod, sin secretos de usuario). Las excepciones van por (paquete,
+# version exacta): si la resolucion trae OTRA version con advisories, o
+# cualquier otro paquete, el gate sigue en rojo. Retirar cada entrada al
+# subir browser-use; revisar en cada release de browser-use.
+QA_AGENTS_IGNORED_PINS = {
+    "anyio": "4.12.1",  # PYSEC-2026-4025, PYSEC-2026-4024 (fix 4.14.2)
+    "mcp": "2.1.1",  # CVE-2026-59951, CVE-2026-116685, CVE-2026-116684 (fix 2.2.0)
+    "pillow": "12.3.0",  # ~40 advisories, fix 13.0.0 (browser-use 1.0.6 aun fija 12.3.0)
+    "pypdf": "6.16.2",  # PYSEC-2026-4153, PYSEC-2026-4154, PYSEC-2026-4160 (fix 6.17.0+)
+}
+
+
 if __name__ == "__main__":  # pragma: no cover
-    raise SystemExit(run_audit())
+    rc = run_audit()
+    # Las herramientas QA (browser-use + playwright en agent-qa.yml) se
+    # instalan del mismo modo y merecen la misma auditoria; excepciones
+    # itemizadas arriba hasta que browser-use suelte los pins.
+    rc_qa = run_audit(
+        output_dir=Path("pip-audit-logs") / "qa-agents",
+        _requirements="qa-agents/requirements.txt",
+        _ignored_pins=QA_AGENTS_IGNORED_PINS,
+    )
+    raise SystemExit(rc or rc_qa)

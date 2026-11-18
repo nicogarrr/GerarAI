@@ -289,3 +289,38 @@ def test_pyproject_with_non_utf8_bytes_stays_red(tmp_path):
     file = tmp_path / "pyproject.toml"
     file.write_bytes(b'[project]\nrequires-python = ">=3.12\xff\xfe"\n')
     assert gate.check_interpreter(file, (3, 12, 9), stderr=None) is False
+
+
+VULNS_QA = json.dumps({"dependencies": [
+    {"name": "anyio", "version": "4.12.1", "vulns": [{"id": "PYSEC-1"}]},
+    {"name": "pillow", "version": "12.3.0", "vulns": [{"id": "PYSEC-2"}]},
+], "fixes": []})
+
+
+def test_ignored_pins_waive_only_the_exact_pinned_version(tmp_path):
+    rc, _, _ = exercise(tmp_path, [result(1, VULNS_QA)],
+                        _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"})
+    assert rc == 0
+    # Otra version del mismo paquete con advisories sigue en rojo.
+    moved = VULNS_QA.replace('"12.3.0"', '"12.4.0"')
+    rc, _, _ = exercise(tmp_path, [result(1, moved)],
+                        _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"})
+    assert rc == 1
+    # Otro paquete con advisories sigue en rojo.
+    other = VULNS_QA.replace('"anyio"', '"starlette"')
+    rc, _, _ = exercise(tmp_path, [result(1, other)],
+                        _ignored_pins={"anyio": "4.12.1", "pillow": "12.3.0"})
+    assert rc == 1
+
+
+def test_ignored_pins_do_not_leak_into_strict_audit(tmp_path):
+    rc, _, _ = exercise(tmp_path, [result(1, VULNERABLE)])
+    assert rc == 1
+
+
+def test_real_qa_agents_pins_match_current_advisories():
+    # La tabla de excepciones va por pin exacto: si browser-use cambia sus
+    # pins, las entradas viejas quedan huerfanas y las nuevas versiones se
+    # auditan en serio. Este test fija que la tabla sigue siendo la de
+    # browser-use 0.13.14 (la del requirements).
+    assert set(gate.QA_AGENTS_IGNORED_PINS) == {"anyio", "mcp", "pillow", "pypdf"}
