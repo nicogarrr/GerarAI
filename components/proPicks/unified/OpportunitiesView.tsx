@@ -42,7 +42,7 @@ function OpportunityCard({ t, row, missing }: { t: TranslateFn; row: Opportunity
                         {row.dcaLevel === null || row.dcaPeriodState === null ? (
                             <span className="text-gray-200">{missing}</span>
                         ) : (
-                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] ${row.dcaPeriodState === 'confirmed' ? 'border-emerald-800 text-emerald-300' : 'border-amber-800 text-amber-300'}`}>
+                            <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs ${row.dcaPeriodState === 'confirmed' ? 'border-emerald-800 text-emerald-300' : 'border-amber-800 text-amber-300'}`}>
                                 {row.dcaPeriodState === 'confirmed' ? t('propicks.unified.dcaConfirmed') : t('propicks.unified.dcaForming')}
                             </span>
                         )}

@@ -30,7 +30,7 @@ export default function TrackingView({ t, rows }: TrackingViewProps) {
                                     {row.ticker} · {row.held ? t('propicks.unified.trackingFollow') : row.watched ? t('propicks.unified.trackingWait') : unifiedMissingLabel(t)}
                                 </h3>
                                 {row.reviewReasons.length > 0 ? (
-                                    <span className="inline-flex rounded-full border border-amber-800 px-2 py-0.5 text-[11px] text-amber-300">
+                                    <span className="inline-flex rounded-full border border-amber-800 px-2 py-0.5 text-xs text-amber-300">
                                         {t('propicks.unified.reviewThesis')}
                                     </span>
                                 ) : null}

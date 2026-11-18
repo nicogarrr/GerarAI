@@ -77,7 +77,7 @@ function MoveList({
                     <p className="mt-1 text-xs text-gray-500">{move.company}</p>
                     <p className="mt-2 text-sm leading-6 text-gray-300">{reasonDisplayText(move.reason.text, locale)}</p>
                     {move.reason.metric !== undefined && move.reason.value !== undefined && (
-                        <p className="mt-1 text-[11px] text-gray-500" title={t('propicks.rebalance.verifiedTitle')}>
+                        <p className="mt-1 text-xs text-gray-500" title={t('propicks.rebalance.verifiedTitle')}>
                             {t('propicks.rebalance.source', { metric: move.reason.metric, value: String(move.reason.value) })}
                         </p>
                     )}

@@ -70,7 +70,7 @@ function Metric({
             ) : (
                 <div className="text-sm font-medium text-gray-500">{t('propicks.factsheet.noData')}</div>
             )}
-            {footnote && <div className="mt-1 text-[11px] text-gray-500">{footnote}</div>}
+            {footnote && <div className="mt-1 text-xs text-gray-500">{footnote}</div>}
         </div>
     );
 }

@@ -413,7 +413,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                     )}
 
                                     {pick.asOf && (
-                                        <p className="text-[11px] text-gray-500 mb-3">
+                                        <p className="text-xs text-gray-500 mb-3">
                                             {t('signals.asOf', { date: formatUserDate(pick.asOf) })}
                                         </p>
                                     )}
