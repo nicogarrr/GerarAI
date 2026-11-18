@@ -228,7 +228,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
         title={t('knowledge.library')}
         description={t('knowledge.description')}
         actions={<div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
-          <LibraryChat scope="library" />
+          <LibraryChat scope="library" label={t('knowledge.askLibrary')} />
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/search"><FileSearch aria-hidden="true" className="h-4 w-4" />{t('knowledge.searchAll')}</Link></Button>
           <Button asChild className="h-11 w-full sm:w-auto" variant="outline"><Link href="/knowledge-graph"><Library aria-hidden="true" className="h-4 w-4" />{t('knowledgeGraph.canvas.feature')}</Link></Button>
         </div>}

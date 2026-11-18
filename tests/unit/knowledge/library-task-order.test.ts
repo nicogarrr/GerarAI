@@ -8,7 +8,7 @@ describe('Library task order', () => {
     it('the library entry lives in the page header actions, not between the tabs and the content', () => {
         const header = source.indexOf('<PageHeader');
         const tabs = source.indexOf('<Tabs ');
-        const chat = source.indexOf('<LibraryChat scope="library" />');
+        const chat = source.indexOf('<LibraryChat scope="library" label=');
         expect(header).toBeGreaterThan(-1);
         expect(chat).toBeGreaterThan(header);
         expect(chat).toBeLessThan(tabs);
@@ -16,6 +16,6 @@ describe('Library task order', () => {
         expect(between).not.toContain('LibraryChat');
     });
     it('keeps exactly one library entry shared across sections', () => {
-        expect(source.match(/<LibraryChat scope="library" \/>/g)).toHaveLength(1);
+        expect(source.match(/<LibraryChat scope="library" label=/g)).toHaveLength(1);
     });
 });

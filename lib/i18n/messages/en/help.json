@@ -40,7 +40,7 @@
       "text": "Weights, concentration (top 1 and top 5) and exposure by sector and factor. It does not calculate VaR, drawdown or volatility: these are portfolio-structure metrics."
     },
     "item4": {
-      "title": "Screener",
+      "title": "Explore stocks",
       "text": "A universe of large caps with real profiles and prices, to start from verifiable candidates."
     },
     "item5": {
