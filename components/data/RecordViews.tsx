@@ -303,7 +303,7 @@ export function RecordList({
                                                         {href ? (
                                                             <Link
                                                                 href={href}
-                                                                className="font-mono font-semibold text-teal-300 hover:text-teal-200 hover:underline"
+                                                                className="relative font-mono font-semibold text-teal-300 before:absolute before:-inset-x-1.5 before:-inset-y-2 before:content-[''] hover:text-teal-200 hover:underline"
                                                             >
                                                                 {cellText(record, column)}
                                                             </Link>
@@ -342,7 +342,7 @@ export function RecordList({
                                                         {href ? (
                                                             <Link
                                                                 href={href}
-                                                                className="font-mono font-semibold text-teal-300 hover:text-teal-200 hover:underline"
+                                                                className="relative font-mono font-semibold text-teal-300 before:absolute before:-inset-x-1.5 before:-inset-y-2 before:content-[''] hover:text-teal-200 hover:underline"
                                                             >
                                                                 {cellText(record, column)}
                                                             </Link>
