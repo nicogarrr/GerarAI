@@ -41,7 +41,10 @@ describe('puente tesis → evidencia (hallazgo de accesibilidad/findability)', (
         // Se ofrece la salida, no se bloquea la generación con datos parciales:
         // el botón solo se desactiva por ocupación o disponibilidad de la IA,
         // nunca por falta de evidencia.
-        assert.match(BTN, /startThesisJob\(ticker, true, crypto\.randomUUID\(\)\)/);
+        // El id de petición lo genera el helper con fallback (contextos sin
+        // crypto.randomUUID) y se pasa tal cual a la generación.
+        assert.match(BTN, /const requestId = newRequestId\(\);/);
+        assert.match(BTN, /startThesisJob\(ticker, true, requestId\)/);
         assert.match(BTN, /disabled=\{busy \|\| !availability\.canStart\}/);
         assert.doesNotMatch(BTN, /disabled=\{[^}]*(evidence|document)/i);
     });
