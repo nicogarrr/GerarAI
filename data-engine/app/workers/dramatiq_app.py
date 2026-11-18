@@ -5918,6 +5918,46 @@ def dispatch_source_health_watchdog(
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
+def dispatch_source_freshness_watchdog(
+    tenant_id: int | None = None,
+    user_id: str | None = None,
+) -> dict[str, Any]:
+    """Alerta in-app al operador cuando una fuente de datos envejece (stale).
+
+    Reusa el inventario del panel de salud de datos (misma politica de edad
+    por capa) y persiste una ResearchAlert por fuente y dia. Nace de FMP e
+    yahoo_intraday paradas desde el 2/7-oct-2026 sin que nadie lo viera.
+    """
+    actor_name = "dispatch_source_freshness_watchdog"
+    db = None
+    lease = None
+    try:
+        from app.services.source_freshness_watchdog import emit_source_freshness_alerts
+
+        db = _session(tenant_id, user_id)
+        lease = acquire_job_lease(
+            f"dispatch_source_freshness_watchdog:{tenant_id}",
+            ttl_seconds=120,
+            redis_url=_lease_redis_url(),
+        )
+        if lease is None:
+            return {"status": "skipped", "actor": actor_name, "reason": "lease_held"}
+        stats = emit_source_freshness_alerts(db)
+        return {"status": "ok", "actor": actor_name, **stats}
+    except Exception as exc:
+        if db is not None:
+            _rollback(db)
+        return _handle_actor_error(actor_name, exc, tenant_id=tenant_id)
+    finally:
+        if lease is not None:
+            release_job_lease(
+                f"dispatch_source_freshness_watchdog:{tenant_id}", lease, redis_url=_lease_redis_url()
+            )
+        if db is not None:
+            db.close()
+
+
+@dramatiq.actor(max_retries=1, min_backoff=30_000, queue_name=ALERT_QUEUE_NAME)
 def dispatch_db_connection_watchdog(
     tenant_id: int | None = None,
     user_id: str | None = None,

@@ -103,7 +103,7 @@ def _coverage_groups(db: Session, *, table: str, source_col: str,
     statement = sa.text(f"""
       WITH RECURSIVE sources(src) AS (
         SELECT * FROM (SELECT {source_col} FROM {table} WHERE {filters}
-          ORDER BY {source_col} LIMIT 1)
+          ORDER BY {source_col} LIMIT 1) AS first_row
         UNION ALL
         SELECT (SELECT {source_col} FROM {table} WHERE {filters}
           AND {source_col} > sources.src ORDER BY {source_col} LIMIT 1)
@@ -130,16 +130,50 @@ def utc(value: datetime | None) -> datetime | None:
     return value.replace(tzinfo=UTC) if value and value.tzinfo is None else value
 
 
-def inventory(db: Session, *, now: datetime | None = None) -> dict:
+def _apply_query_timeouts(db: Session, ms: int) -> None:
+    """statement/lock timeout locales a la transaccion actual (set_config
+    con is_local=true). Hay que reaplicarlo tras CADA rollback: SET LOCAL
+    muere con la transaccion (medido en PG: SHOW devuelve 0 tras rollback).
+    """
+    db.execute(
+        sa.text(
+            "SELECT set_config('statement_timeout', :ms, true), "
+            "set_config('lock_timeout', :ms, true)"
+        ),
+        {"ms": str(ms)},
+    )
+
+
+def inventory(
+    db: Session,
+    *,
+    now: datetime | None = None,
+    statement_timeout_ms: int | None = None,
+) -> dict:
+    """Inventario de cobertura persistida (panel de salud + watchdog).
+
+    ``statement_timeout_ms`` (opcional, solo Postgres) acota cada consulta
+    del inventario: se aplica al inicio, antes de cada capa y tras cada
+    rollback interno de capa, porque un rollback descarta el SET LOCAL y
+    dejaba las capas siguientes sin limite (hallazgo del auditor, 18-nov).
+    """
     tenant = db.info.get("tenant_id")
     if tenant is None:
         raise ValueError("Tenant context required")
     now = now or datetime.now(UTC)
+    pg = db.get_bind().dialect.name == "postgresql"
+    timed = pg and bool(statement_timeout_ms)
+    if timed:
+        _apply_query_timeouts(db, int(statement_timeout_ms))
     total = db.scalar(select(func.count(Company.id))) or 0
     rows = []
     for label, model, source_field, max_age in LAYERS:
         source = getattr(model, source_field)
         try:
+            if timed:
+                # La capa anterior pudo rolar atras: esta transaccion aun no
+                # tiene el limite.
+                _apply_query_timeouts(db, int(statement_timeout_ms))
             # Precios tambien por sonda: el A/B midio la sonda ~20-30x mas
             # barata que el group-by (usa ix_market_prices_source_cov +
             # ix_prices_source_upd); el group-by queda como ruta sqlite.
@@ -182,9 +216,16 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
                              "reason": "No hay registros de fuentes externas para esta capa."})
         except Exception:  # noqa: BLE001 - no false zeros on failed reads
             db.rollback()
+            if timed:
+                # SET LOCAL murio con la transaccion: la siguiente capa debe
+                # volver a tener limite (reproducido: SHOW devuelve 0 tras
+                # el rollback si no se reaplica).
+                _apply_query_timeouts(db, int(statement_timeout_ms))
             rows.append({"layer": label, "source": None, "covered": None, "total": total,
                          "coverage_pct": None, "last_update": None, "status": "error",
                          "max_age_days": max_age, "reason": "No se pudo leer esta capa de la base de datos."})
+    if timed:
+        _apply_query_timeouts(db, int(statement_timeout_ms))
     try:
         states = db.scalars(select(ConnectorState).where(ConnectorState.tenant_id == tenant)).all()
         connectors = [{"source": state.connector,
@@ -242,10 +283,17 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
                 "errors": counts["error"]})
     except Exception:  # noqa: BLE001
         db.rollback()
+        if timed:
+            # Mismo motivo que en las capas: SET LOCAL muere con el rollback.
+            _apply_query_timeouts(db, int(statement_timeout_ms))
         connectors = []
         rows.append({"layer": "Conectores", "source": None, "covered": None, "total": total,
                      "coverage_pct": None, "last_update": None, "status": "error",
                      "max_age_days": None, "reason": "No se pudo leer el registro de conectores."})
+    if timed:
+        # Tras el bloque de conectores (haya rollback o no), la consulta de
+        # ProPick debe encontrar el limite puesto en ESTA transaccion.
+        _apply_query_timeouts(db, int(statement_timeout_ms))
     try:
         run = db.scalar(select(ProPickRun).where(ProPickRun.tenant_id == tenant).order_by(ProPickRun.as_of.desc()).limit(1))
         if run:
@@ -256,6 +304,8 @@ def inventory(db: Session, *, now: datetime | None = None) -> dict:
                                "last_attempt": stamp.isoformat(), "status": status, "errors": None})
     except Exception:  # noqa: BLE001
         db.rollback()
+        if timed:
+            _apply_query_timeouts(db, int(statement_timeout_ms))
         connectors.append({"source": "ProPicks · último run", "last_success": None, "last_attempt": None, "status": "error", "errors": None})
     return {"as_of": now.isoformat(), "total_companies": total, "sources": rows, "connectors": connectors,
             "coverage_basis": "DERIVADO: empresas con al menos un registro / todas las empresas registradas. No mide completitud. Fuentes con alcance estructuralmente acotado (ESEF: emisores reviewed CNMV) llevan ademas eligible y coverage_pct_eligible con el denominador de elegibilidad real.",
