@@ -112,6 +112,15 @@ _FORM_10K_RE = re.compile(r"^-\s*[Kk]\b")
 _RANGE_MARKER_RE = re.compile(r"\b(?:between|entre|de)\s*[$€£]?\s*$", flags=re.IGNORECASE)
 _RANGE_WORD_JOIN_RE = re.compile(r"^\s*[$€£]?\s*(?:and|y|a)\s*[$€£]?\s*$", flags=re.IGNORECASE)
 _RANGE_HARD_JOIN_RE = re.compile(r"^\s*[$€£]?\s*(?:to|[-–])\s*[$€£]?\s*$", flags=re.IGNORECASE)
+# Tras "hasta <ano>", esto delimita un plazo: fin de frase, puntuacion o
+# "de/en/inclusive" ("hasta 2027", "hasta 2027 de 5 millones", "hasta 2027
+# inclusive"). Los conectores a/y/e NO: "hasta 2000 y 3000 unidades" o
+# "hasta 2000 a 3000 unidades" tienen la cifra como objetivo (variante de
+# Cerebro, FAV v5). Un sustantivo de unidad ("hasta 2000 vehiculos")
+# tampoco es plazo: la cifra es la cantidad objetivo.
+_HASTA_YEAR_TRAILER_RE = re.compile(
+    r"^\s*(?:$|[.,;:)\-–]|de\b|en\b|inclusive\b)", flags=re.IGNORECASE
+)
 
 _EN_MAGNITUDES = frozenset({"billion", "bn", "million", "mn", "thousand", "k"})
 _ES_MAGNITUDES = frozenset({"millones", "millón", "mil millones", "billones", "billón", "mil"})
@@ -456,13 +465,27 @@ class ManagementCredibilityService:
             numeric = _parse_number(number_text, magnitude)
             if numeric is None:
                 continue
-            if (
-                not qualifier
-                and not magnitude
+            year_shaped = (
+                not magnitude
                 and not re.search(r"[.,]", number_text)
                 and len(number_text) == 4
                 and 1900 <= int(number_text) <= 2099
+            )
+            if year_shaped and (
+                not qualifier
+                or (qualifier == "hasta" and _HASTA_YEAR_TRAILER_RE.match(following))
             ):
+                # Un ano pelado nunca es el objetivo; tras "hasta" tampoco si
+                # cierra plazo ("ventas de 5 millones hasta 2027": la cifra es
+                # 5 millones, FAV v4). Con sustantivo de unidad o conector de
+                # lista la cifra SI es el objetivo ("hasta 2000 vehiculos" y
+                # "hasta 2000 y 3000 unidades" son <=2000; variante de
+                # Cerebro, FAV v5). Coste declarado: "hasta 2000 en tiendas" o
+                # "hasta 2000 de clientes" se leen como plazo y no dan
+                # objetivo. El resto de cualificadores no cambian: "deliver
+                # at least 2000 vehicles" es >=2000 (FAV r1), "above 2026
+                # units" es >=2026. EN sin regla: by/through/until no son
+                # cualificadores.
                 continue
             candidates.append(
                 (qualifier, numeric, magnitude, match.start("number"), match.end("number"))

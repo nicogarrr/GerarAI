@@ -619,3 +619,37 @@ def test_semestre_sin_ano_no_es_objetivo():
     # "1H" suelto igual; y "2H26" sigue sin ser objetivo.
     assert service._target("growth in 1H of 5%") == ("==", Decimal("5"))
     assert service._target("2H26 revenue of $3 billion") == ("==", Decimal("3000000000"))
+
+
+def test_ano_cualificado_tampoco_es_objetivo():
+    """FAV v4: "ventas de 5 millones hasta 2027" tomaba el año cualificado
+    ("hasta 2027") como objetivo y perdia la cifra. "hasta" + año que cierra
+    plazo (fin, puntuacion o conector) no es objetivo; con sustantivo de
+    unidad la cifra SI es el objetivo (contrato Release v5)."""
+    service = ManagementCredibilityService
+    assert service._target("ventas de 5 millones hasta 2027") == ("==", Decimal("5000000"))
+    assert service._target("ventas hasta 2027 de 5 millones") == ("==", Decimal("5000000"))
+    # Sin otra cifra, un plazo solo no es un objetivo numerico (casos 3-5).
+    assert service._target("hasta 2027") == (None, None)
+    assert service._target("de aquí hasta 2027") == (None, None)
+    assert service._target("hasta 2027 inclusive") == (None, None)
+    assert service._target("hasta 1999") == (None, None)
+    assert service._target("hasta 2099") == (None, None)
+    # Caso 6: "hasta" + cifra con pinta de año + sustantivo de unidad es
+    # cantidad objetivo, no plazo.
+    assert service._target("hasta 2000 vehículos") == ("<=", Decimal("2000"))
+    assert service._target("hasta 2000 unidades") == ("<=", Decimal("2000"))
+    # Variante Cerebro: a/y/e NO cierran plazo; la cifra sigue siendo el
+    # objetivo como en v4 (nunca ==3000 por tragar el conector).
+    assert service._target("hasta 2000 y 3000 unidades") == ("<=", Decimal("2000"))
+    assert service._target("hasta 2000 a 3000 unidades") == ("<=", Decimal("2000"))
+    assert service._target("vendemos hasta 2000 e incluimos 300") == ("<=", Decimal("2000"))
+    assert service._target("hasta 2000 a nivel global") == ("<=", Decimal("2000"))
+    # Casos buenos de Cerebro con guion y "de" tras el año.
+    assert service._target("hasta 2025 - 2027 de 5 millones") == ("==", Decimal("5000000"))
+    assert service._target("hasta 2025 de 12 millones") == ("==", Decimal("12000000"))
+    # Coste declarado: "en/de" + sustantivo se lee como plazo (sin objetivo).
+    assert service._target("hasta 2000 en tiendas") == (None, None)
+    assert service._target("hasta 2000 de clientes") == (None, None)
+    # El cualificador sobre la CIFRA sigue mandando sobre el año pelado.
+    assert service._target("crecer hasta 5 millones en 2027") == ("<=", Decimal("5000000"))
