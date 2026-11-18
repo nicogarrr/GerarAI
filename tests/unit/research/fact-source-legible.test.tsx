@@ -3,7 +3,17 @@
  * pintaban con el id interno del backend en crudo («YAHOO_FUNDAMENTALS»,
  * «sec»), pese a existir sourceDisplay() con etiquetas es/en. Regresión:
  * ids conocidos traducidos, desconocidos humanizados, nunca el crudo.
+ *
+ * Política de presentación (retirada global de etiquetas de fuente,
+ * 31-oct): el nombre del proveedor NO es texto visible; en FactSource
+ * queda como tooltip diagnóstico (title) y en ValuationSummaryCard no
+ * aparece en ninguna forma. El aviso de calidad (no oficial) se conserva.
  */
+
+/** Texto visible de un HTML renderizado: sin etiquetas ni atributos. */
+function visibleText(html: string): string {
+    return html.replace(/<[^>]*>/g, ' ');
+}
 import { readFileSync } from 'node:fs';
 import { renderToString } from 'react-dom/server';
 import { render, screen } from '@testing-library/react';
@@ -37,27 +47,32 @@ const fact = (sourceType: string): ResearchFact => ({
 });
 
 describe('FactSource: proveedor legible', () => {
-    it('es: id conocido traducido', () => {
+    it('es: id conocido traducido en el tooltip, no en el texto visible', () => {
         const html = renderToString(<FactSource fact={fact('YAHOO_FUNDAMENTALS')} locale="es" />);
-        expect(html).toContain('Yahoo Finance (fuente no oficial)');
+        expect(html).toContain('title="Yahoo Finance (fuente no oficial)"');
+        expect(visibleText(html)).not.toContain('Yahoo Finance');
         expect(html).not.toContain('YAHOO_FUNDAMENTALS');
     });
-    it('en: id conocido traducido al inglés', () => {
+    it('en: id conocido traducido al inglés en el tooltip', () => {
         const html = renderToString(<FactSource fact={fact('yahoo_finance')} locale="en" />);
-        expect(html).toContain('Yahoo Finance');
+        expect(html).toContain('title="Yahoo Finance"');
+        expect(visibleText(html)).not.toContain('Yahoo Finance');
     });
-    it('id desconocido: humanizado, nunca el crudo con guiones bajos', () => {
+    it('id desconocido: humanizado en el tooltip, nunca el crudo con guiones bajos', () => {
         const html = renderToString(<FactSource fact={fact('proprietary_feed')} locale="es" />);
-        expect(html).toContain('proprietary feed');
+        expect(html).toContain('title="proprietary feed"');
         expect(html).not.toContain('proprietary_feed');
     });
 });
 
-describe('ValuationSummaryCard: fuente de la evidencia legible', () => {
-    it('traduce el id de fuente y no muestra el crudo', () => {
+describe('ValuationSummaryCard: evidencia sin nombre de proveedor visible', () => {
+    it('ni etiqueta traducida ni id en crudo como texto; el aviso de calidad se conserva', () => {
+        // #5747 reintrodujo la etiqueta vía sourceDisplay en las dos ramas
+        // (con y sin enlace) de Evidence; la retirada global la prohíbe.
         render(<ValuationSummaryCard item={item} quote={quote} />);
-        expect(screen.getAllByText(/Yahoo Finance \(fuente no oficial\)/).length).toBeGreaterThan(0);
-        expect(screen.queryByText(/yahoo_fundamentals/)).toBeNull();
+        expect(screen.queryByText(/Yahoo Finance/)).toBeNull();
+        expect(screen.queryByText(/yahoo_fundamentals/i)).toBeNull();
+        expect(screen.getByText(/Incluye cifras no oficiales/)).toBeInTheDocument();
     });
 });
 
@@ -66,9 +81,9 @@ describe('los componentes dejan de pintar el id crudo', () => {
         const source = readFileSync('components/research/FactSource.tsx', 'utf8');
         expect(source).toContain('sourceDisplay(');
     });
-    it('ValuationSummaryGrid usa sourceDisplay para la evidencia', () => {
+    it('ValuationSummaryGrid no pinta la etiqueta de fuente en la evidencia', () => {
         const source = readFileSync('components/research/ValuationSummaryGrid.tsx', 'utf8');
-        expect(source).toContain('sourceDisplay(');
+        expect(source).not.toContain('sourceDisplay(');
         expect(source).not.toContain('{f.source_type}');
     });
 });

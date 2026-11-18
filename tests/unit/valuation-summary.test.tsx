@@ -65,6 +65,27 @@ describe('shared valuation', () => {
     expect(screen.getByRole('link', { name: /Beneficio neto: 10\s?US\$/ })).toHaveAttribute('href', 'https://www.sec.gov/test');
     expect(screen.getByText(/precio del modelo/)).toBeInTheDocument();
   });
+  it('evidence rows never name the provider; quality warning stays (Nico order, #5747 reverted)', () => {
+    // #5747 reintrodujo sourceDisplay visible en las dos ramas (con y sin
+    // enlace). La retirada global de etiquetas de fuente (31-oct) lo prohíbe:
+    // la procedencia vive en la pestaña Fuentes, el aviso de calidad se queda.
+    const copy = structuredClone(item);
+    copy.health.piotroski.signals[0].evidence = [
+      { fact_id: 4, metric: 'net_income', value: 10, unit: 'USD', period_end: '2025-12-31', source_type: 'sec', source_url: 'https://www.sec.gov/test' },
+      { fact_id: 5, metric: 'total_assets', value: 20, unit: 'USD', period_end: '2025-12-31', source_type: 'yahoo_fundamentals', source_url: 'http://untrusted' },
+    ];
+    render(<ValuationSummaryCard item={copy} quote={quote} />);
+    // Rama con enlace: ni «SEC EDGAR» ni el id en crudo como texto visible.
+    const linked = screen.getByRole('link', { name: /Beneficio neto: 10\s?US\$/ });
+    expect(linked).toHaveAttribute('href', 'https://www.sec.gov/test');
+    expect(linked.textContent).not.toMatch(/SEC/);
+    // Rama sin enlace: aviso de no oficial presente, proveedor ausente.
+    const warning = screen.getByText(/Incluye cifras no oficiales/);
+    const row = warning.closest('li') as HTMLElement;
+    expect(row.textContent).toMatch(/Activos totales: 20\s?US\$/);
+    expect(row.textContent).not.toMatch(/Yahoo/);
+    expect(screen.queryByText(/SEC EDGAR|Yahoo Finance/)).toBeNull();
+  });
   it('renders unavailable values and full scores without false certainty', () => {
     const copy = structuredClone(item);
     copy.fair_value.value = null;
