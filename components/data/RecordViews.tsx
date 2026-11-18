@@ -337,7 +337,7 @@ export function RecordList({
                                             const href = cellHref(record, index, column);
                                             return (
                                                 <div className="min-w-0" key={column}>
-                                                    <dt className="text-[11px] uppercase tracking-wide text-gray-500">{columnLabels?.[column] ?? column}</dt>
+                                                    <dt className="text-xs uppercase tracking-wide text-gray-500">{columnLabels?.[column] ?? column}</dt>
                                                     <dd className="break-words text-sm text-gray-200">
                                                         {href ? (
                                                             <Link
