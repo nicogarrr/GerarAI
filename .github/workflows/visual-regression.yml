@@ -52,13 +52,21 @@ jobs:
       - name: Version de Playwright
         id: pw
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      - name: Cache del navegador de Playwright
+        id: pw-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+      # apt y el navegador tienen limites separados: un mirror Ubuntu lento
+      # no debe consumir el presupuesto de descarga ni parecer un fallo visual.
+      - name: Dependencias de sistema de Chromium (apt)
+        timeout-minutes: 15
+        run: npx playwright install-deps chromium
       - name: Descarga de Chromium
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         timeout-minutes: 8
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Capturas de las paginas publicas
         run: npx playwright test visual-public --reporter=line
       - name: Sube capturas
