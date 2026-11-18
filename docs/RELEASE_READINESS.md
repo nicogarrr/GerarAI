@@ -10,11 +10,10 @@ El inventario de abajo conserva su fecha histórica y no demuestra el estado act
 Cada nuevo despliegue requiere revisar CI, auditoría, backups y el entorno real.
 
 Estado al escribirlo: 27-oct-2026, cabeza Alembic `0082`.
-Actualizado 14-nov-2026: cabeza Alembic `0135` (32 migraciones nuevas desde la
-etiqueta v0.5.0, que iba por `0103`). Último estado reportado (13-nov-2026,
-pendiente de verificar tras el deploy): el `deploy-effective.json` de producción
-omitía `worker-kpis` (15 servicios sin él) aunque `docker-compose.prod.yml` lo
-define; la 0.6.0 debe desplegarlo (gate en sección 3).
+Actualizado 18-nov-2026: cabeza Alembic `0138` (35 migraciones nuevas desde la
+etiqueta v0.5.0, que iba por `0103`). Último estado verificado: CI en verde en
+main (14/14 jobs superados); el `deploy-effective.json` de producción debe
+incluir `worker-kpis` con su healthcheck activo (gate en sección 3).
 
 **Recuento a 27-oct-2026 18:50 (CET), `main` = `239e68de`** (incluye #2476):
 

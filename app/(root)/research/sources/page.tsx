@@ -68,11 +68,6 @@ function sourceTypeLabel(value: string, t?: TranslateFn): string {
   return SOURCE_TYPE_LABELS[value] ?? sourceDisplay(value, t ? 'en' : 'es');
 }
 
-const SOURCE_SCOPE_LABELS = {
-  followed: 'Mi universo',
-  all: 'Todas',
-} as const;
-
 const SOURCE_TYPE_FILTER_OPTIONS = Object.entries(SOURCE_TYPE_LABELS)
   .filter(([value]) => value !== 'YAHOO_FUNDAMENTALS');
 

@@ -63,7 +63,7 @@ de GitHub el 14-nov 10:53 CET).
 
 ### Notas de actualización
 
-- **Migraciones:** 32 nuevas desde `v0.5.0`, de `0104` a `0135` (cabeza única
+- **Migraciones:** 35 nuevas desde `v0.5.0`, de `0104` a `0138` (cabeza única
   verificada; la etiqueta v0.5.0 iba por `0103`). Antes de desplegar: backup de
   Postgres y `alembic upgrade head` probado sobre una copia restaurada.
 - **Variables de entorno nuevas** (ver `.env.production.example`):
