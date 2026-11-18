@@ -35,6 +35,26 @@ describe('zona táctil de enlaces inline', () => {
         expect(src('app/(root)/temas/page.tsx')).toMatch(/text-teal-300 underline before:absolute before:-inset-3\.5/);
     });
 
+    it('los tickers de exposición del flujo de /temas son chips reales de 44 px, SIN pseudo-expansión (Auditoría 18-nov: el halo -inset-x-1.5 solapaba 5,33 px entre tickers seguidos)', () => {
+        const s = src('app/(root)/temas/_components/ThemeFlow.tsx');
+        // Mismo patrón que HoldingsLines de la propia página: caja real
+        // min-h-11 min-w-11, separador fuera del enlace, nada que solapar.
+        const chips = s.match(/className="inline-flex min-h-11 min-w-11 items-center justify-center font-semibold text-teal-300 hover:text-teal-200"/g) ?? [];
+        expect(chips).toHaveLength(2);
+        // Ni la clase antigua sin expandir ni NINGÚN inset horizontal en este archivo.
+        expect(s).not.toContain('className="font-semibold text-teal-300 hover:text-teal-200"');
+        expect(s).not.toContain('-inset-x-1.5');
+        expect(s).not.toContain('before:inset-x-0');
+    });
+
+    it('el enlace SEDI del feed insider (14 px en prod) amplía su zona inline a 34 px', () => {
+        // Medido en prod: 21 px libres hasta el enlace de importe y sin solape
+        // en x, así que la expansión -inset-y-2.5/-x-1.5 no toca a nadie.
+        expect(src('components/insider/InsiderFeed.tsx')).toContain(
+            "className=\"relative underline before:absolute before:-inset-x-1.5 before:-inset-y-2.5 before:content-[''] hover:text-teal-300\"",
+        );
+    });
+
     it('cada evidencia de valoración enlaza a su fuente con la fila entera a 32 px, sin solapar vecinas', () => {
         const s = src('components/research/ValuationSummaryGrid.tsx');
         expect(s).toContain('className="-mx-1 flex min-h-8 w-full items-center rounded px-1 underline"');

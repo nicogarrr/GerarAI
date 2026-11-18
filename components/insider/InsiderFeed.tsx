@@ -269,7 +269,7 @@ export default function InsiderFeed({ feed, side, days }: { feed: InsiderFeedRes
                                                     {tx.form === 'CA-INSIDER' ? (
                                                         <span className="mt-1 block whitespace-normal text-xs font-normal text-gray-500 md:hidden">
                                                             {t('insider.feed.canadaSourcePre')}
-                                                            <a className="underline hover:text-teal-300" href="https://www.sedi.ca" rel="noopener noreferrer" target="_blank">SEDI</a>
+                                                            <a className="relative underline before:absolute before:-inset-x-1.5 before:-inset-y-2.5 before:content-[''] hover:text-teal-300" href="https://www.sedi.ca" rel="noopener noreferrer" target="_blank">SEDI</a>
                                                             {t('insider.feed.canadaSourcePost')}
                                                         </span>
                                                     ) : null}
