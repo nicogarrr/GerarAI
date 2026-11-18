@@ -35,10 +35,10 @@ test('chatWithCompany dead code stays removed', async () => {
 });
 
 test('Cerebro enlaza datos propios solo a rutas internas conocidas', () => {
-    for (const url of ['/portfolio', '/research/AAPL?view=financials', '/research/MSFT?view=thesis', '/research/AAPL?view=news']) {
+    for (const url of ['/portfolio', '/research/AAPL?view=financials', '/research/MSFT?view=thesis', '/research/AAPL?view=noticias', '/research/AAPL?view=seguimiento', '/knowledge?document=7']) {
         assert.equal(toPortfolioChatCitations([{ type: 'market_price', id: 1, title: 'Dato', url }])[0]?.url, url);
     }
-    for (const url of ['//evil.example', '/api/admin', '/research/AAPL?view=financials&redirect=https://evil.example']) {
+    for (const url of ['//evil.example', '/api/admin', '/research/AAPL?view=news', '/research/AAPL?view=financials&redirect=https://evil.example', '/knowledge?document=abc']) {
         assert.equal(toPortfolioChatCitations([{ type: 'market_price', id: 1, title: 'Dato', url }])[0]?.url, null);
     }
 });

@@ -18,7 +18,7 @@ from app.models.entities import (
     FinancialFact,
     ThesisVersion,
 )
-from app.services.chat_service import ChatService, _decimal_to_float, _short
+from app.services.chat_service import ChatService, _decimal_to_float, _internal_source_url, _short
 
 
 @pytest.fixture
@@ -170,6 +170,68 @@ def test_thesis_status_source_entry_is_spanish_not_snake_case(db):
     for source in thesis_sources:
         assert source.get("status") == "datos insuficientes"
         assert "insufficient_data" not in str(source.get("status"))
+
+
+@pytest.mark.parametrize(
+    ("kind", "kwargs", "expected"),
+    [
+        ("thesis_version", {"ticker": "AAPL"}, "/research/AAPL?view=thesis"),
+        ("thesis_section", {"ticker": "AAPL"}, "/research/AAPL?view=thesis"),
+        ("claim", {"ticker": "AAPL"}, "/research/AAPL?view=thesis"),
+        ("claim_evidence", {"ticker": "AAPL"}, "/research/AAPL?view=thesis"),
+        ("financial_fact", {"ticker": "AAPL"}, "/research/AAPL?view=financials"),
+        ("news_event", {"ticker": "AAPL"}, "/research/AAPL?view=noticias"),
+        ("news_event", {"ticker": "AAPL", "requires_update": True}, "/research/AAPL?view=seguimiento"),
+        ("knowledge_chunk", {"knowledge_document_id": 7}, "/knowledge?document=7"),
+        ("financial_fact", {"ticker": "BRK/B"}, "/research/BRK%2FB?view=financials"),
+        ("thesis_version", {}, None),  # sin ticker no se inventa ruta
+        ("knowledge_chunk", {}, None),  # sin documento no se inventa ruta
+        ("memory_item", {"ticker": "AAPL"}, None),  # nota guardada: sin ficha donde abrirla
+    ],
+)
+def test_internal_source_url_uses_only_canonical_views(kind, kwargs, expected):
+    # `news` no existe en research-views.ts: asView('news') cae en overview.
+    assert _internal_source_url(kind, **kwargs) == expected
+
+
+def test_source_entry_adds_internal_url_without_overriding_stored_url():
+    service = ChatService()
+    assert service._source_entry("financial_fact", 1, "Ingresos", ticker="AAPL")["url"] == "/research/AAPL?view=financials"
+    assert service._source_entry("news_event", 2, "AAPL cambia", ticker="AAPL", requires_update=True)["url"] == "/research/AAPL?view=seguimiento"
+    external = service._source_entry("document_chunk", 3, "Carta", ticker="AAPL", url="https://example.org/carta.pdf")
+    assert external["url"] == "https://example.org/carta.pdf"
+    # Sin ticker o sin vista conocida, la procedencia se muestra sin enlace.
+    assert "url" not in service._source_entry("financial_fact", 4, "Dato")
+    assert "url" not in service._source_entry("risk_event", 5, "Aviso", ticker="AAPL")
+
+
+def test_library_chunks_get_real_browser_url_without_inventing_one():
+    service = ChatService()
+    item = {"type": "knowledge_chunk", "id": 9, "knowledge_document_id": 7, "title": "Carta"}
+    assert service._fill_internal_url(item)["url"] == "/knowledge?document=7"
+    assert "url" not in service._fill_internal_url({"type": "knowledge_chunk", "id": 10, "title": "Carta"})
+    stored = {"type": "knowledge_chunk", "id": 11, "title": "Carta", "url": "https://example.org/carta.pdf"}
+    assert service._fill_internal_url(stored)["url"] == stored["url"]
+
+
+def test_company_sources_carry_openable_urls(db):
+    company = _company(db)
+    db.add(FinancialFact(
+        company_id=company.id, metric="revenue", value=Decimal("1000000"),
+        unit="USD", period="2025-12-31:FY", fiscal_year=2025,
+        source_type="sec_xbrl",
+    ))
+    db.add(ThesisVersion(
+        company_id=company.id, version=3, status="published",
+        thesis_markdown="...", executive_summary="...", rating="watch",
+    ))
+    db.commit()
+    response = ChatService()._deterministic_answer(db, "AAPL ingresos y tesis", "company", "AAPL")
+    by_kind = {}
+    for source in response.sources:
+        by_kind.setdefault(source["type"], []).append(source)
+    assert by_kind["thesis_version"][0]["url"] == "/research/AAPL?view=thesis"
+    assert by_kind["financial_fact"][0]["url"] == "/research/AAPL?view=financials"
 
 
 def test_library_doctrine_not_cited_in_company_answers(db, monkeypatch):

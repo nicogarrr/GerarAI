@@ -4,10 +4,17 @@
  * no pueden exportar funciones síncronas.
  */
 
-/** Enlace interno de una fuente: la cartera o la ficha (con una vista permitida). Nunca otra ruta. */
+/**
+ * Enlace interno de una fuente: la cartera, la ficha (con una vista que abra
+ * contenido real) o el explorador de un documento de la biblioteca. Nunca otra
+ * ruta. `news` NO es vista válida: asView('news') cae en `overview` sin ancla;
+ * la vista de noticias es `noticias` (módulo anclado del Resumen).
+ */
 export function isInternalSourcePath(url: unknown): url is string {
     return typeof url === 'string'
-        && (url === '/portfolio' || /^\/research\/[A-Za-z0-9.%_-]+(?:\?view=(?:financials|thesis|news|valoracion))?$/.test(url));
+        && (url === '/portfolio'
+            || /^\/research\/[A-Za-z0-9.%_-]+(?:\?view=(?:financials|thesis|noticias|seguimiento|valoracion))?$/.test(url)
+            || /^\/knowledge\?document=[1-9][0-9]*$/.test(url));
 }
 
 export interface ChatSource {

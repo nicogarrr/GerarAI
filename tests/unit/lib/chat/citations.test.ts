@@ -1,9 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
-    citationKindLabel, citationKindLabelFor, toChatCitations, toPortfolioChatCitations,
-    type ChatSource,
+    citationKindLabel, citationKindLabelFor, isInternalSourcePath, toChatCitations,
+    toPortfolioChatCitations, type ChatSource,
 } from '@/lib/chat/citations';
+import { asView, canonicalViewUrl, viewAnchor } from '@/lib/research/research-views';
 
 describe('toChatCitations', () => {
     it('sin sources devuelve []', () => {
@@ -83,6 +84,37 @@ describe('toPortfolioChatCitations', () => {
     it('una fuente no-chunk conserva su título como documento y su tipo como source_type', () => {
         const [c] = toPortfolioChatCitations([{ type: 'position', id: 2, title: 'Posición SAN' }]);
         expect(c).toMatchObject({ chunk_id: 2, document: 'Posición SAN', page: null, locator: 'position:2', source_type: 'position', url: null });
+    });
+});
+
+describe('isInternalSourcePath: las vistas internas abren contenido real', () => {
+    it.each([
+        ['financials', 'financials'],
+        ['thesis', 'thesis'],
+        ['seguimiento', 'changes'],
+        ['valoracion', 'valuation'],
+    ])('admite ?view=%s → vista %s (nunca overview a secas)', (view, expected) => {
+        expect(asView(view)).toBe(expected);
+        expect(isInternalSourcePath(`/research/AAPL?view=${view}`)).toBe(true);
+    });
+
+    it('la vista de noticias es `noticias`, no `news` (que cae en overview sin ancla)', () => {
+        expect(asView('news')).toBe('overview');
+        expect(viewAnchor('news')).toBeUndefined();
+        expect(isInternalSourcePath('/research/AAPL?view=news')).toBe(false);
+        expect(toPortfolioChatCitations([{ type: 'news_event', id: 1, title: 'AAPL anuncia resultados', url: '/research/AAPL?view=news' }])[0].url).toBeNull();
+
+        // `noticias` es un módulo anclado del Resumen: abre la sección de noticias.
+        expect(viewAnchor('noticias')).toBe('noticias');
+        expect(canonicalViewUrl('AAPL', 'noticias')).toBe('/research/AAPL#noticias');
+        expect(isInternalSourcePath('/research/AAPL?view=noticias')).toBe(true);
+        expect(toPortfolioChatCitations([{ type: 'news_event', id: 1, title: 'AAPL anuncia resultados', url: '/research/AAPL?view=noticias' }])[0].url).toBe('/research/AAPL?view=noticias');
+    });
+
+    it('el explorador de fragmentos de la biblioteca es una ruta interna abrible', () => {
+        expect(isInternalSourcePath('/knowledge?document=42')).toBe(true);
+        expect(isInternalSourcePath('/knowledge?document=0')).toBe(false);
+        expect(toPortfolioChatCitations([{ type: 'knowledge_chunk', id: 1, title: 'Carta', url: '/knowledge?document=42' }])[0].url).toBe('/knowledge?document=42');
     });
 });
 
