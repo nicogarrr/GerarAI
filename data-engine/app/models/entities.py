@@ -762,6 +762,88 @@ class Schedule13DGFiling(TenantOwnedMixin, Base, TimestampMixin):
     error: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
 
+class Form144Notice(TenantOwnedMixin, Base, TimestampMixin):
+    """Aviso SEC Form 144 de venta PROPUESTA (Rule 144), fuente primaria.
+
+    Una fila inmutable por (tenant, accession), igual que ``InsiderFiling``:
+    las enmiendas (144/A) crean su propia fila y nunca sobrescriben el aviso
+    que corrigen. Un Form 144 es un AVISO de venta propuesta, NO una venta
+    ejecutada: nunca se agrega a las operaciones P/S del feed insider ni a
+    totales de venta. ``approx_sale_date`` es la fecha aproximada declarada
+    por el filer, no una fecha confirmada. Los campos que el parser no pudo
+    leer quedan NULL: la UI muestra N/D, nunca una cifra inventada.
+    """
+
+    __tablename__ = "form144_notices"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id", "accession_number", name="uq_form144_tenant_accession"
+        ),
+        Index("ix_form144_issuer", "issuer_cik"),
+        # El feed insider lista por tenant+ticker ordenando por filing_date.
+        Index(
+            "ix_form144_tenant_ticker_date",
+            "tenant_id",
+            "issuer_ticker",
+            "filing_date",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    accession_number: Mapped[str] = mapped_column(String(40))
+    form: Mapped[str] = mapped_column(String(10))
+    is_amendment: Mapped[bool] = mapped_column(Boolean, default=False)
+    issuer_cik: Mapped[str] = mapped_column(String(20))
+    issuer_ticker: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    issuer_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    seller_cik: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    seller_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    # Relacion(es) declarada(s) con el emisor: ["Director"], ["Officer"], ...
+    relationships: Mapped[list] = mapped_column(JSON, default=list)
+    broker_name: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    securities_class_title: Mapped[str | None] = mapped_column(String(160), nullable=True)
+    # Totales derivados de los bloques securitiesInformation: NULL si falta
+    # cualquier bloque (un subtotal no se publica como total).
+    shares_to_sell: Mapped[float | None] = mapped_column(Float, nullable=True)
+    aggregate_market_value: Mapped[float | None] = mapped_column(Float, nullable=True)
+    shares_outstanding: Mapped[float | None] = mapped_column(Float, nullable=True)
+    approx_sale_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    exchange: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    # Detalle completo declarado: bloques securitiesInformation,
+    # adquisiciones (como obtuvo los titulos) y ventas de los ultimos 3 meses.
+    securities: Mapped[list] = mapped_column(JSON, default=list)
+    acquisitions: Mapped[list] = mapped_column(JSON, default=list)
+    sales_past_3m: Mapped[list] = mapped_column(JSON, default=list)
+    nothing_to_report_past_3m: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    notice_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    # Fechas de adopcion de planes 10b5-1 declaradas en la firma del aviso.
+    plan_adoption_dates: Mapped[list] = mapped_column(JSON, default=list)
+    remarks: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filing_date: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    source_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    index_url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    raw_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    parser_version: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20), default="parsed")
+    error: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+
+class MigrationTableProvenance(Base):
+    """Marca create/adopt de migraciones con adopcion de tablas pre-creadas.
+
+    La escribe el upgrade de las migraciones con adopcion (0137 es la
+    primera) para que su downgrade sea no destructivo: solo retira la tabla
+    cuando consta que la migracion la creo. Debe estar en Base.metadata:
+    fuera de el, compare_metadata la proponia como remove_table (deriva).
+    """
+
+    __tablename__ = "migration_table_provenance"
+
+    revision: Mapped[str] = mapped_column(String(40), primary_key=True)
+    table_name: Mapped[str] = mapped_column(String(120), primary_key=True)
+    mode: Mapped[str] = mapped_column(String(10), nullable=False)
+
+
 class Document(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "documents"
     __table_args__ = (
