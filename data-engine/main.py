@@ -66,6 +66,28 @@ def _start_embedder_warmup(settings) -> None:
     threading.Thread(target=_run, name="embedder-warmup", daemon=True).start()
 
 
+def _start_pdf_warmup() -> None:
+    """Precalienta matplotlib en un hilo: el import es perezoso desde que el
+    arranque dejó de pagarlo (~4 s en frío por el escaneo de fuentes de
+    font_manager); sin este hilo, el primer PDF de un contenedor recién
+    desplegado pagaría esos ~4 s dentro de la petición y podría cruzar el
+    presupuesto de <5 s de la descarga. Fail-open: si falla, el primer PDF lo
+    paga, como antes de este cambio lo pagaba el arranque."""
+    import threading
+
+    def _run() -> None:
+        try:
+            import matplotlib.pyplot  # noqa: F401 - solo precalienta import y fuentes
+        except Exception as exc:  # noqa: BLE001 - el warmup jamas rompe el arranque
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "pdf matplotlib warmup skipped (%s: %s)", type(exc).__name__, exc
+            )
+
+    threading.Thread(target=_run, name="pdf-matplotlib-warmup", daemon=True).start()
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     from app.core.db_admission import request_gate
@@ -111,6 +133,7 @@ async def lifespan(_: FastAPI):
 
     if settings.app_env.lower() == "production":
         _start_embedder_warmup(settings)
+        _start_pdf_warmup()
         # Cestas de mercado en el mismo single-flight que las peticiones:
         # el primer usuario no paga las descargas tras reiniciar un proceso.
         from app.api.routes.market import start_themes_warmup
