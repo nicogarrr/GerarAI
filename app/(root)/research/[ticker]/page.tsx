@@ -65,6 +65,7 @@ import { e2eExtendedQuoteFixture } from '@/lib/e2e-extended-quote-fixture';
 import { MoatTerm } from '@/components/GlossaryTerm';
 import { MutationForm } from '@/components/forms/MutationForm';
 import { ResearchClaimForm } from '@/components/research/ResearchClaimForm';
+import { ClaimEvidenceList, safeHttpUrl } from '@/components/research/ClaimEvidenceList';
 // El input de subida (procesa imágenes en canvas) solo aparece en la vista de
 // documentos: carga diferido (ver FileUploadInputLazy) para que su JS no
 // viaje en la ficha inicial.
@@ -328,25 +329,6 @@ function label(value: string | null | undefined, locale: Locale = 'es'): string 
   if (value === null || value === undefined || value === '') return naFor(locale);
   if (locale === 'en') return STATUS_LABELS_EN[value] ?? RATING_LABELS_EN[value] ?? etiquetaValor(value, 'en');
   return STATUS_LABELS[value] ?? RATING_LABELS[value] ?? etiquetaValor(value);
-}
-
-/**
- * F249: source_url se persiste tal cual en varios caminos de ingesta, así
- * que no basta con que sea truthy: solo se enlaza una URL absoluta
- * http(s) con hostname. Cualquier otra cosa (javascript:, data:,
- * relativa, malformada) se queda como texto plano.
- */
-function safeHttpUrl(value: string | null | undefined): string | null {
-  if (!value) return null;
-  try {
-    const url = new URL(value);
-    if ((url.protocol === 'https:' || url.protocol === 'http:') && url.hostname) {
-      return url.toString();
-    }
-  } catch {
-    // malformada: texto plano
-  }
-  return null;
 }
 
 /** Definición metodológica del foso (glosario compartido) para pintarla en la card */
@@ -1486,8 +1468,9 @@ async function ResearchCompanyContent({ params, searchParams }: PageProps) {
                     key: `claim-${claim.id}`,
                     node: (
                       <div className="rounded-lg border border-gray-800 p-4">
-                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status, locale)}</Badge><Badge variant="outline">{t('research.fichaMaterialityLower', { score: claim.materiality_score })}</Badge><Badge variant="outline">{t('research.fichaEvidenceCount', { count: claim.evidence.length })}</Badge></div>
+                        <div className="flex flex-wrap gap-2"><Badge variant="outline">{label(claim.status, locale)}</Badge><Badge variant="outline">{t('research.fichaMaterialityLower', { score: claim.materiality_score })}</Badge></div>
                         <p className="mt-3 text-sm text-gray-300">{claim.statement}</p>
+                        <ClaimEvidenceList evidence={claim.evidence} locale={locale} t={t} />
                       </div>
                     ),
                   }))}
