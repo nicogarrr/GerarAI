@@ -387,3 +387,28 @@ def test_repeated_ticker_does_not_exhaust_company_limit(db, monkeypatch):
     response = asyncio.run(answer_live_question(db, "precio ASTS ASTS ASTS ASTS ASTS"))
     assert response is not None
     assert len(response.sources) == 1
+
+
+@pytest.mark.parametrize("question", [
+    "ASTS stock price",
+    "AAPL share price now",
+    "price AAPL",
+    "what is NVDA trading at",
+    "dame el valor de la acción de PLTR",
+])
+def test_price_phrasings_without_of_trigger_live_quote(question):
+    from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
+
+    assert _PRICE_ASK_RE.search(question) and not _PRICE_EXCLUDE_RE.search(question)
+
+
+@pytest.mark.parametrize("question", [
+    "what is the price target for ASTS",
+    "the price is too high, should I wait",
+    "stock price vs my cost basis",
+    "ASTS share price revenue growth",
+])
+def test_price_phrasings_do_not_hijack_stored_routes(question):
+    from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
+
+    assert not (_PRICE_ASK_RE.search(question) and not _PRICE_EXCLUDE_RE.search(question))
