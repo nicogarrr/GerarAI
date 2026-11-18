@@ -61,7 +61,7 @@ export default function ContributionSplitCard({ split }: { split: ContributionSp
                                     {allocations.map((row) => (
                                         <tr key={row.ticker}>
                                             <td className="py-2 pr-4">
-                                                <Link className="font-mono font-semibold text-teal-300 hover:text-teal-200" href={`/research/${encodeURIComponent(row.ticker)}`}>
+                                                <Link className="relative font-mono font-semibold text-teal-300 before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:text-teal-200" href={`/research/${encodeURIComponent(row.ticker)}`}>
                                                     {row.ticker}
                                                 </Link>
                                             </td>

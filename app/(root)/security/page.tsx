@@ -58,7 +58,7 @@ export default async function SecurityPage() {
                     {emailResetAvailable ? (
                         <p className="text-sm text-gray-400">
                             {t('security.page.forgotBefore')}{' '}
-                            <Link className="text-teal-300 hover:underline" href="/forgot-password">
+                            <Link className="relative text-teal-300 before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:underline" href="/forgot-password">
                                 {t('security.page.forgotLink')}
                             </Link>
                             .
