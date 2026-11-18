@@ -32,7 +32,7 @@ export default function DcaWatchCardToggle({ symbol }: { symbol: string }) {
         // línea de la empresa (lista compacta). Abierto, la tarjeta ocupa todo
         // el ancho debajo. (Decisión de diseño, 2026-11-14.)
         <div className={open ? 'w-full space-y-2' : undefined}>
-            <button type="button" aria-expanded={open} onClick={toggle} className="min-h-11 rounded border border-gray-700 px-2 py-1 text-[11px] text-gray-300 hover:border-gray-500">
+            <button type="button" aria-expanded={open} onClick={toggle} className="min-h-11 rounded border border-gray-700 px-2 py-1 text-xs text-gray-300 hover:border-gray-500">
                 {t('watchlist.dcaCard.trigger')}
             </button>
             {open ? (pending || data === undefined ? <p className="text-xs text-gray-400" role="status">{t('watchlist.dcaCard.loading')}</p> : <DcaWatchCard data={data} ti={t} locale={locale} />) : null}

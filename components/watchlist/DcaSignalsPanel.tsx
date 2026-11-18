@@ -73,7 +73,7 @@ export default function DcaSignalsPanel({ data, unavailable, ti = esT, locale = 
                     </p>
                 ) : null}
                 <DcaAlertSettingsList items={data.items} />
-                <p className="text-[11px] text-gray-500">
+                <p className="text-xs text-gray-500">
                     {ti('watchlist.dca.panel.legend')}
                 </p>
             </div>
