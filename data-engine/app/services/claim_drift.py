@@ -26,6 +26,10 @@ DRIFT_WARNING_ES = "cifra desactualizada, regenerar"
 
 Key = tuple[str, str, str]
 
+#: Fuentes que no son datos reales (mismo criterio que data_health_service): un
+#: hecho sembrado o de prueba nunca puede ser el "hecho vivo" que desmiente una tesis.
+NOT_SOURCE_TYPES = ("seed", "manual", "test", "dummy", "placeholder")
+
 
 def _number(value: Any) -> float | None:
     if isinstance(value, bool):
@@ -153,6 +157,7 @@ def thesis_claim_drift(db: Session, thesis: Any) -> list[dict[str, Any]]:
         FinancialFact.metric.in_({m["claim_metric"] for m in metas}),
         FinancialFact.period.in_({m.get("claim_period") for m in metas if m.get("claim_period")}),
         FinancialFact.unit.in_({m.get("claim_unit") for m in metas if m.get("claim_unit")}),
+        FinancialFact.source_type.not_in(NOT_SOURCE_TYPES),
     )
     if tenant_id is not None:
         fact_stmt = fact_stmt.where(FinancialFact.tenant_id == tenant_id)
