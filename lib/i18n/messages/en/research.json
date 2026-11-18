@@ -2277,7 +2277,7 @@
   },
   "astsBankSupplement": {
     "title": "ASTS: external scenario attributed to Deutsche Bank",
-    "warning": "Deutsche Bank estimate [not verified against the original report]. Figures were received as a text transcription of a screenshot of a tweet; the screenshot is unavailable for comparison and the table has not been visually checked. These are not actual results, consensus or company guidance. It does not change GerarAI valuation.",
+    "warning": "Transcription visually checked on 15 Nov 2026 against the supplied screenshot. Estimates attributed to Deutsche Bank, not verified against the original report. These are not actual results, consensus or company guidance. It does not change GerarAI valuation.",
     "dates": "Received on 15 Nov 2026. Original report date: unknown. The social aggregator dates the matching text to 15 Nov 2026 at 12:30 UTC; it does not verify the table or the bank report.",
     "table": "Figure 3: ASTS Model Summary (transcription). Amounts in USD millions; satellites in units. 2026E-2030E are estimates. 2025 is a table reference not verified against actual results.",
     "revenue": "Revenue",
@@ -2285,7 +2285,6 @@
     "fcf": "Free cash flow",
     "capex": "Capex",
     "satellites": "Cumulative commercial satellites",
-    "missing": "Not transcribed",
     "ramp": "The scenario attributed to the bank reaches USD 4,490.3 million revenue and an 80.3% adjusted EBITDA margin in 2030. Government and other contracts would represent about 73% of 2027 revenue; commercial subscriptions would accelerate in 2028.",
     "funding": "According to the tweet text, existing cash, J-LEO support and planned financing could cover about USD 4,600 million of modeled cash burn before positive FCF in 2029. This is a funding assumption, not secured capital; execution, dilution and funding risks remain.",
     "blacklift": "Blacklift: the AST SpaceMobile release dated 6 Nov 2026 describes a rocket designed to carry up to five BlueBirds per launch starting in late 2028. This is a development plan, not a demonstrated operational capability.",

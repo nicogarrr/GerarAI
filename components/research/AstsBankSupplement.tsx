@@ -27,7 +27,7 @@ export function AstsBankSupplement({ ticker, locale, t }: { ticker: string; loca
               {fields.map(([field, label]) => (
                 <div key={field} className="flex justify-between gap-4">
                   <dt className="min-w-0 text-gray-400">{label}</dt>
-                  <dd className="shrink-0 tabular-nums">{row[field] === null ? t('research.astsBankSupplement.missing') : field === 'satellites' ? row[field] : number.format(row[field])}</dd>
+                  <dd className="shrink-0 tabular-nums">{field === 'satellites' ? row[field] : number.format(row[field])}</dd>
                 </div>
               ))}
             </dl>
