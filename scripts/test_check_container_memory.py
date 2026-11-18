@@ -75,12 +75,13 @@ class ContainerMemoryTests(unittest.TestCase):
         self.assertEqual(r.returncode, 1)
         self.assertIn('OOMKilled=true', r.stdout)
 
-    def test_bucle_de_reinicios_alerta(self):
-        # v2: Restarting=true (bucle AHORA) con RestartCount de contexto.
+    def test_restarting_alerta_reinicio_en_curso(self):
+        # v2: Restarting=true (reinicio en este instante) con RestartCount
+        # de contexto; el mensaje no afirma un bucle (ajuste del auditor).
         r = self.run_case(stats='cavaai-worker;10.00%\n',
                           inspect='cavaai-worker false true 7\n')
         self.assertEqual(r.returncode, 1)
-        self.assertIn('bucle de reinicios', r.stdout)
+        self.assertIn('se esta reiniciando en este instante', r.stdout)
         self.assertIn('7', r.stdout)
 
     def test_stats_fallido_es_error_visible_no_ok(self):

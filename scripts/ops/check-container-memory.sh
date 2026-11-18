@@ -6,10 +6,10 @@
 # often" tambien se observo a mano. Nada mide la memoria por contenedor.
 # Este chequeo sale con codigo 1 si algun contenedor supera el umbral de
 # memoria MEDIDA (docker stats, porcentaje sobre su limite), si algun
-# contenedor lleva la marca OOMKilled o si esta en bucle de reinicios
-# (State.Restarting=true en docker inspect: el daemon lo esta levantando una
-# y otra vez AHORA MISMO), e imprime una linea por hallazgo para que un cron
-# la mande por el canal de alertas. SOLO LEE: docker stats / docker ps /
+# contenedor lleva la marca OOMKilled o si se esta reiniciando en este
+# instante (State.Restarting=true en docker inspect: acredita el reinicio
+# actual, no un bucle probado), e imprime una linea por hallazgo para que un
+# cron la mande por el canal de alertas. SOLO LEE: docker stats / docker ps /
 # docker inspect. Nunca reinicia nada.
 #
 # Veracidad (v2, tras auditoria): un docker que FALLA no es un host sano. Si
@@ -71,9 +71,9 @@ done <<< "${stats_out}"
 # Estado por contenedor via docker inspect: OOMKilled (lo que el daemon
 # declara en el estado actual del contenedor; su persistencia tras un
 # reinicio automatico NO esta medida en este carril, no se afirma),
-# Restarting (bucle de reinicios en curso) y RestartCount (reinicios
-# acumulados medidos; es un acumulado historico, no un bucle: se reporta
-# como contexto en las lineas de alerta, no se umbralea).
+# Restarting (reiniciandose en este instante; acredita el reinicio actual,
+# no un bucle probado) y RestartCount (reinicios acumulados medidos; es un
+# acumulado historico: se reporta como contexto, no se umbralea).
 if ! ids=$(docker ps -aq 2>&1); then
   echo "[mem] ERROR: no se pudo medir la lista de contenedores (docker ps fallo): ${ids}"
   fail=1
@@ -96,12 +96,12 @@ while read -r nombre oom restarting restarts; do
     fail=1
   fi
   if [ "${restarting}" = "true" ]; then
-    echo "[mem] ALERTA: ${nombre} esta en bucle de reinicios AHORA (Restarting=true; reinicios acumulados medidos: ${restarts})"
+    echo "[mem] ALERTA: ${nombre} se esta reiniciando en este instante (Restarting=true; RestartCount=${restarts}, historico acumulado)"
     fail=1
   fi
 done <<< "${ooms}"
 
 if [ "${fail}" -eq 0 ]; then
-  echo "[mem] OK: ${vigilados} contenedores vigilados bajo el umbral, sin OOMKilled ni bucles de reinicio"
+  echo "[mem] OK: ${vigilados} contenedores vigilados bajo el umbral, sin OOMKilled ni reinicios en curso"
 fi
 exit "${fail}"
