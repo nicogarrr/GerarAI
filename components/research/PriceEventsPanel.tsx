@@ -37,7 +37,11 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
                     {shown.map((event) => (
                         <li key={event.id} className="rounded-md border border-gray-800 px-2 py-1.5 text-xs">
                             <div className="flex flex-wrap items-baseline gap-2">
-                                <button type="button" onClick={() => onFocus(event.date)} className="tabular-nums text-gray-400 underline-offset-2 hover:underline" title={t('research.chart.showOnChart')}>{formatMarketDate(event.date)}</button>
+                                {/* Táctil móvil 44px: mismo patrón que el enlace de fuente de la propia fila
+                                    (min-h-11 real, no pseudo — la fila envuelve y los vecinos son interactivos).
+                                    Medido en prod 18-nov-2026 a 320px: botón de fecha de 16px de alto.
+                                    sm:min-h-0 devuelve el ritmo denso de escritorio. */}
+                                <button type="button" onClick={() => onFocus(event.date)} className="inline-flex min-h-11 min-w-11 items-center tabular-nums text-gray-400 underline-offset-2 hover:underline sm:min-h-0 sm:min-w-0" title={t('research.chart.showOnChart')}>{formatMarketDate(event.date)}</button>
                                 <span className="rounded px-1 text-xs font-semibold" style={{ color: EVENT_KINDS[event.kind].color }}>{t(EVENT_KIND_KEYS[event.kind])}</span>
                                 {/* basis-full en móvil: el titular baja a su propia línea a todo lo
                                     ancho. Con flex-1 a secas se quedaba con el hueco que dejaban
@@ -45,7 +49,7 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
                                     línea, ilegible. Desde sm vuelve al comportamiento en línea. */}
                                 <span className="min-w-0 flex-1 basis-full text-gray-200 sm:basis-auto">{event.title}</span>
                                 {event.source_url ? <a href={event.source_url} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-xs text-gray-500 underline sm:min-h-0 sm:min-w-0">{event.source}</a> : <span className="text-xs text-gray-500">{event.source}</span>}
-                                {event.detail && !visibleDetail(event) ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="text-xs text-gray-500 hover:text-gray-200">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
+                                {event.detail && !visibleDetail(event) ? <button type="button" aria-expanded={open === event.id} onClick={() => setOpen(open === event.id ? null : event.id)} className="inline-flex min-h-11 min-w-11 items-center text-xs text-gray-500 hover:text-gray-200 sm:min-h-0 sm:min-w-0">{open === event.id ? t('research.chart.less') : t('research.chart.detail')}</button> : null}
                             </div>
                             {event.detail && (visibleDetail(event) || open === event.id) ? <p className="mt-1 whitespace-pre-line text-gray-400">{event.detail}</p> : null}
                         </li>
