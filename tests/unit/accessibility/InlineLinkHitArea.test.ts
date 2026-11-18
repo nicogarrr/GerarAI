@@ -55,6 +55,12 @@ describe('zona táctil de enlaces inline', () => {
         );
     });
 
+    it('los cobradores del flujo de /temas amplían su zona con el pseudo-elemento (20 px medidos en prod, 18-nov)', () => {
+        const s = src('app/(root)/temas/_components/ThemeFlow.tsx');
+        expect(s).toMatch(/relative text-sm font-semibold text-teal-300 before:absolute before:-inset-3\.5/);
+        expect(s).not.toContain('className="text-sm font-semibold text-teal-300 hover:text-teal-200"');
+    });
+
     it('cada evidencia de valoración enlaza a su fuente con la fila entera a 32 px, sin solapar vecinas', () => {
         const s = src('components/research/ValuationSummaryGrid.tsx');
         expect(s).toContain('className="-mx-1 flex min-h-8 w-full items-center rounded px-1 underline"');
