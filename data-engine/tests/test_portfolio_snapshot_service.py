@@ -370,16 +370,17 @@ def test_relink_respeta_fotos_solo_posiciones(db):
     company = _company(db)
     portfolio, _ = _portfolio_positions(db, company, as_of=TODAY)
     older = TODAY - timedelta(days=2)
-    for day, meta in [
-        (older, {}),
-        (YESTERDAY, {"positions_only": True}),
-        (TODAY, {}),
+    for day, meta, daily, twr in [
+        (older, {}, None, None),
+        (YESTERDAY, {"positions_only": True}, Decimal("0.01"), Decimal("0.02")),
+        (TODAY, {}, None, None),
     ]:
         db.add(PortfolioDailySnapshot(
             portfolio_id=portfolio.id, snapshot_date=day,
             base_currency="EUR", positions_value_base=Decimal("100"),
             cash_value_base=Decimal("0"), total_value_base=Decimal("100"),
             pricing_coverage=Decimal("1"), metadata_=meta,
+            daily_return=daily, cumulative_twr=twr,
         ))
     db.commit()
 
@@ -389,9 +390,11 @@ def test_relink_respeta_fotos_solo_posiciones(db):
         s.snapshot_date: s
         for s in db.scalars(select(PortfolioDailySnapshot)).all()
     }
-    # La solo-posiciones no se toca.
+    # La solo-posiciones no se toca: su cadena la calcula twr_rebuild y el
+    # relink no borra su retorno (mata el mutante que quita el continue).
     assert rows[YESTERDAY].metadata_ == {"positions_only": True}
-    assert rows[YESTERDAY].daily_return is None
+    assert rows[YESTERDAY].daily_return == Decimal("0.01")
+    assert rows[YESTERDAY].cumulative_twr == Decimal("0.02")
     # La real tras ella: declarada base nueva tras cambio de alcance, sin
     # retorno contra la foto solo-posiciones.
     assert rows[TODAY].metadata_["twr_base_after_scope_change"] is True
