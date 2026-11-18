@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import os
 import re
 from datetime import date
@@ -40,6 +41,7 @@ from app.services.brain_service import (
     small_talk_answer,
 )
 from app.services.chat_synthesis_service import ChatSynthesisService
+from app.services.claim_drift import drift_notice_es, thesis_claim_drift
 from app.services.claim_scope import latest_thesis_version, live_claims
 from app.services.company_catalog import all_companies
 from app.services.company_resolver import KNOWN_MARKET_SUFFIXES, resolve_company
@@ -49,6 +51,8 @@ from app.services.portfolio_fx_service import PortfolioFXService
 from app.services.position_value import position_base_value
 from app.services.source_hierarchy_service import source_tier_key
 from app.services.thesis_publication_gate import archived_thesis_notice, thesis_withheld_reason
+
+logger = logging.getLogger(__name__)
 
 # Los nombres son los que persiste la ingesta (financial_ingestion_service):
 # el efectivo se guarda como "cash_and_equivalents"; pedir "cash" aqui dejaba
@@ -666,6 +670,19 @@ def _company_margin_answer(db: Session, company: Company) -> str:
     )
 
 
+def _thesis_drift_items(db: Session, thesis: ThesisVersion | None, withheld: str | None) -> list[dict]:
+    """Cifras de la tesis que ya no coinciden con el hecho vivo (lectura acotada a
+    las claves de sus claims). Con la tesis retenida no se mide ni se cita nada.
+    Un fallo de lectura no rompe la respuesta: sin aviso, con registro."""
+    if thesis is None or withheld:
+        return []
+    try:
+        return thesis_claim_drift(db, thesis)
+    except Exception:  # noqa: BLE001 - el aviso es accesorio; la respuesta no depende de el
+        logger.warning("thesis_drift_failed thesis=%s", getattr(thesis, "id", None), exc_info=True)
+        return []
+
+
 def _natural_company_answer(
     *,
     company: Company,
@@ -681,6 +698,7 @@ def _natural_company_answer(
     question: str = "",
     thesis_withheld: str | None = None,
     margin_line: str | None = None,
+    thesis_drift_items: list[dict] | None = None,
 ) -> str:
     """Respuesta visible: prosa natural en castellano.
 
@@ -741,6 +759,11 @@ def _natural_company_answer(
             f"Tengo guardada la tesis v{thesis.version}"
             + (f" ({', '.join(detalles)})." if detalles else ".")
         )
+        # Avisar (no ocultar) si una cifra de la tesis ya no coincide con el dato vivo.
+        # La deriva se mide fuera con los hechos de las claves de los claims de la
+        # tesis (_thesis_drift_items): `facts` aqui es solo el ultimo hecho por metrica.
+        if thesis_drift_items:
+            thesis_line += " " + drift_notice_es(thesis_drift_items, _METRIC_LABELS_ES)
         parts.append(thesis_line)
     seen_notes: set[str] = set()
     for content in (memory_notes or [])[:3]:
@@ -4630,6 +4653,7 @@ class ChatService:
                 question=question,
                 thesis_withheld=withheld_reason,
                 margin_line=margin_line,
+                thesis_drift_items=_thesis_drift_items(db, thesis, withheld_reason),
             )
 
             holding_sources, holding_lines, holding_citations = self._holding_context(db, company)
