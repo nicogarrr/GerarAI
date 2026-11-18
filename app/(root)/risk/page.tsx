@@ -48,7 +48,7 @@ export default async function RiskPage() {
                         <p>{t('risk.methodology.noRiskMeasures')}</p>
                         <p>
                             {t('risk.methodology.detailPre')}
-                            <Link className="text-teal-300 hover:text-teal-200" href="/portfolio/intelligence">{t('risk.methodology.linkIntelligence')}</Link>
+                            <Link className="relative text-teal-300 before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:text-teal-200" href="/portfolio/intelligence">{t('risk.methodology.linkIntelligence')}</Link>
                             {t('risk.methodology.detailPost')}
                         </p>
                     </MethodologyDisclosure>

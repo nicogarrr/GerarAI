@@ -251,7 +251,7 @@ function positionLink(position: DataRecord) {
         return (
             <Link
                 href={href}
-                className="font-mono font-bold text-teal-300 hover:text-teal-200 hover:underline"
+                className="relative font-mono font-bold text-teal-300 before:absolute before:-inset-x-1 before:-inset-y-2 before:content-[''] hover:text-teal-200 hover:underline"
             >
                 {label}
             </Link>

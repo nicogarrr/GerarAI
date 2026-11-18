@@ -60,7 +60,7 @@ export function CompanyCard({ company }: { company: InsiderOperationsCompany }) 
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Link
                     href={`/insider?ticker=${encodeURIComponent(company.ticker)}`}
-                    className="font-mono text-base font-bold text-teal-300 hover:text-teal-200 hover:underline"
+                    className="relative font-mono text-base font-bold text-teal-300 before:absolute before:-inset-x-1.5 before:-inset-y-2 before:content-[''] hover:text-teal-200 hover:underline"
                 >
                     {company.ticker}
                 </Link>

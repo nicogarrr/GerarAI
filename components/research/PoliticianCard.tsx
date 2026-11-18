@@ -52,7 +52,7 @@ export function PoliticianCardView({ card, locale = DEFAULT_LOCALE }: { card: Po
           <p className="text-xs text-gray-500">{t('insider.politicians.topTickers')}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
             {card.top_tickers.map((tk) => (
-              <Link className="rounded border border-gray-800 px-2 py-0.5 text-xs text-gray-200 hover:border-teal-700" href={`/research/${encodeURIComponent(tk.ticker)}?view=seguimiento#politicos`} key={tk.ticker}>
+              <Link className="inline-flex min-h-8 items-center rounded border border-gray-800 px-2 py-0.5 text-xs text-gray-200 hover:border-teal-700" href={`/research/${encodeURIComponent(tk.ticker)}?view=seguimiento#politicos`} key={tk.ticker}>
                 {tk.ticker} <span className="text-gray-500">{tk.trades}</span>
               </Link>
             ))}
