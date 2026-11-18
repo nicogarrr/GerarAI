@@ -97,8 +97,16 @@ def _submissions(forms, accessions):
 
 def test_10k_url_none_sin_formulario_10k():
     # Solo 10-Q: la rama `form != "10-K"` continua y agota el bucle.
-    fetch_json = lambda url: _submissions(["10-Q"], ["0001-25-000001"])  # noqa: E731
+    calls = []
+
+    def fetch_json(url):
+        calls.append(url)
+        return _submissions(["10-Q"], ["0001-25-000001"])
+
     assert svc._latest_10k_instance_url("1", fetch_json) is None
+    # Mutante: quitar el filtro de formulario haria una 2a llamada pidiendo
+    # el indice del 10-Q. Solo submissions debe llamarse, una vez.
+    assert len(calls) == 1 and "submissions" in calls[0]
 
 
 def test_10k_url_none_sin_instancia_htm_en_el_indice():
@@ -139,10 +147,12 @@ def test_eps_backfill_sin_hechos_dimensionados_no_escribe_nada(db):
 
 
 def test_class_cover_candidates_excluye_portada_fresca_y_sin_cik(db):
+    # Insercion FUERA de orden alfabetico: sin .order_by(Company.ticker)
+    # SQLite devuelve por rowid y el mutante sobrevive (medido).
+    _company(db, "DSINHECHOS", "0004")
     stale = _company(db, "ASTALE", "0002")
     fresh = _company(db, "BFRESH", "0003")
     _company(db, "CNOSIN", None)  # sin CIK: nunca candidata
-    _company(db, "DSINHECHOS", "0004")
     db.add(FinancialFact(
         company_id=fresh.id, metric="shares_outstanding", value=Decimal("100"),
         unit="shares", period="2026-11-01:DEI", fiscal_year=2026,
@@ -160,8 +170,16 @@ def test_class_cover_candidates_excluye_portada_fresca_y_sin_cik(db):
 
 
 def test_latest_instance_url_none_sin_formulario_listado():
-    fetch_json = lambda url: _submissions(["8-K"], ["0001-25-000001"])  # noqa: E731
+    calls = []
+
+    def fetch_json(url):
+        calls.append(url)
+        return _submissions(["8-K"], ["0001-25-000001"])
+
     assert svc._latest_instance_url("1", fetch_json) is None
+    # Mutante: quitar el filtro de formularios haria una 2a llamada pidiendo
+    # el indice del 8-K. Solo submissions debe llamarse, una vez.
+    assert len(calls) == 1 and "submissions" in calls[0]
 
 
 def test_latest_instance_url_none_sin_htm_en_el_indice():
