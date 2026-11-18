@@ -337,3 +337,64 @@ def test_capture_default_date_is_madrid_not_utc(db, monkeypatch):
     snapshot = snapshot_module.PortfolioSnapshotService().capture(db)
     assert snapshot.snapshot_date == madrid_today
     assert snapshot.pricing_coverage == Decimal("1")
+
+
+def test_history_y_count_sin_cartera_y_con_paginacion(db):
+    """count_history/history: sin cartera 0 y [] honestos; con cartera,
+    filtro start, pagina, offset explicito y ventana entera (page_size=None)."""
+    service = PortfolioSnapshotService()
+    assert service.count_history(db) == 0
+    assert service.history(db) == []
+
+    company = _company(db)
+    _portfolio_positions(db, company, as_of=TODAY)
+    service.capture(db, as_of=YESTERDAY)
+    service.capture(db, as_of=TODAY)
+
+    assert service.count_history(db) == 2
+    assert service.count_history(db, start=TODAY) == 1
+    whole = service.history(db, page_size=None)
+    assert [s.snapshot_date for s in whole] == [YESTERDAY, TODAY]
+    assert [s.snapshot_date for s in service.history(db, page=1, page_size=1)] == [YESTERDAY]
+    assert [s.snapshot_date for s in service.history(db, page=2, page_size=1)] == [TODAY]
+    # offset explicito gana a la pagina derivada.
+    assert [s.snapshot_date for s in service.history(db, page=1, page_size=1, offset=1)] == [TODAY]
+    assert [s.snapshot_date for s in service.history(db, start=TODAY, page_size=None)] == [TODAY]
+
+
+def test_relink_respeta_fotos_solo_posiciones(db):
+    """_relink_following: una foto solo-posiciones (twr_rebuild) no se
+    relinkea (continue) y la siguiente foto real queda declarada base de
+    tramo nuevo tras el cambio de alcance, sin retorno fabricado."""
+    service = PortfolioSnapshotService()
+    company = _company(db)
+    portfolio, _ = _portfolio_positions(db, company, as_of=TODAY)
+    older = TODAY - timedelta(days=2)
+    for day, meta in [
+        (older, {}),
+        (YESTERDAY, {"positions_only": True}),
+        (TODAY, {}),
+    ]:
+        db.add(PortfolioDailySnapshot(
+            portfolio_id=portfolio.id, snapshot_date=day,
+            base_currency="EUR", positions_value_base=Decimal("100"),
+            cash_value_base=Decimal("0"), total_value_base=Decimal("100"),
+            pricing_coverage=Decimal("1"), metadata_=meta,
+        ))
+    db.commit()
+
+    service._relink_following(db, portfolio.id, older)
+
+    rows = {
+        s.snapshot_date: s
+        for s in db.scalars(select(PortfolioDailySnapshot)).all()
+    }
+    # La solo-posiciones no se toca.
+    assert rows[YESTERDAY].metadata_ == {"positions_only": True}
+    assert rows[YESTERDAY].daily_return is None
+    # La real tras ella: declarada base nueva tras cambio de alcance, sin
+    # retorno contra la foto solo-posiciones.
+    assert rows[TODAY].metadata_["twr_base_after_scope_change"] is True
+    assert rows[TODAY].metadata_["twr_blocked_by_scope_change"] is True
+    assert rows[TODAY].daily_return is None
+    assert rows[TODAY].cumulative_twr is None
