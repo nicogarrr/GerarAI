@@ -9,7 +9,7 @@ def test_pb_cap_is_recorded_not_hidden():
     assert [(c["scenario"], c["bound"]) for c in caps] == [("bull", "ceiling"), ("bear", "floor")]
     warnings = _cap_warnings(caps)
     assert [w["code"] for w in warnings] == ["pb_cap_applied", "pb_cap_applied"]
-    assert "5.00x" in warnings[0]["detail"] and "techo" in warnings[0]["detail"]
+    assert "5,00x" in warnings[0]["detail"] and "techo" in warnings[0]["detail"]
     assert "suelo" in warnings[1]["detail"]
 
 
@@ -34,3 +34,11 @@ def test_reit_nav_floor_and_cap_rate_floor_are_warned():
     assert ("nav_floored_at_zero", "bull") not in codes
     assert ("cap_rate_floor_applied", "bull") in codes
     assert reit_nav_warnings({"base": (200.0, 0.05)}, 100.0, 0.05) == []
+
+
+def test_spanish_number_format():
+    from app.valuation.engines.sector_specific import _es
+
+    assert _es(1234567.891, 0) == "1.234.568"
+    assert _es(-5000.0, 0) == "-5.000"
+    assert _es(5.0) == "5,00"

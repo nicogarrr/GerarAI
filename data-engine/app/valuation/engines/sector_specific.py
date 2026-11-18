@@ -514,6 +514,12 @@ def _probabilities(values: list[SourcedValue], directional_quality: float = 0.0)
     return {"bear": tail - bull, "base": base, "bull": bull}
 
 
+def _es(value: float, decimals: int = 2) -> str:
+    """Formato es-ES: punto de millares y coma decimal."""
+    text = f"{value:,.{decimals}f}"
+    return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+
+
 PB_FLOOR = 0.25
 PB_CEILING = 3.0
 
@@ -539,7 +545,7 @@ def _cap_warnings(caps: list[dict]) -> list[dict]:
             "code": "pb_cap_applied",
             "scenario": cap["scenario"],
             "detail": (
-                f"P/B justificado {cap['raw_pb']:.2f}x acotado a {cap['applied_pb']:.2f}x "
+                f"P/B justificado {_es(cap['raw_pb'])}x acotado a {_es(cap['applied_pb'])}x "
                 f"({'suelo' if cap['bound'] == 'floor' else 'techo'} del modelo)."
             ),
         }
@@ -557,7 +563,7 @@ def reit_nav_warnings(specs: dict, net_debt: float, base_cap_rate: float) -> lis
                 {
                     "code": "nav_floored_at_zero",
                     "scenario": name,
-                    "detail": f"NAV por deuda neta superior a los activos ({raw_nav:,.0f}) mostrado como 0.",
+                    "detail": f"NAV por deuda neta superior a los activos ({_es(raw_nav, 0)}) mostrado como 0.",
                 }
             )
     if "bull" in specs and specs["bull"][1] == 0.001 and base_cap_rate - 0.005 < 0.001:
