@@ -56,6 +56,34 @@ for COLL in "${COLLECTIONS[@]}"; do
   fi
   mv "${OUT}.part" "${OUT}"
   echo "[qdrant-snapshot] OK ${COLL}: $(wc -c < "${OUT}") bytes"
+  # El snapshot se crea en el disco del SERVIDOR Qdrant: si no se borra, el
+  # cron diario llena el volumen (hallazgo de FAV, 18-nov-2026). Solo se borra
+  # despues de descargarlo y verificarlo; si la descarga fallo, queda en el
+  # servidor para diagnostico (y la retencion de mas abajo lo acota).
+  if ! curl -fsS -X DELETE "${API}/collections/${COLL}/snapshots/${SNAP_NAME}"; then
+    echo "[qdrant-snapshot] ERROR: no se pudo borrar el snapshot del servidor (${COLL}/${SNAP_NAME}); la copia local esta a salvo pero el disco del servidor crece"
+    fail=1
+  fi
+done
+
+# Retencion TAMBIEN en el servidor: los restos de borrados fallidos no pueden
+# acumularse sin limite. Se conservan los KEEP mas recientes por coleccion
+# (los nombres llevan timestamp ISO: el orden alfabetico es el cronologico).
+for COLL in "${COLLECTIONS[@]}"; do
+  LIST_JSON="$(curl -fsS "${API}/collections/${COLL}/snapshots")" || {
+    echo "[qdrant-snapshot] ERROR listando snapshots del servidor de ${COLL}"; fail=1; continue; }
+  mapfile -t SERVER_SNAPS < <(printf '%s' "${LIST_JSON}" | python3 -c 'import json,sys; [print(s["name"]) for s in sorted(json.load(sys.stdin)["result"], key=lambda s: s["name"])]')
+  EXTRAS=$(( ${#SERVER_SNAPS[@]} - KEEP ))
+  if [ "${EXTRAS}" -gt 0 ]; then
+    for OLD in "${SERVER_SNAPS[@]:0:${EXTRAS}}"; do
+      if curl -fsS -X DELETE "${API}/collections/${COLL}/snapshots/${OLD}"; then
+        echo "[qdrant-snapshot] servidor: borrado snapshot antiguo ${COLL}/${OLD}"
+      else
+        echo "[qdrant-snapshot] ERROR borrando snapshot antiguo ${COLL}/${OLD}"
+        fail=1
+      fi
+    done
+  fi
 done
 
 # Rotar solo si TODO salio bien: un fallo nunca purga copias buenas.
