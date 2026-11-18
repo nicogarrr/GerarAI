@@ -8,11 +8,24 @@ const m = vi.hoisted(() => ({
     start: vi.fn(),
     latest: vi.fn(),
     status: vi.fn(),
+    availabilityRefresh: vi.fn(),
 }));
 
 vi.mock('next/navigation', () => ({
     useRouter: () => m.router,
     useSearchParams: () => m.searchParams,
+}));
+// La puerta de disponibilidad de IA (main) deshabilita el botón si no se
+// puede generar: sin este mock el click no llega nunca a startThesisJob.
+vi.mock('@/components/ai/AiAvailabilityNotice', () => ({
+    useAiAvailability: () => ({
+        status: { feature: 'thesis', state: 'unverified', can_start: true, reason: 'not_probed', retry_after_seconds: null },
+        failed: false,
+        checking: false,
+        canStart: true,
+        refresh: m.availabilityRefresh,
+    }),
+    AiAvailabilityNotice: () => null,
 }));
 vi.mock('@/lib/actions/thesis-jobs.actions', () => ({
     startThesisJob: m.start,
@@ -47,6 +60,7 @@ function runningJob(): ThesisJobStatus {
 
 beforeEach(() => {
     vi.resetAllMocks();
+    m.availabilityRefresh.mockResolvedValue(true);
     m.latest.mockResolvedValue(null);
     m.start.mockResolvedValue(runningJob());
     m.status.mockResolvedValue(runningJob());
