@@ -70,7 +70,7 @@ jobs:
 
       # setup-python SOLO aporta el interprete 3.12; instalar lo hace uv, con
       # el lock (FIX-3.3/3.4). Sin `cache: pip` ni pins de herramientas: el
-      # lock trae ruff==0.17.0 y pyright==1.1.414 via el extra `dev`.
+      # lock trae ruff==0.17.4 y pyright==1.1.414 via el extra `dev`.
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7
         with:
           python-version: "3.12"

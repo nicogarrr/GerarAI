@@ -22,6 +22,10 @@ Backend (desde `data-engine/`): `uv sync --frozen --extra test --extra dev --no-
 `ruff check .`, `pyright` (0 errores; los warnings no bloquean y su número no se apunta a mano: caduca con cada PR), export de openapi y
 `APP_ENV=test pytest -q -p no:warnings`. En imagen slim sin `git` fallan 4 tests conocidos de
 `tests/test_repo_and_image_hygiene.py::test_market_data_paths_are_ignored`; cualquier otro fallo es tuyo.
+Nota: ese `pytest` es la comprobacion local MINIMA, no el comando de CI. La fuente de verdad es
+`.github/workflows/ci.yml` (y `coverage.yml` para cobertura): `backend` corre
+`pytest -n 2 --dist worksteal -m "not services" --durations=20` mas los pasos fail-closed de
+RAG activation, cuota de Redis y `run_financial_evals.py`. No reescribir los gates ni quitar los 4 tests conocidos.
 Dependencias: `requirements.txt` se genera con `scripts/sync_requirements.py --write`.
 Frontend: `npm run lint` y `npm run typecheck`.
 
