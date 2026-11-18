@@ -81,3 +81,32 @@ it('CLI exits nonzero and reports drift for an incompatible OpenAPI', () => {
     rmSync(root, { recursive: true, force: true });
   }
 }, 30_000);
+
+// --root debe aislar tambien el allowlist, no solo las fuentes.
+it('CLI uses the fixture allowlist and --no-allowlist still fails closed', () => {
+  const root = mkdtempSync(join(tmpdir(), 'contract-cli-allowlist-'));
+  try {
+    mkdirSync(join(root, 'lib'));
+    mkdirSync(join(root, 'scripts'));
+    const spec = join(root, 'openapi.json');
+    writeFileSync(spec, JSON.stringify({ paths: {} }));
+    writeFileSync(join(root, 'lib', 'fixture.ts'), `
+      declare function researchRequest(path: string): void;
+      researchRequest('/api/fixture-only');
+    `);
+    writeFileSync(join(root, 'scripts', 'contract-drift.allowlist.json'), JSON.stringify({
+      entries: [{ kind: 'ENDPOINT_NOT_IN_SPEC', endpoint: 'GET /api/fixture-only' }],
+    }));
+    const args = [resolve('scripts/contract-drift.mjs'), '--json', '--root', root, '--openapi', spec];
+    const allowed = spawnSync(process.execPath, args, { encoding: 'utf8', timeout: 30_000 });
+    expect(allowed.error).toBeUndefined();
+    expect(allowed.status).toBe(0);
+    expect(JSON.parse(allowed.stdout).summary).toMatchObject({ calls: 1, findings: 1, allowlisted: 1, open: 0 });
+    const strict = spawnSync(process.execPath, [...args, '--no-allowlist'], { encoding: 'utf8', timeout: 30_000 });
+    expect(strict.error).toBeUndefined();
+    expect(strict.status).toBe(1);
+    expect(JSON.parse(strict.stdout).summary).toMatchObject({ calls: 1, allowlisted: 0, open: 1 });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 30_000);
