@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+from unittest.mock import Mock, patch
+
 import pytest
 import sqlalchemy as sa
 from alembic.migration import MigrationContext
 from alembic.operations import Operations
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
+from sqlalchemy.exc import IntegrityError
 
+from app.models.entities import NewsEvent
+from app.services import form144_monitor, form144_news, form144_persistence
 from app.services.connectors import form144
 from tests.test_0137_form144_migration import _create_table, _load
-from tests.test_form144_connector import SLGN_XML as REAL_144_XML
+from tests.test_form144_monitor import REAL_144_XML, _db, _FakeClient
 
 
 def _create_table_nullable_flipped(conn):
@@ -169,5 +174,224 @@ def test_parse_helpers_never_invent():
     )
     assert totals["shares_to_sell"] == 10  # entero declarado: int
     assert form144.proposed_sale_totals({"securities": []})["shares_to_sell"] is None
+
+
+
+
+def test_normalize_cik_tolerant():
+    assert form144_monitor._normalize_cik("0000849869") == "849869"
+    assert form144_monitor._normalize_cik("ABC") == "ABC"
+
+
+def test_missing_cik_reported_and_status_error(monkeypatch):
+    db = _db()
+    monkeypatch.setattr(form144_monitor, "resolve_ciks", lambda *a, **k: {})
+    stats = form144_monitor.scan(db, tickers=["ZZT"], delay_seconds=0)
+    assert stats["tickers_scanned"] == 0
+    assert any("sin CIK SEC" in e for e in stats["errors"])
+    assert stats["status"] == "error"
+
+
+def test_zero_download_budget_stops_before_first_listing(monkeypatch):
+    db = _db()
+    listing = Mock(return_value=[])
+    monkeypatch.setattr(form144_monitor, "resolve_ciks", lambda *a, **k: {"ZZT": "1"})
+    monkeypatch.setattr(form144_monitor.form144_connector, "recent_form144_filings", listing)
+    stats = form144_monitor.scan(db, tickers=["ZZT"], max_new_fetches=0, delay_seconds=0)
+    assert listing.call_count == 0
+    assert any("presupuesto de descargas agotado" in e for e in stats["errors"])
+
+
+def test_zero_time_budget_stops_immediately(monkeypatch):
+    db = _db()
+    listing = Mock(return_value=[])
+    monkeypatch.setattr(form144_monitor, "resolve_ciks", lambda *a, **k: {"ZZT": "1"})
+    monkeypatch.setattr(form144_monitor.form144_connector, "recent_form144_filings", listing)
+    stats = form144_monitor.scan(db, tickers=["ZZT"], max_seconds=0, delay_seconds=0)
+    assert listing.call_count == 0
+    assert any("presupuesto de tiempo agotado" in e for e in stats["errors"])
+
+
+def test_listing_failure_is_per_ticker_and_continues(monkeypatch):
+    db = _db()
+    monkeypatch.setattr(form144_monitor, "resolve_ciks", lambda *a, **k: {"ZZT": "1", "AAA": "2"})
+
+    def boom(cik, **kwargs):
+        if cik == "1":
+            raise RuntimeError("sec down")
+        return []
+
+    monkeypatch.setattr(form144_monitor.form144_connector, "recent_form144_filings", boom)
+    stats = form144_monitor.scan(db, tickers=["AAA", "ZZT"], delay_seconds=0)
+    assert stats["tickers_listed"] == 2  # sigue con el siguiente emisor
+    assert any("ZZT: form144_list_error" in e for e in stats["errors"])
+    assert stats["status"] == "partial"
+
+
+def test_inner_download_budget_keeps_offset_on_partial_ticker(monkeypatch):
+    db = _db()
+    filings = [
+        {"accession_number": f"0000849869-26-0000{i:02d}", "form": "144", "filing_date": "2026-11-13",
+         "document_url": "https://www.sec.gov/Archives/edgar/data/849869/x/primary_doc.xml"}
+        for i in range(3)
+    ]
+    monkeypatch.setattr(form144_monitor, "resolve_ciks", lambda *a, **k: {"ZZT": "0000849869"})
+    monkeypatch.setattr(form144_monitor.form144_connector, "recent_form144_filings", lambda *a, **k: filings)
+    stats = form144_monitor.scan(
+        db, tickers=["ZZT"], max_new_fetches=1, delay_seconds=0, fetcher=lambda filing: REAL_144_XML
+    )
+    assert stats["filings_new"] == 1
+    assert stats["next_offset"] == 0  # el emisor a medias se rehace entero
+    assert any("presupuesto de descargas agotado" in e for e in stats["errors"])
+
+
+def test_real_download_path_without_fetcher(monkeypatch):
+    db = _db()
+    monkeypatch.setattr(
+        form144_monitor.form144_connector, "fetch_filing_xml", lambda url, client=None: REAL_144_XML
+    )
+    stats = form144_monitor.scan(db, client=_FakeClient(), delay_seconds=0)
+    assert stats["filings_new"] == 1
+
+
+def test_issuer_mismatch_rejected_and_delayed(monkeypatch):
+    db = _db()
+    hostile = REAL_144_XML.replace("<issuerCik>0000849869</issuerCik>", "<issuerCik>9999999999</issuerCik>")
+    sleeps: list[float] = []
+    stats = form144_monitor.scan(
+        db,
+        client=_FakeClient(),
+        fetcher=lambda filing: hostile,
+        delay_seconds=0.5,
+        sleeper=sleeps.append,
+    )
+    assert stats["filings_rejected"] == 1
+    assert sleeps == [0.5]
+    assert stats["filings_new"] == 0
+
+
+def test_filing_failure_is_best_effort(monkeypatch):
+    db = _db()
+
+    def boom(filing):
+        raise RuntimeError("xml roto")
+
+    stats = form144_monitor.scan(db, client=None, fetcher=boom, delay_seconds=0.01, sleeper=lambda s: None)
+    assert stats["filings_new"] == 0
+    assert any("form144_filing_error" in e for e in stats["errors"])
+    assert stats["status"] == "partial"
+
+
+def test_fatal_never_raises_and_stays_public_reason(monkeypatch):
+    db = _db()
+    monkeypatch.setattr(
+        form144_monitor, "resolve_ciks", Mock(side_effect=RuntimeError("redis url con secreto"))
+    )
+    stats = form144_monitor.scan(db, tickers=["ZZT"], delay_seconds=0)
+    assert stats["status"] == "error"
+    assert stats["errors"] == ["fatal: form144_scan_fatal"]
+    assert "secreto" not in str(stats)
+
+
+# ---------------- news ----------------
+
+_ARCH_URL = "https://www.sec.gov/Archives/edgar/data/849869/000084986926000005/primary_doc.xml"
+_FILING = {
+    "accession_number": "0000849869-26-000005",
+    "issuer_ticker": "ZZT",
+    "document_url": _ARCH_URL,
+    "filing_date": "2026-11-16",
+    "form": "144",
+}
+
+
+def test_news_rejects_invalid_identity(db=None):
+    db = _db()
+    assert form144_news.ensure_news(db, {**_FILING, "accession_number": "bad"})["reason"] == "invalid_identity"
+    other_url = "https://www.sec.gov/Archives/edgar/data/849869/000084986926000099/primary_doc.xml"
+    assert (
+        form144_news.ensure_news(db, {**_FILING, "document_url": other_url})["reason"]
+        == "invalid_identity"
+    )
+    assert (
+        form144_news.ensure_news(db, _FILING, parsed={"issuer_cik": "9999999"})["reason"]
+        == "issuer_mismatch"
+    )
+    assert (
+        form144_news.ensure_news(db, {**_FILING, "filing_date": "no-es-fecha"})["reason"]
+        == "invalid_date"
+    )
+    assert form144_news.ensure_news(db, {**_FILING, "issuer_ticker": "NOEXISTE"})["reason"] == (
+        "issuer_not_found"
+    )
+
+
+def test_news_summary_marks_10b5_plan():
+    db = _db()
+    parsed = {
+        "parsed_ok": True,
+        "issuer_cik": "0000849869",
+        "seller_name": "LEWIS ROBERT B",
+        "plan_adoption_dates": ["05/01/2026"],
+        "relationships": ["Director"],
+    }
+    out = form144_news.ensure_news(db, _FILING, parsed)
+    assert out["created"] is True
+    row = db.scalar(select(NewsEvent))
+    assert "10b5-1" in row.summary
+
+
+def test_news_update_keeps_previous_parsed_data():
+    db = _db()
+    good = {"parsed_ok": True, "issuer_cik": "0000849869", "seller_name": "LEWIS ROBERT B"}
+    assert form144_news.ensure_news(db, _FILING, good)["created"] is True
+    # Una re-ingesta sin parsear no pisa los datos parseados previos.
+    out = form144_news.ensure_news(db, _FILING, {"parsed_ok": False})
+    assert out["created"] is False
+    row = db.scalar(select(NewsEvent))
+    assert row.metadata_["proposed_sale"]["seller_name"] == "LEWIS ROBERT B"
+
+
+def test_news_identity_race_retries_once():
+    db = _db()
+    parsed = {"parsed_ok": True, "issuer_cik": "0000849869"}
+    assert form144_news.ensure_news(db, _FILING, parsed)["created"] is True
+    db.commit()  # sin pendientes: el flush parcheado solo se dispara en el reintento
+    original_flush = db.flush
+    calls = {"n": 0}
+
+    def flaky_flush(*args, **kwargs):
+        # autoflush invoca flush() en cada query aunque no haya nada pendiente:
+        # la carrera solo se simula cuando hay trabajo real que escribir.
+        if not (db.new or db.dirty):
+            return original_flush(*args, **kwargs)
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise IntegrityError("INSERT", {}, Exception("unique"))
+        return original_flush(*args, **kwargs)
+
+    with patch.object(db, "flush", flaky_flush):
+        out = form144_news.ensure_news(db, _FILING, parsed)
+    assert out["created"] is False  # gano la fila existente en el reintento
+
+
+# ---------------- persistence ----------------
+
+
+def test_persist_existing_filing_notifies_news_without_duplicate(monkeypatch):
+    db = _db()
+    parsed = form144.parse_form144_xml(REAL_144_XML)
+    filing = dict(_FILING)
+    first = form144_persistence.persist_filing(db, filing, parsed, raw_text=REAL_144_XML)
+    assert first["filing_created"] is True
+    seen = []
+    monkeypatch.setattr(
+        "app.services.form144_news.ensure_news",
+        lambda db, filing, payload, tenant_id=None: seen.append(payload) or {"created": False},
+    )
+    second = form144_persistence.persist_filing(db, filing, parsed, raw_text=REAL_144_XML)
+    assert second["filing_created"] is False
+    assert second["filing_id"] == first["filing_id"]
+    assert seen  # la noticia se recalcula sobre la fila existente
 
 

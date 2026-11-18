@@ -97,6 +97,7 @@ def insider_feed_route(
             "clusters": [],
             "c_suite_buys": [],
             "big_buys": [],
+            "proposed_sales": [],
         }
 
 
