@@ -61,10 +61,10 @@ function HomeFairValueHint({ holding, signals }: { holding: PortfolioHolding; si
     const { formatNumber, formatPercent } = useFormat();
     if (signals === null) return null;
     const fair = signals.fairValues[holding.symbol.toUpperCase()];
-    if (!fair) return <span className="text-[11px] text-gray-500">{t('home.fair.none')}</span>;
+    if (!fair) return <span className="text-xs text-gray-500">{t('home.fair.none')}</span>;
     const gap = fairValueGapPercent(holding.currentPrice, holding.nativeCurrency, fair);
     return (
-        <span className="whitespace-nowrap text-[11px] text-gray-400" title={t('home.fair.title', { label: fair.label })}>
+        <span className="whitespace-nowrap text-xs text-gray-400" title={t('home.fair.title', { label: fair.label })}>
             {t('home.fair.abbr')} {gap !== null ? formatPercent(gap, { fromRatio: false, digits: 0, signDisplay: 'always' }) : formatNumber(fair.value)}
             <span className="text-gray-500"> · {fair.source === 'tesis' ? t('home.fair.source.tesis') : fair.source === 'motor' ? t('home.fair.source.motor') : t('home.fair.source.orient')}</span>
         </span>
@@ -889,7 +889,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
                                                 </div>
                                                 <p className="text-xs text-gray-500 mt-2 text-right">{t('home.opportunities.fairUnknown', { na: NA, value: formatNumber(op.fairValue) })}</p>
                                                 {op.fairValueLabel ? (
-                                                    <p className="text-[11px] text-gray-500 mt-0.5 text-right">
+                                                    <p className="text-xs text-gray-500 mt-0.5 text-right">
                                                         {t('home.opportunities.source', { label: op.fairValueLabel })}{op.fairValueAsOf ? ` · ${formatMarketDate(op.fairValueAsOf)}` : ''}
                                                     </p>
                                                 ) : null}

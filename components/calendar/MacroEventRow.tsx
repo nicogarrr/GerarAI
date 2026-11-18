@@ -10,7 +10,7 @@ const esT: TiFn = t;
 
 /** Badge de calidad del dato (OFICIAL): se conserva; no es una etiqueta de fuente. */
 export function SourceBadge({ children }: { children: React.ReactNode }) {
-    return <span className="rounded border border-teal-400/30 px-1.5 py-0.5 text-[11px] font-semibold uppercase text-teal-300">{children}</span>;
+    return <span className="rounded border border-teal-400/30 px-1.5 py-0.5 text-xs font-semibold uppercase text-teal-300">{children}</span>;
 }
 
 /** Fila de evento macro. El enlace del documento lleva icono y aria genérico:

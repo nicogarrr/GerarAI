@@ -98,7 +98,7 @@ export default function PortfolioSummary({ summary }: Props) {
             )
           ) : null}
         </div>
-        <p className="text-gray-400 text-[11px] sm:text-xs uppercase tracking-normal sm:tracking-wider font-semibold mb-1">{ti('portfolio.summary.gainTitle')}</p>
+        <p className="text-gray-400 text-xs uppercase tracking-normal sm:tracking-wider font-semibold mb-1">{ti('portfolio.summary.gainTitle')}</p>
         <p className={`text-base min-[420px]:text-lg sm:text-2xl font-bold tracking-tight break-words ${noData ? 'text-gray-500' : isPositive ? 'text-good' : 'text-bad'}`}>
           {noData
             ? ti('common.na')
