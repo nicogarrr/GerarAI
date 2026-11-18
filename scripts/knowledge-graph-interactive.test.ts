@@ -129,7 +129,12 @@ export function checkInteractiveGraph(source: string): Violation[] {
     // son 200 elementos reconciliados por frame mientras se arrastra. Se
     // comprueba contra los nombres reales de los `setX` del fichero, no contra
     // un `/set[A-Z]/` generico que tambien casaria con `setAttribute`.
-    const applyViewport = source.match(/const applyViewport = useCallback\(([\s\S]*?)\n {4}\}, \[\]\);/);
+    // El cierre admite dependencias (`[t]` por i18n es legitimo): exigir
+    // `[]` hacia que la captura perezosa saltara al siguiente `}, []);` del
+    // fichero y recogiera setters ajenos (falso positivo del 18-nov tras
+    // #5943: `[t]` en applyViewport acuso setSize/setHoveredId/setCopyState/
+    // setPrevSelectedId, que viven en otros hooks).
+    const applyViewport = source.match(/const applyViewport = useCallback\(([\s\S]*?)\n {4}\}, \[[^\]\n]*\]\);/);
     if (!applyViewport) {
         found.push({ rule: 'rAF', message: 'no se encuentra applyViewport, la funcion que aplica la vista' });
     } else {
@@ -319,6 +324,53 @@ export default function Canvas() {
 `;
         const rules = checkInteractiveGraph(withState).map((violation) => violation.rule);
         assert.ok(rules.includes('sin-setstate'), 'escribir la vista en estado re-renderiza el grafo entero por frame');
+    });
+
+    it('detecta setState en applyViewport aunque el hook tenga dependencias', () => {
+        // El extractor no puede dejar de mirar el callback por llevar deps
+        // (regresion del falso positivo al reves: que `[t]` esconda un
+        // setState real).
+        const withStateAndDeps = `
+'use client';
+import { useState } from 'react';
+export default function Canvas() {
+    const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 });
+    const applyViewport = useCallback((next) => {
+        setViewport(next);
+    }, [t]);
+    return <div onPointerMove={applyViewport} />;
+}
+`;
+        const rules = checkInteractiveGraph(withStateAndDeps).map((violation) => violation.rule);
+        assert.ok(rules.includes('sin-setstate'), 'un setState real se detecta con deps no vacias');
+    });
+
+    it('no acusa a un applyViewport con dependencias legitimas y sin setState', () => {
+        // Replica la forma real tras #5943 (cierre `}, [t]);`): la captura
+        // tiene que parar en su propio cierre y no barrer setters de otros
+        // hooks del fichero.
+        const cleanWithDeps = `
+'use client';
+import { useState } from 'react';
+export default function Canvas() {
+    const [size, setSize] = useState({ w: 0, h: 0 });
+    useEffect(() => {
+        const ro = new ResizeObserver(() => setSize({ w: 1, h: 1 }));
+        ro.observe(document.body);
+    }, []);
+    const applyViewport = useCallback((next) => {
+        frameRef.current = window.requestAnimationFrame(() => {
+            layerRef.current?.setAttribute('transform', toSvgTransform(next));
+            zoomLabelRef.current.textContent = t('kg.zoom', { percent: 100 });
+        });
+    }, [t]);
+    return <div onPointerMove={applyViewport} />;
+}
+`;
+        const violations = checkInteractiveGraph(cleanWithDeps);
+        assert.ok(!violations.some((violation) => violation.rule === 'sin-setstate'), `falso positivo: ${JSON.stringify(violations)}`);
+        assert.ok(!violations.some((violation) => violation.rule === 'rAF'), 'el callback con deps se sigue encontrando');
+        assert.ok(!violations.some((violation) => violation.rule === 'transform'), 'la escritura del transform se reconoce');
     });
 
     it('detecta texto de UI en crudo entre etiquetas', () => {
