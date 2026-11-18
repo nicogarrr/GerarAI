@@ -973,6 +973,8 @@ class FinancialFact(TenantOwnedMixin, Base, TimestampMixin):
     __tablename__ = "financial_facts"
     __table_args__ = (
         Index("ix_financial_facts_company_metric_year", "company_id", "metric", "fiscal_year"),
+        # 0138: general snapshot counts by tenant and company.
+        Index("ix_facts_tenant_company_count", "tenant_id", "company_id"),
         # 0122: barrido perezoso (skip scan) del panel data-health / metric-coverage.
         Index(
             "ix_facts_health_src_cid",
