@@ -28,15 +28,33 @@ terminan con error explicito ANTES de tocar nada; no respaldan ni restauran
 Garage (ver `docs/MINIO_RETIREMENT.md`). Lo que sigue en esta seccion es el
 formato del flujo antiguo, conservado solo como referencia.
 
-Los flujos activos hoy son: `scripts/ops/pg-daily-backup.sh` (Postgres diario
-con restauracion estricta verificada, mas abajo), `scripts/mongo-backup.sh`
-(Mongo Atlas cifrado, seccion propia mas abajo), `scripts/ops/qdrant-snapshot.sh`
-(snapshot diario de Qdrant por coleccion via API loopback, con retencion) y el
-backup diario de Garage, que vive solo en la VM y aun no tiene script en este
-repo (brecha abierta: codificarlo y verificar copia y restore por separado,
-como pide `docs/MINIO_RETIREMENT.md`).
+Estado real de los pilares de backup (a 18-nov-2026):
+
+- `scripts/ops/pg-daily-backup.sh` (Postgres diario con restauracion estricta
+  verificada, mas abajo): el job de la VM producia dumps verificados el
+  17-nov-2026: un dump fresco se restauro en aislamiento como gate del
+  deploy de esa noche (registro del 18-nov-2026). Que SHA concreto corre el
+  job instalado no esta verificado desde este repo.
+- `scripts/mongo-backup.sh` (Mongo Atlas cifrado, seccion propia mas abajo):
+  segun registro de conversacion del 12-nov-2026, el cron diario quedo en
+  marcha ese dia. Su frescura actual no se ha comprobado: nadie ha mirado la
+  VM desde entonces.
+- `scripts/ops/qdrant-snapshot.sh` (snapshot de Qdrant por coleccion via API
+  loopback, con retencion): script y tests entregados en este repo, NO
+  instalado en el cron de la VM y no corrido contra un Qdrant real. Hasta
+  instalarlo no hay backup programado de Qdrant. El drill del 26-sep citado
+  en la cabecera del script es afirmacion del autor, sin verificar de forma
+  independiente; la ruta de restore existe en el repo
+  (`data-engine/scripts/restore/restore_qdrant.py`).
+- Backup diario de Garage: vive solo en la VM y aun no tiene script en este
+  repo (brecha abierta: codificarlo y verificar copia y restore por separado,
+  como pide `docs/MINIO_RETIREMENT.md`). En marcha desde el 12-nov-2026 segun
+  el mismo registro de conversacion; frescura actual sin comprobar.
+
 `scripts/ops/check-backup-freshness.sh` vigila la frescura de los cuatro
-pilares y alerta por cron si uno envejece.
+pilares y alerta por cron si uno envejece: script y tests entregados en este
+repo, NO instalado todavia en el cron de la VM. Hasta instalarlo, las
+frescuras de arriba solo se pueden comprobar a mano en la VM.
 
 Referencia del flujo legacy (NO ejecutar): los equivalentes en bash eran
 `scripts/backup.sh` y `scripts/restore.sh` (contrato: Postgres `pg_dump -Fc`,
@@ -85,8 +103,10 @@ Coste 0 EUR, solo lectura sobre Atlas:
 - Programacion: cron semanal (domingo 04:30 UTC), despues del backup del
   stack de las 04:17. Ejemplo:
   `30 4 * * 0 cd ~/GerarAI && ./scripts/mongo-backup.sh`.
-  En la VM de produccion corre a diario desde el 12-nov-2026 (restore
-  probado esa misma noche); la frescura la vigila
+  En la VM de produccion corre a diario desde el 12-nov-2026, segun
+  registro de conversacion de ese dia (el restore probado esa misma noche es
+  afirmacion del autor, sin verificar de forma independiente); frescura
+  actual sin comprobar. Cuando se instale, la frescura la vigila
   `scripts/ops/check-backup-freshness.sh`.
 - M0 no tiene backups gestionados: si el cron no corre, no hay segunda copia.
   Verifica el primer domingo que aparece un `backups/mongo-*.age` nuevo.
