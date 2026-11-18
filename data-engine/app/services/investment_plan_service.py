@@ -554,11 +554,15 @@ class InvestmentPlanService:
         # Servicios financieros) quedaba visualmente dentro del grupo equivocado.
         ordered_labels: list[str] = []
         for sector in sector_order:
-            if sector in by_label:
-                ordered_labels.append(sector)
-                ordered_labels.extend(
-                    f"ticker:{ticker}" for ticker in tickers_by_sector[sector] if f"ticker:{ticker}" in by_label
-                )
+            # Sin guardia "sector in by_label": era rama muerta. sector_order
+            # solo crece en la misma iteracion del bucle anterior que escribe
+            # by_label[sector] (linea del += por sector), y nada borra claves;
+            # medido inalcanzable con cobertura de rama sobre las 19 suites
+            # del carril + los bordes nuevos.
+            ordered_labels.append(sector)
+            ordered_labels.extend(
+                f"ticker:{ticker}" for ticker in tickers_by_sector[sector] if f"ticker:{ticker}" in by_label
+            )
         ordered_labels.extend(label for label in by_label if label.startswith("asset_class:"))
         current_weights = {
             label: float((by_label[label] / total * 100).quantize(Decimal("0.01")))
