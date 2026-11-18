@@ -13,6 +13,7 @@ import ipaddress
 import socket
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from http.cookies import SimpleCookie
 
 try:
     # API privada de httpcore (no hay equivalente publico en httpx para
@@ -357,3 +358,135 @@ async def fetch_public_url_async(
                         )
                 return bytes(content), response.headers.get("content-type"), target.url
     raise ValueError(f"Too many redirects (maximum {MAX_REDIRECTS})")
+
+
+_STRIP_RESPONSE_HEADERS = {"content-encoding", "content-length", "transfer-encoding", "set-cookie"}
+
+
+class PublicSession:
+    """Sesion HTTP acotada para portales publicos con POST y cookie de sesion
+    (p. ej. ASP.NET WebForms con ``__VIEWSTATE``).
+
+    Mismas garantias que ``fetch_public_url``: cada salto se valida contra
+    ``allowed_url`` y contra la politica de IP publica, la IP validada se fija
+    en la conexion (Host/SNI originales), las redirecciones se siguen a mano
+    (maximo ``MAX_REDIRECTS``) y el cuerpo tiene tope duro de bytes.
+
+    Cookies (declarado): solo "host-only". Una cookie se guarda para el host
+    EXACTO que la emitio y solo se reenvia a ese host, nunca a otro (aunque
+    este en la allowlist) y nunca por http si lleva ``Secure``. Se ignora el
+    atributo ``Domain``. Una cookie con Max-Age<=0 se borra. La sesion vive
+    lo que viva el objeto: no se persiste nada.
+
+    Devuelve ``httpx.Response`` ya leida (``.text``, ``.headers``,
+    ``.status_code``, ``raise_for_status()``). No lanza por status >=400: el
+    llamador decide (p. ej. leer Retry-After antes de ``raise_for_status``).
+    Un POST redirigido con 301/302/303 pasa a GET sin cuerpo; con 307/308 se
+    rechaza (reenviar un cuerpo a otro destino no se hace en silencio).
+    """
+
+    def __init__(
+        self,
+        *,
+        allowed_url: Callable[[str], bool],
+        user_agent: str | None = None,
+        timeout: float = DEFAULT_TIMEOUT_SECONDS,
+        max_bytes: int = DEFAULT_MAX_BYTES,
+        extra_headers: dict[str, str] | None = None,
+    ) -> None:
+        self._allowed_url = allowed_url
+        self._timeout = timeout
+        self._max_bytes = max_bytes
+        self._headers = {"User-Agent": user_agent or USER_AGENT, "Accept": "*/*"}
+        if extra_headers:
+            self._headers.update(extra_headers)
+        self._cookies: dict[str, dict[str, tuple[str, bool]]] = {}
+
+    def __enter__(self) -> PublicSession:
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self._cookies.clear()
+
+    def get(self, url: str) -> httpx.Response:
+        return self._request("GET", url, None)
+
+    def post(self, url: str, data: dict[str, str]) -> httpx.Response:
+        return self._request("POST", url, data)
+
+    def _cookie_header(self, host: str, https: bool) -> str | None:
+        jar = self._cookies.get(host, {})
+        pairs = [f"{name}={value}" for name, (value, secure) in jar.items() if https or not secure]
+        return "; ".join(pairs) if pairs else None
+
+    def _store_cookies(self, host: str, response: httpx.Response) -> None:
+        for raw in response.headers.get_list("set-cookie"):
+            cookie: SimpleCookie = SimpleCookie()
+            cookie.load(raw)  # el parser descarta en silencio lo ilegible
+            for name, morsel in cookie.items():
+                jar = self._cookies.setdefault(host, {})
+                max_age = _int_or_none(morsel["max-age"])
+                if max_age is not None and max_age <= 0:
+                    jar.pop(name, None)
+                else:
+                    jar[name] = (morsel.value, bool(morsel["secure"]))
+
+    def _request(self, method: str, url: str, data: dict[str, str] | None) -> httpx.Response:
+        for _ in range(MAX_REDIRECTS + 1):
+            if not self._allowed_url(url):
+                raise ValueError("Public session URL denied by source policy")
+            target = _resolve_public_url(url)
+            host = (urlparse(target.url).hostname or "").lower()
+            headers = {**self._headers, "Host": target.host_header}
+            cookie = self._cookie_header(host, target.url.lower().startswith("https:"))
+            if cookie:
+                headers["Cookie"] = cookie
+            with httpx.Client(
+                timeout=self._timeout,
+                follow_redirects=False,
+                transport=httpx.HTTPTransport(trust_env=False),
+            ) as client:
+                _connect_pinned_httpcore(client=client, target=target)
+                with client.stream(
+                    method,
+                    target.request_url,
+                    headers=headers,
+                    data=data,
+                    extensions={"sni_hostname": target.sni_hostname},
+                ) as response:
+                    self._store_cookies(host, response)
+                    next_url = _redirect_target(response, target.url)
+                    if next_url is not None:
+                        if method == "POST":
+                            if response.status_code not in {301, 302, 303}:
+                                raise ValueError(
+                                    "Public session refuses to resend a POST body on a 307/308 redirect"
+                                )
+                            method, data = "GET", None
+                        url = next_url
+                        continue
+                    content_length = _parse_content_length(response.headers.get("content-length"))
+                    if content_length is not None and content_length > self._max_bytes:
+                        raise ValueError(
+                            f"Remote document exceeds {self._max_bytes // (1024 * 1024)}MB limit"
+                        )
+                    content = _read_limited(response.iter_bytes(), self._max_bytes)
+                    kept = [
+                        (k, v)
+                        for k, v in response.headers.multi_items()
+                        if k.lower() not in _STRIP_RESPONSE_HEADERS
+                    ]
+                    return httpx.Response(
+                        response.status_code,
+                        headers=kept,
+                        content=content,
+                        request=httpx.Request(method, target.url),
+                    )
+        raise ValueError(f"Too many redirects (maximum {MAX_REDIRECTS})")
+
+
+def _int_or_none(value: object) -> int | None:
+    try:
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
