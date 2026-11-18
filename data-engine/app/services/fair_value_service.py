@@ -507,14 +507,32 @@ def _estimated_inputs(payload: object) -> tuple[str, ...]:
     return tuple(str(i.get("metric")) for i in items if isinstance(i, dict) and i.get("metric"))
 
 
+WARNING_MAX_ITEMS = 6
+WARNING_MAX_CHARS = 240
+
+
 def _engine_warnings(payload: object) -> tuple[str, ...]:
-    """Detalles de los avisos que el motor dejó en su resultado (texto ya en español)."""
+    """Detalles de los avisos que el motor dejó en su resultado (texto ya en español).
+
+    Solo cuentan los ``detail`` de tipo texto no vacío; se deduplican (orden de
+    aparición), se recortan a ``WARNING_MAX_CHARS`` y se limitan a ``WARNING_MAX_ITEMS``.
+    """
     if not isinstance(payload, dict):
         return ()
     items = payload.get("warnings") or []
     if not isinstance(items, list):
         return ()
-    return tuple(str(i["detail"]) for i in items if isinstance(i, dict) and i.get("detail"))
+    out: list[str] = []
+    for item in items:
+        detail = item.get("detail") if isinstance(item, dict) else None
+        if not isinstance(detail, str):
+            continue
+        text = detail.strip()[:WARNING_MAX_CHARS].rstrip()
+        if text and text not in out:
+            out.append(text)
+        if len(out) >= WARNING_MAX_ITEMS:
+            break
+    return tuple(out)
 
 
 def _method_label(payload: object) -> str | None:
@@ -794,6 +812,7 @@ def resolve_fair_value(
                     value=value,
                     as_of=today,
                     publishable=bool(result.get("publishable")),
+                    warnings=_engine_warnings(result),
                 )
             elif result.get("status") == "insufficient_data":
                 # El motor respondio: con los datos actuales no hay cifra.
