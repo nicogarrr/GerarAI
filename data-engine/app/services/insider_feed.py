@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
-from app.models.entities import InsiderFiling, InsiderTransaction
+from app.models.entities import Form144Notice, InsiderFiling, InsiderTransaction
 from app.services import insider_service
 from app.services.pdmr_monetary_quality import monetary_fields, transaction_money
 
@@ -287,6 +287,68 @@ def build_feed(
         )
         or 0
     )
+    # Avisos Form 144 persistidos (venta PROPUESTA, Rule 144): se listan
+    # aparte y JAMAS entran en buys/sells/totales de operaciones: un aviso
+    # no es una venta ejecutada. Solo lectura local, sin red.
+    notice_stmt = (
+        select(
+            Form144Notice.issuer_ticker.label("issuer_ticker"),
+            Form144Notice.issuer_name.label("issuer_name"),
+            Form144Notice.seller_name.label("seller_name"),
+            Form144Notice.relationships.label("relationships"),
+            Form144Notice.shares_to_sell.label("shares_to_sell"),
+            Form144Notice.aggregate_market_value.label("aggregate_market_value"),
+            Form144Notice.shares_outstanding.label("shares_outstanding"),
+            Form144Notice.approx_sale_date.label("approx_sale_date"),
+            Form144Notice.exchange.label("exchange"),
+            Form144Notice.broker_name.label("broker_name"),
+            Form144Notice.plan_adoption_dates.label("plan_adoption_dates"),
+            Form144Notice.is_amendment.label("is_amendment"),
+            Form144Notice.form.label("form"),
+            Form144Notice.filing_date.label("filing_date"),
+            Form144Notice.accession_number.label("accession_number"),
+            Form144Notice.source_url.label("source_url"),
+            Form144Notice.status.label("status"),
+        )
+        .where(
+            Form144Notice.filing_date >= cutoff,
+            *tenant_filters(db, Form144Notice),
+        )
+        .order_by(Form144Notice.filing_date.desc())
+    )
+    notice_rows = db.execute(notice_stmt).mappings().all()
+    if wanted:
+        notice_rows = [row for row in notice_rows if wanted in ticker_list(row["issuer_ticker"])]
+    proposed_sales = [
+        {
+            "ticker": primary_ticker(row["issuer_ticker"]),
+            "issuer_tickers_raw": row["issuer_ticker"],
+            "issuer_name": row["issuer_name"],
+            "seller": row["seller_name"],
+            "relationships": row["relationships"] or [],
+            "shares": row["shares_to_sell"],
+            "market_value": row["aggregate_market_value"],
+            # Porcentaje de las acciones en circulacion: DERIVADO de cifras
+            # declaradas en el aviso; None si falta cualquiera de las dos.
+            "pct_of_shares_outstanding": (
+                round(100.0 * float(row["shares_to_sell"]) / float(row["shares_outstanding"]), 4)
+                if row["shares_to_sell"] is not None and row["shares_outstanding"]
+                else None
+            ),
+            "approx_sale_date": row["approx_sale_date"],
+            "filing_date": row["filing_date"],
+            "exchange": row["exchange"],
+            "broker": row["broker_name"],
+            "plan_adoption_dates": row["plan_adoption_dates"] or [],
+            "has_10b5_1_plan": bool(row["plan_adoption_dates"]),
+            "is_amendment": bool(row["is_amendment"]),
+            "form": row["form"],
+            "status": row["status"],
+            "accession_number": row["accession_number"],
+            "source_url": row["source_url"],
+        }
+        for row in notice_rows
+    ]
     with_data = (
         db.scalar(
             select(func.count(func.distinct(InsiderTransaction.filing_id))).where(
@@ -309,7 +371,9 @@ def build_feed(
             "filings_total": total_filings,
             "filings_with_transactions": with_data,
             "filings_pending": max(0, total_filings - with_data),
+            "proposed_sales_count": len(proposed_sales),
         },
+        "proposed_sales": proposed_sales[:50],
         "clusters": clusters[:10],
         "c_suite_buys": c_suite[:20],
         "big_buys": big_buys[:10],
