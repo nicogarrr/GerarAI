@@ -202,6 +202,13 @@ describe('irLinksFor', () => {
         }
     });
 
+    it('cubre los 11 tickers BME de la watchlist con seccion IR oficial', () => {
+        // Guard anti-regresion: BME anadidos a la watchlist el 2026-10-28.
+        for (const ticker of ['SAN.MC', 'IBE.MC', 'AENA.MC', 'ENG.MC', 'RED.MC', 'GEST.MC', 'PRM.MC', 'VIS.MC', 'VID.MC', 'EBRO.MC', 'IBG.MC']) {
+            expect(irLinksFor(ticker, '2026-11-18')?.section.url, ticker).toMatch(/^https:\/\//);
+        }
+    });
+
     it('ONDS enlaza presentacion y webcast del T3 2026 solo ese dia', () => {
         const exact = irLinksFor('ONDS', '2026-11-12');
         expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
