@@ -142,7 +142,7 @@ export default function AnalystTargetLine({
                       : formatNumber(data.mean)}
             </span>
             {currencyMismatch && data.currency ? (
-                <span className="ml-1 text-[10px] text-gray-500">
+                <span className="ml-1 text-xs text-gray-500">
                     {converted !== null ? t('ui.analystTargets.convertedFrom', { currency: data.currency }) : unconvertedTargetLabel(data.currency)}
                 </span>
             ) : null}

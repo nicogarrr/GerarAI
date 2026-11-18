@@ -139,7 +139,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                             {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 flex-1 basis-[21%] rounded-md px-1 text-[11px] transition sm:basis-auto sm:flex-initial sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setSinceBuy(false); setRange(value); }}>{t(RANGE_KEYS[value])}</button>)}
                             {eventData?.firstBuyDate ? <button type="button" aria-pressed={sinceBuy} className={`min-h-11 rounded-md px-2 text-[11px] transition sm:px-3 sm:text-xs ${sinceBuy ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { setSinceBuy(true); if (range !== 'Máx') { setRequestState('loading'); setRange('Máx'); } }}>{t('research.chart.sinceBuy')}</button> : null}
                         </div>
-                        <a href={TRADINGVIEW_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-[10px] text-gray-500 underline">TradingView</a>
+                        <a href={TRADINGVIEW_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-xs text-gray-500 underline">TradingView</a>
                     </div>
                     {visible.length > 0 ? <p className="mt-1 text-[11px] text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {hourly ? t('research.chart.hourlyBars', { count: visible.length }) : t('research.chart.sessions', { count: visible.length })}{range === 'Máx' ? ` · ${t('research.chart.providerMax')}` : ''}{hourly ? ` · ${t('research.chart.lastBarWindow')}` : ''}</p> : null}
                     <PriceEventsPanel
@@ -182,7 +182,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
 }
 
 function Metric({ label, value, detail }: { label: string; value: string; detail: string }) {
-    return <div className="min-w-0 rounded-lg bg-gray-900/60 p-2"><dt className="text-[10px] text-gray-500">{label}</dt><dd className="mt-1 break-words text-xs font-semibold text-gray-200">{value}</dd><dd className="mt-1 text-[10px] leading-4 text-gray-500">{detail}</dd></div>;
+    return <div className="min-w-0 rounded-lg bg-gray-900/60 p-2"><dt className="text-xs text-gray-500">{label}</dt><dd className="mt-1 break-words text-xs font-semibold text-gray-200">{value}</dd><dd className="mt-1 text-xs leading-4 text-gray-500">{detail}</dd></div>;
 }
 
 type CanvasMarker = { date: string; text: string; color: string; count: number };

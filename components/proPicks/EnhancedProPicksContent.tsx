@@ -321,7 +321,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                                     {pick.symbol}
                                                 </h3>
                                                 {pick.isStrongBuy && (
-                                                    <span className="px-2 py-0.5 rounded text-[10px] font-bold text-gray-900 bg-gradient-to-r from-teal-500 to-emerald-500 animate-pulse">
+                                                    <span className="px-2 py-0.5 rounded text-xs font-bold text-gray-900 bg-gradient-to-r from-teal-500 to-emerald-500 animate-pulse">
                                                         {t('propicks.content.gemBadge')}
                                                     </span>
                                                 )}
@@ -387,7 +387,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                         })}
                                     </div>
                                     {(['value', 'momentum', 'profitability'] as const).some((key) => categoryDisplay(pick, key).kind === 'neutral') && (
-                                        <div className="text-[10px] leading-4 text-gray-500 mb-2">
+                                        <div className="text-xs leading-4 text-gray-500 mb-2">
                                             {t('propicks.content.naNote')}
                                         </div>
                                     )}

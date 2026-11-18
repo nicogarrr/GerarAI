@@ -80,7 +80,7 @@ export default function StrategySelector({ strategies, currentStrategy, onStrate
                                 <span className="font-medium">
                                     {strategy.name}
                                     {!strategy.available && (
-                                        <span className="ml-2 text-[10px] font-normal uppercase tracking-wide text-amber-400">
+                                        <span className="ml-2 text-xs font-normal uppercase tracking-wide text-amber-400">
                                             {t('propicks.strategySelector.noData')}
                                         </span>
                                     )}
