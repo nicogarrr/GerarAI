@@ -2006,6 +2006,21 @@ def backfill_finnhub_profiles(
         return _handle_actor_error("backfill_finnhub_profiles", exc, tenant_id=tenant_id)
 
 
+# Carril externa (2 hilos): backfill_sec_fundamentals dura 7,5-10,6 min por
+# mensaje (medido por el Piloto el 18-nov: 2 backfills ocupaban los 2 hilos y
+# refresh_valuation_metrics esperaba). Tope de UNA corrida SEC en vuelo con
+# Redis disponible (fallback por proceso si falla). Evita que SEC monopolice
+# ambos hilos; otros actores aun pueden ocupar el restante. Una copia con el
+# hueco ocupado solo usa el hilo para reencolarse con retardo
+# (sin gastar reintentos ni tocar time_limit). Tras SEC_BACKFILL_MAX_DEFERRALS
+# se rinde y deja la pasada al siguiente tick diario.
+SEC_BACKFILL_SLOT = "backfill_sec_fundamentals:slot"
+SEC_BACKFILL_SLOT_TTL_SECONDS = 1_800 + 120  # time_limit del actor + margen
+SEC_BACKFILL_DEFER_DELAY_MS = 90_000
+SEC_BACKFILL_DEFER_JITTER_MS = 30_000
+SEC_BACKFILL_MAX_DEFERRALS = 60
+
+
 @dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=1_800_000,
               queue_name=EXTERNA_QUEUE_NAME)
 @_coalesce_on_success("backfill_sec_fundamentals", 20 * 3600, ("tenant_id",))
@@ -2013,6 +2028,7 @@ def backfill_sec_fundamentals(
     tenant_id: int | None = None,
     user_id: str | None = None,
     max_companies: int = 100,
+    deferrals: int = 0,
 ) -> dict[str, Any]:
     """Backfill presupuestado de fundamentales SEC (companyfacts) para el
     universo US del tenant. Medido en prod (19 oct 2026): solo 164/2.135
@@ -2024,17 +2040,48 @@ def backfill_sec_fundamentals(
     nunca inventados. Coste 0 EUR."""
     from app.services.sec_fundamentals_backfill import backfill_sec_fundamentals as _run
 
+    slot = acquire_job_lease(
+        SEC_BACKFILL_SLOT,
+        ttl_seconds=SEC_BACKFILL_SLOT_TTL_SECONDS,
+        redis_url=_lease_redis_url(),
+    )
+    if slot is None:
+        if deferrals >= SEC_BACKFILL_MAX_DEFERRALS:
+            return {
+                "status": "skipped",
+                "actor": "backfill_sec_fundamentals",
+                "reason": "slot_busy_deferrals_exhausted",
+                "deferrals": deferrals,
+            }
+        backfill_sec_fundamentals.send_with_options(
+            kwargs={
+                "tenant_id": tenant_id,
+                "user_id": user_id,
+                "max_companies": max_companies,
+                "deferrals": deferrals + 1,
+            },
+            delay=SEC_BACKFILL_DEFER_DELAY_MS + _retry_jitter_ms(SEC_BACKFILL_DEFER_JITTER_MS),
+        )
+        return {
+            "status": "skipped",
+            "actor": "backfill_sec_fundamentals",
+            "reason": "slot_busy_deferred",
+            "deferrals": deferrals + 1,
+        }
     try:
-        db = _session(tenant_id, user_id)
-    except Exception as exc:  # noqa: BLE001
-        return _handle_actor_error("backfill_sec_fundamentals", exc, tenant_id=tenant_id)
-    try:
-        return {"actor": "backfill_sec_fundamentals", **_run(db, max_companies=max_companies)}
-    except Exception as exc:
-        _rollback(db)
-        return _handle_actor_error("backfill_sec_fundamentals", exc, tenant_id=tenant_id)
+        try:
+            db = _session(tenant_id, user_id)
+        except Exception as exc:  # noqa: BLE001
+            return _handle_actor_error("backfill_sec_fundamentals", exc, tenant_id=tenant_id)
+        try:
+            return {"actor": "backfill_sec_fundamentals", **_run(db, max_companies=max_companies)}
+        except Exception as exc:
+            _rollback(db)
+            return _handle_actor_error("backfill_sec_fundamentals", exc, tenant_id=tenant_id)
+        finally:
+            db.close()
     finally:
-        db.close()
+        release_job_lease(SEC_BACKFILL_SLOT, slot, redis_url=_lease_redis_url())
 
 
 @dramatiq.actor(max_retries=2, min_backoff=60_000, time_limit=600_000)
