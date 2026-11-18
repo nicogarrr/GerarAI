@@ -89,8 +89,13 @@ def test_sec_sin_respuesta_solo_la_primera_carga_espera(db, monkeypatch):
 
     primera, t1 = _timed(CompanyEventsService(db, submissions_fetcher=hang).get_filings(aapl))
     assert t1 >= 0.35
+    assert hang.calls == 1
     segunda, t2 = _timed(CompanyEventsService(db, submissions_fetcher=hang).get_filings(aapl))
-    assert t2 < 0.2
+    # "No espera" se prueba por lo que no hace (no vuelve a llamar a la SEC),
+    # no por un cronometro: 0,2 s fallaba bajo carga (0,2595 s medido en el
+    # gate). La cota de tiempo solo descarta esperar el cuelgue de 3 s.
+    assert hang.calls == 1
+    assert t2 < 1.0
     # Misma respuesta que la carga que si espero.
     assert _sin_reloj(segunda) == _sin_reloj(primera)
     assert segunda["sec_status"] == "unavailable"
@@ -99,7 +104,8 @@ def test_sec_sin_respuesta_solo_la_primera_carga_espera(db, monkeypatch):
 
     # Otro emisor tampoco espera mientras dura la memoria.
     otra, t3 = _timed(CompanyEventsService(db, submissions_fetcher=hang).get_filings(msft))
-    assert t3 < 0.2
+    assert hang.calls == 1
+    assert t3 < 1.0
     assert otra["sec_status"] == "unavailable"
 
 
@@ -138,8 +144,11 @@ def test_cik_lento_tambien_activa_la_memoria(db, monkeypatch):
     sin_cik = _company(db, "SAN", None)
     hang = _Hang()
     _timed(CompanyEventsService(db, cik_fetcher=hang, submissions_fetcher=hang).get_filings(sin_cik))
+    llamadas = hang.calls
+    assert llamadas >= 1
     out, t = _timed(CompanyEventsService(db, cik_fetcher=hang, submissions_fetcher=hang).get_filings(sin_cik))
-    assert t < 0.2
+    assert hang.calls == llamadas  # la memoria evita volver a preguntar a la SEC
+    assert t < 1.0
     assert out["sec_status"] == "unavailable"
     assert "no respondió a tiempo" in out["note"]
 

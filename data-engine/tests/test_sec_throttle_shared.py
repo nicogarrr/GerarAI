@@ -127,9 +127,33 @@ def test_alternating_modules_hold_the_spacing_over_four_calls():
     assert all(gap >= MIN_INTERVAL - TOLERANCE for gap in gaps), gaps
 
 
-def test_two_threads_from_different_modules_are_serialized():
+class _StampLock:
+    """Lock real que anota el instante de CADA concesion del throttle.
+
+    La marca se toma dentro del ``with`` (antes de soltar el cerrojo), asi mide
+    cuando concedio el limitador y no cuando el planificador desperto al hilo
+    que llamo al stub: esa latencia (decenas de ms bajo carga) hacia fallar el
+    test con huecos de 0,005 s que el throttle nunca concedio.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self.grants: list[float] = []
+
+    def __enter__(self):
+        self._lock.acquire()
+        return self
+
+    def __exit__(self, *exc) -> None:
+        self.grants.append(time.perf_counter())
+        self._lock.release()
+
+
+def test_two_threads_from_different_modules_are_serialized(monkeypatch):
     """El lock es compartido, no por modulo: 4 llamadas = 3 huecos, en total."""
     stub = _StubClient(EMPTY_SUBMISSIONS)
+    stamp = _StampLock()
+    monkeypatch.setattr(base._sec_rate_limiter, "_lock", stamp)
 
     def worker(module: str) -> None:
         # El lock del throttle vive dentro de base, no en el modulo: si cada
@@ -151,5 +175,8 @@ def test_two_threads_from_different_modules_are_serialized():
 
     # 4 llamadas a 10 req/s no pueden completarse en menos de 3 intervalos.
     assert time.perf_counter() - started >= 3 * MIN_INTERVAL - TOLERANCE
-    ordered = sorted(stub.at)
-    assert all(b - a >= MIN_INTERVAL - TOLERANCE for a, b in zip(ordered, ordered[1:]))
+    assert len(stub.at) == 4
+    # Una concesion por llamada, todas por el limitador compartido de base.
+    assert len(stamp.grants) == 4, stamp.grants
+    gaps = [b - a for a, b in zip(stamp.grants, stamp.grants[1:])]
+    assert all(gap >= MIN_INTERVAL - TOLERANCE for gap in gaps), gaps
