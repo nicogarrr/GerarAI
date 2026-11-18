@@ -60,6 +60,19 @@ def chat_request():
     return LLMRequest([Message("user", "hola")], task="chat")
 
 
+def spy_wait_for(monkeypatch):
+    """Registra el timeout de cada asyncio.wait_for (comportamiento real intacto)."""
+    real = asyncio.wait_for
+    timeouts = []
+
+    async def spy(aw, timeout):
+        timeouts.append(timeout)
+        return await real(aw, timeout=timeout)
+
+    monkeypatch.setattr(asyncio, "wait_for", spy)
+    return timeouts
+
+
 @pytest.fixture(autouse=True)
 def _clean_cooldowns():
     reset_quota_cooldowns()
@@ -115,13 +128,16 @@ async def test_gemini_first_model_429_second_model_answers():
 
 
 @run_async
-async def test_total_deadline_bounds_hanging_providers():
+async def test_total_deadline_bounds_hanging_providers(monkeypatch):
+    """Proveedores colgados 5 s: solo el plazo total (.15) puede cortarlos.
+    Se comprueba el plazo pasado, no segundos de pared (flaky en runners lentos)."""
     primary, groq, gemini = Fake(delay=5), Fake(delay=5), Fake(delay=5)
     provider = ChatFallbackProvider(primary, groq, total=.15, delay=.05, backup2=gemini)
-    start = time.monotonic()
+    timeouts = spy_wait_for(monkeypatch)
     with pytest.raises(ProviderTransportError):
         await provider.complete(chat_request())
-    assert time.monotonic() - start < 1
+    assert timeouts[0] is not None
+    assert 0 < timeouts[0] <= .15
     assert primary.cancelled
 
 
@@ -151,46 +167,67 @@ async def test_complete_with_deadline_preserves_provider_timeout():
 async def test_complete_with_deadline_bounds_guard(monkeypatch):
     monkeypatch.setattr(interactive_deadline, "get_settings",
                         lambda: SimpleNamespace(chat_total_timeout_seconds=.2))
-
+    timeouts = spy_wait_for(monkeypatch)
     @bounded_chat
     async def ask():
         return await complete_with_deadline(Fake(delay=5), chat_request(), source="test")
 
-    start = time.monotonic()
     with pytest.raises(TimeoutError):
         await ask()
-    assert time.monotonic() - start < 1
+    # Plazo externo (bounded_chat) e interno (guard): ambos acotados por .2, ninguno None.
+    assert len(timeouts) >= 2
+    assert all(t is not None and 0 < t <= .2 for t in timeouts)
 
 
 @run_async
 async def test_nested_deadline_is_not_restarted(monkeypatch):
+    """Con reloj falso: pasan .2 s de un presupuesto de .3 y el guard interno
+    recibe lo que queda (.1), no otros .3 completos. Sin sleep ni reloj de pared."""
+    now = [100.0]
+    monkeypatch.setattr(interactive_deadline, "time", SimpleNamespace(monotonic=lambda: now[0]))
     monkeypatch.setattr(interactive_deadline, "get_settings",
                         lambda: SimpleNamespace(chat_total_timeout_seconds=.3))
+    timeouts = spy_wait_for(monkeypatch)
 
     @bounded_chat
     async def ask():
-        await asyncio.sleep(.2)
-        # Quedan ~0,1 s de presupuesto: un proveedor colgado 1 s no debe
-        # disponer de otros 0,3 s completos.
-        return await complete_with_deadline(Fake(delay=1), chat_request(), source="test")
+        now[0] = 100.2
+        return await complete_with_deadline(Fake(delay=5), chat_request(), source="test")
 
-    start = time.monotonic()
     with pytest.raises(TimeoutError):
         await ask()
-    elapsed = time.monotonic() - start
-    assert elapsed < .6
+    assert timeouts[0] == pytest.approx(.3)
+    assert timeouts[1] == pytest.approx(.1)
 
 
 @run_async
-async def test_cjk_retry_respects_total_deadline():
+async def test_cjk_retry_respects_total_deadline(monkeypatch):
+    """El reintento CJK acota la cadena de respaldo con el plazo total.
+
+    No mide segundos de pared (flaky en runners lentos: 1,027 s en CI #5843).
+    Se espia el timeout que recibe el wait_for externo: el plazo se pasa
+    (<= total, nunca None) y, al vencer, el miembro de respaldo en vuelo
+    se cancela y sale ProviderTransportError. El proveedor falso tarda 5 s,
+    asi que solo el plazo puede cortarlo, con cualquier carga de CPU.
+    """
     primary = Fake(delay=5)
     groq = Fake(delay=5, name="groq")
     provider = ChatFallbackProvider(primary, groq, total=.15, delay=.05)
-    start = time.monotonic()
+    real_wait_for = asyncio.wait_for
+    timeouts = []
+
+    async def spy(aw, timeout):
+        timeouts.append(timeout)
+        return await real_wait_for(aw, timeout=timeout)
+
+    monkeypatch.setattr(asyncio, "wait_for", spy)
     with pytest.raises(ProviderTransportError):
         await provider.complete_cjk_retry(chat_request())
-    assert time.monotonic() - start < 1
+    assert timeouts and timeouts[0] is not None
+    assert 0 < timeouts[0] <= .15
+    assert len(groq.calls) == 1  # un solo intento: no reintenta tras vencer
     assert groq.cancelled
+    assert not primary.calls  # el reintento CJK salta al respaldo, no repite el primario
 
 
 @run_async
