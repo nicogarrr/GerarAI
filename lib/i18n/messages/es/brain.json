@@ -131,6 +131,7 @@
     "messagesAria": "Mensajes del cerebro",
     "copy": "Copiar",
     "copied": "Copiado",
+    "copyFailed": "No se pudo copiar",
     "suggestedAria": "Preguntas sugeridas",
     "preparingAnalysis": "Preparando el análisis (puede tardar hasta 90 segundos).",
     "writing": "GerarAI está escribiendo la respuesta.",

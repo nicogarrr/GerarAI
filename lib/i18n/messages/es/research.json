@@ -1479,6 +1479,8 @@
     "recovering": "Recuperando generación…",
     "queuing": "Encolando…",
     "generating": "Generando…",
+    "pollFailed": "No se pudo consultar el estado de la generación (fallo de red). Reintentando automáticamente…",
+    "checkNow": "Consultar ahora",
     "unknownState": "Estado desconocido: la generación no responde desde hace 30 min. El trabajo del servidor no se cancela; recarga la página para volver a leer su estado.",
     "waitingQueue": "Esperando reconexión de la cola",
     "retrying": "Reintentando en el servidor",

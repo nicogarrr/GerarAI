@@ -317,7 +317,7 @@ describe('GlobalBrain: chat de cartera', () => {
         expect(screen.getByRole('button', { name: 'Enviar pregunta' })).toBeDisabled(); // input vacío, no cargando
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
-    it('Copiar escribe el texto de la respuesta; no aparece en el saludo; si falla no marca Copiado', async () => {
+    it('Copiar escribe el texto de la respuesta; no aparece en el saludo; si falla informa del error', async () => {
         chatWithPortfolio.mockResolvedValue({ success: true, message: 'Respuesta uno', citations: [] });
         const writeText = vi.fn().mockResolvedValue(undefined);
         Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
@@ -331,7 +331,7 @@ describe('GlobalBrain: chat de cartera', () => {
         expect(writeText).toHaveBeenCalledWith('Respuesta uno');
         writeText.mockRejectedValueOnce(new Error('denied'));
         fireEvent.click(screen.getByRole('button', { name: 'Copiado' }));
-        await screen.findByRole('button', { name: 'Copiar' });
+        await screen.findByRole('button', { name: 'No se pudo copiar' });
     });
 });
 
