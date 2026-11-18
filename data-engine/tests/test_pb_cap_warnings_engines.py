@@ -15,6 +15,15 @@ EXTREME = {
         "combined_ratio": 0.95, "book_value_growth": 0.03}),
     "RTCAP": ("reit", "reit_nav", {
         "net_operating_income": 100, "cap_rate": 0.05, "net_debt": 5000, "shares_diluted": 100}),
+    "BKFLR": ("bank", "bank_residual_income", {
+        "tangible_book_value": 1000, "shares_diluted": 100, "roe": 0.02,
+        "cost_of_equity": 0.10, "book_value_growth": 0.03}),
+    "INFLR": ("insurer", "insurance_book_value", {
+        "book_value": 1200, "shares_diluted": 100, "roe": 0.02, "cost_of_equity": 0.10,
+        "combined_ratio": 0.95, "book_value_growth": 0.03}),
+    "INOKK": ("insurer", "insurance_book_value", {
+        "book_value": 1200, "shares_diluted": 100, "roe": 0.13, "cost_of_equity": 0.10,
+        "combined_ratio": 0.95, "book_value_growth": 0.03}),
     "BKOKK": ("bank", "bank_residual_income", {
         "tangible_book_value": 1000, "shares_diluted": 100, "roe": 0.14,
         "cost_of_equity": 0.10, "book_value_growth": 0.03}),
@@ -55,6 +64,20 @@ def test_real_engines_surface_cap_warnings_in_result_and_trace():
             assert res[t]["trace"]["warnings"] == res[t]["warnings"]
             assert res[t]["trace"]["assumptions"]["pb_caps_applied"]
             assert any("3,00x" in w["detail"] for w in res[t]["warnings"])
+        # Valores sin cambio (el tope sigue aplicando) y bound correcto.
+        assert abs(res["BKCAP"]["base_value"] - 30.0) < 1e-6
+        assert abs(res["INCAP"]["base_value"] - 12 * 3.0 * 1.1) < 1e-6
+        assert abs(res["BKFLR"]["base_value"] - 2.5) < 1e-6
+        assert abs(res["INFLR"]["base_value"] - 12 * 0.25 * 1.1) < 1e-6
+        for t in ("BKCAP", "INCAP"):
+            assert "ceiling" in {c["bound"] for c in res[t]["trace"]["assumptions"]["pb_caps_applied"]}
+        for t in ("BKFLR", "INFLR"):
+            caps = res[t]["trace"]["assumptions"]["pb_caps_applied"]
+            assert {c["bound"] for c in caps} == {"floor"}
+            assert {w["code"] for w in res[t]["warnings"]} == {"pb_cap_applied"}
+            assert res[t]["trace"]["warnings"] == res[t]["warnings"]
+            assert any("suelo" in w["detail"] and "0,25x" in w["detail"] for w in res[t]["warnings"])
+        assert "warnings" not in res["INOKK"] and "warnings" not in res["INOKK"]["trace"]
         reit = res["RTCAP"]
         assert {w["scenario"] for w in reit["warnings"] if w["code"] == "nav_floored_at_zero"} == {"bear", "base", "bull"}
         assert reit["trace"]["warnings"] == reit["warnings"]
