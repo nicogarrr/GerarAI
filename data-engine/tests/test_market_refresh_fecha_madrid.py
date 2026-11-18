@@ -118,3 +118,25 @@ def test_caducidad_de_hoy_usa_la_rama_de_cierre_de_la_bolsa_en_dia_de_madrid(db,
 
     assert asked == [MADRID_DAY]
     assert result["stages"][2]["stale_prices"] == []
+
+
+def test_cierre_de_antesdeayer_si_sale_caducado_a_las_00_30_de_madrid(db, clock_23_30_utc):
+    """Contrapeso del anterior: el cierre del 16-nov (hace 26,5 h) NO es vigente.
+
+    Fija que el techo de 24 h desde el cierre de la bolsa no se aflojo.
+    """
+    _setup(db)
+
+    class Prices:
+        async def fetch(self, companies, *, as_of):
+            return {c.ticker: PriceObservation(c.ticker, Decimal("110"), UTC_DAY - timedelta(days=1), "test")
+                    for c in companies}, []
+
+    class FX:
+        async def fetch(self, **kwargs):
+            return ECBRates(rate_date=MADRID_DAY, rates={"USD": Decimal("1.1")})
+
+    result = asyncio.run(MarketRefreshService(Prices(), FX()).refresh(db))
+
+    stale = result["stages"][2]["stale_prices"]
+    assert [s["ticker"] for s in stale] == ["AAPL"]
