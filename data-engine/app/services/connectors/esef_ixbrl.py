@@ -19,6 +19,7 @@ el consolidado (dims == []), igual que en el carril del indice.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, BinaryIO
@@ -207,6 +208,14 @@ def parse_ixbrl_facts(source: str | BinaryIO) -> dict[str, Any]:
     return {"facts": facts, "dropped": dropped, "entity_lei": entity_lei}
 
 
+# resolve_entities=False deja las entidades no predefinidas como texto
+# literal "&nombre;". Las 5 predefinidas y las referencias numericas llegan
+# ya resueltas como caracteres, asi que un '&...;' literal en el texto es
+# siempre una entidad no expandida (un '&' suelto, como en "AT&T", viene de
+# &amp; y es legitimo).
+_UNRESOLVED_ENTITY = re.compile(r"&[A-Za-z_][\w.-]*;")
+
+
 def parse_entity_name(source: str | BinaryIO) -> str | None:
     """Nombre legal declarado (ifrs-full:NameOfReportingEntity...) con cadena
     de continuaciones; None si el documento no lo declara."""
@@ -223,5 +232,9 @@ def parse_entity_name(source: str | BinaryIO) -> str | None:
             "ifrs-full:NameOfReportingEntityOrOtherMeansOfIdentification"
         ):
             name = _collect_continuations(elem, continuations).strip()
+            if _UNRESOLVED_ENTITY.search(name):
+                # El nombre contendria una entidad sin expandir: mejor no
+                # declarar nombre que fabricarlo a medias.
+                return None
             return " ".join(name.split()) or None
     return None

@@ -260,5 +260,13 @@ def test_internal_entities_in_external_xml_never_expanded():
     assert '9999.9' not in revenue_vals
 
     namedoc = doc.replace('>Kerry Group</ix:nonNumeric>', '>&smuggled;</ix:nonNumeric>')
-    name = parse_entity_name(io.BytesIO(namedoc.encode()))
-    assert name is None or '9999.9' not in name
+    # El nombre con una entidad sin expandir se descarta entero: devolverlo
+    # literal ('&smuggled; plc') lo fabricaria a medias.
+    assert parse_entity_name(io.BytesIO(namedoc.encode())) is None
+
+
+def test_entity_name_with_literal_ampersand_kept():
+    # Un '&' legitimo (llega como &amp;, entidad predefinida) no se confunde
+    # con una entidad sin expandir: el nombre se conserva.
+    doc = DOC.replace('>Kerry Group</ix:nonNumeric>', '>Kerry &amp; Group</ix:nonNumeric>')
+    assert parse_entity_name(io.BytesIO(doc.encode())) == 'Kerry & Group plc'
