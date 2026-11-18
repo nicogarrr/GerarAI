@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 let pathname = '/calendar';
@@ -446,6 +446,8 @@ describe('SubscriptionManager', () => {
         // botón operativo antes de simular el siguiente gesto del usuario.
         await waitFor(() => expect(screen.getByRole('button', { name: 'Desactivar' })).toBeEnabled());
         fireEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
+        expect(revokeCalendarFeed).not.toHaveBeenCalled();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Desactivar' }));
         await screen.findByRole('button', { name: 'Crear suscripción' });
         expect(revokeCalendarFeed).toHaveBeenCalledTimes(1);
         expect(screen.queryByLabelText('Enlace de suscripción')).not.toBeInTheDocument();
@@ -455,7 +457,10 @@ describe('SubscriptionManager', () => {
         revokeCalendarFeed.mockRejectedValue(new Error('x'));
         render(<SubscriptionManager initialState={active} origin="https://x.test" />);
         fireEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
+        expect(revokeCalendarFeed).not.toHaveBeenCalled();
+        fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Desactivar' }));
         expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo desactivar');
+        expect(revokeCalendarFeed).toHaveBeenCalledTimes(1);
         expect(screen.getByRole('region', { name: 'Suscripción activa' })).toBeInTheDocument();
     });
 });
