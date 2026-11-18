@@ -39,7 +39,15 @@ import { formatNumber } from '@/lib/format';
 import { mapBackendYahooQuote, sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { combineAbortSignals, createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
-import { parseListingCurrencies, symbolFromKey, valuePositions, type DemoValuation, type ValuationQuote } from '@/lib/market/demo-valuation';
+import { cboeContractKey, createCboeChainCache, type CachedCboeChain } from '@/lib/market/cboe-options';
+import {
+    parseListingCurrencies,
+    symbolFromKey,
+    valuePositions,
+    type DemoValuation,
+    type OptionPremiumLookup,
+    type ValuationQuote,
+} from '@/lib/market/demo-valuation';
 import { requestLocale } from '@/lib/research/backend-error-locale';
 import { computeManualDemoAccount } from '@/lib/paper-trading/accounting';
 import { docsToLedger } from '@/lib/paper-trading/ledger-adapter';
@@ -814,6 +822,17 @@ async function finnhubOnlyQuote(symbol: string, signal?: AbortSignal): Promise<Q
  */
 const valuationQuoteCache = createQuoteCache();
 
+/**
+ * Caché dedupe de cadenas de opciones de CBOE (lib/market/cboe-options.ts):
+ * misma disciplina que valuationQuoteCache pero por SUBYACENTE (la cadena
+ * entera, ~0,5 MB, sirve a todos los contratos de ese subyacente de la
+ * cuenta). TTL 60 s, máx. 8 fetches en curso, backoff con Retry-After.
+ */
+const cboeChainCache = createCboeChainCache();
+
+/** Tope de subyacentes de opción consultados por valoración (cadenas pesadas). */
+const MAX_OPTION_UNDERLYINGS = 10;
+
 const LISTING_TTL_MS = 6 * 3_600_000;
 let usListing: { at: number; map: Map<string, string> } | null = null;
 let listingInflight: Promise<Map<string, string> | null> | null = null;
@@ -894,6 +913,12 @@ async function backendYahooQuote(symbol: string, signal?: AbortSignal): Promise<
  * Sin cotización => N/D por posición; nunca se usa el precio de
  * un fill como precio de mercado. Más de 25 símbolos distintos: los
  * sobrantes salen "No consultada: límite de 25 símbolos por consulta".
+ * Las opciones se valoran con la prima REAL del contrato (última operación
+ * publicada por la delayed quotes API de CBOE, vía cboeChainCache; dato
+ * diferido y etiquetado con su hora de Nueva York), nunca con la cotización
+ * del subyacente; solo posiciones en USD (las primas de CBOE son USD).
+ * Más de 10 subyacentes de opción distintos: los sobrantes salen
+ * "No consultada: límite de 10 subyacentes de opciones por consulta".
  * Estrictamente de solo lectura: ni siquiera crea la cuenta vacía (a
  * diferencia de getManualDemoAccount); el libro vacío valora a "sin posiciones".
  */
@@ -953,10 +978,64 @@ export async function getManualDemoValuation(): Promise<ManualDemoValuationResul
             const attempt = settleOf(backendSettled[i]);
             applyAttempt(symbol, attempt, typeof attempt.quote?.currency === 'string' ? attempt.quote.currency : null);
         });
-        const queried = verifiable.length + backendSymbols.length;
+        // Opciones: la prima real del contrato (delayed quotes de CBOE,
+        // saneada). Solo se consultan posiciones en USD (las primas de CBOE
+        // son USD por propiedad de la fuente); el resto queda N/D en la
+        // valoración sin conversión. La cadena entera de cada subyacente
+        // sirve a todos sus contratos; los fallos se pliegan al mismo
+        // backoff/señales que las cotizaciones de acciones.
+        const usdOptionPositions = positions.filter((p) => p.kind === 'opcion' && p.currency === 'USD');
+        const optionUnderlyingsAll = [
+            ...new Set(
+                usdOptionPositions
+                    .map((p) => parseOptionKey(p.instrumentKey)?.underlying)
+                    .filter((u): u is string => Boolean(u))
+                    .map((u) => u.toUpperCase()),
+            ),
+        ];
+        const optionUnderlyings = optionUnderlyingsAll.slice(0, MAX_OPTION_UNDERLYINGS);
+        const optionsNotQueried = new Set(optionUnderlyingsAll.slice(MAX_OPTION_UNDERLYINGS));
+        const chainSettled = await Promise.allSettled(optionUnderlyings.map((u) => cboeChainCache.getChain(u)));
+        const chainByUnderlying = new Map<string, CachedCboeChain>();
+        optionUnderlyings.forEach((u, i) => {
+            const r = chainSettled[i];
+            chainByUnderlying.set(
+                u,
+                r.status === 'fulfilled'
+                    ? r.value
+                    : { chain: null, fetchFailed: true, retryAfterSeconds: null, fetchedAt: null, saturated: false },
+            );
+        });
+        const optionPremiums = new Map<string, OptionPremiumLookup>();
+        for (const position of usdOptionPositions) {
+            const parsed = parseOptionKey(position.instrumentKey);
+            if (!parsed) continue;
+            const chainResult = chainByUnderlying.get(parsed.underlying.toUpperCase());
+            if (!chainResult) continue; // subyacente por encima del tope: lo marca optionsNotQueried
+            if (chainResult.fetchedAt !== null) oldestQuoteAt = Math.min(oldestQuoteAt ?? Infinity, chainResult.fetchedAt);
+            if (chainResult.fetchFailed) {
+                fetchFailures += 1;
+                if (chainResult.retryAfterSeconds !== null) retryAfterSeconds = Math.max(retryAfterSeconds ?? 0, chainResult.retryAfterSeconds);
+                optionPremiums.set(position.instrumentKey, { quote: null, fetchFailed: true });
+                continue;
+            }
+            const premium = chainResult.chain?.get(cboeContractKey(parsed.underlying, parsed.expiry, parsed.callPut, parsed.strike)) ?? null;
+            optionPremiums.set(position.instrumentKey, { quote: premium, fetchFailed: false });
+        }
+        const queried = verifiable.length + backendSymbols.length + optionUnderlyings.length;
         return {
             ok: true,
-            valuation: valuePositions(positions, quotes, { notQueried, currencyUnverified, locale: await requestLocale() }),
+            valuation: valuePositions(positions, quotes, {
+                notQueried,
+                currencyUnverified,
+                locale: await requestLocale(),
+                optionPremiums,
+                optionsNotQueried,
+                optionUnderlyingLimit: MAX_OPTION_UNDERLYINGS,
+                // Reloj para el aviso de prima envejecida (>1 día hábil desde
+                // la última operación del contrato, civil de Nueva York).
+                optionPremiumNowMs: Date.now(),
+            }),
             // min(fetchedAt): la cotización más vieja servida manda (cambio
             // de semántica documentado arriba: antes era Date.now() siempre).
             asOf: oldestQuoteAt ?? Date.now(),

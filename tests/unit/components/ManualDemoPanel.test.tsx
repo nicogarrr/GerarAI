@@ -247,7 +247,7 @@ describe('ManualDemoPanel (cuenta demo manual)', () => {
         expect(byTextContent('LI', `USD: valor ${formatMoney(500, 'USD')}`)).toBeInTheDocument();
         const asOfFormat = new Intl.DateTimeFormat('es-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
         expect(document.body.textContent).toContain(`consultado a las ${asOfFormat.format(new Date(asOf))} (hora de Madrid)`);
-        expect(screen.getByText(/Las opciones no se valoran/)).toBeInTheDocument();
+        expect(screen.getByText(/Las opciones se valoran con la última prima negociada del contrato/)).toBeInTheDocument();
     });
 
     it('sin acción de refresco no se ofrece el botón de actualizar', () => {

@@ -33,6 +33,8 @@ const PROPER = new Set([
     'GerarAI', 'IBKR', 'Flex', 'Piotroski', 'Altman', 'Sharpe', 'Pearson', 'Brier', 'YouTube',
     'Inicio', 'Bear', 'Bull', 'Brent', 'España', 'Nasdaq', 'Wall', 'Fórmula', 'Nico', 'Biblioteca',
     'Fiscalidad', 'Hacienda', 'Renta', 'Modelo', 'Interactive', 'Brokers', 'DCA',
+    // «Nueva York» es nombre propio (ciudad), no Title Case.
+    'York',
 ]);
 
 const TITLE_CASE = new RegExp(

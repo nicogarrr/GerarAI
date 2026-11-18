@@ -13,7 +13,7 @@ import type { DemoValuation, ValuationPosition, ValuationQuote, ValuedPosition }
 const valuePositions = v.valuePositions as (
     positions: ValuationPosition[],
     quotes: Record<string, ValuationQuote | null | undefined>,
-    options?: { notQueried?: ReadonlySet<string> },
+    options?: Parameters<typeof v.valuePositions>[2],
 ) => DemoValuation;
 
 const asts: ValuationPosition = { instrumentKey: 'A:ASTS', name: 'AST SpaceMobile', kind: 'accion', currency: 'USD', quantity: 5, avgCost: 50 };
@@ -95,6 +95,96 @@ test('opciones no se valoran con el subyacente', () => {
     assert.equal(r.rows[0].status, 'opcion-no-valorada');
     assert.equal(r.rows[0].marketValue, null);
     assert.deepEqual(r.coverage, { valued: 0, total: 1 });
+});
+
+test('opciones SÍ se valoran con la prima REAL del contrato (CBOE): multiplicador 100, PyG y etiqueta diferida', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5 };
+    const optionPremiums = new Map([
+        ['O:ASTS:2026-12-18:call:50:100', { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-17T15:47:43' }, fetchFailed: false }],
+    ]);
+    const r = valuePositions([option], {}, { optionPremiums });
+    const row = r.rows[0];
+    assert.equal(row.status, 'valorada');
+    assert.equal(row.price, 2.3);
+    // 2 contratos x 2,30 x 100 = 460; coste 2 x 1,50 x 100 = 300; PyG 160.
+    assert.equal(row.marketValue, 460);
+    assert.equal(row.unrealizedPnl, 160);
+    assert.equal(row.currencyBasis, 'cboe');
+    assert.match(row.quoteLabel ?? '', /última operación .*15:47 \(hora de Nueva York\) · diferida/);
+    assert.deepEqual(r.coverage, { valued: 1, total: 1 });
+    assert.deepEqual(r.totals, [{ currency: 'USD', marketValue: 460, unrealizedPnl: 160, costBasis: 300, valuedPositions: 1 }]);
+});
+
+test('opciones: huecos honestos — fuente caída, contrato ausente, sin operación, divisa no USD, sobre el tope', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2 };
+    const failed = valuePositions([option], {}, { optionPremiums: new Map([[option.instrumentKey, { quote: null, fetchFailed: true }]]) }).rows[0];
+    assert.equal(failed.status, 'sin-cotizacion');
+    assert.match(failed.note ?? '', /falló la consulta/);
+    const missing = valuePositions([option], {}, { optionPremiums: new Map([[option.instrumentKey, { quote: null, fetchFailed: false }]]) }).rows[0];
+    assert.equal(missing.status, 'sin-cotizacion');
+    assert.match(missing.note ?? '', /Contrato no encontrado/);
+    const noTrades = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: null, lastTradeTime: null }, fetchFailed: false }]]),
+    }).rows[0];
+    assert.equal(noTrades.status, 'sin-cotizacion');
+    assert.match(noTrades.note ?? '', /Sin operación registrada/);
+    // En EUR no se valora aunque haya prima: las primas de la fuente son USD, sin conversión.
+    const eurOption = valuePositions([{ ...option, currency: 'EUR' as const }], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-17T15:47:43' }, fetchFailed: false }]]),
+    }).rows[0];
+    assert.equal(eurOption.status, 'divisa-no-coincide');
+    assert.equal(eurOption.marketValue, null);
+    // Por encima del tope de subyacentes: no consultada con el límite en el motivo.
+    const overCap = valuePositions([option], {}, {
+        optionPremiums: new Map(),
+        optionsNotQueried: new Set(['ASTS']),
+        optionUnderlyingLimit: 10,
+    }).rows[0];
+    assert.equal(overCap.status, 'no-consultada');
+    assert.match(overCap.note ?? '', /límite de 10/);
+});
+
+test('opciones: precio válido SIN hora => N/D con motivo propio (una prima sin hora no se puede etiquetar)', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 2 };
+    const row = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: null }, fetchFailed: false }]]),
+    }).rows[0] as ValuedPosition;
+    // Hay PRECIO pero no su hora: la etiqueta "diferida" necesita la hora,
+    // asi que la fila es N/D. El motivo NO puede ser "sin operacion
+    // registrada" (la hay): es un hueco distinto de la fuente.
+    assert.equal(row.status, 'sin-cotizacion');
+    assert.equal(row.marketValue, null);
+    assert.match(row.note ?? '', /sin hora/i);
+    assert.doesNotMatch(row.note ?? '', /Sin operación registrada/);
+});
+
+test('opciones: aviso visible si la última operación tiene más de 1 día hábil', () => {
+    const option: ValuationPosition = { instrumentKey: 'O:ASTS:2026-12-18:call:50:100', name: 'ASTS Call', kind: 'opcion', currency: 'USD', quantity: 2, avgCost: 1.5 };
+    const value = (lastTradeTime: string, nowMs: number): ValuedPosition =>
+        valuePositions([option], {}, {
+            optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime }, fetchFailed: false }]]),
+            optionPremiumNowMs: nowMs,
+        }).rows[0] as ValuedPosition;
+    // 2026-11-16T20:00Z = lunes 16 nov, 15:00 en Nueva York (EST, UTC-5).
+    const monday = Date.parse('2026-11-16T20:00:00Z');
+    // Viernes 13 -> lunes 16: 1 día hábil transcurrido, SIN aviso.
+    const fresh = value('2026-11-13T15:47:43', monday);
+    assert.equal(fresh.status, 'valorada');
+    assert.equal(fresh.note, null);
+    // Jueves 12 -> lunes 16: 2 días hábiles (vie 13 + lun 16), CON aviso.
+    const stale = value('2026-11-12T15:47:43', monday);
+    assert.equal(stale.status, 'valorada');
+    assert.equal(stale.marketValue, 460);
+    assert.match(stale.note ?? '', /día hábil/);
+    // El caso del auditor: operación del martes 10 consultada el miércoles 18.
+    const auditor = value('2026-11-10T10:05:00', Date.parse('2026-11-18T20:00:00Z'));
+    assert.match(auditor.note ?? '', /día hábil/);
+    // Mismo día: sin aviso. Sin reloj inyectado: no se juzga frescura.
+    assert.equal(value('2026-11-16T14:00:00', monday).note, null);
+    const noClock = valuePositions([option], {}, {
+        optionPremiums: new Map([[option.instrumentKey, { quote: { lastTradePrice: 2.3, lastTradeTime: '2026-11-10T10:05:00' }, fetchFailed: false }]]),
+    }).rows[0] as ValuedPosition;
+    assert.equal(noClock.note, null);
 });
 
 test('divisa: sin verificar => N/D; no coincide => N/D; GBp u otras => N/D; nunca por sufijo ni ausencia', () => {
