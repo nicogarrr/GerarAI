@@ -13,16 +13,36 @@ import { readFileSync } from 'node:fs';
 
 const page = readFileSync('app/(root)/research/[ticker]/page.tsx', 'utf8');
 
+const evidence = readFileSync('components/research/ClaimEvidenceList.tsx', 'utf8');
+
+function assertSafeHttpUrlContract(source: string): void {
+  assert.match(source, /export function safeHttpUrl/, 'helper de validación exportado');
+  assert.match(source, /new URL\(value\)/, 'parseo estricto');
+  assert.match(source, /url\.protocol === 'https:' \|\| url\.protocol === 'http:'/, 'esquema http(s) únicamente');
+  assert.match(source, /url\.hostname/, 'hostname obligatorio');
+}
+
 const list = readFileSync('components/research/DocumentsList.tsx', 'utf8');
 
 describe('documents list links guard (F249)', () => {
   it('solo se enlaza una URL absoluta http(s)', () => {
-    assert.match(page, /function safeHttpUrl/, 'helper de validación');
-    assert.match(page, /new URL\(value\)/, 'parseo estricto');
-    assert.match(page, /url\.protocol === 'https:' \|\| url\.protocol === 'http:'/, 'esquema http(s) únicamente');
-    assert.match(page, /url\.hostname/, 'hostname obligatorio');
+    assertSafeHttpUrlContract(evidence);
+    assert.match(page, /import \{[^}]*\bsafeHttpUrl\b[^}]*\} from '@\/components\/research\/ClaimEvidenceList'/, 'la ficha importa el helper compartido');
   });
 
+
+  it('el guard rechaza perder validación aunque el helper cambie de fichero', () => {
+    for (const [pattern, replacement] of [
+      [/export function safeHttpUrl/, 'export function unsafeUrl'],
+      [/new URL\(value\)/, 'value'],
+      [/url\.protocol === 'https:' \|\| url\.protocol === 'http:'/, 'true'],
+      [/url\.hostname/g, 'true'],
+    ] as const) {
+      const mutated = evidence.replace(pattern, replacement);
+      assert.notEqual(mutated, evidence, 'el control negativo debe alterar el contrato');
+      assert.throws(() => assertSafeHttpUrlContract(mutated));
+    }
+  });
 
   it('la ficha enlaza cuando hay source_url', () => {
     assert.match(page, /url: safeHttpUrl\(document\.source_url\)/, 'URL validada al construir las filas');
