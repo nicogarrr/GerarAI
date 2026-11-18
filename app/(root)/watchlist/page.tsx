@@ -702,7 +702,7 @@ export default async function WatchlistPage({
                                             </div>
                                         </TableCell>
                                         <TableCell className="block font-mono font-medium text-gray-200 xl:table-cell xl:text-right">
-                                            <span className="block font-sans text-[11px] font-normal text-gray-500 xl:hidden">{t('watchlist.page.sort.price')}</span>
+                                            <span className="block font-sans text-xs font-normal text-gray-500 xl:hidden">{t('watchlist.page.sort.price')}</span>
                                             {formatPriceCell(stock.price, stock.currency)}
                                             {stock.priceKind === 'close' ? (
                                                 <div className="text-xs font-normal text-gray-500">{stock.priceAsOf ? t('watchlist.page.closeOn', { date: formatMarketDate(stock.priceAsOf) }) : t('watchlist.page.closeUndated')}</div>

@@ -16,10 +16,8 @@
  *   de columna solo móvil (xl:hidden) y marcador «· derivada».
  *
  * Quedan fuera los marcadores tipográficos (sup «*» de watchlist:727).
- * Excepción temporal: la etiqueta «Precio» de watchlist (línea ~705) sigue a
- * 11 px porque su hunk lo toca el PR #5852 (pendiente de merge); subirla aquí
- * rompería la aplicación limpia de uno de los dos parches. Cuando #5852
- * mergee, subirla y endurecer este guard a 0 ocurrencias.
+ * La etiqueta «Precio» subió a text-xs cuando #5852 quedó sustituido por
+ * #5884 (mergeado): el guard queda endurecido a 0 ocurrencias.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -46,10 +44,15 @@ describe('texto legible lote 11 px: nada de lectura bajo 12 px', () => {
         expect(src(path)).not.toContain('text-[11px]');
     });
 
-    it('watchlist solo conserva una ocurrencia a 11 px (la etiqueta «Precio», bloqueada por #5852)', () => {
+    it('watchlist no conserva ninguna ocurrencia a 11 px', () => {
         const s = src('app/(root)/watchlist/page.tsx');
         const occurrences = s.match(/text-\[11px\]/g) ?? [];
-        expect(occurrences).toHaveLength(1);
+        expect(occurrences).toHaveLength(0);
+    });
+
+    it('watchlist: la etiqueta de columna «Precio» (xl:hidden) va a 12 px', () => {
+        const s = src('app/(root)/watchlist/page.tsx');
+        expect(s).toContain('text-xs font-normal text-gray-500 xl:hidden">{t(\'watchlist.page.sort.price\')}');
     });
 
     it('knowledge etiqueta de sección a text-xs sin variante sm redundante', () => {
