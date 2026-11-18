@@ -23,3 +23,14 @@ def test_sensitivity_flags_capped_rows():
     rows = _pb_sensitivity_rows(book_per_share=10, roe=0.40, cost_of_equity=0.10, growth=0.03)["rows"]
     assert all("pb_cap_applied" in r for r in rows)
     assert rows[0]["pb_cap_applied"] is True and rows[0]["justified_pb"] == 3.0
+
+
+def test_reit_nav_floor_and_cap_rate_floor_are_warned():
+    from app.valuation.engines.sector_specific import reit_nav_warnings
+
+    specs = {"bear": (100.0, 0.08), "base": (200.0, 0.06), "bull": (212.0, 0.001)}
+    codes = [(w["code"], w["scenario"]) for w in reit_nav_warnings(specs, 5000.0, 0.005)]
+    assert ("nav_floored_at_zero", "bear") in codes and ("nav_floored_at_zero", "base") in codes
+    assert ("nav_floored_at_zero", "bull") not in codes
+    assert ("cap_rate_floor_applied", "bull") in codes
+    assert reit_nav_warnings({"base": (200.0, 0.05)}, 100.0, 0.05) == []

@@ -547,6 +547,30 @@ def _cap_warnings(caps: list[dict]) -> list[dict]:
     ]
 
 
+def reit_nav_warnings(specs: dict, net_debt: float, base_cap_rate: float) -> list[dict]:
+    """Avisos del NAV de REIT: NAV negativo llevado a 0 y suelo del cap rate (nada oculto)."""
+    out: list[dict] = []
+    for name, (noi, cap) in specs.items():
+        raw_nav = noi / cap - net_debt
+        if raw_nav < 0:
+            out.append(
+                {
+                    "code": "nav_floored_at_zero",
+                    "scenario": name,
+                    "detail": f"NAV por deuda neta superior a los activos ({raw_nav:,.0f}) mostrado como 0.",
+                }
+            )
+    if "bull" in specs and specs["bull"][1] == 0.001 and base_cap_rate - 0.005 < 0.001:
+        out.append(
+            {
+                "code": "cap_rate_floor_applied",
+                "scenario": "bull",
+                "detail": "Cap rate del escenario alcista llevado al suelo del 0,1 %.",
+            }
+        )
+    return out
+
+
 def _pb_sensitivity_rows(
     *,
     book_per_share: float,
@@ -1071,6 +1095,7 @@ class ReitValuationEngine(ValuationEngine):
             name: max(0.0, scenario_noi / scenario_cap_rate - net_debt.value) / shares.value
             for name, (scenario_noi, scenario_cap_rate) in specs.items()
         }
+        reit_warnings = reit_nav_warnings(specs, net_debt.value, cap_rate.value)
         probabilities = _probabilities(list(sourced.values()), -cap_rate.value)
         sensitivity = _reit_sensitivity_rows(
             noi=noi.value,
@@ -1089,4 +1114,5 @@ class ReitValuationEngine(ValuationEngine):
             sensitivity=sensitivity,
             period_anchor=resolved.as_trace(),
             estimated_inputs=estimated_input_items(context, sourced),
+            warnings=reit_warnings,
         )
