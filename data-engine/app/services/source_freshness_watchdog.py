@@ -97,6 +97,13 @@ def load_episode_states(db: Session, tenant_id: Any) -> dict[tuple[str, str], st
     return states
 
 
+def _state_key(row: dict[str, Any]) -> tuple[str, str]:
+    """Clave de dedup normalizada. La MISMA en lectura y escritura (FAV
+    condicionado de Cerebro): con layer/source None, lector y escritor
+    deben coincidir o una fuente stale realertaria cada tick."""
+    return (str(row.get("layer") or ""), str(row.get("source") or ""))
+
+
 def _previous_status(
     row: dict[str, Any],
     *,
@@ -106,8 +113,7 @@ def _previous_status(
 ) -> str | None:
     """Estado previo de la fuente: memoria del proceso y, si no, el episodio
     durable persistido (supera reinicios y cambios de dia)."""
-    key: tuple[str, str] = (str(row.get("layer") or ""),
-                            str(row.get("source") or ""))
+    key = _state_key(row)
     previous: str | None = None
     if durable_states:
         previous = durable_states.get(key)
@@ -175,11 +181,12 @@ def record_states(
     """Graba el estado observado; llamar solo tras un commit exitoso."""
     if last_states is not None:
         for row in sources:
-            last_states[(row["layer"], row["source"] or "")] = row["status"]
+            last_states[_state_key(row)] = row["status"]
         return
     with _last_states_lock:
         for row in sources:
-            _last_states[(tenant_id, row["layer"], row["source"])] = row["status"]
+            layer, source = _state_key(row)
+            _last_states[(tenant_id, layer, source)] = row["status"]
 
 
 def _message(row: dict[str, Any]) -> tuple[str, str, str]:

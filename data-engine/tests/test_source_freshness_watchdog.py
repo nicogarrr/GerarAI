@@ -100,6 +100,22 @@ def test_record_states_graba_tras_commit():
     assert estados == {("Precios diarios", "fmp"): "stale"}
 
 
+def test_record_y_detect_misma_clave_con_layer_y_source_none():
+    """Ida y vuelta record->detect con layer None y source None (FAV
+    condicionado de Cerebro): lector y escritor normalizan la clave igual,
+    asi una fuente stale con campos None NO realerta cada tick. Antes el
+    lector usaba ("", "") y el escritor (None, None): nunca coincidian.
+    """
+    fila = {"layer": None, "source": None, "status": "stale"}
+    # Dict explicito (memoria del actor).
+    estados: dict = {}
+    wd.record_states([fila], last_states=estados)
+    assert wd.detect_stale([dict(fila)], last_states=estados) == []
+    # Estado global del proceso (tenant aislado para no pisar otros tests).
+    wd.record_states([fila], tenant_id=777001)
+    assert wd.detect_stale([dict(fila)], tenant_id=777001) == []
+
+
 # --- emit_source_freshness_alerts -------------------------------------------
 
 
