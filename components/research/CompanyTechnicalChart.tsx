@@ -127,21 +127,21 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         <div className="inline-flex rounded-lg border border-gray-800 p-1" role="group" aria-label={t('research.chart.chartType')}>
                             {(['line', 'candles'] as const).map((mode) => <button key={mode} type="button" aria-pressed={(chartType === 'candles' && candlesAvailable ? 'candles' : 'line') === mode} disabled={mode === 'candles' && !candlesAvailable} onClick={() => setChartType(mode)} className={`min-h-11 min-w-20 rounded-md px-3 text-xs transition disabled:cursor-not-allowed disabled:opacity-40 ${(chartType === 'candles' && candlesAvailable ? 'candles' : 'line') === mode ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'}`}>{t(mode === 'line' ? 'research.chart.lineMode' : 'research.chart.candlesMode')}</button>)}
                         </div>
-                        {!candlesAvailable ? <span className="text-[11px] text-gray-500">{t('research.chart.candlesUnavailable')}</span> : null}
+                        {!candlesAvailable ? <span className="text-xs text-gray-500">{t('research.chart.candlesUnavailable')}</span> : null}
                     </div>
                     {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">{t('research.chart.loadingRange', { range: t(RANGE_KEYS[range]) })}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">{t('research.chart.rangeError')}</div> : <PriceCanvas candleMode={chartType === 'candles' && candlesAvailable} bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} spikes={spikes} markers={markers} priceLines={priceLines} focusDate={focusDate} />}
-                    {holdingNotice ? <p className="mb-3 text-[11px] text-amber-300/90" role="status" data-testid="chart-holding-notice">{holdingNotice}</p> : null}
+                    {holdingNotice ? <p className="mb-3 text-xs text-amber-300/90" role="status" data-testid="chart-holding-notice">{holdingNotice}</p> : null}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex w-full flex-wrap gap-1 sm:w-auto" aria-label={t('research.chart.rangeAria')}>
                             {/* basis-[21%] + flex-1 en móvil: 8 rangos x min-w-11 no caben a 390 px
                                 (380 > 358) y «Máx» quedaba huérfano en su línea; con base ~21% salen
                                 4 por fila en dos filas parejas. Desde sm vuelven a su tamaño natural. */}
-                            {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 flex-1 basis-[21%] rounded-md px-1 text-[11px] transition sm:basis-auto sm:flex-initial sm:px-3 sm:text-xs ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setSinceBuy(false); setRange(value); }}>{t(RANGE_KEYS[value])}</button>)}
-                            {eventData?.firstBuyDate ? <button type="button" aria-pressed={sinceBuy} className={`min-h-11 rounded-md px-2 text-[11px] transition sm:px-3 sm:text-xs ${sinceBuy ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { setSinceBuy(true); if (range !== 'Máx') { setRequestState('loading'); setRange('Máx'); } }}>{t('research.chart.sinceBuy')}</button> : null}
+                            {CHART_RANGES.map((value) => <button type="button" key={value} disabled={range === value && requestState !== 'error'} aria-pressed={range === value} className={`min-h-11 min-w-11 flex-1 basis-[21%] rounded-md px-1 text-xs transition sm:basis-auto sm:flex-initial sm:px-3 ${range === value ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { if (range === value) setRetry((count) => count + 1); setRequestState(value === '1D' || value === '5D' || value === '5A' || value === 'Máx' ? 'loading' : 'ready'); setSinceBuy(false); setRange(value); }}>{t(RANGE_KEYS[value])}</button>)}
+                            {eventData?.firstBuyDate ? <button type="button" aria-pressed={sinceBuy} className={`min-h-11 rounded-md px-2 text-xs transition sm:px-3 ${sinceBuy ? 'bg-teal-400/10 font-semibold text-teal-300' : 'text-gray-500 hover:bg-gray-800 hover:text-gray-200'}`} onClick={() => { setSinceBuy(true); if (range !== 'Máx') { setRequestState('loading'); setRange('Máx'); } }}>{t('research.chart.sinceBuy')}</button> : null}
                         </div>
                         <a href={TRADINGVIEW_URL} target="_blank" rel="noreferrer" className="inline-flex min-h-11 min-w-11 items-center text-xs text-gray-500 underline">TradingView</a>
                     </div>
-                    {visible.length > 0 ? <p className="mt-1 text-[11px] text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {hourly ? t('research.chart.hourlyBars', { count: visible.length }) : t('research.chart.sessions', { count: visible.length })}{range === 'Máx' ? ` · ${t('research.chart.providerMax')}` : ''}{hourly ? ` · ${t('research.chart.lastBarWindow')}` : ''}</p> : null}
+                    {visible.length > 0 ? <p className="mt-1 text-xs text-gray-500">{formatMarketDate(visible[0].date)} – {formatMarketDate(visible.at(-1)!.date)} · {hourly ? t('research.chart.hourlyBars', { count: visible.length }) : t('research.chart.sessions', { count: visible.length })}{range === 'Máx' ? ` · ${t('research.chart.providerMax')}` : ''}{hourly ? ` · ${t('research.chart.lastBarWindow')}` : ''}</p> : null}
                     <PriceEventsPanel
                         events={rangeEvents}
                         hiddenKinds={hiddenKinds}
@@ -155,8 +155,8 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                 <MobileCollapse inset title={t('research.chart.reading')}><aside className="min-w-0 border-t border-gray-800 p-4 xl:border-l xl:border-t-0" data-testid="technical-reading">
                     <h2 className="hidden text-base font-semibold text-gray-100 md:block">{t('research.chart.reading')}</h2>
                     <div id={`technical-panel-${snapshot.ticker}`} className="mt-3 space-y-4 text-xs text-gray-400">
-                        {last ? <p className="text-[11px] text-gray-500">{t('research.chart.observedUntil', { date: formatMarketDate(last.date) })}</p> : null}
-                        {last ? <p className="text-[11px] text-gray-500">{t('research.chart.unconfirmedClose')}</p> : null}
+                        {last ? <p className="text-xs text-gray-500">{t('research.chart.observedUntil', { date: formatMarketDate(last.date) })}</p> : null}
+                        {last ? <p className="text-xs text-gray-500">{t('research.chart.unconfirmedClose')}</p> : null}
                         <>
                             <dl className="grid grid-cols-3 gap-2">
                                 <Metric label={t('research.chart.structure')} value={t(TREND_KEYS[trend])} detail={t('research.chart.structureDetail')} />
@@ -172,7 +172,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         <div>
                             <h3 className="mb-2 font-medium text-gray-200">{t('research.chart.fibTitle', { range: t(RANGE_KEYS[range]) })}</h3>
                             {fib.length ? <dl className="space-y-3">{fib.map((level) => <div key={level.ratio} className="flex justify-between border-b border-gray-800 pb-2"><dt>{t('research.chart.fibRatio', { value: formatNumber(level.ratio * 100) })}</dt><dd className="tabular-nums text-gray-200">{price(level.price, visibleCurrency, fmt)}</dd></div>)}</dl> : <p>{t('research.chart.fibNoData')}</p>}
-                            <p className="mt-3 text-[11px] text-gray-500">{t('research.chart.fibNote')}</p>
+                            <p className="mt-3 text-xs text-gray-500">{t('research.chart.fibNote')}</p>
                         </div>
                     </div>
                 </aside></MobileCollapse>

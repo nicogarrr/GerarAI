@@ -25,7 +25,7 @@ export function PriceEventsPanel({ events, hiddenKinds, onToggleKind, onFocus, h
         <div className="mt-4 space-y-3 border-t border-gray-800 pt-3" data-testid="price-events">
             {hourly ? null : <p className="text-xs text-gray-500">{t('research.chart.volumeNote')}</p>}
             <div className="flex flex-wrap gap-1" role="group" aria-label={t('research.chart.kindsAria')}>
-                {EVENT_KIND_ORDER.filter((kind) => present.has(kind)).map((kind) => <button key={kind} type="button" aria-pressed={!hiddenKinds.has(kind)} onClick={() => onToggleKind(kind)} className={`inline-flex min-h-9 items-center gap-1 rounded-full border px-2 text-[11px] ${hiddenKinds.has(kind) ? 'border-gray-800 text-gray-500 line-through' : 'border-gray-700 text-gray-300'}`}>
+                {EVENT_KIND_ORDER.filter((kind) => present.has(kind)).map((kind) => <button key={kind} type="button" aria-pressed={!hiddenKinds.has(kind)} onClick={() => onToggleKind(kind)} className={`inline-flex min-h-9 items-center gap-1 rounded-full border px-2 text-xs ${hiddenKinds.has(kind) ? 'border-gray-800 text-gray-500 line-through' : 'border-gray-700 text-gray-300'}`}>
                     <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: EVENT_KINDS[kind].color }} />{t(EVENT_KIND_KEYS[kind])}
                 </button>)}
             </div>

@@ -39,7 +39,7 @@ export default async function PublicLanding() {
     return (
         <main id="content" tabIndex={-1} className="w-full overflow-x-clip">
             <section className="container pb-16 pt-10 text-left sm:pb-28 sm:pt-20 sm:text-center">
-                <p className="inline-flex max-w-full items-center gap-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-2 text-[10px] font-semibold uppercase leading-5 tracking-[0.16em] text-teal-300 sm:text-xs sm:tracking-[0.2em]">
+                <p className="inline-flex max-w-full items-center gap-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-2 text-xs font-semibold uppercase leading-5 tracking-[0.16em] text-teal-300 sm:tracking-[0.2em]">
                     {t('landing.hero.kicker')}
                 </p>
                 <h1 className="mx-auto mt-4 max-w-3xl text-balance text-[clamp(2.7rem,11vw,3.1rem)] font-semibold leading-[1.12] tracking-[-0.015em] text-gray-100 sm:mt-6 sm:text-7xl">
