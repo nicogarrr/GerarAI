@@ -10,7 +10,8 @@
  *   nota de volumen, tag de tipo, fuente y botón «detalle» de PriceEventsPanel.
  * - common: nota de divisa de AnalystTargetLine y Tag de ExtendedHoursLine.
  *
- * Quedan fuera los marcadores tipográficos (sup «*») y los badges de estado.
+ * Quedan fuera solo los marcadores tipográficos (sup «*»): los badges que
+ * transmiten información (gema, «mejor» horizonte) también suben a 12 px.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -35,6 +36,23 @@ describe('texto legible en proPicks, research y common: nada de lectura bajo 12 
         'components/common/ExtendedHoursLine.tsx',
     ])('%s no tiene texto de lectura a 10 px', (path) => {
         expect(src(path)).not.toContain('text-[10px]');
+    });
+
+    it.each([
+        'components/proPicks/EnhancedProPicksContent.tsx',
+        'components/proPicks/GemsView.tsx',
+        'components/proPicks/StrategySelector.tsx',
+        'components/research/AnalystHistoryView.tsx',
+        'components/research/CompanyTechnicalChart.tsx',
+        'components/research/PriceEventsPanel.tsx',
+        'components/common/AnalystTargetLine.tsx',
+        'components/common/ExtendedHoursLine.tsx',
+    ])('%s no tiene texto a 9 px', (path) => {
+        expect(src(path)).not.toContain('text-[9px]');
+    });
+
+    it('AnalystHistoryView tampoco tiene texto a 11 px (badge mejor horizonte)', () => {
+        expect(src('components/research/AnalystHistoryView.tsx')).not.toContain('text-[11px]');
     });
 
     it('PriceEventsPanel sube fuente, tag y detalle a text-xs', () => {
