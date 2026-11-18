@@ -117,6 +117,13 @@ for (const vp of [
 
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto("/portfolio", { waitUntil: "networkidle", timeout: 60000 });
+    // P14 (18-nov-2026): los graficos de Resumen montan al acercarse al
+    // viewport (LazyMount + IntersectionObserver; el donut asoma a ~1178px
+    // y este viewport llega a 900). Sin scroll el donut no se descarga
+    // nunca y la espera del SVG agotaba los 60 s en el caso movil-768.
+    // Las cajas reservan el sitio (CLS 0), asi que un unico salto al pie
+    // dispara el observer de todos los charts de la pestana.
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
     // Espera por estado: el donut (dynamic import propio) monta su SVG.
     await page.waitForSelector(".recharts-responsive-container svg", { timeout: 60000 });
     await page.waitForTimeout(4000);
