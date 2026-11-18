@@ -42,3 +42,5 @@ def test_spanish_number_format():
     assert _es(1234567.891, 0) == "1.234.568"
     assert _es(-5000.0, 0) == "-5.000"
     assert _es(5.0) == "5,00"
+    assert _es(-0.4, 0) == "0"
+    assert _es(-0.001) == "0,00"

@@ -517,6 +517,8 @@ def _probabilities(values: list[SourcedValue], directional_quality: float = 0.0)
 def _es(value: float, decimals: int = 2) -> str:
     """Formato es-ES: punto de millares y coma decimal."""
     text = f"{value:,.{decimals}f}"
+    if float(text.replace(",", "")) == 0:
+        text = text.lstrip("-")
     return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
 
 
