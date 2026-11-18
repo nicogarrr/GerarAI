@@ -29,8 +29,9 @@ AMFVADParseError en lugar de inventar campos. El agregado por emisor
 (suma de titulares) se etiqueta siempre como DERIVADO; el ratio por
 titular es OFICIAL. Sin fila vigente para un ISIN: N/D, nunca 0.
 
-Coste declarado: 2 GET por proceso y ventana de cache (6 h; publicación
-diaria hábil, así que el coste real es 2-4 GET/día/proceso). Pacer global
+Coste declarado: 2 GET por proceso y ventana de cache (12 h; publicación
+diaria hábil): como máximo 2 ventanas/día = 4 GET/día/proceso. Single-flight
+por proceso: dos misses concurrentes comparten UNA descarga (lock + recheck). Pacer global
 «amf» propio (1 req/s entre procesos vía Redis, fallback local por
 proceso). Retry-After se obedece ÍNTEGRO (numérico o HTTP-date), nunca
 recortado (mismo criterio que CNMV/FCA, auditoría 18-nov): un Retry-After
@@ -44,6 +45,7 @@ import csv
 import io
 import json
 import re
+import threading
 import time
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -67,7 +69,7 @@ DATASET_API_URL = (
 )
 USER_AGENT = "GerarAI/1.0 (research; single-user app)"
 MIN_INTERVAL_S = 1.0  # 1 petición/s GLOBAL a data.gouv + bucket OVH (todos los procesos)
-CACHE_TTL_S = 6 * 3600  # publicación diaria hábil: 2-4 GET/día/proceso reales
+CACHE_TTL_S = 12 * 3600  # publicación diaria hábil: hasta 2 ventanas/día = 4 GET/día/proceso (2 por ventana)
 
 _REGISTRY_KEY = "amf"
 
@@ -199,7 +201,12 @@ def _parse_iso(raw: str, line_no: int, campo: str) -> date:
 
 def parse_csv(text: str, *, now: datetime | None = None) -> list[AMFVADRow]:
     """Parsea el CSV histórico completo. Fail-closed: deriva -> AMFVADParseError."""
-    rows = list(csv.reader(io.StringIO(text.lstrip("\ufeff")), delimiter=";", quotechar='"'))
+    try:
+        # strict=True: comillas mal cerradas o basura tras comillas lanzan en
+        # vez de alterar nombres en silencio (auditoria FCA 18-nov, misma leccion).
+        rows = list(csv.reader(io.StringIO(text.lstrip("\ufeff")), delimiter=";", quotechar='"', strict=True))
+    except csv.Error as exc:
+        raise AMFVADParseError(f"CSV malformado: {exc}") from exc
     if not rows or rows[0] != _HEADER:
         raise AMFVADParseError("cabecera VAD no reconocida (deriva del CSV)")
     today = (now or datetime.now(UTC)).date()
@@ -228,6 +235,8 @@ def parse_csv(text: str, *, now: datetime | None = None) -> list[AMFVADRow]:
         if position_start > today:
             raise AMFVADParseError(f"fila {line_no} con fecha de posicion futura: {raw_pos!r}")
         publication_start = _parse_iso(raw_pub, line_no, "fecha de publicacion")
+        if publication_start > today:
+            raise AMFVADParseError(f"fila {line_no} con fecha de publicacion futura: {raw_pub!r}")
         publication_end = _parse_iso(raw_end, line_no, "fecha fin de publicacion") if raw_end else None
         out.append(
             AMFVADRow(
@@ -275,8 +284,9 @@ def aggregate_by_isin(rows: list[AMFVADRow]) -> dict[str, float]:
 
 
 # Cache por proceso: el fichero es el mismo para todas las empresas y su
-# cadencia es diaria hábil. El TTL lo acota a 2-4 GET/día/proceso (declarado).
+# cadencia es diaria hábil. TTL 12 h: máx. 4 GET/día/proceso (declarado).
 _CACHE: dict[str, tuple[float, list[AMFVADRow]]] = {}
+_FETCH_LOCK = threading.Lock()  # single-flight por proceso
 
 
 def reset_cache() -> None:
@@ -296,6 +306,15 @@ def fetch_current(
     cached = cache.get("current")
     if cached is not None and monotonic() - cached[0] < CACHE_TTL_S:
         return cached[1]
+    with _FETCH_LOCK:
+        # Recheck: otro hilo pudo rellenar la cache mientras esperabamos el lock.
+        cached = cache.get("current")
+        if cached is not None and monotonic() - cached[0] < CACHE_TTL_S:
+            return cached[1]
+        return _download(cache, client, monotonic)
+
+
+def _download(cache, client, monotonic) -> list[AMFVADRow]:
     client, own_client = _client(client)
     registry = get_data_source_registry()
     try:

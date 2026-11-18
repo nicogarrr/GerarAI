@@ -498,3 +498,82 @@ def test_emit_amf_holder_set_changed_no_alert(db, monkeypatch):
     actual["positions"][1]["holder"] = "OTRO TITULAR LLP"  # cambió el set: no comparable
     short_positions_service.emit_shorts_increase(db, company, previo, actual, datetime.now())
     emit.assert_not_called()
+
+
+def test_emit_mixed_sources_no_alert(db, monkeypatch):
+    """Previo CNMV + actual AMF-VAD (y al reves): no comparables, sin alerta.
+    Mata el mutante que quita la igualdad previous.source == current.source."""
+    from app.models import Position
+
+    emit = _alertas(monkeypatch)
+    company = db.get(Company, 1)
+    db.add(Position(company_id=company.id, quantity=1))
+    db.commit()
+    previo = _payload_fr(0.5, 1.51, "2026-06-09", "2026-03-10")
+    previo["source"] = "CNMV"
+    actual = _payload_fr(0.71, 1.6, "2026-11-13", "2026-11-13")
+    short_positions_service.emit_shorts_increase(db, company, previo, actual, datetime.now())
+    emit.assert_not_called()
+    previo["source"], actual["source"] = "AMF-VAD", "CNMV"
+    short_positions_service.emit_shorts_increase(db, company, previo, actual, datetime.now())
+    emit.assert_not_called()
+
+
+def test_malformed_quotes_rejected_strict():
+    broken = FIXTURE.replace('"CAPITAL FUND MANAGEMENT"', '"CAPITAL FUND MANAGEMENT"basura', 1)
+    with pytest.raises(amf_vad.AMFVADParseError, match="malformado"):
+        amf_vad.parse_csv(broken)
+
+
+def test_future_publication_date_raises():
+    broken = FIXTURE.replace('"2026-06-10";""', '"2999-06-10";""', 1)
+    with pytest.raises(amf_vad.AMFVADParseError, match="publicacion futura"):
+        amf_vad.parse_csv(broken, now=datetime(2026, 11, 18))
+
+
+def test_concurrent_cache_miss_single_download(monkeypatch):
+    import threading
+
+    monkeypatch.setattr(amf_vad, "_throttle", lambda: None)
+    gets = []
+    gate = threading.Event()
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        gets.append(str(request.url))
+        gate.wait(timeout=0.3)  # mantiene abierta la ventana de carrera
+        if "data.gouv.fr" in str(request.url):
+            return httpx.Response(200, text=_API_JSON)
+        return httpx.Response(200, text=FIXTURE)
+
+    cache: dict = {}
+    results = []
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        threads = [
+            threading.Thread(target=lambda: results.append(amf_vad.fetch_current(client=client, cache=cache)))
+            for _ in range(3)
+        ]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(5)
+    assert len(gets) == 2  # API + CSV UNA vez, no una por hilo
+    assert len(results) == 3 and all(r is results[0] for r in results)
+
+
+@pytest.mark.parametrize("dia_actual", ["2026-11-01", "2026-11-13", "2999-01-01"])
+def test_emit_amf_no_alert_without_advanced_dates(db, monkeypatch, dia_actual):
+    from app.models import Position
+
+    emit = _alertas(monkeypatch)
+    company = db.get(Company, 1)
+    db.add(Position(company_id=company.id, quantity=1))
+    db.commit()
+    previo = _payload_fr(0.5, 1.51, "2026-11-13", "2026-11-13")
+    actual = _payload_fr(0.71, 1.6, dia_actual, dia_actual)
+    short_positions_service.emit_shorts_increase(db, company, previo, actual, datetime(2026, 11, 18))
+    if dia_actual == "2026-11-13":
+        emit.assert_not_called()  # fecha igual: no avanza
+    elif dia_actual == "2026-11-01":
+        emit.assert_not_called()  # retrocede
+    else:
+        emit.assert_not_called()  # futura

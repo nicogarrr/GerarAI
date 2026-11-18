@@ -106,7 +106,7 @@ async def refresh_shorts(db: Session, company: Company) -> dict:
             # AMF VAD: posiciones cortas netas públicas por TITULAR (>=0,5%,
             # UE 236/2012; Francia no adoptó el régimen agregado SSR 2025).
             # El fichero es el mismo para todas las empresas: cacheado por
-            # proceso (6 h); el sync connector corre en hilo para no bloquear
+            # proceso (12 h, single-flight); el sync connector corre en hilo para no bloquear
             # el loop (pacer global "amf", 1 req/s entre procesos).
             if not (company.isin or "").strip():
                 raise ValueError("empresa FR sin ISIN: no se puede cuadrar identidad VAD")
