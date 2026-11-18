@@ -305,3 +305,40 @@ def test_contribution_route_rejects_positive_input_rounded_to_zero(db):
     assert caught.value.status_code == 400
     assert "precisión de céntimos" in caught.value.detail
     assert db.scalar(select(func.count()).select_from(PlanContribution)) == 0
+
+
+def test_drift_default_band_is_five_points_when_target_omits_band(db):
+    """Un objetivo sin band_pct usa la banda por defecto del plan (±5 puntos),
+    no 0.05: una desviación de 3 puntos está dentro de banda y no sugiere nada.
+    """
+    service = InvestmentPlanService()
+    _plan(
+        service, db,
+        target_allocations=[{"kind": "sector", "label": "Tech", "target_pct": 50}],
+    )
+    from app.models.entities import CashBalance, Company, Position
+
+    company = Company(
+        ticker="AAPL", name="Apple", exchange="NASDAQ", currency="USD",
+        sector="Tech", industry="Tech", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(company)
+    db.flush()
+    db.add(
+        Position(
+            company_id=company.id, quantity=Decimal("53"), market_price=Decimal("100"),
+            currency="EUR", market_value_base=Decimal("5300"), as_of=date(2026, 9, 20),
+        )
+    )
+    db.add(CashBalance(currency="EUR", balance=Decimal("4700"), as_of=date(2026, 9, 20)))
+    db.commit()
+
+    drift = service.drift_analysis(db)
+    assert drift["status"] == "ok"
+    deviation = drift["deviations"][0]
+    assert deviation["label"] == "Tech"
+    assert deviation["band_pct"] == pytest.approx(5.0)
+    assert deviation["current_pct"] == pytest.approx(53.0)
+    assert deviation["within_band"] is True  # 53 dentro de 50 ± 5
+    assert drift["suggestions"] == []  # no compra/venta por una desviación de 3 puntos

@@ -33,7 +33,7 @@ class ContributionConflict(ValueError):
     """An import key already identifies a different recorded contribution."""
 
 
-DEFAULT_BAND = Decimal("0.05")  # ±5 percentage points
+DEFAULT_BAND = Decimal("5")  # ±5 puntos porcentuales, como el default de la API (plan.py)
 
 # Omiso != None: un cliente viejo que OMITE la divisa no debe borrar la ya
 # registrada al actualizar; un None EXPLICITO si la desregistra (queda como
