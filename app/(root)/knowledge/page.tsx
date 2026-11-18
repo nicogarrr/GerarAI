@@ -297,7 +297,7 @@ export default async function KnowledgeLibraryPage({ searchParams }: PageProps) 
           [t('knowledge.stats.pendingApproval'), library.proposedTotal],
         ].map(([label, value]) => (
           <div className="min-w-0 rounded-xl border border-gray-800 bg-surface-1 p-3 sm:p-4" key={label}>
-            <div className="text-[11px] font-semibold uppercase leading-tight tracking-wide text-gray-500 sm:text-xs">{label}</div>
+            <div className="text-xs font-semibold uppercase leading-tight tracking-wide text-gray-500">{label}</div>
             <div className="mt-1 text-xl font-semibold tabular-nums text-gray-100 sm:mt-2 sm:text-2xl">{formatNumber(Number(value), { maximumFractionDigits: 0 }, undefined, locale)}</div>
           </div>
         ))}

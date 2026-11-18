@@ -354,7 +354,7 @@ export default async function WatchlistPage({
             }))
             .filter((group) => group.symbols.length > 0);
         return marketCapGaps.length > 0 ? (
-            <div className="space-y-0.5 text-[11px] leading-relaxed text-gray-500" data-testid="watchlist-marketcap-legend">
+            <div className="space-y-0.5 text-xs leading-relaxed text-gray-500" data-testid="watchlist-marketcap-legend">
                 {marketCapGaps.map((group) => (
                     <p key={group.reason}>{t('watchlist.page.capLegend', { who: group.symbols.length === stocks.length ? t('watchlist.page.capLegendAll') : group.symbols.join(', '), reason: MARKET_CAP_GAP_TEXT[group.reason] })}</p>
                 ))}
@@ -457,7 +457,7 @@ export default async function WatchlistPage({
         const key = valueRankKey(rank);
         if (!rank || !key) return null;
         return (
-            <span className="block text-[11px] text-gray-500" title={rankTitle(rank)}>
+            <span className="block text-xs text-gray-500" title={rankTitle(rank)}>
                 {t(key)}
             </span>
         );
@@ -468,7 +468,7 @@ export default async function WatchlistPage({
     // cobertura. Visible bajo el N/D: en el iPhone un title no se ve.
     const peNdNoteEl = (stock: WatchlistStock) => {
         const note = peNdNote(stock);
-        return note ? <span className="mt-1 block font-sans text-[11px] text-gray-500" data-testid="pe-nd-reason">{t(note.key, note.params)}</span> : null;
+        return note ? <span className="mt-1 block font-sans text-xs text-gray-500" data-testid="pe-nd-reason">{t(note.key, note.params)}</span> : null;
     };
 
     // Sin orden por métrica el cierre llega después: cada fila va en su propio
@@ -710,7 +710,7 @@ export default async function WatchlistPage({
                                             <ExtendedHoursLine symbol={stock.symbol} currency={stock.currency} />
                                         </TableCell>
                                         <TableCell className="block xl:table-cell xl:text-right">
-                                            <span className="block text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.change')}</span>
+                                            <span className="block text-xs text-gray-500 xl:hidden">{t('watchlist.page.sort.change')}</span>
                                             {stock.changePercent === null ? (
                                                 <span className="font-mono text-gray-500">{NA}</span>
                                             ) : (
@@ -723,11 +723,11 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="block font-mono text-gray-400 xl:table-cell xl:text-right" title={stock.marketCap === null && stock.metricsNotApplicable && !stock.metricsReadFailed ? t('watchlist.page.noMetricsTitle') : undefined}>
-                                            <span className="block font-sans text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.marketCap')}</span>
-                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-[11px] text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
+                                            <span className="block font-sans text-xs text-gray-500 xl:hidden">{t('watchlist.page.sort.marketCap')}</span>
+                                            {stock.marketCap !== null ? formatMarketCap(stock.marketCap, stock.currency) : NA}{stock.marketCap !== null && stock.marketCapDerived ? <span className="ml-1 font-sans text-xs text-gray-500">· {t('watchlist.page.derived')}</span> : null}{stock.marketCap === null ? <sup aria-hidden="true" className="ml-0.5 font-sans text-[10px] text-gray-500">*</sup> : null}
                                         </TableCell>
                                         <TableCell className="block xl:table-cell xl:text-right">
-                                            <span className="block text-[11px] text-gray-500 xl:hidden">{stock.peKind === 'fy' ? t('watchlist.page.peFy') : t('watchlist.page.peTtm')}</span>
+                                            <span className="block text-xs text-gray-500 xl:hidden">{stock.peKind === 'fy' ? t('watchlist.page.peFy') : t('watchlist.page.peTtm')}</span>
                                             {stock.peRatio !== null && stock.peRatio !== undefined && Number.isFinite(stock.peRatio) ? (
                                                 // F144: sin semáforo. Los umbrales <15/<25 eran
                                                 // arbitrarios y ciegos al sector: pintaban de rojo
@@ -735,7 +735,7 @@ export default async function WatchlistPage({
                                                 // una app de «datos, no recomendaciones». Color
                                                 // neutro, como en la vista de tarjetas.
                                                 <Badge variant="outline" className="border-gray-700 font-mono text-gray-300" title={stock.peSource ?? undefined}>
-                                                    {formatPeRatio(stock.peRatio)}{stock.peKind === 'fy' ? <span className="ml-1 font-sans text-[11px] text-gray-500">· FY</span> : null}
+                                                    {formatPeRatio(stock.peRatio)}{stock.peKind === 'fy' ? <span className="ml-1 font-sans text-xs text-gray-500">· FY</span> : null}
                                                 </Badge>
                                             ) : (
                                                 // N/D con su motivo también en la tabla (antes «N/D» pelado:
@@ -744,17 +744,17 @@ export default async function WatchlistPage({
                                             )}
                                         </TableCell>
                                         <TableCell className="block text-sm xl:table-cell xl:text-right">
-                                            <span className="block text-[11px] text-gray-500 xl:hidden" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</span>
+                                            <span className="block text-xs text-gray-500 xl:hidden" title={t('watchlist.page.analystTitle')}>{t('watchlist.page.analystTarget')}</span>
                                             <AnalystTargetLine symbol={stock.symbol} quoteSymbol={stock.quoteSymbol} currency={stock.currency} referencePrice={stock.price} fxRates={fxRates} baseCurrency={baseCurrency} />
                                         </TableCell>
                                         {monitorEl(data => {
                                             const monitored = stock.monitorSkipped ? stock : {...stock, monitor: data.items[stock.symbol.trim().toUpperCase()] ?? null};
                                             const earningsNote = earningsNoteFor(data);
                                             return (                                        <TableCell className="block font-mono text-sm text-gray-300 xl:table-cell xl:text-right" title={monitored.monitor?.next_earnings_source ?? (!monitored.monitor?.next_earnings_date ? earningsNote ?? undefined : undefined)}>
-                                            <span className="block font-sans text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.earnings')}</span>
-                                            {monitored.monitor?.next_earnings_date ? formatMarketDate(monitored.monitor.next_earnings_date) : NA}{!monitored.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-[11px] text-gray-500">{earningsNote}</span> : null}
+                                            <span className="block font-sans text-xs text-gray-500 xl:hidden">{t('watchlist.page.sort.earnings')}</span>
+                                            {monitored.monitor?.next_earnings_date ? formatMarketDate(monitored.monitor.next_earnings_date) : NA}{!monitored.monitor?.next_earnings_date && earningsNote ? <span className="block font-sans text-xs text-gray-500">{earningsNote}</span> : null}
                                         </TableCell>);
-                                        }, <TableCell className="block font-mono text-sm text-gray-300 xl:table-cell xl:text-right" aria-busy="true"><span className="block font-sans text-[11px] text-gray-500 xl:hidden">{t('watchlist.page.sort.earnings')}</span>{NA}</TableCell>)}
+                                        }, <TableCell className="block font-mono text-sm text-gray-300 xl:table-cell xl:text-right" aria-busy="true"><span className="block font-sans text-xs text-gray-500 xl:hidden">{t('watchlist.page.sort.earnings')}</span>{NA}</TableCell>)}
 
                                     </WatchlistEntry>
                                 )))}

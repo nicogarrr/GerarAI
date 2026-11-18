@@ -115,7 +115,7 @@ export default async function MacroCalendarPage({ searchParams }: PageProps) {
                                     <span className="text-sm text-gray-400">{entry.company}</span>
                                     <span className="text-sm text-gray-500">{entry.filed_at ? f.formatMarketDate(entry.filed_at) : ti('calendar.macro.dateUnavailable')}</span>
                                     {entry.matching.map((m) => (
-                                        <span key={m} className="rounded bg-gray-800 px-1.5 py-0.5 text-[11px] text-gray-300">{eightKMatchingLabel(m, entry.items, f.locale)}</span>
+                                        <span key={m} className="rounded bg-gray-800 px-1.5 py-0.5 text-xs text-gray-300">{eightKMatchingLabel(m, entry.items, f.locale)}</span>
                                     ))}
                                     <SourceBadge>{ti('calendar.macro.official')}</SourceBadge>
                                     <a className="ml-auto inline-flex min-h-11 min-w-11 items-center text-xs text-teal-300 hover:underline" href={entry.source_url} target="_blank" rel="noopener noreferrer">{ti('calendar.macro.secDocument')}</a>

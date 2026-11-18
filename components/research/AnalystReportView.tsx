@@ -247,7 +247,7 @@ const EBITDA_REASON_KEYS = {
 function ebitdaReason(t: T, row: ReportPeriod) {
   if (row.ebitda?.value != null || !row.ebitda_reason) return null;
   const key = EBITDA_REASON_KEYS[row.ebitda_reason as keyof typeof EBITDA_REASON_KEYS];
-  return key ? <span className="block whitespace-normal text-[11px] leading-4 text-gray-500" data-testid="informe-ebitda-reason">{t(key)}</span> : null;
+  return key ? <span className="block whitespace-normal text-xs leading-4 text-gray-500" data-testid="informe-ebitda-reason">{t(key)}</span> : null;
 }
 
 /** La cifra real enlazada al filing del que sale (si el informe trae su URL). */
@@ -307,7 +307,7 @@ function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false, share
     if (cell?.reason && cell.reason === shared) return <Cell className={mobile ? 'text-gray-400' : 'py-1 pl-2 text-gray-500'} title={cell.reason}>{t('research.informe.na')}<sup aria-hidden="true">*</sup></Cell>;
     // El motivo del N/D se lee en pantalla también en la tabla de PC (antes solo
     // en el «title», invisible en táctil y sin descubrir con ratón).
-    return <Cell className={mobile ? 'text-gray-400' : 'py-1 pl-2 text-gray-500'} title={cell?.reason ?? undefined}>{t('research.informe.na')}{cell?.reason ? <span className={mobile ? 'mt-1 block text-xs leading-5 text-amber-300' : 'block max-w-[16rem] text-[11px] leading-4 text-amber-300/90'}>{cell.reason}</span> : null}</Cell>;
+    return <Cell className={mobile ? 'text-gray-400' : 'py-1 pl-2 text-gray-500'} title={cell?.reason ?? undefined}>{t('research.informe.na')}{cell?.reason ? <span className={mobile ? 'mt-1 block text-xs leading-5 text-amber-300' : 'block max-w-[16rem] text-xs leading-4 text-amber-300/90'}>{cell.reason}</span> : null}</Cell>;
   }
   // BPA con su divisa (la del ejercicio): «68,82» a secas junto a un precio en
   // US$ invitaba a un PER absurdo cuando la empresa presenta en otra moneda.
@@ -322,13 +322,13 @@ function ConsensusCellView({ cell, t, fmt, big, unit, eps, mobile = false, share
   return (
     <Cell className={mobile ? 'min-w-0 text-gray-100 [overflow-wrap:anywhere]' : 'py-1 pl-2 text-gray-100'} title={cell.formula ?? undefined}>
       <span className={mobile ? 'tabular-nums' : 'whitespace-nowrap'}>{value}</span>
-      <span className={mobile ? 'block text-xs text-gray-400' : 'block text-[11px] text-gray-500'}>
+      <span className={mobile ? 'block text-xs text-gray-400' : 'block text-xs text-gray-500'}>
         {url ? <a className="underline decoration-dotted hover:text-teal-300" href={url} target="_blank" rel="noopener noreferrer">{source}</a> : source}
       </span>
-      {reach ? <span className={mobile ? 'block text-xs text-gray-400' : 'block text-[11px] text-gray-500'} title={cell.base_rate_check?.formula ?? undefined} data-testid="consensus-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: fmt.formatPercent(reach.share, { digits: 0 }) })}</span> : null}
+      {reach ? <span className={mobile ? 'block text-xs text-gray-400' : 'block text-xs text-gray-500'} title={cell.base_rate_check?.formula ?? undefined} data-testid="consensus-base-rate-reach">{t(REACH_KEYS[reach.key], { pct: fmt.formatPercent(reach.share, { digits: 0 }) })}</span> : null}
       {/* La fórmula se abre con un toque: en iPhone no hay «pasar el ratón». */}
       {cell.formula ? (
-        <details className={mobile ? 'mt-1 text-xs text-gray-400' : 'mt-0.5 text-[11px] text-gray-500'} data-testid="consensus-formula">
+        <details className={mobile ? 'mt-1 text-xs text-gray-400' : 'mt-0.5 text-xs text-gray-500'} data-testid="consensus-formula">
           <summary className={mobile ? 'inline-flex min-h-[44px] cursor-pointer items-center text-teal-300' : 'cursor-pointer text-teal-300/80'}>{t('research.informe.formula')}</summary>
           <span className="block max-w-[20rem] whitespace-normal text-left [overflow-wrap:anywhere]">{cell.formula}</span>
         </details>
