@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 import main
 from app.core.database import SessionLocal, init_db
+from app.core.local_date import local_today
 from app.models import Company, EarningsDate, FundamentalModelVersion, MarketPrice, Tenant, ThesisVersion
 
 
@@ -133,3 +134,44 @@ def test_monitor_sondas_lateral_pg_fijan_su_forma():
         assert "close IS NOT NULL AND close > 0" in fragmento
     assert "ORDER BY date DESC LIMIT 1" in wl._MONITOR_CIERRE_LATERAL_PG
     assert "date >= :cutoff" in wl._MONITOR_SESIONES_LATERAL_PG
+
+
+class _UtcYesterdayDate(date):
+    """El servidor corre con TZ=UTC: entre las 00:00 y la 1:00/2:00 de Madrid
+    su date.today() todavia devuelve ayer. Simula esa hora."""
+
+    @classmethod
+    def today(cls):
+        return local_today() - timedelta(days=1)
+
+
+def test_watchlist_monitor_low_52w_uses_madrid_date(monkeypatch):
+    # Con el servidor una fecha por detras de Madrid, un minimo de hace 366
+    # dias entraba en la ventana de 52 semanas y salia como "minimo 52s".
+    import app.api.routes.watchlist as watchlist_route
+
+    company_id = _seed_monitor_fixtures()
+    _set_earnings_rows([])
+    db = SessionLocal()
+    try:
+        db.merge(MarketPrice(
+            company_id=company_id, date=local_today() - timedelta(days=366),
+            open=100, high=105, low=45, close=50.0, adj_close=None))
+        db.commit()
+    finally:
+        db.close()
+    monkeypatch.setattr(watchlist_route, "date", _UtcYesterdayDate)
+    client = TestClient(main.app)
+    res = client.get("/api/watchlist/monitor", params={"tickers": "MONTEST"})
+    assert res.status_code == 200
+    row = res.json()["items"]["MONTEST"]
+    assert row["low_52w"] == 80.0
+
+
+def test_watchlist_today_is_madrid_not_server_utc(monkeypatch):
+    # _today() alimenta la antiguedad del PER (18 meses): con TZ=UTC podia
+    # quedarse una fecha por detras de Madrid a primera hora.
+    import app.api.routes.watchlist as watchlist_route
+
+    monkeypatch.setattr(watchlist_route, "date", _UtcYesterdayDate)
+    assert watchlist_route._today() == local_today()

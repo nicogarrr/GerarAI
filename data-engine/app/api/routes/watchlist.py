@@ -16,6 +16,7 @@ from app.core.cache import (
     tenant_from_first_db_arg,
 )
 from app.core.database import get_db
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.core.ui_errors import ui_error
 from app.models import (
@@ -234,7 +235,9 @@ def watchlist_monitor(
     # All monitor reads are synchronous ORM/valuation work. A sync endpoint
     # keeps them in FastAPI's worker pool instead of freezing the event loop.
     wanted = list(dict.fromkeys(t.strip().upper() for t in tickers.split(",") if t.strip()))[:60]
-    today = date.today()
+    # Hoy en Madrid (no el dia UTC del servidor): la ventana de 52 semanas y
+    # la frescura de fechas se deciden con el dia del usuario.
+    today = local_today()
     cutoff = today - timedelta(days=365)
 
     companies = db.scalars(select(Company).where(Company.ticker.in_(wanted))).all()
@@ -419,8 +422,8 @@ PER_MAX_ANNUAL_AGE_MONTHS = 18
 
 
 def _today() -> date:
-    """Fecha de hoy (punto único para que los tests la fijen)."""
-    return date.today()
+    """Fecha de hoy en Madrid (punto único para que los tests la fijen)."""
+    return local_today()
 
 
 def _whole_months_and_days(start: date, end: date) -> tuple[int, int]:
