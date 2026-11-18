@@ -129,7 +129,10 @@ describe('InsiderFeed', () => {
         // Tabla responsiva única (2026-11-14): cada dato aparece una sola vez.
         expect(screen.getAllByText('Divisa no informada')).toHaveLength(1);
         expect(screen.getByText(/Fuente: tracefour/)).toBeInTheDocument();
-        expect(screen.getByRole('link', { name: 'SEDI' })).toHaveAttribute('href', 'https://www.sedi.ca');
+        const sedi = screen.getByRole('link', { name: 'SEDI' });
+        expect(sedi).toHaveAttribute('href', 'https://www.sedi.ca');
+        // Zona táctil inline a 34 px (auditoría móvil 18-nov-2026: 14 px en prod).
+        expect(sedi.className).toContain('before:-inset-y-2.5');
         expect(screen.getAllByRole('link', { name: /12\.500/ })).toHaveLength(1);
     });
 

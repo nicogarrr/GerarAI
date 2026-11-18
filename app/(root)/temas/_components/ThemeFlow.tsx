@@ -240,7 +240,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
               {inPortfolio.map((ticker, index) => (
                 <span key={ticker}>
                   {index > 0 ? ', ' : ''}
-                  <Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/research/${ticker}`}>
+                  <Link className="inline-flex min-h-11 min-w-11 items-center justify-center font-semibold text-teal-300 hover:text-teal-200" href={`/research/${ticker}`}>
                     {ticker}
                   </Link>
                 </span>
@@ -254,7 +254,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
               {inWatchlist.map((ticker, index) => (
                 <span key={ticker}>
                   {index > 0 ? ', ' : ''}
-                  <Link className="font-semibold text-teal-300 hover:text-teal-200" href={`/research/${ticker}`}>
+                  <Link className="inline-flex min-h-11 min-w-11 items-center justify-center font-semibold text-teal-300 hover:text-teal-200" href={`/research/${ticker}`}>
                     {ticker}
                   </Link>
                 </span>

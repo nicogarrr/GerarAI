@@ -34,6 +34,15 @@ describe('Temas: flujo de dinero, fundamentales y botones en inglés', () => {
         expect(screen.getByText(/in your portfolio/)).toBeTruthy();
     });
 
+    it('los tickers de exposición son chips reales de 44 px, sin pseudo-elemento (regresión Auditoría 18-nov)', async () => {
+        mocks.locale = 'es';
+        render(await ThemeFlow({ flow, holdings }));
+        const exposure = screen.getAllByRole('link', { name: 'NVDA' }).find((el) => el.className.includes('min-h-11'));
+        expect(exposure, 'chip de exposición con min-h-11').toBeTruthy();
+        expect(exposure?.className).toContain('min-w-11');
+        expect(exposure?.className).not.toContain('before:');
+    });
+
     it('en español no cambia', async () => {
         mocks.locale = 'es';
         render(await ThemeFlow({ flow, holdings }));
