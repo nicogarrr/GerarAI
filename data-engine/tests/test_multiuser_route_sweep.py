@@ -135,6 +135,9 @@ def _first_id(payload):
     return None
 
 
+refetch_calls: list[tuple] = []
+
+
 @pytest.fixture()
 def world(monkeypatch):
     _no_network(monkeypatch)
@@ -147,6 +150,20 @@ def world(monkeypatch):
     from app.workers import dramatiq_app
 
     monkeypatch.setattr(dramatiq_app.broker, "enqueue", lambda message, delay=None: message)
+    # GET /api/screeners/real programa un refresh en el executor de modulo. Sin
+    # este stub corria el refetch REAL (35 quotes + perfiles) y, con >55
+    # llamadas Finnhub en la ventana, sus hilos dormian en _reserve_finnhub_call
+    # ~60 s: pytest tardaba ~79 s en salir tras acabar los tests. Se captura
+    # la llamada para que el barrido siga ejerciendo la ruta.
+    from app.api.routes import screeners as screeners_routes
+
+    refetch_calls.clear()
+
+    def refetch_hermetico(*, vendor=None, tenant_id=None):
+        refetch_calls.append((vendor, tenant_id))
+        return []
+
+    monkeypatch.setattr(screeners_routes, "_refetch_real_items", refetch_hermetico)
     suffix = uuid4().hex[:8]
     client = TestClient(main.app, raise_server_exceptions=False)
 
@@ -292,6 +309,13 @@ def test_tenant_b_never_sees_tenant_a_marker_on_any_get(world):
     if report:
         with open(report, "w") as fh:
             json.dump({"seeded": seeded, "ids": ids, "get_statuses": statuses, "crashes": crashes, "leaks": leaks}, fh, indent=1)
+    # El barrido ejerce /real y su refresh en background es el stub hermetico.
+    from app.api.routes import screeners as screeners_routes
+
+    for future in list(screeners_routes._real_refresh_futures.values()):
+        future.result(timeout=5)
+    assert refetch_calls, "el barrido no programo el refresh de /api/screeners/real"
+    assert not screeners_routes._real_refresh_executor._work_queue.qsize()
     assert len(statuses) > 150, f"only {len(statuses)} GET routes swept"
     assert not leaks, "tenant A data visible to tenant B:\n" + "\n".join(leaks)
 
