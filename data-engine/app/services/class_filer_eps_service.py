@@ -19,6 +19,8 @@ import gzip
 import io
 import json
 import re
+import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -55,6 +57,10 @@ CLASS_MEMBER_RE = re.compile(r"Class[A-Z]Member")
 
 _SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik}.json"
 _ARCHIVES_URL = "https://www.sec.gov/Archives/edgar/data/{cik_int}/{acc_nodash}/"
+
+# Hosts EDGAR de las constantes de arriba: los unicos a los que una
+# redireccion puede saltar. Si se anade otra fuente, va aqui.
+_EDGAR_HOSTS = frozenset({"data.sec.gov", "www.sec.gov"})
 
 
 @dataclass(frozen=True)
@@ -123,17 +129,53 @@ def _require_https(url: str) -> None:
         raise ValueError(f"URL no https rechazada: {url.split(':', 1)[0]}://")
 
 
+class _EdgarRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """Cada salto de redireccion debe seguir en https y en un host EDGAR.
+
+    Medido 18-nov-2026: el handler por defecto de urllib sigue un 302 a
+    http:// (downgrade, p.ej. a 169.254.169.254), a otro host https e
+    incluso a file://. Las URL de entrada ya son https y de host fijo,
+    pero un 302 del servidor (o de quien controle la respuesta) convertia
+    la descarga en SSRF / lectura local. EDGAR no redirige fuera de sus
+    hosts en operacion normal, asi que cualquier salto que salga es rojo.
+    """
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        parts = urllib.parse.urlsplit(newurl)
+        try:
+            port = parts.port
+        except ValueError:  # puerto no numerico: no es un destino valido
+            port = -1
+        if (
+            parts.scheme != "https"
+            or parts.hostname not in _EDGAR_HOSTS
+            or port not in (None, 443)
+        ):
+            raise urllib.error.HTTPError(
+                newurl,
+                code,
+                f"redireccion rechazada: solo https:443 y hosts EDGAR "
+                f"(recibido {parts.scheme}://{parts.hostname}:{port})",
+                headers,
+                fp,
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+_OPENER = urllib.request.build_opener(_EdgarRedirectHandler())
+
+
 def _fetch_json(url: str) -> dict[str, Any]:
     _require_https(url)
     request = urllib.request.Request(url, headers=default_headers())
-    with urllib.request.urlopen(request, timeout=30) as response:  # nosec B310 - https verificado arriba
+    with _OPENER.open(request, timeout=30) as response:  # nosec B310 - https y saltos verificados
         return json.loads(_read_response(response).decode("utf-8"))
 
 
 def _fetch_bytes(url: str) -> bytes:
     _require_https(url)
     request = urllib.request.Request(url, headers=default_headers())
-    with urllib.request.urlopen(request, timeout=60) as response:  # nosec B310 - https verificado arriba
+    with _OPENER.open(request, timeout=60) as response:  # nosec B310 - https y saltos verificados
         return _read_response(response)
 
 
