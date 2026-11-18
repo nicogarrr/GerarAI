@@ -49,7 +49,7 @@ describe('Mercados en directo en inglés', () => {
 
     it('la tabla tiene nombre y cabeceras de columna accesibles', () => {
         render(<LocaleProvider locale="en"><LiveMarketsPanel initial={PANEL_DATA} /></LocaleProvider>);
-        expect(screen.getByRole('table', { name: 'Live quotes: Indices' })).toBeTruthy();
+        expect(screen.getByRole('table', { name: 'Quotes: Indices' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Instrument' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Price' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Change' })).toBeTruthy();
@@ -57,7 +57,7 @@ describe('Mercados en directo en inglés', () => {
 
     it('cabeceras accesibles en español', () => {
         render(<LocaleProvider locale="es"><LiveMarketsPanel initial={PANEL_DATA} /></LocaleProvider>);
-        expect(screen.getByRole('table', { name: 'Cotizaciones en directo: Índices' })).toBeTruthy();
+        expect(screen.getByRole('table', { name: 'Cotizaciones: Índices' })).toBeTruthy();
         expect(screen.getByRole('columnheader', { name: 'Instrumento' })).toBeTruthy();
     });
 
