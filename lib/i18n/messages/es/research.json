@@ -1428,6 +1428,8 @@
     "notFinal": "Esta tesis aún no es una valoración final:",
     "publishEffect": "Al publicarla pasa a la Biblioteca y el Cerebro la usará como referencia.",
     "publishAnyway": "Publicar igualmente",
+    "rejectEffect": "Rechazar la v{version} cambia su estado a rechazada y la retira de la Biblioteca.",
+    "rejectAnyway": "Rechazar igualmente",
     "cancel": "Cancelar"
   },
   "thesisHumanInput": {
@@ -1906,6 +1908,8 @@
     "saved": "Desglose guardado",
     "deleted": "Desglose borrado",
     "delete": "Borrar mi desglose",
+    "deleteConfirmTitle": "¿Borrar el desglose guardado?",
+    "deleteConfirmDescription": "Se borrarán tu modelo y su historial de versiones. La ficha volverá al borrador de ejemplo, si lo hay.",
     "save": "Guardar versión",
     "unitsHint": "Importes y acciones en millones. Tasa, margen y probabilidad en % (12,5 = 12,5 %). Deja vacía una fila para no usarla.",
     "baseYear": "Año de hoy",

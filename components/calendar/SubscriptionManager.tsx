@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
     createCalendarFeed,
     revokeCalendarFeed,
@@ -43,6 +45,18 @@ export function SubscribeButtons({ origin, token }: { origin: string; token: str
         outlook: ti('calendar.subscription.subscribeOutlook'),
     }[provider];
 
+    // Si el navegador bloquea el portapapeles, avisar: antes el clic no hacía
+    // nada y el usuario no sabía si el enlace se había copiado.
+    const copyLink = async () => {
+        try {
+            await navigator.clipboard.writeText(urls.https);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            toast.error(ti('calendar.subscription.copyFailed'));
+        }
+    };
+
     return (
         <div className="flex flex-col gap-4">
             <div role="tablist" aria-label={ti('calendar.subscription.providerAria')} className="flex gap-4 border-b border-gray-800 text-sm font-medium">
@@ -79,12 +93,7 @@ export function SubscribeButtons({ origin, token }: { origin: string; token: str
                 <Button
                     variant="outline"
                     className="min-h-11 shrink-0"
-                    onClick={() => {
-                        void navigator.clipboard.writeText(urls.https).then(() => {
-                            setCopied(true);
-                            setTimeout(() => setCopied(false), 2000);
-                        });
-                    }}
+                    onClick={() => void copyLink()}
                 >
                     {copied ? ti('calendar.subscription.copied') : ti('calendar.subscription.copy')}
                 </Button>
@@ -120,6 +129,7 @@ export default function SubscriptionManager({
     const [scope, setScope] = useState<CalendarFeedScope>(initialState.scope ?? 'watchlist');
     const [freshToken, setFreshToken] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [confirmOpen, setConfirmOpen] = useState(false);
     const [pending, startTransition] = useTransition();
 
     const create = (nextScope: CalendarFeedScope) => {
@@ -192,7 +202,7 @@ export default function SubscriptionManager({
                         <Button disabled={pending} onClick={() => create(state.scope ?? scope)} className="min-h-11 flex-1">
                             {ti('calendar.subscription.regenerate')}
                         </Button>
-                        <Button disabled={pending} variant="outline" onClick={revoke} className="min-h-11 flex-1">
+                        <Button disabled={pending} variant="outline" onClick={() => setConfirmOpen(true)} className="min-h-11 flex-1">
                             {ti('calendar.subscription.deactivate')}
                         </Button>
                     </div>
@@ -205,6 +215,14 @@ export default function SubscriptionManager({
                     {ti('calendar.subscription.create')}
                 </Button>
             )}
+            <ConfirmDialog
+                open={confirmOpen}
+                onOpenChange={setConfirmOpen}
+                title={ti('calendar.subscription.deactivateConfirmTitle')}
+                description={ti('calendar.subscription.deactivateConfirmDescription')}
+                confirmLabel={ti('calendar.subscription.deactivate')}
+                onConfirm={revoke}
+            />
         </div>
     );
 }

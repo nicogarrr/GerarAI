@@ -1428,6 +1428,8 @@
     "notFinal": "This thesis is not a final valuation yet:",
     "publishEffect": "Once published it goes to the Library and the Brain will use it as a reference.",
     "publishAnyway": "Publish anyway",
+    "rejectEffect": "Rejecting v{version} changes its status to rejected and removes it from the Library.",
+    "rejectAnyway": "Reject anyway",
     "cancel": "Cancel"
   },
   "thesisHumanInput": {
@@ -1906,6 +1908,8 @@
     "saved": "Breakdown saved",
     "deleted": "Breakdown deleted",
     "delete": "Delete my breakdown",
+    "deleteConfirmTitle": "Delete the saved breakdown?",
+    "deleteConfirmDescription": "Your model and its version history will be deleted. The page will go back to the example draft, if there is one.",
     "save": "Save version",
     "unitsHint": "Amounts and shares in millions. Rate, margin and probability in % (12.5 = 12.5%). Leave a row empty to skip it.",
     "baseYear": "Current year",

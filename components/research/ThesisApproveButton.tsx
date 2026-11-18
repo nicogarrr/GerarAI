@@ -53,7 +53,7 @@ export default function ThesisApproveButton({
     const router = useRouter();
     const t = useT();
     const [pending, setPending] = useState<'approved' | 'rejected' | null>(null);
-    const [confirming, setConfirming] = useState(false);
+    const [confirming, setConfirming] = useState<'approved' | 'rejected' | null>(null);
 
     const alreadyPublished = latestStatus === 'published';
     const notApprovableKey = latestStatus && Object.hasOwn(NON_APPROVABLE, latestStatus) ? NON_APPROVABLE[latestStatus as keyof typeof NON_APPROVABLE] : undefined;
@@ -70,13 +70,19 @@ export default function ThesisApproveButton({
             : null;
 
     const decide = async (decision: 'approved' | 'rejected', confirmed = false) => {
-        // Publicar una tesis con valoración parcial, datos pendientes o red team
-        // bajo exige una confirmación explícita con los motivos a la vista.
-        if (decision === 'approved' && riskNotes.length > 0 && !confirmed) {
-            setConfirming(true);
-            return;
+        // Publicar con valoración parcial o datos pendientes, y rechazar (que
+        // cambia el estado y retira de la Biblioteca), exigen confirmación.
+        if (!confirmed) {
+            if (decision === 'approved' && riskNotes.length > 0) {
+                setConfirming(decision);
+                return;
+            }
+            if (decision === 'rejected') {
+                setConfirming(decision);
+                return;
+            }
         }
-        setConfirming(false);
+        setConfirming(null);
         setPending(decision);
         try {
             const result = await approveThesis(ticker, decision);
@@ -106,7 +112,7 @@ export default function ThesisApproveButton({
             preserveScrollPosition(() => router.refresh());
         } catch (exc) {
             if (isNextRedirectError(exc)) throw exc;
-            showErrorToast(exc, { onRetry: () => decide(decision, confirmed) });
+            showErrorToast(exc, { onRetry: () => decide(decision, true) });
         } finally {
             setPending(null);
         }
@@ -150,7 +156,7 @@ export default function ThesisApproveButton({
             {blockNote ? (
                 <span className="text-xs text-gray-500">{blockNote}</span>
             ) : null}
-            {confirming ? (
+            {confirming === 'approved' ? (
                 <div role="alert" className="w-full rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
                     <p className="font-medium">{t('research.thesisApprove.notFinal')}</p>
                     <ul className="mt-1 list-disc pl-5">
@@ -165,7 +171,25 @@ export default function ThesisApproveButton({
                         <Button type="button" size="sm" onClick={() => decide('approved', true)} disabled={pending !== null}>
                             {t('research.thesisApprove.publishAnyway')}
                         </Button>
-                        <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(false)}>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(null)}>
+                            {t('research.thesisApprove.cancel')}
+                        </Button>
+                    </div>
+                </div>
+            ) : null}
+            {confirming === 'rejected' ? (
+                <div role="alert" className="w-full rounded-lg border border-amber-900/70 bg-amber-950/20 p-3 text-sm text-amber-200">
+                    <p className="font-medium">{t('research.thesisApprove.rejectEffect', { version: latestVersion ?? '?' })}</p>
+                    {olderPublishedVersion !== null ? (
+                        <p className="mt-1 text-xs text-amber-300/80">
+                            {t('research.thesisApprove.olderStillPublished', { version: olderPublishedVersion })}
+                        </p>
+                    ) : null}
+                    <div className="mt-2 flex gap-2">
+                        <Button type="button" size="sm" onClick={() => decide('rejected', true)} disabled={pending !== null}>
+                            {t('research.thesisApprove.rejectAnyway')}
+                        </Button>
+                        <Button type="button" size="sm" variant="outline" onClick={() => setConfirming(null)}>
                             {t('research.thesisApprove.cancel')}
                         </Button>
                     </div>
