@@ -125,10 +125,29 @@ def test_profile_ir_url_exige_http_y_cabe_en_la_columna():
 
 # -- backfill diario -----------------------------------------------------------
 
+class _FakePacer:
+    """Pacer compartido de banco: cuenta huecos y cooldowns, sin sleeps."""
+
+    def __init__(self, blocked: float = 0.0):
+        self.waits = 0
+        self.cooldowns: list[float] = []
+        self._blocked = blocked
+
+    def wait_sync(self) -> None:
+        self.waits += 1
+
+    def cool_down(self, seconds: float) -> None:
+        self.cooldowns.append(seconds)
+        self._blocked = max(self._blocked, seconds)
+
+    def blocked_for(self) -> float:
+        return self._blocked
+
+
 def _backfill(db, company, profiles):
     client = _Client(profiles=profiles)
-    service = FinnhubProfileBackfill(settings=_Settings(), client=client)
-    return service.backfill(db, max_companies=5, sleep_between_calls=0), client
+    service = FinnhubProfileBackfill(settings=_Settings(), client=client, pacer=_FakePacer())
+    return service.backfill(db, max_companies=5), client
 
 
 def test_backfill_promueve_weburl_con_listado_verificado(db):

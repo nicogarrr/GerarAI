@@ -55,6 +55,18 @@ def finnhub_blocked_for() -> float:
     return _pacer.blocked_for()
 
 
+def finnhub_pacer() -> GlobalPacer:
+    """Pacer compartido de Finnhub para consumidores SYNC (backfills).
+
+    Los consumidores async ya pasan por ``FinnhubClient`` (que reserva hueco
+    y propaga 429). Un consumidor sync con su propio httpx debe reservar el
+    MISMO hueco global (``wait_sync``) y propagar los 429 que vea
+    (``cool_down``): si no, su ritmo es invisible para los demas carriles y
+    el agregado supera la cuota FREE de 60 llamadas/min.
+    """
+    return _pacer
+
+
 def reset_finnhub_pacer() -> None:
     """Solo para tests."""
     _pacer.reset()
