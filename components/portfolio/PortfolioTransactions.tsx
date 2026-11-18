@@ -139,7 +139,7 @@ const TransactionRow = memo(function TransactionRow({ tx, userId, deleting, setC
         <div className="pl-11 sm:pl-0 sm:text-right">
           <p className="font-medium text-gray-200">
             {currency ? f.formatMoney(gross, currency) : ti('common.na')}
-            <span className="ml-1.5 text-[10px] uppercase tracking-wide text-gray-500">{ti('portfolio.transactions.grossTag')}</span>
+            <span className="ml-1.5 text-xs uppercase tracking-wide text-gray-500">{ti('portfolio.transactions.grossTag')}</span>
           </p>
           <p className="text-xs text-gray-500">
             {ti('portfolio.transactions.sharesLine', { quantity: f.formatNumber(tx.quantity, { maximumFractionDigits: 4 }), price: currency ? f.formatPrice(tx.price, currency) : ti('common.na') })}

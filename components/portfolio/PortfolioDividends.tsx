@@ -271,7 +271,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
                                                             <span>
                                                                 {f.formatMoney(month.gross_base, baseCurrency)}
                                                                 {month.gross_unverified_base != null && month.gross_unverified_base > 0 ? (
-                                                                    <span className="block text-[10px] text-amber-400/90">
+                                                                    <span className="block text-xs text-amber-400/90">
                                                                         {ti('portfolio.dividends.unverifiedGross', { amount: f.formatMoney(month.gross_unverified_base, baseCurrency) })}
                                                                     </span>
                                                                 ) : null}
@@ -281,7 +281,7 @@ export default function PortfolioDividends({ projection, userId, ti = esT, f = e
                                                             ? (
                                                                 <span title={ti('portfolio.dividends.grossOnlyTitle')}>
                                                                     {f.formatMoney(month.gross_unverified_base, baseCurrency)}
-                                                                    <span className="block text-[10px] text-amber-400/90">{ti('portfolio.dividends.grossOnly')}</span>
+                                                                    <span className="block text-xs text-amber-400/90">{ti('portfolio.dividends.grossOnly')}</span>
                                                                 </span>
                                                             )
                                                             : ti('common.na')}

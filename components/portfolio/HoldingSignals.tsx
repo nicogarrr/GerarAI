@@ -98,7 +98,7 @@ export function FairValueLine({
                     ({f.formatPercent(gap, { fromRatio: false, digits: 1, signDisplay: 'always' })})
                 </span>
             ) : null}
-            <span className="block text-[10px] text-gray-500">{fairValueLabelText(fair.label, locale)}</span>
+            <span className="block text-xs text-gray-500">{fairValueLabelText(fair.label, locale)}</span>
         </span>
     );
 }
