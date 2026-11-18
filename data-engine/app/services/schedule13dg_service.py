@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.core.tenancy import tenant_filters
 from app.models.entities import Schedule13DGFiling
+from app.services.connectors.form13dg import FORMS_13DG
 
 ND = "N/D"
 SOURCE_LABEL = "SEC EDGAR · SC 13D/13G"
@@ -75,12 +76,17 @@ def filings_for_ticker(
     *,
     limit: int = 50,
 ) -> dict:
-    """Filings SC 13D/13G persistidos del ticker, mas recientes primero."""
+    """Filings SC 13D/13G persistidos del ticker, mas recientes primero.
+
+    Solo formularios US (FORMS_13DG): las participaciones significativas
+    CNMV (form="PS-ES") comparten tabla pero NUNCA esta pantalla.
+    """
     normalized = ticker.strip().upper()
     rows = db.scalars(
         select(Schedule13DGFiling)
         .where(
             Schedule13DGFiling.issuer_ticker == normalized,
+            Schedule13DGFiling.form.in_(sorted(FORMS_13DG)),
             *tenant_filters(db, Schedule13DGFiling),
         )
         .order_by(Schedule13DGFiling.filing_date.desc(), Schedule13DGFiling.id.desc())

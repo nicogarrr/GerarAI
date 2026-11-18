@@ -15,7 +15,7 @@ from pathlib import Path
 import httpx
 import pytest
 
-from app.services.connectors import cnmv, cnmv_nod, cnmv_pacer
+from app.services.connectors import cnmv, cnmv_nod, cnmv_pacer, cnmv_ps
 
 NOD_FIXTURE = (Path(__file__).parent / "fixtures" / "cnmv" / "nod_results_2026-11.html").read_text(
     encoding="utf-8"
@@ -37,6 +37,7 @@ def cooldowns(monkeypatch):
 
 def test_one_pacer_instance_for_all_cnmv_connectors():
     assert cnmv_nod._pacer is cnmv_pacer.cnmv_pacer
+    assert cnmv_ps._pacer is cnmv_pacer.cnmv_pacer
 
 
 def test_nod_retry_after_http_date_marks_cooldown(cooldowns):
@@ -63,6 +64,11 @@ def test_shared_parser_numeric_absent_past_date_and_garbage(cooldowns):
     assert cooldowns[-1] == 0.0  # fecha pasada: sin espera (nunca negativo)
     cnmv_pacer.respect_retry_after(httpx.Response(429, headers={"Retry-After": "pronto"}))
     assert cooldowns[-1] == 60.0  # ilegible: 60 s declarados
+
+
+def test_ps_wrapper_uses_shared_parser(cooldowns):
+    cnmv_ps._respect_retry_after(httpx.Response(429, headers={"Retry-After": "120"}))
+    assert cooldowns == [120.0]
 
 
 def test_oir_retry_after_marks_shared_cooldown(cooldowns):

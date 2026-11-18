@@ -1713,6 +1713,38 @@ def ingest_cnmv_nod_daily(tenant_id: int | None = None, user_id: str | None = No
     finally:
         db.close()
 
+@dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)
+@_coalesce_on_success("ingest_cnmv_ps_daily", 330 * 60, ("tenant_id",))
+def ingest_cnmv_ps_daily(tenant_id: int | None = None, user_id: str | None = None) -> dict[str, Any]:
+    """Participaciones significativas CNMV (registro oficial, coste 0).
+
+    Ventana de los ultimos 3 dias (cubre fines de semana con corrida diaria);
+    2 + 2*N peticiones con N = emisores con novedades (tope 25 por corrida).
+    Declarado (auditoria 2026-11-18): queue INGESTA (queue_taxonomy); cada
+    tenant descarga el mismo registro por separado (coste acotado a 52
+    peticiones/dia/tenant a 1 req/s global via pacer «cnmv», compartido con
+    NOD). Coste MEDIDO en vivo 18-nov (ventana 3 dias): 16 peticiones
+    (2 + 2x7) para 8 emisores en el registro, 7 conocidos, 41 titulares,
+    sin truncado. Si el tope deja emisores conocidos sin visitar, la metrica
+    truncated=1 lo senala: lo a medias nunca se presenta como completo.
+    """
+    from datetime import date, timedelta
+
+    from app.services.cnmv_ps_ingestion import ingest_cnmv_ps
+
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:  # noqa: BLE001
+        return _handle_actor_error("ingest_cnmv_ps_daily", exc, tenant_id=tenant_id)
+    try:
+        end = date.today()
+        result = ingest_cnmv_ps(db, db.info["tenant_id"], end - timedelta(days=3), end)
+        return {"actor": "ingest_cnmv_ps_daily", "status": "ok", **result}
+    except Exception as exc:
+        _rollback(db)
+        return _handle_actor_error("ingest_cnmv_ps_daily", exc)
+    finally:
+        db.close()
 
 
 @dramatiq.actor(max_retries=2, min_backoff=30_000, time_limit=300_000)

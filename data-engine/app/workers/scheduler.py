@@ -36,6 +36,7 @@ from app.workers.dramatiq_app import (
     ingest_ca_insider_yahoo,
     ingest_class_shares_outstanding,
     ingest_cnmv_nod_daily,
+    ingest_cnmv_ps_daily,
     ingest_corporate_splits,
     ingest_house_ptr,
     ingest_sec_bottleneck_filings,
@@ -711,6 +712,17 @@ def build_scheduler(*, background: bool = False) -> BlockingScheduler | Backgrou
         job_id="cnmv_nod_daily",
         hour=21,
         minute=35,
+        jitter=300,
+    )
+    # Participaciones significativas CNMV (registro oficial): diario; el
+    # actor visita solo emisores con novedades en la ventana (tope 25).
+    _register(
+        scheduler,
+        partial(enqueue_for_all_tenants, ingest_cnmv_ps_daily),
+        "cron",
+        job_id="cnmv_ps_daily",
+        hour=21,
+        minute=45,
         jitter=300,
     )
     # Cierres oficiales de todo el universo (base de Movers/Mercado/watchlist).
