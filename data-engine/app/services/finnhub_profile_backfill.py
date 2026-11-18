@@ -99,7 +99,12 @@ class FinnhubProfileBackfill:
                 # la ventana cerrada solo mantiene la cuota agotada.
                 raise UpstreamRateLimited(
                     f"Finnhub 429 en backfill de perfiles ({url})",
-                    retry_after=retry_after_seconds(resp, cap=86400.0) or None,
+                    # La ventana del proveedor NUNCA se acorta: no es un
+                    # reintento inline (ahi cabe el cap), es el cooldown
+                    # compartido que respetan todos los procesos. Un
+                    # Retry-After de 2 dias se propaga como 2 dias
+                    # (objecion del auditor 1, contraejemplo medido).
+                    retry_after=retry_after_seconds(resp, cap=float("inf")) or None,
                 )
             if resp.status_code == 200:
                 return resp.json()
@@ -159,6 +164,11 @@ class FinnhubProfileBackfill:
                 profile = self._get(PROFILE_URL, company.ticker)
             except UpstreamRateLimited as exc:
                 rate_limited = exc
+                # La proteccion compartida se publica AL DETECTAR el 429,
+                # antes del commit: si el commit falla, el cooldown ya
+                # frena a todos los procesos (objecion del auditor 1,
+                # contraejemplo medido con commit roto).
+                self._pacer.cool_down(exc.retry_after or 60.0)
                 break
             attended += 1
             if profile is None and quote is None:
@@ -295,10 +305,10 @@ class FinnhubProfileBackfill:
             **stats,
         }
         if rate_limited is not None:
-            # La ventana que pidio Finnhub la respetan todos los procesos
-            # (suelo 60 s si no mando Retry-After util, como el conector).
+            # El cooldown ya se publico al detectar el 429 (antes del
+            # commit); aqui solo se reporta. Ventana del proveedor sin
+            # acortar; suelo 60 s si no mando Retry-After util.
             window = rate_limited.retry_after or 60.0
-            self._pacer.cool_down(window)
             result.update({
                 "status": "partial",
                 "reason": "finnhub_429",
