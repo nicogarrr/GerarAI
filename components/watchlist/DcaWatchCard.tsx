@@ -89,7 +89,7 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
                     <li key={tf.key}>
                         {tf.available && tf.zone ? (
                             <span
-                                className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                                className="inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-semibold"
                                 style={chipStyle(tf.zone.color, tf.zone.fg)}
                                 title={`${ti(TF_KEYS[tf.key as keyof typeof TF_KEYS])}: ${dcaEngineText(tf.zone.label, ti)}`}
                                 data-testid={`dca-tf-${tf.key}`}
@@ -99,7 +99,7 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
                                 {tf.zone.key.toUpperCase().replace('-TRIM', '')}
                             </span>
                         ) : (
-                            <span className="inline-flex items-center rounded-md border border-gray-700 px-2 py-0.5 text-[11px] text-gray-500" title={ti('watchlist.dcaCard.tfMissing')} data-testid={`dca-tf-${tf.key}`}>
+                            <span className="inline-flex items-center rounded-md border border-gray-700 px-2 py-0.5 text-xs text-gray-500" title={ti('watchlist.dcaCard.tfMissing')} data-testid={`dca-tf-${tf.key}`}>
                                 {ti(TF_SHORT_KEYS[tf.key as keyof typeof TF_SHORT_KEYS])} —
                             </span>
                         )}
@@ -111,7 +111,7 @@ export default function DcaWatchCard({ data, ti, locale }: { data: DcaWatchCardD
                     {dcaEngineText(cur.label, ti)} · {dcaEngineText(cur.zone, ti)} · {ti('watchlist.dcaCard.monthsInZone', { count: cur.months_in_zone })}
                 </span>
                 {risk ? <span className={`rounded-full border px-2 py-0.5 text-xs ${RISK_TONE[risk.key] ?? ''}`} data-testid="dca-card-risk">{ti(RISK_KEYS[risk.key as keyof typeof RISK_KEYS])}</span> : null}
-                {cur.status === 'forming' ? <span className="text-[11px] text-gray-400">{ti('watchlist.dcaCard.forming')}</span> : null}
+                {cur.status === 'forming' ? <span className="text-xs text-gray-400">{ti('watchlist.dcaCard.forming')}</span> : null}
             </div>
             {liveLine ? (
                 <p className="text-xs text-gray-300" data-testid="dca-card-live">

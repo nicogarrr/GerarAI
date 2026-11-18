@@ -64,14 +64,14 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
         <div className="space-y-2" data-testid="dca-hit-rates">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold text-gray-100">{ti('watchlist.hitRates.title')}</p>
-                <p className="text-[11px] text-gray-500">
+                <p className="text-xs text-gray-500">
                     {ti('watchlist.hitRates.monthsCompleted', { count: INT.format(data.months_completed) })} · {scope === 'range' ? ti('watchlist.hitRates.scopeRange') : ti('watchlist.hitRates.scopeFull')}
                     {data.first_period ? ` (${data.first_period} – ${data.last_period})` : ''}
                 </p>
             </div>
-            <p className="text-[11px] leading-4 text-gray-400" data-testid="dca-hit-rates-explainer">{ti('watchlist.hitRates.explainer')}</p>
+            <p className="text-xs leading-4 text-gray-400" data-testid="dca-hit-rates-explainer">{ti('watchlist.hitRates.explainer')}</p>
             {zoneVisitsLine(data, ti, MONTHS) ? (
-                <p className="text-[11px] text-gray-400" data-testid="dca-zone-visits">{zoneVisitsLine(data, ti, MONTHS)}</p>
+                <p className="text-xs text-gray-400" data-testid="dca-zone-visits">{zoneVisitsLine(data, ti, MONTHS)}</p>
             ) : null}
             <div
                 role="table"
@@ -80,9 +80,9 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                 style={{ '--hcols': String(data.horizons.length) } as CSSProperties}
             >
                 <div role="row" className="hidden border-b border-gray-800 pb-1 text-gray-400 sm:grid sm:grid-cols-[minmax(0,1.2fr)_repeat(var(--hcols),minmax(0,1fr))] sm:gap-x-2">
-                    <span role="columnheader" className="px-1 text-left text-[11px] font-medium">{ti('watchlist.hitRates.signal')}</span>
+                    <span role="columnheader" className="px-1 text-left text-xs font-medium">{ti('watchlist.hitRates.signal')}</span>
                     {data.horizons.map((h) => (
-                        <span key={h} role="columnheader" className="px-1 text-right text-[11px] font-medium">{ti('watchlist.hitRates.months', { count: h })}</span>
+                        <span key={h} role="columnheader" className="px-1 text-right text-xs font-medium">{ti('watchlist.hitRates.months', { count: h })}</span>
                     ))}
                 </div>
                 {data.rows.map((row) => (
@@ -93,12 +93,12 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                     >
                         <div role="rowheader" className="mb-1.5 flex items-center gap-2 sm:mb-0 sm:px-1">
                             <span
-                                className="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold"
                                 style={{ backgroundColor: row.color ?? '#374151', color: contrast(row.color) }}
                             >
                                 {dcaEngineText(row.label, ti)}
                             </span>
-                            <span className="text-[11px] text-gray-500">{ti('watchlist.hitRates.signalMonths', { count: INT.format(row.signal_months) })}</span>
+                            <span className="text-xs text-gray-500">{ti('watchlist.hitRates.signalMonths', { count: INT.format(row.signal_months) })}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-1.5 sm:contents">
                             {row.cells.map((cell) => {
@@ -122,7 +122,7 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                         {!compact ? (() => {
                             const last = [...row.cells].reverse().find((cell) => cell.pct_higher !== null && cell.months > 0);
                             return last ? (
-                                <p className="mt-1 text-[11px] text-gray-400 sm:col-span-full sm:px-1" data-testid={`dca-hit-rates-takeaway-${row.key}`}>
+                                <p className="mt-1 text-xs text-gray-400 sm:col-span-full sm:px-1" data-testid={`dca-hit-rates-takeaway-${row.key}`}>
                                     {ti('watchlist.hitRates.takeaway', {
                                         horizon: INT.format(last.horizon_months),
                                         pct: dcaPercent(last.pct_higher, locale) ?? '—',
@@ -134,11 +134,11 @@ export default function DcaHitRatesCard({ data, compact = false, scope = 'full',
                     </div>
                 ))}
             </div>
-            <p className="text-[11px] text-gray-500">
+            <p className="text-xs text-gray-500">
                 {dcaReasonText(data.disclaimer, locale)} {ti('watchlist.hitRates.footer')}
             </p>
             {!compact && data.rows.some((row) => row.cells.some((cell) => cell.avg_return !== null && Math.abs(cell.avg_return) >= 1)) ? (
-                <p className="text-[11px] leading-4 text-gray-500" data-testid="dca-hit-rates-extreme">{ti('watchlist.hitRates.extremeNote')}</p>
+                <p className="text-xs leading-4 text-gray-500" data-testid="dca-hit-rates-extreme">{ti('watchlist.hitRates.extremeNote')}</p>
             ) : null}
         </div>
     );

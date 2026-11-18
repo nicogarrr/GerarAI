@@ -34,7 +34,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                   ? 'border-amber-800 text-amber-300'
                   : 'border-gray-700 text-gray-500';
         return (
-            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] ${tone}`} title={missing.title} data-testid="dca-missing-badge">
+            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs ${tone}`} title={missing.title} data-testid="dca-missing-badge">
                 {missing.text}
             </span>
         );
@@ -76,7 +76,7 @@ export default function DcaLevelBadge({ item, signalMonths, compact = false }: D
                     // preventDefault evita que Radix cierre el tooltip en pointerdown/click.
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={(event) => { event.preventDefault(); setOpen((value) => !value); }}
-                    className="relative before:absolute before:-inset-2.5 before:content-[''] inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold whitespace-nowrap"
+                    className="relative before:absolute before:-inset-2.5 before:content-[''] inline-flex min-h-6 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold whitespace-nowrap"
                     style={{ backgroundColor: state.color, color: readableInk(state.color, state.fg), borderColor: state.color === '#FFFFFF' ? '#9CA3AF' : state.color }}
                     aria-label={`${item?.symbol ?? ''}: ${dcaEngineText(state.label, t)}, ${dcaStatusLabel(state.status, t)}${staleText ? `, ${staleText}` : ''}`}
                 >
