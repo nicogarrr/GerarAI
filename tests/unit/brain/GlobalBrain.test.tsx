@@ -88,7 +88,7 @@ describe('GlobalBrain: botón y apertura', () => {
     it('a click on the library SSR button before hydration opens the brain with the library context', async () => {
         window.eval(EARLY_OPEN_CAPTURE_JS);
         const html = document.createElement('div');
-        html.innerHTML = renderToString(<LibraryChat scope="library" authors={['Buffett']} />);
+        html.innerHTML = renderToString(<LibraryChat scope="library" authors={['Buffett']} label="Preguntar a la biblioteca" />);
         document.body.append(html);
         try {
             fireEvent.click(html.querySelector('button')!);
