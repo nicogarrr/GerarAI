@@ -110,7 +110,11 @@ class PortfolioReconstructionService:
         for t in transactions:
             if t.company_id is not None:
                 ids.add(t.company_id)
-                currency[t.company_id] = (t.currency or "USD")
+                # Solo como reserva para empresas sin posicion viva: la divisa
+                # de la posicion manda; una pata del libro en otra divisa (el
+                # broker la registro en EUR un titulo en USD) no puede pisarla
+                # o los cierres dejan de casar con la unidad destino.
+                currency.setdefault(t.company_id, (t.currency or "USD"))
         company_ids = sorted(ids)
         companies_by_id = {company.id: company for _, company in (rows or [])}
         missing = [cid for cid in company_ids if cid not in companies_by_id]
@@ -120,17 +124,22 @@ class PortfolioReconstructionService:
             })
         tickers = {cid: company.ticker for cid, company in companies_by_id.items()}
 
-        signed: list[tuple[date, int, Decimal, Decimal]] = []  # fecha, company, dqty, flow nativo
+        # Cada flujo conserva la divisa de SU operacion: un libro con patas en
+        # varias divisas no puede convertirse todo al tipo de la ultima.
+        signed: list[
+            tuple[date, int, Decimal, Decimal, str]
+        ] = []  # fecha, company, dqty, flow nativo, divisa
         net: dict[int, Decimal] = defaultdict(Decimal)
         for t in transactions:
             action = (t.action or "").lower()
             gross = t.quantity * t.price
             fees = t.fees or Decimal("0")
+            flow_currency = t.currency or "USD"
             if action in BUY_ACTIONS:
-                signed.append((t.trade_date, t.company_id, t.quantity, gross + fees))
+                signed.append((t.trade_date, t.company_id, t.quantity, gross + fees, flow_currency))
                 net[t.company_id] += t.quantity
             else:
-                signed.append((t.trade_date, t.company_id, -t.quantity, -(gross - fees)))
+                signed.append((t.trade_date, t.company_id, -t.quantity, -(gross - fees), flow_currency))
                 net[t.company_id] -= t.quantity
 
         positions = {p.company_id: p for p in held_positions}
@@ -239,7 +248,7 @@ class PortfolioReconstructionService:
         days = sorted(d for d in prices_by_day if d >= warmup)
         fx_table = fx.fx_table(
             db,
-            currencies=set(currency.values()) | {base},
+            currencies=set(currency.values()) | {flow[4] for flow in signed} | {base},
             base_currency=base,
             as_of_max=days[-1] if days else date.today(),
         )
@@ -267,10 +276,10 @@ class PortfolioReconstructionService:
         base_row: dict[str, Any] | None = None
         for day in days:
             while index < len(signed) and signed[index][0] <= day:
-                _, company_id, dqty, flow = signed[index]
+                _, company_id, dqty, flow, flow_currency = signed[index]
                 qty[company_id] += dqty
                 rate_flow = PortfolioFXService.rate_from_table(
-                    fx_table, quote_currency=currency[company_id], base_currency=base, as_of=signed[index][0]
+                    fx_table, quote_currency=flow_currency, base_currency=base, as_of=signed[index][0]
                 )
                 if rate_flow is None:
                     return Reconstruction(
