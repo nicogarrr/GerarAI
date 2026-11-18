@@ -240,3 +240,25 @@ def test_typed_dimensions_never_look_consolidated():
                 'ifrs-full:BusinessAxis' if axis else '__unknown_dimension__'
             ]
             assert parsed['dropped'] == 1  # unchanged invalid numeric fixture
+
+
+def test_internal_entities_in_external_xml_never_expanded():
+    # Un informe ESEF es XML externo: las entidades internas no se expanden
+    # (resolve_entities=False). Un hecho cuyo valor vive en una entidad se
+    # descarta en vez de fabricarse a partir de contenido expandido.
+    doc = DOC.replace(
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html [<!ENTITY smuggled "9,999.9">]>',
+    ).replace(
+        '<p><ix:nonFraction name="ifrs-full:Revenue"',
+        '<p><ix:nonFraction name="ifrs-full:Revenue" format="ixt4:num-dot-decimal" '
+        'contextRef="c-1" unitRef="u-1" decimals="1">&smuggled;</ix:nonFraction></p>\n'
+        '<p><ix:nonFraction name="ifrs-full:Revenue"',
+    )
+    parsed = parse_ixbrl_facts(io.BytesIO(doc.encode()))
+    revenue_vals = [e['val'] for e in parsed['facts']['ifrs-full:Revenue']['iso4217:EUR']]
+    assert '9999.9' not in revenue_vals
+
+    namedoc = doc.replace('>Kerry Group</ix:nonNumeric>', '>&smuggled;</ix:nonNumeric>')
+    name = parse_entity_name(io.BytesIO(namedoc.encode()))
+    assert name is None or '9999.9' not in name

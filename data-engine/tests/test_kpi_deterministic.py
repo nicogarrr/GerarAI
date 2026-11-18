@@ -368,3 +368,32 @@ def test_xbrl_sibling_namespace_declaration_cannot_authorize_unit_qname():
     xml = XML.replace(' xmlns:iso4217="http://www.xbrl.org/2003/iso4217"', '')
     xml = xml.replace('<x:context id="fy">', '<x:context id="fy" xmlns:iso4217="http://www.xbrl.org/2003/iso4217">')
     assert parser.extract([chunk(xml)], [row()], source_type="SEC", cik="123") == []
+
+
+def test_xbrl_fact_value_from_dtd_entity_rejected_not_expanded():
+    # El fragmento iXBRL es XML externo y se parsea con defusedxml: un
+    # DOCTYPE con entidades se rechaza entero, sin expandir nada. Con el
+    # parser stdlib el valor expandido (123.4 via &n;) llegaba a publicarse
+    # como observacion KPI aunque la cifra no existe en el texto del filing.
+    smuggled = XML.replace(
+        "<html ",
+        '<!DOCTYPE html [<!ENTITY n "123.4">]>\n<html ',
+    ).replace(
+        '>123.4</ix:nonFraction>',
+        '>&n;</ix:nonFraction>',
+    )
+    assert parser.extract([chunk(smuggled)], [row()], source_type="SEC", cik="123") == []
+
+
+def test_xbrl_quadratic_entity_bomb_rejected_fast():
+    # Bomba cuadratica por debajo del limite de amplificacion de expat:
+    # defusedxml la rechaza sin expandir los 100 KB x 2 referencias.
+    big = "9" * 100_000
+    bomb = XML.replace(
+        "<html ",
+        f'<!DOCTYPE html [<!ENTITY big "{big}">]>\n<html ',
+    ).replace(
+        '>123.4</ix:nonFraction>',
+        '>&big;&big;</ix:nonFraction>',
+    )
+    assert parser.extract([chunk(bomb)], [row()], source_type="SEC", cik="123") == []

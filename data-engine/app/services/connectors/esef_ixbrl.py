@@ -109,8 +109,13 @@ def parse_ixbrl_facts(source: str | BinaryIO) -> dict[str, Any]:
     "entity_lei": lei_mas_frecuente}."""
     # huge_tree: los informes ESEF llevan nodos de texto de varios MB
     # (el limite por defecto de libxml2 rechaza informes reales, p.ej.
-    # Kerry FY2021 linea 192).
-    tree = etree.parse(source, etree.XMLParser(huge_tree=True))
+    # Kerry FY2021 linea 192). resolve_entities=False + no_network: mismo
+    # endurecimiento que sec_filing_instance y xbrl_extension_map - un
+    # informe ESEF es XML externo y sus entidades nunca se expanden (las
+    # referencias numericas y las 5 predefinidas siguen funcionando).
+    tree = etree.parse(
+        source, etree.XMLParser(huge_tree=True, resolve_entities=False, no_network=True)
+    )
     root = tree.getroot()
 
     contexts: dict[str, _Context] = {}
@@ -205,7 +210,10 @@ def parse_ixbrl_facts(source: str | BinaryIO) -> dict[str, Any]:
 def parse_entity_name(source: str | BinaryIO) -> str | None:
     """Nombre legal declarado (ifrs-full:NameOfReportingEntity...) con cadena
     de continuaciones; None si el documento no lo declara."""
-    tree = etree.parse(source, etree.XMLParser(huge_tree=True))
+    # Mismo parser endurecido que parse_ixbrl_facts (XML externo).
+    tree = etree.parse(
+        source, etree.XMLParser(huge_tree=True, resolve_entities=False, no_network=True)
+    )
     root = tree.getroot()
     continuations = {
         e.get("id"): e for e in root.iter(_IX + "continuation") if e.get("id")

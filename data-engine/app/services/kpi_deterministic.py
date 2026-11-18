@@ -9,7 +9,12 @@ import re
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from io import StringIO
-from xml.etree import ElementTree as ET
+from xml.etree import ElementTree as ET  # nosec B314  # stdlib solo para tipos (Element) y ParseError: defusedxml no los exporta; el parseo usa defusedxml
+
+# Fragmentos iXBRL externos (SEC/IR): defusedxml solo para PARSEAR - entidades
+# y DTD con entidades rechazados sin expandir; ParseError sigue del stdlib.
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 
 VERSION = "sec-ir-kpi-deterministic-v1"
 # Exact standard concepts only. Extensions require a reviewed mapping.
@@ -92,7 +97,7 @@ def _xbrl(chunk, active, cik):
     try:
         namespaces = {}
         root_started = False
-        for event, value in ET.iterparse(StringIO(chunk.text), events=("start-ns", "start")):
+        for event, value in DefusedET.iterparse(StringIO(chunk.text), events=("start-ns", "start")):
             if event == "start":
                 root_started = True
                 continue
@@ -108,8 +113,10 @@ def _xbrl(chunk, active, cik):
             return []
         if not re.fullmatch(r"https?://xbrl.sec.gov/dei/20\d{2}(?:-\d{2}-\d{2})?", namespaces.get("dei", "")):
             return []
-        root = ET.fromstring(chunk.text)
-    except ET.ParseError:
+        root = DefusedET.fromstring(chunk.text)
+    except (ET.ParseError, DefusedXmlException):
+        # Un DTD con entidades no es un fragmento soportado: se descarta
+        # entero, igual que cualquier otro XML que no parsea.
         return []
     contexts, units = {}, {}
     for element in root.iter():

@@ -26,11 +26,11 @@ def _module_parser(module):
 
 
 def test_connectors_parse_with_defusedxml_and_reject_entities():
-    from app.services import ibkr_connection_service, investor_videos
+    from app.services import ibkr_connection_service, investor_videos, kpi_deterministic
     from app.services.connectors import ecb, form4, form13dg, form13f, ibkr, rss, sec_xbrl_instance
 
     for module in (ecb, form4, form13dg, form13f, ibkr, rss, sec_xbrl_instance,
-                   ibkr_connection_service, investor_videos):
+                   ibkr_connection_service, investor_videos, kpi_deterministic):
         parser = _module_parser(module)
         with pytest.raises(EntitiesForbidden):
             parser.fromstring(BOMB)
