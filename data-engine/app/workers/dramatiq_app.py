@@ -2599,9 +2599,18 @@ def propicks_radar_scan(
         db.close()
 
 
-# Presupuesto por corrida: 50 min dentro del time_limit de 1 h (10 min de
-# margen para la empresa en vuelo). Agotado, sigue en otro mensaje con cursor.
-VALUATION_TIME_BUDGET_SECONDS = 50 * 60
+# Tanda por corrida: 5 min dentro del time_limit de 1 h (55 min de margen para
+# la empresa en vuelo; el limite queda como red de seguridad). Agotada, sigue
+# en otro mensaje con cursor que entra al FINAL de la cola externa: con 13
+# tenants cada uno avanza una tanda por vuelta en vez de que el primero ocupe
+# un hilo 50 min y los demas esperen su turno entero (cola medida 18-nov:
+# 13 listas, la mas vieja a 61 min). Lo ya hecho no se repite: cursor en Redis
+# y cache fresca de 24 h.
+VALUATION_TIME_BUDGET_SECONDS = 5 * 60
+# Espera de la continuacion: solo debe pasar tras soltar el lease y el claim
+# del coalescer (ambos se liberan al devolver "partial", en milisegundos).
+VALUATION_CONTINUATION_DELAY_MS = 15_000
+VALUATION_CONTINUATION_JITTER_MS = 5_000
 
 
 @dramatiq.actor(max_retries=1, min_backoff=30_000, time_limit=3_600_000,
@@ -2731,7 +2740,7 @@ def refresh_valuation_metrics(
                 logger.warning("valuation cursor: no se pudo guardar el cursor en Redis", exc_info=True)
         refresh_valuation_metrics.send_with_options(
             kwargs={"tenant_id": tenant_id, "user_id": user_id},
-            delay=60_000 + _retry_jitter_ms(),
+            delay=VALUATION_CONTINUATION_DELAY_MS + _retry_jitter_ms(VALUATION_CONTINUATION_JITTER_MS),
         )
         return {
             "status": "partial",
