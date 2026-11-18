@@ -1,0 +1,168 @@
+<?xml version="1.0" encoding="UTF-8"?><edgarSubmission xmlns="http://www.sec.gov/edgar/ownership" xmlns:com="http://www.sec.gov/edgar/common">
+  <headerData>
+    <submissionType>144</submissionType>
+    <filerInfo>
+      <filer>
+        <filerCredentials>
+          <cik>0001164469</cik>
+          <ccc>XXXXXXXX</ccc>
+        </filerCredentials>
+      </filer>
+      <liveTestFlag>LIVE</liveTestFlag>
+
+
+
+    </filerInfo>
+  </headerData>
+  <formData>
+    <issuerInfo>
+      <issuerCik>0000849869</issuerCik>
+      <issuerName>SILGAN HOLDINGS INC</issuerName>
+      <secFileNumber>001-41459</secFileNumber>
+      <issuerAddress>
+        <com:street1>601 MERRITT 7</com:street1>
+        <com:city>NORWALK</com:city>
+        <com:stateOrCountry>CT</com:stateOrCountry>
+        <com:zipCode>06851</com:zipCode>
+      </issuerAddress>
+      <issuerContactPhone>2039757110</issuerContactPhone>
+      <nameOfPersonForWhoseAccountTheSecuritiesAreToBeSold>LEWIS ROBERT B</nameOfPersonForWhoseAccountTheSecuritiesAreToBeSold>
+      <relationshipsToIssuer>
+        <relationshipToIssuer>Director</relationshipToIssuer>
+      </relationshipsToIssuer>
+    </issuerInfo>
+    <securitiesInformation>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <brokerOrMarketmakerDetails>
+        <name>FSC Securities Corporation</name>
+        <address>
+          <com:street1>2300 Windy Ridge Pkwy</com:street1>
+          <com:street2>Suite 1100</com:street2>
+          <com:city>Atlanta</com:city>
+          <com:stateOrCountry>GA</com:stateOrCountry>
+          <com:zipCode>30339</com:zipCode>
+        </address>
+      </brokerOrMarketmakerDetails>
+      <noOfUnitsSold>88861</noOfUnitsSold>
+      <aggregateMarketValue>3687731.50</aggregateMarketValue>
+      <noOfUnitsOutstanding>105682020</noOfUnitsOutstanding>
+      <approxSaleDate>11/16/2026</approxSaleDate>
+      <securitiesExchangeName>NYSE</securitiesExchangeName>
+    </securitiesInformation>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>03/01/2025</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>18251</amountOfSecuritiesAcquired>
+      <paymentDate>03/01/2025</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>03/01/2022</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>17897</amountOfSecuritiesAcquired>
+      <paymentDate>03/01/2022</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>03/01/2013</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>4992</amountOfSecuritiesAcquired>
+      <paymentDate>03/01/2013</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>03/01/2012</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>6513</amountOfSecuritiesAcquired>
+      <paymentDate>03/01/2012</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>03/01/2011</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>6663</amountOfSecuritiesAcquired>
+      <paymentDate>03/01/2011</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>03/01/2010</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>1960</amountOfSecuritiesAcquired>
+      <paymentDate>03/01/2010</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>08/16/2008</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>6855</amountOfSecuritiesAcquired>
+      <paymentDate>08/16/2008</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>08/16/2007</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>6855</amountOfSecuritiesAcquired>
+      <paymentDate>08/16/2007</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>08/16/2006</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>6855</amountOfSecuritiesAcquired>
+      <paymentDate>08/16/2006</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>08/16/2005</acquiredDate>
+      <natureOfAcquisitionTransaction>Common Stock received in settlement of an employee grant of restricted stock units upon vesting.</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>5000</amountOfSecuritiesAcquired>
+      <paymentDate>08/16/2005</paymentDate>
+      <natureOfPayment>The securities to be sold were received upon the settlement of vested restricted stock units. Under the applicable plan, upon vesting restricted stock units are settled in shares of Common Stock on a 1-for-1 basis without any payment.</natureOfPayment>
+    </securitiesToBeSold>
+    <securitiesToBeSold>
+      <securitiesClassTitle>Common Stock</securitiesClassTitle>
+      <acquiredDate>05/10/2005</acquiredDate>
+      <natureOfAcquisitionTransaction>Open Market Purchase</natureOfAcquisitionTransaction>
+      <nameOfPersonfromWhomAcquired>Open Market</nameOfPersonfromWhomAcquired>
+      <isGiftTransaction>N</isGiftTransaction>
+      <amountOfSecuritiesAcquired>7020</amountOfSecuritiesAcquired>
+      <paymentDate>05/10/2005</paymentDate>
+      <natureOfPayment>Cash</natureOfPayment>
+    </securitiesToBeSold>
+    <nothingToReportFlagOnSecuritiesSoldInPast3Months>Y</nothingToReportFlagOnSecuritiesSoldInPast3Months>
+    <noticeSignature>
+      <noticeDate>11/13/2026</noticeDate>
+      <signature>/s/ Robert B. Lewis</signature>
+    </noticeSignature>
+  </formData>
+</edgarSubmission>

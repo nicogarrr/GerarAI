@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?><edgarSubmission xmlns="http://www.sec.gov/edgar/ownership" xmlns:com="http://www.sec.gov/edgar/common">
+	<headerData>
+        <submissionType>144</submissionType>
+                <filerInfo>
+            <filer>
+                <filerCredentials>
+                    <cik>0001997710</cik>
+                    <ccc>XXXXXXXX</ccc>
+                </filerCredentials>
+            </filer>
+        <liveTestFlag>LIVE</liveTestFlag>
+
+
+
+
+                </filerInfo>
+    </headerData>
+
+     <formData>
+        <issuerInfo>
+            <issuerCik>0001501796</issuerCik>
+			<issuerName>AURA BIOSCIENCES, INC.</issuerName>
+
+
+			    <secFileNumber>001-40971</secFileNumber>
+
+
+			<issuerAddress>
+				<com:street1>80 GUEST STREET</com:street1>
+                				<com:city>BOSTON</com:city>
+				<com:stateOrCountry>MA</com:stateOrCountry>
+				<com:zipCode>02135</com:zipCode>
+			</issuerAddress>
+
+			<issuerContactPhone>(617) 500-8864</issuerContactPhone>
+			<nameOfPersonForWhoseAccountTheSecuritiesAreToBeSold>Janet Jill Hopkins</nameOfPersonForWhoseAccountTheSecuritiesAreToBeSold>
+
+			<relationshipsToIssuer>
+
+				    <relationshipToIssuer>Officer</relationshipToIssuer>
+
+			</relationshipsToIssuer>
+		</issuerInfo>
+
+				          <securitiesInformation>
+			<securitiesClassTitle>Common Stock</securitiesClassTitle>
+			<brokerOrMarketmakerDetails>
+				<name>Morgan Stanley Smith Barney LLC</name>
+				<address>
+				<com:street1>200 West Civic Center Drive</com:street1>
+                				<com:street2>4th Floor</com:street2>
+                				<com:city>Sandy</com:city>
+				<com:stateOrCountry>UT</com:stateOrCountry>
+				<com:zipCode>84070</com:zipCode>
+				</address>
+			</brokerOrMarketmakerDetails>
+			<noOfUnitsSold>16903</noOfUnitsSold>
+			<aggregateMarketValue>119167</aggregateMarketValue>
+			<noOfUnitsOutstanding>104074302</noOfUnitsOutstanding>
+			<approxSaleDate>11/16/2026</approxSaleDate>
+			<securitiesExchangeName>NASDAQ</securitiesExchangeName>
+		</securitiesInformation>
+
+    		       <securitiesToBeSold>
+         <securitiesClassTitle>Common Stock</securitiesClassTitle>
+         <acquiredDate>11/15/2026</acquiredDate>
+         <natureOfAcquisitionTransaction>Acquired as compensation - Restricted Stock Units</natureOfAcquisitionTransaction>
+                  <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+                  <isGiftTransaction>N</isGiftTransaction>
+		          <amountOfSecuritiesAcquired>16903</amountOfSecuritiesAcquired>
+                  <paymentDate>11/15/2026</paymentDate>
+                  <natureOfPayment>Compensation</natureOfPayment>
+      </securitiesToBeSold>
+
+    <nothingToReportFlagOnSecuritiesSoldInPast3Months>Y</nothingToReportFlagOnSecuritiesSoldInPast3Months>
+
+
+    		<remarks>The Shares covered by this Form 144 are being sold automatically pursuant to a mandatory, non-discretionary, sell-to-cover arrangement adopted by the Issuer for the purpose of satisfying tax withholding obligations incurred upon the vesting and settlement of equity awards</remarks>
+
+        <noticeSignature>
+            <noticeDate>11/16/2026</noticeDate>
+                        <signature> /s/ Amy Elazzouzi, as Attorney-in-Fact</signature>
+        </noticeSignature>
+	</formData>
+
+    </edgarSubmission>

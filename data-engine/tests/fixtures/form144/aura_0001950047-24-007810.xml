@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?><edgarSubmission xmlns="http://www.sec.gov/edgar/ownership" xmlns:ns2="http://www.sec.gov/edgar/common">
+    <headerData>
+        <submissionType>144</submissionType>
+        <filerInfo>
+            <filer>
+                <filerCredentials>
+                    <cik>0001710237</cik>
+                    <ccc>XXXXXXXX</ccc>
+                </filerCredentials>
+            </filer>
+            <liveTestFlag>LIVE</liveTestFlag>
+
+
+
+        </filerInfo>
+    </headerData>
+    <formData>
+        <issuerInfo>
+            <issuerCik>0001501796</issuerCik>
+            <issuerName>AURA BIOSCIENCES INC</issuerName>
+            <secFileNumber>001-40971</secFileNumber>
+            <issuerAddress>
+                <ns2:street1>80 GUEST STREET</ns2:street1>
+                <ns2:city> BOSTON</ns2:city>
+                <ns2:stateOrCountry>MA</ns2:stateOrCountry>
+                <ns2:zipCode>01235</ns2:zipCode>
+            </issuerAddress>
+            <issuerContactPhone>(617)500-8864</issuerContactPhone>
+            <nameOfPersonForWhoseAccountTheSecuritiesAreToBeSold>JULIE FEDER</nameOfPersonForWhoseAccountTheSecuritiesAreToBeSold>
+            <relationshipsToIssuer>
+                <relationshipToIssuer>Officer</relationshipToIssuer>
+            </relationshipsToIssuer>
+        </issuerInfo>
+        <securitiesInformation>
+            <securitiesClassTitle>COMMON</securitiesClassTitle>
+            <brokerOrMarketmakerDetails>
+                <name>Morgan Stanley Smith Barney LLC Executive Financial Services</name>
+                <address>
+                    <ns2:street1>1 New York Plaza</ns2:street1>
+                    <ns2:street2>8th Floor</ns2:street2>
+                    <ns2:city>New York</ns2:city>
+                    <ns2:stateOrCountry>NY</ns2:stateOrCountry>
+                    <ns2:zipCode>10004</ns2:zipCode>
+                </address>
+            </brokerOrMarketmakerDetails>
+            <noOfUnitsSold>25131</noOfUnitsSold>
+            <aggregateMarketValue>258597.99</aggregateMarketValue>
+            <noOfUnitsOutstanding>49606115</noOfUnitsOutstanding>
+            <approxSaleDate>10/18/2024</approxSaleDate>
+            <securitiesExchangeName>NASDAQ</securitiesExchangeName>
+        </securitiesInformation>
+        <securitiesToBeSold>
+            <securitiesClassTitle>Common</securitiesClassTitle>
+            <acquiredDate>10/18/2024</acquiredDate>
+            <natureOfAcquisitionTransaction>Exercise of Stock Options</natureOfAcquisitionTransaction>
+            <nameOfPersonfromWhomAcquired>Issuer</nameOfPersonfromWhomAcquired>
+            <isGiftTransaction>N</isGiftTransaction>
+            <amountOfSecuritiesAcquired>25131</amountOfSecuritiesAcquired>
+            <paymentDate>10/18/2024</paymentDate>
+            <natureOfPayment>Cash</natureOfPayment>
+        </securitiesToBeSold>
+        <nothingToReportFlagOnSecuritiesSoldInPast3Months>Y</nothingToReportFlagOnSecuritiesSoldInPast3Months>
+        <noticeSignature>
+            <noticeDate>10/18/2024</noticeDate>
+            <planAdoptionDates>
+                <planAdoptionDate>06/23/2023</planAdoptionDate>
+            </planAdoptionDates>
+            <signature>/s/ Julie Feder</signature>
+        </noticeSignature>
+    </formData>
+</edgarSubmission>
