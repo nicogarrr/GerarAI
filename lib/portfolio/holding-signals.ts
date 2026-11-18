@@ -1,3 +1,5 @@
+// @ts-expect-error TS5097: explicit extension for the node strip-types guards.
+import { fairValueWarnings } from '../research/fair-value-warnings.ts';
 // @ts-expect-error TS5097: extension explicita para node --experimental-strip-types (scripts/holding-signals.test.ts, sin alias «@/»).
 import { chartPriceUnit } from '../market/chart-price-units.ts';
 
@@ -12,6 +14,7 @@ import { chartPriceUnit } from '../market/chart-price-units.ts';
 export type FairValueSource = 'tesis' | 'motor' | 'motor_orientativo';
 
 export type HoldingFairValue = {
+    warnings?: string[];
     value: number;
     source: FairValueSource;
     label: string;
@@ -52,6 +55,7 @@ export function mapFairValues(raw: unknown): Record<string, HoldingFairValue> {
         const value = typeof item.value === 'number' ? item.value : null;
         const source = SOURCES.find((s) => s === item.source);
         if (value === null || !(value > 0) || !Number.isFinite(value) || !source) continue;
+        const warnings = fairValueWarnings(item.warnings);
         out[ticker.toUpperCase()] = {
             value,
             source,
@@ -59,6 +63,7 @@ export function mapFairValues(raw: unknown): Record<string, HoldingFairValue> {
             asOf: typeof item.as_of === 'string' ? item.as_of : null,
             currency: typeof item.currency === 'string' ? item.currency : null,
             publishable: item.publishable === true,
+            ...(warnings.length ? { warnings } : {}),
         };
     }
     return out;
