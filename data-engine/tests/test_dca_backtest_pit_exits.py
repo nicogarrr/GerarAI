@@ -22,6 +22,15 @@ T0 = 2008 * 12  # 2008-01
 MONTHS = list(range(T0, T0 + 12))  # 2008-01 .. 2008-12
 
 
+def _gz(payload: bytes) -> bytes:
+    """gzip determinista. ``gzip.compress`` sin ``mtime`` escribe ``time.time()`` en la
+    cabecera: dos compresiones del mismo contenido en segundos distintos dan bytes
+    distintos y ``_data_hash`` (que hashea los bytes) cambia. Flaky medido en CI #5887:
+    el test reescribe el mismo companyfacts y cruzar un limite de segundo rompia la
+    igualdad de hash."""
+    return gzip.compress(payload, mtime=0)
+
+
 def _bars(rets, start=100.0, day0=date(2005, 1, 3)):
     out = []
     price = start
@@ -257,7 +266,7 @@ def test_data_hash_cubre_spy_sec_simbolos_y_config(tmp_path):
     secdir.mkdir()
     (pxdir / "WIN.csv").write_text("Date,Close\n2005-01-03,100\n")
     (pxdir / "SPY.csv").write_text("Date,Close\n2005-01-03,20\n")
-    (secdir / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {}}'))
+    (secdir / "WIN.json.gz").write_bytes(_gz(b'{"facts": {}}'))
     syms = tmp_path / "symbols.txt"
     syms.write_text("WIN\n")
     cfg = {"seed": 1, "start": "2008-01"}
@@ -267,12 +276,36 @@ def test_data_hash_cubre_spy_sec_simbolos_y_config(tmp_path):
     assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg) != base
     # companyfacts distinto -> hash distinto.
     (pxdir / "SPY.csv").write_text("Date,Close\n2005-01-03,20\n")
-    (secdir / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"x": 1}}'))
+    (secdir / "WIN.json.gz").write_bytes(_gz(b'{"facts": {"x": 1}}'))
     assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg) != base
     # config distinta -> hash distinto; entrada identica -> mismo hash.
-    (secdir / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {}}'))
+    (secdir / "WIN.json.gz").write_bytes(_gz(b'{"facts": {}}'))
     assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, {**cfg, "seed": 2}) != base
     assert bt._data_hash([pxdir], [secdir], ["WIN", "SPY"], syms, None, None, cfg) == base
+
+
+def test_data_hash_igualdad_no_depende_del_segundo_en_que_se_escribe_el_gz(tmp_path, monkeypatch):
+    # Reloj que avanza 1 s por llamada: antes de _gz, la misma entrada escrita dos
+    # veces daba hashes distintos (mtime en la cabecera gzip).
+    import time as _time
+
+    clock = [1_700_000_000.0]
+
+    def tick():
+        clock[0] += 1.0
+        return clock[0]
+
+    monkeypatch.setattr(_time, "time", tick)
+    pxdir, secdir = tmp_path / "px", tmp_path / "sec"
+    pxdir.mkdir()
+    secdir.mkdir()
+    (pxdir / "WIN.csv").write_text("Date,Close\n2005-01-03,100\n")
+    syms = tmp_path / "symbols.txt"
+    syms.write_text("WIN\n")
+    (secdir / "WIN.json.gz").write_bytes(_gz(b'{"facts": {}}'))
+    first = bt._data_hash([pxdir], [secdir], ["WIN"], syms, None, None, {"seed": 1})
+    (secdir / "WIN.json.gz").write_bytes(_gz(b'{"facts": {}}'))
+    assert bt._data_hash([pxdir], [secdir], ["WIN"], syms, None, None, {"seed": 1}) == first
 
 
 def test_data_hash_cubre_todos_los_candidatos_y_el_orden(tmp_path):
@@ -285,8 +318,8 @@ def test_data_hash_cubre_todos_los_candidatos_y_el_orden(tmp_path):
         d.mkdir()
     (z / "WIN.csv").write_text("Date,Close\n2006-01-03,1\n")
     (a / "WIN.csv").write_text("Date,Close\n2005-01-03,1\n")  # inicio mas temprano: el usado
-    (zsec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {}}'))
-    (asec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"y": 2}}'))
+    (zsec / "WIN.json.gz").write_bytes(_gz(b'{"facts": {}}'))
+    (asec / "WIN.json.gz").write_bytes(_gz(b'{"facts": {"y": 2}}'))
     syms = tmp_path / "symbols.txt"
     syms.write_text("WIN\n")
     cfg = {"seed": 1}
@@ -296,9 +329,9 @@ def test_data_hash_cubre_todos_los_candidatos_y_el_orden(tmp_path):
     assert bt._data_hash([z, a], [zsec, asec], ["WIN"], syms, None, None, cfg) != base
     (z / "WIN.csv").write_text("Date,Close\n2006-01-03,1\n")
     # Tocar el companyfacts NO usado (segundo en orden CLI) cambia el hash.
-    (asec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"y": 3}}'))
+    (asec / "WIN.json.gz").write_bytes(_gz(b'{"facts": {"y": 3}}'))
     assert bt._data_hash([z, a], [zsec, asec], ["WIN"], syms, None, None, cfg) != base
-    (asec / "WIN.json.gz").write_bytes(gzip.compress(b'{"facts": {"y": 2}}'))
+    (asec / "WIN.json.gz").write_bytes(_gz(b'{"facts": {"y": 2}}'))
     assert bt._data_hash([z, a], [zsec, asec], ["WIN"], syms, None, None, cfg) == base
     # Permutar el orden de los directorios cambia el hash.
     assert bt._data_hash([a, z], [zsec, asec], ["WIN"], syms, None, None, cfg) != base
