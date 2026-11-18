@@ -15,7 +15,7 @@
   "faqTitle": "Preguntas frecuentes",
   "docsTitle": "Documentación",
   "docsSubtitle": "Guía práctica por módulo: lo que la app hace hoy y cómo usarla.",
-  "firstStepsTitle": "Primeros pasos: modelo → tesis → decisión",
+  "firstStepsTitle": "Primeros pasos: tesis → valoración → decisión",
   "moduleGuideTitle": "Guía por módulo",
   "glossaryTitle": "Glosario y metodología",
   "contactTitle": "Contacto",
@@ -29,7 +29,7 @@
     },
     "item1": {
       "title": "Modelo a largo plazo",
-      "text": "Modelo fundamental con supuestos visibles (crecimiento, margen FCF, WACC), escenarios Bear/Base/Bull con sus spreads, owner earnings, TAM/SAM/SOM y reverse DCF. Pestaña «Modelo» de la ficha."
+      "text": "Modelo fundamental con supuestos visibles (crecimiento, margen FCF, WACC), escenarios Bajista / Base / Alcista con sus spreads, owner earnings, TAM/SAM/SOM y reverse DCF. Sección «Modelo fundamental a largo plazo» de la pestaña «Valoración»."
     },
     "item2": {
       "title": "Cartera",
@@ -102,11 +102,11 @@
     "public": ". Esta página de ayuda y la metodología se leen sin cuenta."
   },
   "steps": {
-    "model": "1. Modelo.",
-    "modelText": "elige la compañía y abre la pestaña «Modelo» y pulsa «Generar modelo». Revisa los supuestos (crecimiento, margen FCF, WACC) y los escenarios Bear/Base/Bull con sus spreads antes de fiarte del número.",
+    "thesis": "1. Tesis.",
+    "thesisText": "elige la compañía, abre la pestaña «Tesis» y pulsa «Generar tesis» (o «Regenerar tesis» si ya hay una). Revisa la hipótesis, los escenarios con probabilidades, los catalizadores con fecha y qué la invalidaría. El memo y el EPUB se exportan desde la propia vista de tesis («Exportar memo» y «Exportar EPUB»);",
     "in": "En",
-    "thesis": "2. Tesis.",
-    "thesisText": "Genera la tesis desde la misma ficha: hipótesis, escenarios con probabilidades, catalizadores con fecha y qué la invalidaría. El memo y el EPUB se exportan desde la propia vista de tesis («Exportar memo» y «Exportar EPUB»);",
+    "valuation": "2. Valoración.",
+    "valuationText": "En la misma ficha, abre la pestaña «Valoración» y revisa la sección «Modelo fundamental a largo plazo»: los supuestos (crecimiento, margen FCF y WACC) y los escenarios Bajista / Base / Alcista con sus spreads antes de fiarte del número.",
     "exportText": "es la exportación anual del journal.",
     "decision": "3. Decisión.",
     "decisionText": "Registra la decisión en el Diario de decisiones (Comprar / Mantener / Reducir / Vender / Vigilar / Evitar) con la evidencia que la justifica y las condiciones verificables («Qué debe cumplirse»). Más adelante, «Expectativa vs realidad» compara tu previsión con los hechos publicados."

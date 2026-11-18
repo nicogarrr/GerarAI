@@ -15,7 +15,7 @@
   "faqTitle": "Frequently asked questions",
   "docsTitle": "Documentation",
   "docsSubtitle": "A practical guide per module: what the app does today and how to use it.",
-  "firstStepsTitle": "First steps: model → thesis → decision",
+  "firstStepsTitle": "First steps: thesis → valuation → decision",
   "moduleGuideTitle": "Module guide",
   "glossaryTitle": "Glossary and methodology",
   "contactTitle": "Contact",
@@ -29,7 +29,7 @@
     },
     "item1": {
       "title": "Long-term model",
-      "text": "Fundamental model with visible assumptions (growth, FCF margin, WACC), Bear/Base/Bull scenarios with their spreads, owner earnings, TAM/SAM/SOM and reverse DCF. The «Model» tab of the company page."
+      "text": "Fundamental model with visible assumptions (growth, FCF margin, WACC), Bear / Base / Bull scenarios with their spreads, owner earnings, TAM/SAM/SOM and reverse DCF. Section «Long-term fundamental model» in the «Valuation» tab of the company page."
     },
     "item2": {
       "title": "Portfolio",
@@ -102,11 +102,11 @@
     "public": ". This help page and the methodology can be read without an account."
   },
   "steps": {
-    "model": "1. Model.",
-    "modelText": "choose the company, open the «Model» tab and press «Generate model». Review the assumptions (growth, FCF margin, WACC) and the Bear/Base/Bull scenarios with their spreads before trusting the number.",
+    "thesis": "1. Thesis.",
+    "thesisText": "choose the company, open the «Thesis» tab and press «Generate thesis» (or «Regenerate thesis» if one already exists). Review the hypothesis, scenarios with probabilities, dated catalysts and what would invalidate it. The memo and the EPUB are exported from the thesis view itself («Export memo» and «Export EPUB»);",
     "in": "In",
-    "thesis": "2. Thesis.",
-    "thesisText": "Generate the thesis from the same page: hypothesis, scenarios with probabilities, dated catalysts and what would invalidate it. The memo and the EPUB are exported from the thesis view itself («Export memo» and «Export EPUB»);",
+    "valuation": "2. Valuation.",
+    "valuationText": "In the same page, open the «Valuation» tab and review the «Long-term fundamental model» section: the assumptions (growth, FCF margin and WACC) and the Bear / Base / Bull scenarios with their spreads before trusting the number.",
     "exportText": "is the yearly export of the journal.",
     "decision": "3. Decision.",
     "decisionText": "Record the decision in the Decision journal (Buy / Hold / Trim / Sell / Watch / Avoid) with the evidence behind it and the verifiable conditions («What must be true»). Later, «Expectations vs reality» compares your forecast with the published facts."
