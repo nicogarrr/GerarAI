@@ -42,7 +42,7 @@ export default function BottomNav() {
                             <li key="cerebro">
                                 <button
                                     aria-label={t('brain.openAria')}
-                                    className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium text-teal-300 transition-colors hover:text-teal-200"
+                                    className="flex min-h-14 w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium min-[360px]:text-xs text-teal-300 transition-colors hover:text-teal-200"
                                     data-early-open="brain"
                                     ref={brainRef}
                                     onClick={() => openBrain()}
@@ -60,7 +60,7 @@ export default function BottomNav() {
                             <IntentLink
                                 href={item.href}
                                 aria-current={active ? (isNavItemExact(pathname, item.href) ? 'page' : 'true') : undefined}
-                                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium transition-colors ${
+                                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-[11px] font-medium min-[360px]:text-xs transition-colors ${
                                     active ? 'text-teal-300' : 'text-gray-500 hover:text-gray-300'
                                 }`}
                             >
