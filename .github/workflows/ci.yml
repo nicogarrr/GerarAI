@@ -322,7 +322,9 @@ jobs:
             echo "Redis quota tests skipped: redis-server must be available" >&2
             exit 1
           fi
-      - run: uv run --frozen python -m pytest -n 2 --dist worksteal -m "not services"
+      # --durations=20 es informativo (no cambia el resultado): deja en el log los
+      # 20 tests mas lentos reales de CI para decidir si hay algo que recortar.
+      - run: uv run --frozen python -m pytest -n 2 --dist worksteal -m "not services" --durations=20
       - run: uv run --frozen python scripts/run_financial_evals.py
 
   evals:
