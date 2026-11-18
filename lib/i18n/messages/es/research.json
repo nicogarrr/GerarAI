@@ -1484,7 +1484,9 @@
     "queued": "En cola",
     "generated": "Tesis v{version} generada",
     "view": "Ver tesis v{version}",
-    "failed": "La generación falló{errorClass}. Puedes reintentar."
+    "failed": "La generación falló{errorClass}. Puedes reintentar.",
+    "addEvidence": "Aportar evidencia",
+    "evidenceHint": "Sin documentos de apoyo, la tesis puede salir con datos insuficientes. Subir documentos mejora la trazabilidad."
   },
   "companyMenu": {
     "moreActions": "Más acciones",
