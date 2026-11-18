@@ -1,11 +1,11 @@
 """Fail-closed pip-audit gate with bounded retries for PyPI read timeouts only."""
 
 import json
-from datetime import date
 import re
 import subprocess
 import sys
 import time
+from datetime import date
 from pathlib import Path
 
 _PYPROJECT = Path(__file__).resolve().parents[1] / "data-engine" / "pyproject.toml"
@@ -116,7 +116,7 @@ def inspect_report(text, ignored_pins=None):
                 or not vuln["id"]
             ):
                 return "invalid"
-        if vulns and not (ignored_pins or {}).get(dep["name"]) == dep["version"]:
+        if vulns and (ignored_pins or {}).get(dep["name"]) != dep["version"]:
             vulnerable = True
     return "vulnerable" if vulnerable else "clean"
 

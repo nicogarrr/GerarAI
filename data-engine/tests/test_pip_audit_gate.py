@@ -398,5 +398,5 @@ def test_expiry_never_touches_the_strict_audit(tmp_path):
 def test_ignored_pins_review_date_is_real_and_future_of_registration():
     from datetime import date
 
-    assert gate.QA_AGENTS_IGNORED_PINS_SINCE == date(2026, 11, 18)
+    assert date(2026, 11, 18) == gate.QA_AGENTS_IGNORED_PINS_SINCE
     assert gate.QA_AGENTS_IGNORED_PINS_REVIEW >= gate.QA_AGENTS_IGNORED_PINS_SINCE
