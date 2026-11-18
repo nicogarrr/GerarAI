@@ -722,3 +722,562 @@ describe('getManualDemoValuation: cotización real o N/D', () => {
         vi.unstubAllGlobals();
     });
 });
+
+/* ------------------------------------------------------------------ */
+/* Cobertura de ramas (auditor 18-nov-2026): bordes de parseo,         */
+/* comparación fina de payloads persistidos, carreras en la grabación  */
+/* del rechazo, errores de infraestructura y callbacks reales de las   */
+/* fuentes de cotización.                                              */
+/* ------------------------------------------------------------------ */
+
+describe('validación de órdenes: bordes que faltaban', () => {
+    it.each([
+        ['clientOrderId no es cadena', { clientOrderId: 42 }, 'clientOrderId'],
+        ['executedAt no es número', { executedAt: 'ayer' }, 'executedAt'],
+        ['executedAt no entero', { executedAt: NOW + 0.5 }, 'executedAt'],
+        ['precio minúsculo en notación exponencial', { price: 0.0000001 }, 'price'],
+        ['precio por encima del tope', { price: 10_000_001 }, 'price'],
+        ['precio NaN', { price: Number.NaN }, 'price'],
+        ['cantidad por encima del tope', { quantity: 1_000_001 }, 'quantity'],
+        ['cantidad no numérica', { quantity: '10' }, 'quantity'],
+        ['comisión por encima del tope', { fee: 10_000_001 }, 'fee'],
+        ['comisión NaN', { fee: Number.NaN }, 'fee'],
+        ['instrumento nulo', { instrument: null }, 'instrument'],
+        ['símbolo no es cadena', { instrument: { kind: 'accion', symbol: 42 } }, 'symbol'],
+    ])('%s -> fallo con campo, sin escribir', async (_name: string, patch: object, expectedField: string) => {
+        const m = await load();
+        const result = await m.placeManualOrder(order(patch));
+        expect(result).toMatchObject({ ok: false, field: expectedField });
+        expect(tradeCreate).not.toHaveBeenCalled();
+    });
+
+    it('comisión ausente vale 0; nombre no cadena cae al símbolo', async () => {
+        const m = await load();
+        expect(await m.placeManualOrder(order({ fee: undefined }))).toMatchObject({ ok: true, outcome: 'filled' });
+        expect(
+            await m.placeManualOrder(order({ clientOrderId: 'orden-de-prueba-2', instrument: { kind: 'accion', symbol: 'AAPL', name: 42 } })),
+        ).toMatchObject({ ok: true, outcome: 'filled' });
+    });
+});
+
+describe('validación fx: bordes que faltaban', () => {
+    it('conversión que no es objeto -> campo fx', async () => {
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(null)).toMatchObject({ ok: false, field: 'fx' });
+        expect(tradeCreate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['clientOrderId no es cadena', { clientOrderId: 42 }, 'clientOrderId'],
+        ['origen no soportada', { from: 'GBP' }, 'from'],
+        ['destino no soportada', { to: 'JPY' }, 'to'],
+        ['importe no numérico', { amount: '100' }, 'amount'],
+        ['importe cero', { amount: 0 }, 'amount'],
+        ['importe por encima del tope', { amount: 100_000_001 }, 'amount'],
+        ['importe NaN', { amount: Number.NaN }, 'amount'],
+        ['tipo no numérico', { rate: 'x' }, 'rate'],
+        ['tipo cero', { rate: 0 }, 'rate'],
+        ['tipo por encima del tope', { rate: 1001 }, 'rate'],
+        ['fecha no numérica', { executedAt: 'ayer' }, 'executedAt'],
+    ])('%s -> fallo con campo, sin escribir', async (_name: string, patch: object, expectedField: string) => {
+        const m = await load();
+        const result = await m.convertManualDemoCurrency(fxOrder(patch));
+        expect(result).toMatchObject({ ok: false, field: expectedField });
+        expect(tradeCreate).not.toHaveBeenCalled();
+    });
+});
+
+describe('idempotencia: comparación fina del payload persistido (acciones)', () => {
+    const storedFill = {
+        clientOrderId: 'orden-de-prueba-1', kind: 'accion', symbol: 'AAPL', name: 'Apple',
+        contract: null, side: 'buy', openClose: 'open', quantity: 10, status: 'filled',
+        fillPrice: 100, currency: 'EUR', fee: 0, executedAt: new Date(NOW),
+        rejectReason: null, createdAt: new Date(NOW), requestPayload: null,
+    };
+
+    it.each([
+        ['tipo distinto (fx)', { kind: 'fx' }],
+        ['lado distinto', { side: 'sell', openClose: 'close' }],
+        ['openClose distinto', { openClose: 'close' }],
+        ['cantidad distinta', { quantity: 11 }],
+        ['divisa distinta', { currency: 'USD' }],
+        ['símbolo distinto', { symbol: 'MSFT' }],
+        ['precio de fill distinto', { fillPrice: 99 }],
+        ['comisión distinta', { fee: 1 }],
+        ['fecha de ejecución distinta', { executedAt: new Date(NOW + 60_000) }],
+        ['fill sin fecha persistida', { executedAt: null }],
+    ])('fill persistido con %s -> conflicto, no duplicado', async (_name: string, delta: object) => {
+        tradeFindOne.mockImplementation(() => chainOf({ ...storedFill, ...delta }));
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: false, field: 'clientOrderId' });
+        expect(tradeCreate).not.toHaveBeenCalled();
+    });
+
+    const optionContract = { underlying: 'AAPL', expiry: '2027-01-15', strike: 100, callPut: 'call' as const, multiplier: 100, deliverable: 'acciones' };
+    const optionOrder = () => order({ currency: 'USD', openClose: 'open', price: 2, quantity: 1, instrument: { kind: 'opcion', contract: optionContract } });
+    const storedOptionFill = {
+        clientOrderId: 'orden-de-prueba-1', kind: 'opcion', symbol: null, name: 'AAPL Call',
+        contract: optionContract, side: 'buy', openClose: 'open', quantity: 1, status: 'filled',
+        fillPrice: 2, currency: 'USD', fee: 0, executedAt: new Date(NOW),
+        rejectReason: null, createdAt: new Date(NOW), requestPayload: null,
+    };
+
+    it('opción: mismo contrato -> duplicate; contrato ausente o distinto -> conflicto', async () => {
+        tradeFindOne.mockImplementation(() => chainOf(storedOptionFill));
+        const m = await load();
+        expect(await m.placeManualOrder(optionOrder())).toMatchObject({ ok: true, outcome: 'duplicate' });
+        // Sin contrato persistido no se puede reconstruir la clave: conflicto honesto.
+        tradeFindOne.mockImplementation(() => chainOf({ ...storedOptionFill, contract: null }));
+        expect(await m.placeManualOrder(optionOrder())).toMatchObject({ ok: false, field: 'clientOrderId' });
+        // Otro contrato = otra operación con la misma clave de idempotencia.
+        tradeFindOne.mockImplementation(() => chainOf({ ...storedOptionFill, contract: { ...optionContract, strike: 105 } }));
+        expect(await m.placeManualOrder(optionOrder())).toMatchObject({ ok: false, field: 'clientOrderId' });
+    });
+
+    const baseSnap = {
+        v: 1, kind: 'accion', symbol: 'AAPL', contractKey: null, side: 'buy', openClose: 'open',
+        quantity: 10, currency: 'EUR', price: 100, fee: 0, executedAtMs: NOW,
+    };
+    const rejectedWith = (requestPayload: unknown) => ({
+        ...storedFill, status: 'rejected', fillPrice: null, executedAt: null, rejectReason: 'r', requestPayload,
+    });
+
+    it.each([
+        ['tipo', { kind: 'opcion', symbol: null, contractKey: 'AAPL|2027-01-15|call|100000' }],
+        ['símbolo', { symbol: 'MSFT' }],
+        ['clave de contrato', { contractKey: 'AAPL|2027-01-15|call|100000' }],
+        ['lado', { side: 'sell' }],
+        ['openClose', { openClose: 'close' }],
+        ['cantidad', { quantity: 11 }],
+        ['divisa', { currency: 'USD' }],
+        ['precio', { price: 99 }],
+        ['comisión', { fee: 2 }],
+        ['fecha', { executedAtMs: NOW + 1 }],
+    ])('rechazo con snapshot que difiere en %s -> conflicto', async (_name: string, delta: object) => {
+        tradeFindOne.mockImplementation(() => chainOf(rejectedWith({ ...baseSnap, ...delta })));
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: false, field: 'clientOrderId' });
+    });
+
+    it.each([
+        ['un array', [] as unknown],
+        ['versión desconocida', { v: 2 }],
+        ['tipo ajeno', { v: 1, kind: 'fx' }],
+        ['lado imposible', { v: 1, kind: 'accion', side: 'hold' }],
+        ['openClose imposible', { v: 1, kind: 'accion', side: 'buy', openClose: 'x' }],
+        ['divisa ajena', { v: 1, kind: 'accion', side: 'buy', openClose: 'open', currency: 'GBP' }],
+        ['símbolo no cadena', { v: 1, kind: 'accion', side: 'buy', openClose: 'open', currency: 'EUR', symbol: 42 }],
+        ['contrato no cadena', { v: 1, kind: 'opcion', side: 'buy', openClose: 'open', currency: 'EUR', contractKey: 42 }],
+        ['cantidad no numérica', { v: 1, kind: 'accion', side: 'buy', openClose: 'open', currency: 'EUR', quantity: '10', price: 100, fee: 0, executedAtMs: NOW }],
+        ['precio no finito', { v: 1, kind: 'accion', side: 'buy', openClose: 'open', currency: 'EUR', quantity: 10, price: Number.NaN, fee: 0, executedAtMs: NOW }],
+    ])('rechazo con snapshot inválido (%s) -> igualdad legacy por el subconjunto persistido', async (_name: string, payload: unknown) => {
+        tradeFindOne.mockImplementation(() => chainOf(rejectedWith(payload)));
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: true, outcome: 'duplicate', reason: 'r' });
+    });
+});
+
+describe('idempotencia fx: comparación fina del payload persistido', () => {
+    const storedFx = {
+        clientOrderId: 'fx-de-prueba-0001', kind: 'fx', symbol: 'EURUSD', fxFrom: 'EUR', fxTo: 'USD',
+        side: 'buy', openClose: 'open', quantity: 100, status: 'filled', fillPrice: 1.1,
+        currency: 'EUR', fee: 0, executedAt: new Date(NOW), rejectReason: null, createdAt: new Date(NOW), requestPayload: null,
+    };
+
+    it.each([
+        ['tipo no fx', { kind: 'accion' }],
+        ['origen distinta', { fxFrom: 'USD' }],
+        ['destino distinta', { fxTo: 'EUR' }],
+        ['importe distinto', { quantity: 50 }],
+        ['tipo de cambio distinto', { fillPrice: 1.2 }],
+        ['fecha distinta', { executedAt: new Date(NOW + 60_000) }],
+        ['fill sin fecha persistida', { executedAt: null }],
+    ])('fx persistido con %s -> conflicto, no duplicado', async (_name: string, delta: object) => {
+        tradeFindOne.mockImplementation(() => chainOf({ ...storedFx, ...delta }));
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: false, field: 'clientOrderId' });
+        expect(tradeCreate).not.toHaveBeenCalled();
+    });
+
+    const baseFxSnap = { v: 1, kind: 'fx', from: 'EUR', to: 'USD', amount: 100, rate: 1.1, executedAtMs: NOW };
+    const rejectedFxWith = (requestPayload: unknown) => ({
+        ...storedFx, status: 'rejected', fillPrice: null, executedAt: null, rejectReason: 'r', requestPayload,
+    });
+
+    it('rechazo fx con snapshot idéntico -> duplicate con el motivo grabado', async () => {
+        tradeFindOne.mockImplementation(() => chainOf(rejectedFxWith(baseFxSnap)));
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: true, outcome: 'duplicate', reason: 'r' });
+    });
+
+    it.each([
+        ['origen', { from: 'USD' }],
+        ['destino', { to: 'EUR' }],
+        ['importe', { amount: 50 }],
+        ['tipo de cambio', { rate: 1.2 }],
+        ['fecha', { executedAtMs: NOW + 1 }],
+    ])('rechazo fx con snapshot que difiere en %s -> conflicto', async (_name: string, delta: object) => {
+        tradeFindOne.mockImplementation(() => chainOf(rejectedFxWith({ ...baseFxSnap, ...delta })));
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: false, field: 'clientOrderId' });
+    });
+
+    it.each([
+        ['versión desconocida', { v: 2, kind: 'fx' }],
+        ['tipo ajeno', { v: 1, kind: 'accion' }],
+        ['origen ajena', { v: 1, kind: 'fx', from: 'GBP', to: 'USD' }],
+        ['destino ajeno', { v: 1, kind: 'fx', from: 'EUR', to: 'JPY' }],
+        ['importe no numérico', { v: 1, kind: 'fx', from: 'EUR', to: 'USD', amount: '100', rate: 1.1, executedAtMs: NOW }],
+        ['tipo no finito', { v: 1, kind: 'fx', from: 'EUR', to: 'USD', amount: 100, rate: Number.NaN, executedAtMs: NOW }],
+        ['no es objeto', 'texto' as unknown],
+    ])('rechazo fx con snapshot inválido (%s) -> igualdad legacy', async (_name: string, payload: unknown) => {
+        tradeFindOne.mockImplementation(() => chainOf(rejectedFxWith(payload)));
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: true, outcome: 'duplicate', reason: 'r' });
+    });
+});
+
+describe('transacción: la grabación del rechazo resiste carreras', () => {
+    const divergence = () => {
+        computeManualDemoAccount
+            .mockImplementationOnce(() => stateWith())
+            .mockImplementationOnce(() => ({ ...stateWith(), violations: ['descuadre replay'] }))
+            .mockImplementation(() => stateWith());
+    };
+    const storedDoc = (status: string, over: object = {}) => ({
+        clientOrderId: 'orden-de-prueba-1', kind: 'accion', symbol: 'AAPL', contract: null,
+        side: 'buy', openClose: 'open', quantity: 10, status, fillPrice: status === 'filled' ? 100 : null,
+        currency: 'EUR', fee: 0, executedAt: status === 'filled' ? new Date(NOW) : null,
+        rejectReason: null, createdAt: new Date(NOW), requestPayload: null, ...over,
+    });
+
+    it('el rechazo ya estaba grabado sin motivo persistido -> se devuelve el motivo de ESTE intento', async () => {
+        divergence();
+        tradeFindOne.mockImplementationOnce(() => chainOf(null));
+        tradeFindOne.mockImplementation(() => chainOf(storedDoc('rejected')));
+        const m = await load();
+        const result = await m.placeManualOrder(order());
+        expect(result).toMatchObject({ ok: true, outcome: 'rejected' });
+        expect((result as { reason: string }).reason).toContain('no cuadra en su fecha');
+    });
+
+    it('el ganador de la carrera fue el fill -> duplicate', async () => {
+        divergence();
+        tradeFindOne.mockImplementationOnce(() => chainOf(null));
+        tradeFindOne.mockImplementation(() => chainOf(storedDoc('filled')));
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: true, outcome: 'duplicate' });
+    });
+
+    it('la carrera persistió OTRA operación -> conflicto explícito, no reinterpretación', async () => {
+        divergence();
+        tradeFindOne.mockImplementationOnce(() => chainOf(null));
+        tradeFindOne.mockImplementation(() => chainOf(storedDoc('filled', { fillPrice: 55 })));
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: false, field: 'clientOrderId' });
+    });
+
+    it('grabar el rechazo falla con error NO duplicado -> propaga y se declara genérico', async () => {
+        divergence();
+        tradeFindOne.mockImplementation(() => chainOf(null));
+        tradeCreate.mockResolvedValueOnce([{}] as never); // el fill
+        tradeCreate.mockRejectedValueOnce(new Error('índice caído')); // el rechazo
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: false, message: expect.stringContaining('No se pudo completar') });
+    });
+
+    it('sin fila persistida tras la carrera -> rechazo con el motivo de este intento', async () => {
+        divergence();
+        tradeFindOne.mockImplementation(() => chainOf(null));
+        const m = await load();
+        const result = await m.placeManualOrder(order());
+        expect(result).toMatchObject({ ok: true, outcome: 'rejected' });
+        expect((result as { reason: string }).reason).toContain('no cuadra en su fecha');
+    });
+});
+
+describe('convertManualDemoCurrency: carrera de clave duplicada y errores', () => {
+    const storedFx = {
+        clientOrderId: 'fx-de-prueba-0001', kind: 'fx', symbol: 'EURUSD', fxFrom: 'EUR', fxTo: 'USD',
+        side: 'buy', openClose: 'open', quantity: 100, status: 'filled', fillPrice: 1.1,
+        currency: 'EUR', fee: 0, executedAt: new Date(NOW), rejectReason: null, createdAt: new Date(NOW), requestPayload: null,
+    };
+
+    it('11000 al insertar y el ganador es idéntico -> duplicate', async () => {
+        tradeCreate.mockRejectedValue({ code: 11000 });
+        tradeFindOne.mockImplementationOnce(() => chainOf(null)); // pre-chequeo: nada
+        tradeFindOne.mockImplementation(() => chainOf(storedFx)); // tras la carrera: lo persistido
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: true, outcome: 'duplicate' });
+    });
+
+    it('11000 al insertar y no aparece lo persistido -> fallo genérico', async () => {
+        tradeCreate.mockRejectedValue({ code: 11000 });
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: false, message: expect.stringContaining('No se pudo completar') });
+    });
+
+    it('divergencia y la carrera persistió OTRA operación -> conflicto explícito', async () => {
+        computeManualDemoAccount
+            .mockImplementationOnce(() => stateWith())
+            .mockImplementationOnce(() => ({ ...stateWith(), violations: ['descuadre replay'] }))
+            .mockImplementation(() => stateWith());
+        tradeFindOne.mockImplementationOnce(() => chainOf(null));
+        tradeFindOne.mockImplementation(() => chainOf({ ...storedFx, fillPrice: 9.99 }));
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: false, field: 'clientOrderId' });
+    });
+
+    it('versión en conflicto en la conversión -> fallo legible', async () => {
+        accountFindOneAndUpdate.mockResolvedValue(null);
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: false, message: expect.stringContaining('otra operación a la vez') });
+    });
+});
+
+describe('errores de infraestructura: declarados, nunca filtrados', () => {
+    it('sin conexión a Mongo en runtime -> fallo genérico', async () => {
+        connectToDatabase.mockResolvedValue(null);
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: false, message: expect.stringContaining('No se pudo completar') });
+    });
+
+    it('cuenta ausente dentro de la transacción -> fallo genérico', async () => {
+        accountFindOne.mockImplementation(() => chainOf(null));
+        const m = await load();
+        expect(await m.placeManualOrder(order())).toMatchObject({ ok: false, message: expect.stringContaining('No se pudo completar') });
+    });
+
+    it('un rechazo que no es Error se envuelve con String(), sin romper', async () => {
+        tradeCreate.mockRejectedValue('cadena de error cruda');
+        const m = await load();
+        expect(await m.convertManualDemoCurrency(fxOrder())).toMatchObject({ ok: false, message: expect.stringContaining('No se pudo completar') });
+    });
+});
+
+describe('getManualDemoOrders: filas con fechas no-Date', () => {
+    it('executedAt/createdAt que no son Date salen null/0, nunca rompen la fila', async () => {
+        tradeFind.mockImplementation(() => chainOf([{
+            clientOrderId: 'orden-x', kind: 'fx', symbol: 'EURUSD', side: 'buy', openClose: 'open',
+            quantity: 100, status: 'rejected', fillPrice: null, currency: 'EUR', fee: 0,
+            executedAt: 12345, rejectReason: 'r', createdAt: 'ayer',
+        }]));
+        const m = await load();
+        const result = await m.getManualDemoOrders();
+        expect(result).toMatchObject({ ok: true });
+        const row = (result as { orders: Array<Record<string, unknown>> }).orders[0];
+        expect(row).toMatchObject({ executedAt: null, createdAt: 0 });
+    });
+});
+
+describe('callback real de Finnhub (finnhubOnlyQuote) y listado US caído', () => {
+    const applePosition = {
+        instrumentKey: 'A:AAPL', name: 'Apple', kind: 'accion', currency: 'USD', quantity: 2, avgCost: 100, realizedPnl: 0,
+    };
+    const bbvaPosition = {
+        instrumentKey: 'A:BBVA.MC', name: 'BBVA', kind: 'accion', currency: 'EUR', quantity: 100, avgCost: 9, realizedPnl: 0,
+    };
+    // El cache mock invoca el fetcher de verdad (finnhubOnlyQuote), como hace
+    // el callback real del backend en los tests de arriba.
+    const realQuoteCallback = (withSignal = false) => {
+        cacheGetQuote.mockImplementation(async (symbol: string, fetcher: (s: string, signal?: AbortSignal) => Promise<{ quote: unknown; fetchFailed: boolean; retryAfterSeconds: number | null }>) => {
+            const attempt = await fetcher(symbol, withSignal ? new AbortController().signal : undefined);
+            return { quote: attempt.quote, fetchFailed: attempt.fetchFailed, retryAfterSeconds: attempt.retryAfterSeconds, fetchedAt: attempt.quote ? 111 : null, saturated: false };
+        });
+    };
+    const finnhubFetch = (quoteResponder: () => Promise<Response>) => {
+        const fetchMock = vi.fn(async (...args: Parameters<typeof fetch>): Promise<Response> => {
+            if (String(args[0]).includes('stock/symbol')) return { ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response;
+            return quoteResponder();
+        });
+        vi.stubGlobal('fetch', fetchMock);
+        return fetchMock;
+    };
+    const firstRow = async () => {
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        return { result, row: valuation.rows[0] };
+    };
+
+    it('cotización OK con señal -> valorada; fetch a la URL pública con token', async () => {
+        state = stateWith(100000, 0, [applePosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        const fetchMock = finnhubFetch(async () => ({ ok: true, json: async () => ({ c: 150, pc: 149, t: 1700000000, kind: 'live', source: 'Finnhub' }) } as Response));
+        realQuoteCallback(true);
+        const { result, row } = await firstRow();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: false });
+        expect(row).toMatchObject({ status: 'valorada', marketValue: 300 });
+        const quoteCall = fetchMock.mock.calls.find((c) => String(c[0]).includes('/quote?'));
+        expect(String(quoteCall?.[0])).toBe('https://finnhub.io/api/v1/quote?symbol=AAPL&token=key');
+        vi.unstubAllGlobals();
+    });
+
+    it('429 con Retry-After: 30 -> la espera se propaga a la valoración', async () => {
+        state = stateWith(100000, 0, [applePosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        finnhubFetch(async () => ({ ok: false, headers: { get: (k: string) => (k === 'retry-after' ? '30' : null) } } as unknown as Response));
+        realQuoteCallback();
+        const { result, row } = await firstRow();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true, retryAfterSeconds: 30 });
+        expect(row).toMatchObject({ status: 'sin-cotizacion', marketValue: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('503 sin cabecera Retry-After -> fallo sin espera propagada', async () => {
+        state = stateWith(100000, 0, [applePosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        finnhubFetch(async () => ({ ok: false, headers: { get: () => null } } as unknown as Response));
+        realQuoteCallback();
+        const { result, row } = await firstRow();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true, retryAfterSeconds: null });
+        expect(row).toMatchObject({ status: 'sin-cotizacion', marketValue: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('error de red -> fallo transitorio, nunca excepción', async () => {
+        state = stateWith(100000, 0, [applePosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        finnhubFetch(async () => { throw new TypeError('fetch failed'); });
+        realQuoteCallback();
+        const { result, row } = await firstRow();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true });
+        expect(row).toMatchObject({ status: 'sin-cotizacion', marketValue: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('listado US HTTP 503 -> listingUnavailable y filas N/D', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        vi.stubGlobal('fetch', vi.fn(async (): Promise<Response> => ({ ok: false } as Response)));
+        const { result, row } = await firstRow();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: true, quoteFetchFailed: false });
+        expect(row).toMatchObject({ marketValue: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('listado US vacío -> listingUnavailable (no se valora con divisa desconocida)', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        vi.stubGlobal('fetch', vi.fn(async (): Promise<Response> => ({ ok: true, json: async () => [] } as Response)));
+        const { result, row } = await firstRow();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: true });
+        expect(row).toMatchObject({ marketValue: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('listado US: error de red -> listingUnavailable', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        vi.stubGlobal('fetch', vi.fn(async (): Promise<Response> => { throw new TypeError('fetch failed'); }));
+        const { result, row } = await firstRow();
+        expect(result).toMatchObject({ ok: true, listingUnavailable: true });
+        expect(row).toMatchObject({ marketValue: null });
+        vi.unstubAllGlobals();
+    });
+});
+
+describe('getManualDemoValuation: bordes de agregación', () => {
+    const applePosition = {
+        instrumentKey: 'A:AAPL', name: 'Apple', kind: 'accion', currency: 'USD', quantity: 2, avgCost: 100, realizedPnl: 0,
+    };
+    const bbvaPosition = {
+        instrumentKey: 'A:BBVA.MC', name: 'BBVA', kind: 'accion', currency: 'EUR', quantity: 100, avgCost: 9, realizedPnl: 0,
+    };
+    const optionPosition = (key: string) => ({
+        instrumentKey: key, name: key, kind: 'opcion', currency: 'USD', quantity: 1, avgCost: 1, realizedPnl: 0,
+    });
+    const usListing = () => vi.stubGlobal('fetch', vi.fn(async (): Promise<Response> => ({ ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response)));
+
+    it('cotización sin fetchedAt -> asOf cae al reloj actual, nunca a una hora inventada', async () => {
+        state = stateWith(100000, 0, [applePosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        usListing();
+        cacheGetQuote.mockResolvedValue({ quote: { c: 150, t: 1700000000, kind: 'live', source: 'Finnhub' }, fetchFailed: false, retryAfterSeconds: null, fetchedAt: null, saturated: false });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, asOf: NOW + 60_000 });
+        vi.unstubAllGlobals();
+    });
+
+    it('la promesa de cotización rechazada se pliega a fallo de la fila, nunca rompe la valoración', async () => {
+        state = stateWith(100000, 0, [applePosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        usListing();
+        cacheGetQuote.mockRejectedValue(new Error('boom'));
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true, retryAfterSeconds: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('backend: la promesa de cotización rechazada también se pliega', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        process.env.FMP_BACKEND_URL = 'https://backend.test';
+        process.env.RESEARCH_AUTH_SECRET = 's'.repeat(32);
+        usListing();
+        cacheGetQuote.mockRejectedValue(new Error('boom'));
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true, retryAfterSeconds: null });
+        vi.unstubAllGlobals();
+    });
+
+    it('backend con señal: combineAbortSignals llega al fetch', async () => {
+        state = stateWith(100000, 0, [bbvaPosition]);
+        process.env.FINNHUB_API_KEY = 'key';
+        process.env.FMP_BACKEND_URL = 'https://backend.test';
+        process.env.RESEARCH_AUTH_SECRET = 's'.repeat(32);
+        vi.stubGlobal('fetch', vi.fn(async (...args: Parameters<typeof fetch>): Promise<Response> => {
+            if (String(args[0]).includes('/api/market/quote/')) return { ok: true, json: async () => ({ c: 10.5, pc: 10.4, currency: 'EUR', cd: '2026-11-06' }) } as Response;
+            return { ok: true, json: async () => [{ symbol: 'AAPL', currency: 'USD' }] } as Response;
+        }));
+        cacheGetQuote.mockImplementation(async (symbol: string, fetcher: (s: string, signal?: AbortSignal) => Promise<{ quote: unknown; fetchFailed: boolean; retryAfterSeconds: number | null }>) => {
+            const attempt = await fetcher(symbol, new AbortController().signal);
+            return { quote: attempt.quote, fetchFailed: attempt.fetchFailed, retryAfterSeconds: attempt.retryAfterSeconds, fetchedAt: attempt.quote ? 111 : null, saturated: false };
+        });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.rows[0]).toMatchObject({ status: 'valorada', marketValue: 1050 });
+        vi.unstubAllGlobals();
+    });
+
+    it('opción con instrumentKey irreconocible -> N/D sin consultar la cadena', async () => {
+        state = stateWith(100000, 500, [optionPosition('clave-rota')]);
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(cacheGetChain).not.toHaveBeenCalled();
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.rows[0]).toMatchObject({ marketValue: null });
+    });
+
+    it('cadena presente pero sin el contrato -> N/D, nunca la prima de otro contrato', async () => {
+        state = stateWith(100000, 500, [optionPosition('O:ASTS:2027-01-15:call:30:100')]);
+        cacheGetChain.mockResolvedValue({ chain: new Map(), fetchFailed: false, retryAfterSeconds: null, fetchedAt: null, saturated: false });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, asOf: NOW + 60_000 });
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.rows[0]).toMatchObject({ marketValue: null });
+    });
+
+    it('fuente de primas caída sin Retry-After -> quoteFetchFailed sin espera propagada', async () => {
+        state = stateWith(100000, 500, [optionPosition('O:ASTS:2027-01-15:call:30:100')]);
+        cacheGetChain.mockResolvedValue({ chain: null, fetchFailed: true, retryAfterSeconds: null, fetchedAt: null, saturated: false });
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true, retryAfterSeconds: null });
+    });
+
+    it('la promesa de la cadena rechazada se pliega a fallo de la fila', async () => {
+        state = stateWith(100000, 500, [optionPosition('O:ASTS:2027-01-15:call:30:100')]);
+        cacheGetChain.mockRejectedValue(new Error('boom'));
+        const m = await load();
+        const result = await m.getManualDemoValuation();
+        expect(result).toMatchObject({ ok: true, quoteFetchFailed: true });
+        const valuation = (result as { valuation: { rows: Array<Record<string, unknown>> } }).valuation;
+        expect(valuation.rows[0]).toMatchObject({ marketValue: null });
+    });
+});
