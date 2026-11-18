@@ -552,6 +552,12 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
                     { kind: 'webcast', url: 'https://stream.brrmedia.co.uk/broadcast/6ad77ddbe50bec7a2a7d1d40', source: 'https://www.thewosgroupplc.com/investors/results-centre/' },
                 ],
             },
+            // Fecha oficial del calendario financiero: resultados del primer semestre FY27.
+            {
+                date: '2026-12-10',
+                period: 'S1 F2027',
+                url: 'https://www.thewosgroupplc.com/investors/financial-calendar/',
+            },
         ],
         verifiedOn: '2026-11-18',
     },

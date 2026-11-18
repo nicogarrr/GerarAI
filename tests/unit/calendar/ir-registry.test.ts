@@ -230,6 +230,12 @@ describe('irLinksFor', () => {
         expect(irLinksFor('NVDA', '2026-11-18')?.eventPage).toBeNull();
     });
 
+    it('WOSG.L enlaza el evento oficial del 2026-12-10 solo ese dia', () => {
+        expect(irLinksFor('WOSG.L', '2026-12-10')?.eventPage?.url).toContain('thewosgroupplc.com');
+        expect(irLinksFor('WOSG.L', '2026-12-09')?.eventPage).toBeNull();
+        expect(irLinksFor('WOSG.L', '2026-12-11')?.eventPage).toBeNull();
+    });
+
     it('KRKNF lleva el webcast oficial anunciado para el 2026-11-24', () => {
         // Regresion 2026-11-18: posicion de cartera sin evento registrado para su T3 2026.
         const live = irLiveAssetFor('KRKNF', '2026-11-24');
