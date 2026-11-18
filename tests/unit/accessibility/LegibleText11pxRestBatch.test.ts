@@ -28,7 +28,11 @@ describe('texto legible lote resto: nada de lectura bajo 12 px', () => {
 
     it('el título «Ganancia» del resumen va a 12 px fijos, sin duplicar sm:', () => {
         const s = src('components/portfolio/PortfolioSummary.tsx');
-        expect(s).toContain('text-gray-400 text-xs uppercase tracking-normal sm:tracking-wider');
+        // P23 v2 (18-nov): la excepción tracking-normal móvil desaparece; la
+        // etiqueta queda idéntica a sus hermanas y la tarjeta pasa a 1
+        // columna <420px (a 12px el token irrompible se recortaba en 2).
+        expect(s).toContain('text-gray-400 text-xs uppercase tracking-wider font-semibold mb-1');
+        expect(s).not.toContain('tracking-normal sm:tracking-wider');
         expect(s).not.toContain('sm:text-xs');
     });
 
