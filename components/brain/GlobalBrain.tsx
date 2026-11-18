@@ -181,14 +181,18 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
     // safe-area), nunca la tapa; en escritorio vuelve a la esquina habitual.
     // `viewportFit: "cover"` + barra de inicio de iOS: sin el inset la
     // burbuja queda bajo la barra en modo standalone.
+    // La pista es decorativa (aria-hidden): el contenedor deja pasar el ratón
+    // y solo el botón del Cerebro captura clics. Sin esto, la etiqueta y el
+    // propio contenedor tapaban el CTA «Nueva alerta» de /alerts (y cualquier
+    // botón que cayera bajo la pastilla en otras páginas).
     return (
-        <div className="group fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.5rem+env(safe-area-inset-right))] z-50 hidden items-center gap-2 md:flex">
+        <div className="group pointer-events-none fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom))] right-[calc(1.5rem+env(safe-area-inset-right))] z-50 hidden items-center gap-2 md:flex">
             <span
                 aria-hidden="true"
                 className={`whitespace-nowrap rounded-full border border-indigo-500/30 bg-slate-950/90 px-3 py-1 text-xs text-indigo-200 shadow-lg motion-safe:transition-all motion-safe:duration-500 ${showHint
                     ? 'translate-x-0 opacity-100'
-                    : 'pointer-events-none translate-x-2 opacity-0'
-                    } group-hover:pointer-events-auto group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:translate-x-0 group-focus-within:opacity-100`}
+                    : 'translate-x-2 opacity-0'
+                    } group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100`}
             >
                 {hint}
             </span>
@@ -198,7 +202,7 @@ export function GlobalBrain({ userId }: GlobalBrainProps) {
                 onFocus={() => void loadBrainPanel()}
                 aria-label={t('brain.openAria')}
                 title={hint}
-                className="h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white"
+                className="pointer-events-auto h-14 w-14 p-0 rounded-none shadow-none bg-transparent hover:bg-transparent text-white"
             >
                 <BrainGlassesIcon className={`h-14 w-14 shrink-0 object-contain ${showHint ? 'brain-breathe' : ''}`} />
             </Button>

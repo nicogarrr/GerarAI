@@ -113,6 +113,24 @@ describe('GlobalBrain: botón y apertura', () => {
         expect(hint.className).toContain('opacity-0');
         expect(container.querySelector('.brain-breathe')).toBeNull();
     });
+    it('la pastilla no intercepta el ratón: solo el botón del Cerebro recibe clics', () => {
+        vi.useFakeTimers();
+        render(<GlobalBrain userId="u1" />);
+        const trigger = screen.getByRole('button', { name: 'Abrir el cerebro' });
+        const pill = trigger.parentElement as HTMLElement;
+        // La pista «Pregunta al Cerebro» es decorativa y se solapa con el CTA
+        // «Nueva alerta» de /alerts. El contenedor y la pista dejan pasar el
+        // ratón; solo el botón captura, así el CTA sigue siendo clicable.
+        expect(pill.className).toContain('pointer-events-none');
+        expect(trigger.className).toContain('pointer-events-auto');
+        const hint = screen.getByText('Pregunta al Cerebro');
+        expect(hint.className).not.toContain('pointer-events-auto');
+        expect(hint.className).not.toContain('pointer-events-none');
+        act(() => { vi.advanceTimersByTime(4100); });
+        expect(pill.className).toContain('pointer-events-none');
+        expect(trigger.className).toContain('pointer-events-auto');
+        expect(hint.className).not.toContain('pointer-events');
+    });
     it('marca el documento como listo mientras está montado y lo desmarca al desmontar', () => {
         const { unmount } = render(<GlobalBrain userId="u1" />);
         expect(document.documentElement.hasAttribute('data-brain-ready')).toBe(true);
