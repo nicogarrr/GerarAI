@@ -6,14 +6,15 @@ in missing_fx. A zero would understate concentration and distort exposures
 without any visible signal.
 """
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-from app.models.entities import Base, Company, MarketPrice, Portfolio, Position
+from app.core.local_date import local_today
+from app.models.entities import Base, Company, FinancialFact, MarketPrice, Portfolio, Position
 from app.services.portfolio_intelligence_service import PortfolioIntelligenceService
 
 
@@ -240,3 +241,91 @@ def test_build_no_hidrata_entidades_completas_de_snapshots_ni_benchmark(db):
     assert hidratadas == {"snapshots": 0, "benchmark": 0}, (
         f"build() hidrato {hidratadas}; debia leer solo columnas"
     )
+
+
+def _fx_today_fixture(db):
+    """Cartera USD con compra de HOY y tipos EUR/USD distintos ayer y hoy.
+
+    Las fechas se anclan a local_today() (Madrid), no al date.today() del
+    host: con TZ=UTC, entre las 22:00/23:00 y las 24:00 el dia de Madrid ya
+    es manana y una fixture con la fecha del host quedaba un dia corrida.
+    """
+    from app.models.entities import FXRate, Transaction
+
+    _eur_portfolio(db)
+    company = _company(db, "USDFX", currency="USD")
+    today = local_today()
+    yesterday = today - timedelta(days=1)
+    _position(db, company, currency="USD", market_value_base=None, market_value="1000")
+    for day in (yesterday, today):
+        db.add(MarketPrice(company_id=company.id, date=day, open=100, high=100,
+                           low=100, close=100.0, adj_close=None))
+    db.add(Transaction(company_id=company.id, action="buy", quantity=Decimal("10"),
+                       price=Decimal("100"), currency="USD", trade_date=today))
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=yesterday, rate=Decimal("0.90")))
+    db.add(FXRate(base_currency="EUR", quote_currency="USD", rate_date=today, rate=Decimal("0.95")))
+    db.commit()
+
+
+class _UtcYesterdayDate(date):
+    """El servidor corre con TZ=UTC: a las 00:30 de Madrid su date.today()
+    todavia devuelve ayer. Simula esa hora."""
+
+    @classmethod
+    def today(cls):
+        return local_today() - timedelta(days=1)
+
+
+def test_attribution_fx_component_uses_madrid_date(db, monkeypatch):
+    # Con el servidor una fecha por detras, la atribucion decia "efecto divisa
+    # 0,0 %" cuando el tipo EUR/USD se movio hoy: la tabla FX excluia la fila
+    # fechada hoy (rate_date <= as_of_max con as_of_max=ayer).
+    import app.services.portfolio_intelligence_service as service_module
+
+    _fx_today_fixture(db)
+    monkeypatch.setattr(service_module, "date", _UtcYesterdayDate)
+    result = PortfolioIntelligenceService().build(db)
+    fx_component = result["attribution"]["portfolio_components"]["fx"]
+    assert fx_component == pytest.approx(0.95 / 0.90 - 1, rel=1e-6)
+
+
+def test_ledger_flow_from_today_converts_with_todays_fx(db, monkeypatch):
+    # Una compra registrada HOY debe convertirse con el tipo de HOY:
+    # 1000 USD x 0,95 = 950 EUR, no con el de ayer (900 EUR).
+    import app.services.portfolio_intelligence_service as service_module
+
+    _fx_today_fixture(db)
+    monkeypatch.setattr(service_module, "date", _UtcYesterdayDate)
+    result = PortfolioIntelligenceService().build(db)
+    position = result["ledger_contribution"]["positions"][0]
+    assert position["net_invested"] == pytest.approx(950.0, rel=1e-9)
+
+
+def test_attribution_window_end_without_prices_uses_madrid_year(db, monkeypatch):
+    # Posicion sin historico de precios: el tope del horizonte fundamental es
+    # el ano de HOY en Madrid. Con el servidor un ejercicio por detras (caso
+    # limite del 1 de enero 00:00-01:00) el FY en curso quedaba fuera de la
+    # ventana y el crecimiento fundamental salia N/D.
+    import app.services.portfolio_intelligence_service as service_module
+
+    _eur_portfolio(db)
+    company = _company(db, "NOPX", currency="EUR")
+    _position(db, company, currency="EUR", market_value_base="1000")
+    current_year = local_today().year
+    for year, value in ((current_year - 5, "1.0"), (current_year, "2.0")):
+        db.add(FinancialFact(
+            tenant_id=db.info.get("tenant_id"), company_id=company.id,
+            metric="eps_diluted", value=Decimal(value), unit="USD",
+            period=f"FY{year}", fiscal_year=year, fiscal_quarter="FY",
+            source_type="sec"))
+    db.commit()
+
+    class _YearBehindDate(date):
+        @classmethod
+        def today(cls):
+            return date(current_year - 1, 12, 31)
+
+    monkeypatch.setattr(service_module, "date", _YearBehindDate)
+    result = PortfolioIntelligenceService().build(db)
+    entry = next(p for p in result["attribution"]["positions"] if p["ticker"] == "NOPX")
+    assert entry["components"]["fundamental_growth"] == pytest.approx(1.0)
