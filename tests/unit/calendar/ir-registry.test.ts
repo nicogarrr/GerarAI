@@ -196,8 +196,8 @@ describe('irLinksFor', () => {
     });
 
     it('cubre las posiciones y watchlist registradas el 2026-11-18', () => {
-        // Guard anti-regresion: NVDA y los 4X DCA sin entrada propia (CHTR, HIMS, NAUT, RXRX) + AMD.
-        for (const ticker of ['NVDA', 'CHTR', 'HIMS', 'NAUT', 'RXRX', 'AMD']) {
+        // Guard anti-regresion: NVDA y los 4X DCA sin entrada propia (CHTR, HIMS, NAUT, NFLX, RXRX) + AMD.
+        for (const ticker of ['NVDA', 'CHTR', 'HIMS', 'NAUT', 'NFLX', 'RXRX', 'AMD']) {
             expect(irLinksFor(ticker, '2026-11-18')?.section.url, ticker).toMatch(/^https:\/\//);
         }
     });
@@ -228,6 +228,12 @@ describe('irLinksFor', () => {
         expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
         expect(irLiveAssetFor('NVDA', '2026-11-17')?.asset.url).toContain('q4inc.com');
         expect(irLinksFor('NVDA', '2026-11-18')?.eventPage).toBeNull();
+    });
+
+    it('WOSG.L enlaza el evento oficial del 2026-12-10 solo ese dia', () => {
+        expect(irLinksFor('WOSG.L', '2026-12-10')?.eventPage?.url).toContain('thewosgroupplc.com');
+        expect(irLinksFor('WOSG.L', '2026-12-09')?.eventPage).toBeNull();
+        expect(irLinksFor('WOSG.L', '2026-12-11')?.eventPage).toBeNull();
     });
 
     it('KRKNF lleva el webcast oficial anunciado para el 2026-11-24', () => {

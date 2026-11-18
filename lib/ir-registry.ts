@@ -301,6 +301,12 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
         events: [],
         verifiedOn: '2026-11-18',
     },
+    NFLX: {
+        name: 'Netflix',
+        section: { url: 'https://ir.netflix.net/investor-news-and-events/financial-releases/2026/default.aspx', labelKey: 'quarterlyResults' },
+        events: [],
+        verifiedOn: '2026-11-18',
+    },
     RXRX: {
         name: 'Recursion Pharmaceuticals',
         section: { url: 'https://ir.recursion.com/', labelKey: 'investorRelations' },
@@ -545,6 +551,12 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
                     // Enlace "Webcast" del results centre oficial (replay del directo del trading update).
                     { kind: 'webcast', url: 'https://stream.brrmedia.co.uk/broadcast/6ad77ddbe50bec7a2a7d1d40', source: 'https://www.thewosgroupplc.com/investors/results-centre/' },
                 ],
+            },
+            // Fecha oficial del calendario financiero: resultados del primer semestre FY27.
+            {
+                date: '2026-12-10',
+                period: 'S1 F2027',
+                url: 'https://www.thewosgroupplc.com/investors/financial-calendar/',
             },
         ],
         verifiedOn: '2026-11-18',
