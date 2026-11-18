@@ -43,6 +43,13 @@ describe('Temas: flujo de dinero, fundamentales y botones en inglés', () => {
         expect(exposure?.className).not.toContain('before:');
     });
 
+    it('el enlace del cobrador tiene zona táctil ampliada (20 px medidos en prod, 18-nov)', async () => {
+        mocks.locale = 'es';
+        render(await ThemeFlow({ flow, holdings }));
+        const supplier = screen.getAllByRole('link', { name: 'NVDA' }).find((el) => el.className.includes('text-sm'));
+        expect(supplier?.className).toContain('before:-inset-3.5');
+    });
+
     it('en español no cambia', async () => {
         mocks.locale = 'es';
         render(await ThemeFlow({ flow, holdings }));

@@ -200,7 +200,7 @@ export async function ThemeFlow({ flow: rawFlow, holdings }: ThemeFlowProps) {
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   {supplier.ticker ? (
                     <Link
-                      className="text-sm font-semibold text-teal-300 hover:text-teal-200"
+                      className="relative text-sm font-semibold text-teal-300 before:absolute before:-inset-3.5 before:content-[''] hover:text-teal-200"
                       href={`/research/${supplier.ticker}`}
                     >
                       {supplier.ticker}
