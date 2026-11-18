@@ -180,6 +180,26 @@ def test_ingest_knowledge_source_error_handle_estructurado_con_source_id(env, mo
     env.db.close.assert_called_once_with()
 
 
+def test_ingest_knowledge_source_error_de_sesion_no_revienta_crudo(env, monkeypatch):
+    """Un ValueError permanente de _session pasa por _handle_actor_error.
+
+    Antes iba por fuera del try: dramatiq lo reintentaba dos veces y lo
+    mandaba a dead-letter sin registro estructurado (mismo contrato que
+    test_worker_uncovered_actors fijo para ingest_class_shares_outstanding).
+    """
+    env.session_error = ValueError("tenant inactivo")
+    called = []
+    monkeypatch.setattr(knowledge_jobs, "run_ingest_job", lambda db, sid, st: called.append(sid))
+
+    out = krag_actors.ingest_knowledge_source.fn(55, tenant_id=7, user_id="u")
+
+    assert out["status"] == "error"
+    assert env.handled[0][0] == "ingest_knowledge_source"
+    assert isinstance(env.handled[0][1], ValueError)
+    assert env.handled[0][2] == {"source_id": 55}
+    assert called == []
+
+
 def test_ingest_knowledge_source_registro_en_cola_dedicada():
     actor = krag_actors.ingest_knowledge_source
     assert actor.queue_name == krag_actors.KNOWLEDGE_QUEUE_NAME == "knowledge"

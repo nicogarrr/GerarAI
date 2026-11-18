@@ -33,7 +33,13 @@ def ingest_knowledge_source(
     from app.core.config import get_settings
     from app.services.knowledge_rag.jobs import run_ingest_job
 
-    db = _session(tenant_id, user_id)
+    try:
+        db = _session(tenant_id, user_id)
+    except Exception as exc:
+        # Un ValueError permanente de sesion no debe reventar crudo: sin esta
+        # captura dramatiq lo reintentaba y lo mandaba a dead-letter sin
+        # registro estructurado (mismo contrato que refresh_thesis_track_record).
+        return _handle_actor_error("ingest_knowledge_source", exc, source_id=source_id)
     try:
         return run_ingest_job(db, source_id, get_settings())
     except Exception as exc:
