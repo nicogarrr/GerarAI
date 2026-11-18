@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session, aliased
 
 from app.core.config import get_settings
 from app.core.errors import redact_secrets
+from app.core.local_date import local_today
 from app.core.tenancy import tenant_filters
 from app.models import Company, FinancialFact, MarketPrice, Position, SavedScreen
 from app.services.alert_rule_service import AlertRuleService
@@ -469,7 +470,7 @@ class MarketRefreshService:
     ) -> dict:
         if db.info.get("tenant_id") is None:
             raise ValueError("Tenant context is required for market refresh")
-        as_of = as_of or date.today()
+        as_of = as_of or local_today()  # Madrid, no el dia UTC del servidor
         started = datetime.now(UTC)
         rows = db.execute(
             select(Position, Company)
@@ -724,7 +725,7 @@ class MarketRefreshService:
             # apertura el cierre de ayer sigue vigente); fecha pasada: días naturales.
             stale = (
                 close_is_stale(latest.date, company.exchange, max_age, ticker=company.ticker)
-                if as_of == date.today()
+                if as_of == local_today()
                 else market_price_is_stale(age_days, max_age)
             )
             if stale:
