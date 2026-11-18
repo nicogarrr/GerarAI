@@ -747,7 +747,17 @@ jobs:
         # transitiva de llama-index-core) quedo corregida en nltk 3.10.4, que es
         # la que resuelve requirements.txt y la que fija uv.lock. Si vuelve a
         # hacer falta ignorar algo, que sea con fecha y motivo aqui mismo.
-        run: python -m pip_audit -r data-engine/requirements.txt
+        # Reintenta solo ReadTimeout de PyPI sin informe. Advisory, informe
+        # incompleto, error desconocido o reintentos agotados siguen en rojo.
+        run: python scripts/pip_audit_gate.py
+      - name: Preserve pip-audit attempt logs
+        if: ${{ always() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: pip-audit-attempt-logs
+          path: pip-audit-logs/
+          if-no-files-found: warn
+          retention-days: 7
 
   e2e:
     name: Research API E2E
