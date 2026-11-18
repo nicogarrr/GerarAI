@@ -9,6 +9,10 @@
  * Reglas:
  * - Cada nota de grupo (es y en) lleva "medido/medida" (es) o "measured"
  *   (en) y una fecha "d-mmm-aaaa" (p.ej. 18-nov-2026 / Nov 18, 2026).
+ * - Cada nota se presenta como MUESTRA fechada, no como latencia garantizada
+ *   (auditor 18-nov-2026: el retraso del feed gratuito cambia sin aviso).
+ * - La cifra fina 603-609 s solo aparece junto a ES=F: se midió en ese
+ *   contrato, no en todos los futuros (auditor 18-nov-2026).
  * - Ninguna nota, caption ni título afirma "tiempo real", "en directo" o
  *   "live": la frescura la dice la hora y la antigüedad de cada fila, y el
  *   retraso medido lo dice la nota.
@@ -41,6 +45,24 @@ test('cada nota de grupo afirma un retraso MEDIDO y FECHADO (es y en)', () => {
         assert.match(noteEs, DATE_ES, `nota es de ${key} sin fecha d-mmm-aaaa: ${noteEs}`);
         assert.match(noteEn, /\bmeasured\b/i, `nota en de ${key} sin "measured": ${noteEn}`);
         assert.match(noteEn, DATE_EN, `nota en de ${key} sin fecha Mmm d, yyyy: ${noteEn}`);
+    }
+});
+
+test('cada nota se presenta como MUESTRA, no como latencia garantizada', () => {
+    for (const key of GROUPS) {
+        assert.match(es.live.notes[key] as string, /no (es )?una latencia garantizada/i, `nota es de ${key} sin el marco de muestra`);
+        assert.match(en.live.notes[key] as string, /not a guaranteed latency/i, `nota en de ${key} sin el marco de muestra`);
+    }
+});
+
+test('la cifra fina 603-609 s solo se afirma junto a ES=F (donde se midió)', () => {
+    for (const [lang, notes] of [['es', es.live.notes], ['en', en.live.notes]] as const) {
+        for (const key of GROUPS) {
+            const note = notes[key] as string;
+            if (note.includes('603-609')) {
+                assert.ok(note.includes('ES=F'), `nota ${lang} de ${key} cita 603-609 s sin acotarlo a ES=F: ${note}`);
+            }
+        }
     }
 });
 
