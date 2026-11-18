@@ -1,9 +1,10 @@
 /**
- * Contrato de escala de la retención en origen (18-nov-2026): el API envía
- * `source_withholding_rate` como RATIO (0.15 = 15 %; lo fija
- * data-engine/tests/test_dividend_projection.py) y el frontend lo pinta con
- * formatPercent por defecto (fromRatio: true, lib/format.ts). Si alguien
- * cambia la escala en un solo lado, US pasaría de 15,0 % a 1500,0 % o a 0,2 %.
+ * Contrato de escala de la retención en origen (18-nov-2026), lado frontend:
+ * el componente pinta `source_withholding_rate` con formatPercent por defecto
+ * (fromRatio: true, lib/format.ts), es decir, espera un RATIO (0.15 = 15 %).
+ * El lado API (que el campo sale como ratio) lo guarda
+ * data-engine/tests/test_dividend_projection.py. Si alguien cambia la escala
+ * en un solo lado, US pasaría de 15,0 % a 1500,0 % o a 0,2 %.
  */
 import { render } from '@testing-library/react';
 import { beforeAll, describe, expect, it } from 'vitest';
@@ -46,6 +47,10 @@ describe('retención en origen: el ratio del API se pinta como porcentaje', () =
             positions: [{ ...projection.positions[0], source_withholding_rate: null, unverified_reason: ['sin_fuente'] }],
         };
         const { container } = render(<PortfolioDividends projection={sinTasa} />);
-        expect(container.textContent ?? '').not.toMatch(/NaN|1500/);
+        const text = container.textContent ?? '';
+        // La fila de retención muestra N/D (common.na en es) y ningún porcentaje inventado.
+        expect(text).toContain('N/D');
+        expect(text).not.toMatch(/\d+,\d\s*%/);
+        expect(text).not.toMatch(/NaN|1500/);
     });
 });
