@@ -70,6 +70,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
                 url: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast',
                 assets: [
                     { kind: 'presentacion', url: 'https://bn.brookfield.com/sites/brookfield-bn-v2/files/Brookfield-BN-IR-V2/2026/Q3/2026-q3-bn-supplemental.pdf', source: 'https://bn.brookfield.com/events/bn-q3-2026-conference-call-webcast' },
+                    { kind: 'webcast', url: 'https://edge.media-server.com/mmc/p/a5qsvhzs', source: 'https://bn.brookfield.com/events-news/events-financial-calendar' },
                 ],
             },
             {
@@ -82,7 +83,7 @@ export const IR_REGISTRY: Record<string, IrEntry> = {
                 ],
             },
         ],
-        verifiedOn: '2026-10-21',
+        verifiedOn: '2026-11-18',
     },
     TSLA: {
         name: 'Tesla',

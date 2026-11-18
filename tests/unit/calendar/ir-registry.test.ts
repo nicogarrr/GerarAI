@@ -26,7 +26,7 @@ describe('irLiveAssetFor', () => {
     it('sin entrada, sin evento ese día o evento sin directo: null', () => {
         expect(irLiveAssetFor('ZZZZ', '2026-10-21')).toBeNull();
         expect(irLiveAssetFor('META', '2026-10-22')).toBeNull();
-        expect(irLiveAssetFor('BN', '2026-11-12')).toBeNull();
+        expect(irLiveAssetFor('BN', '2026-11-13')).toBeNull();
     });
 });
 
@@ -200,6 +200,13 @@ describe('irLinksFor', () => {
         for (const ticker of ['NVDA', 'CHTR', 'HIMS', 'NAUT', 'RXRX', 'AMD']) {
             expect(irLinksFor(ticker, '2026-11-18')?.section.url, ticker).toMatch(/^https:\/\//);
         }
+    });
+
+    it('BN enlaza presentacion y webcast del T3 2026 solo ese dia', () => {
+        const exact = irLinksFor('BN', '2026-11-12');
+        expect(exact?.eventPage?.assets.map((a) => a.kind)).toEqual(['presentacion', 'webcast']);
+        expect(irLiveAssetFor('BN', '2026-11-12')?.asset.url).toContain('edge.media-server.com');
+        expect(irLinksFor('BN', '2026-11-13')?.eventPage).toBeNull();
     });
 
     it('cubre los 11 tickers BME de la watchlist con seccion IR oficial', () => {

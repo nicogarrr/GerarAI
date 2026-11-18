@@ -64,7 +64,7 @@ test('registro IR: BN T2 enlaza grabacion y transcripcion solo con fecha exacta'
     assert.deepEqual(hit?.eventPage?.assets.map((a) => a.kind), ['grabacion', 'transcripcion']);
     for (const a of hit?.eventPage?.assets ?? []) assert.ok(a.url.startsWith('https://bn.brookfield.com/') && a.source.startsWith('https://bn.brookfield.com/events/'));
     assert.equal(irLinksFor('BN', '2026-08-14')?.eventPage, null);
-    assert.deepEqual(irLinksFor('BN', '2026-11-12')?.eventPage?.assets.map((a) => a.kind), ['presentacion']);
+    assert.deepEqual(irLinksFor('BN', '2026-11-12')?.eventPage?.assets.map((a) => a.kind), ['presentacion', 'webcast']);
 });
 
 test('registro IR: META T1 enlaza presentacion y transcripcion (fecha exacta); T3 aun sin archivos', () => {
