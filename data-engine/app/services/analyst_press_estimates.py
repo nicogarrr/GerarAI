@@ -472,9 +472,6 @@ def _reporting_currency(db: Any, company: Any) -> str | None:
 
 
 def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tuple[Article, ArticleReading]]) -> dict[str, Any]:
-    from sqlalchemy import select
-
-    from app.models.declared_input_value import DeclaredInputValue
     from app.services.analyst_note_service import AnalystNoteError, AnalystNoteInput, analyst_note_service
     from app.services.declared_input_service import DeclaredInput, DeclaredInputService
 
@@ -483,6 +480,17 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
     skipped: list[str] = []
     reporting = _reporting_currency(db, company)  # las estimaciones se comparan con los informes
     listing = (str(getattr(company, "currency", "") or "").strip().upper() or None)  # el objetivo, con el precio
+    # Una sola consulta para las cifras vigentes del lote (antes: un SELECT por
+    # estimación dentro del bucle). Solo artículos con fecha, que son los que
+    # pueden llegar a guardarse; el orden de lectura se mantiene intacto.
+    keys = {
+        estimate_key(est.metric, est.year, est.firm)
+        for article, reading in readings
+        if article.dated
+        for est in (*reading.estimates, *reading.targets)
+        if est.metric != "price_target"
+    }
+    current_values = service.current(db, company_id=company.id, tenant_id=tenant_id, keys=keys) if keys else {}
     for article, reading in sorted(readings, key=lambda r: r[0].published):
         if not article.dated:
             # Sin fecha verificable el as_of seria "hoy" fabricado: pisaria
@@ -503,9 +511,7 @@ def store_readings(db: Any, company: Any, tenant_id: int, readings: Sequence[tup
                 if ccy is None:
                     skipped.append(f"{key}: divisa ambigua: «$» sin marca en una empresa que informa en {reporting}")
                     continue
-                current = db.scalars(select(DeclaredInputValue).where(
-                    DeclaredInputValue.tenant_id == tenant_id, DeclaredInputValue.company_id == company.id,
-                    DeclaredInputValue.input_key == key, DeclaredInputValue.superseded_at.is_(None))).first()
+                current = current_values.get((key, ""))
                 if current is not None and current.as_of and current.as_of > est.published:
                     skipped.append(f"{key}: hay una cifra más reciente ({current.as_of})")
                     continue

@@ -6,7 +6,7 @@ llama a ningún proveedor (sin red en el test: un fetch fallaría).
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import uuid4
 
@@ -30,7 +30,7 @@ from app.models.entities import (
     Position,
     Transaction,
 )
-from app.services.company_events_service import stored_holding, stored_timeline_events
+from app.services.company_events_service import TIMELINE_MAX_EVENTS, stored_holding, stored_timeline_events
 from tests.auth_helpers import auth_settings, signed_request
 
 SECRET = "company-timeline-events-test-sec"
@@ -92,6 +92,27 @@ def test_stored_events_have_date_source_and_respect_range_and_thresholds():
     assert events[1]["title"] == "Gran contrato"  # la noticia de materialidad 2 no entra
     assert events[3]["detail"] == "0.25 USD por acción"
     assert events[4]["title"] == "Resultados T2 2026" and events[4]["source_url"] == "https://www.nasdaq.com/x"
+
+
+def test_stored_events_are_bounded_and_deterministic_in_a_wide_range():
+    """Un rango amplio no puede devolver más del tope; el orden es estable y conserva los más recientes."""
+    with _memory_db() as db:
+        company = _company(db, "TLB")
+        first = date(2020, 1, 1)
+        total = TIMELINE_MAX_EVENTS + 25
+        for i in range(total):
+            db.add(EarningsDate(ticker="TLB", event_date=first + timedelta(days=i), fiscal_label=f"T{i}",
+                                confirmed=True, source="nasdaq", source_label="NASDAQ"))
+        db.commit()
+        desde, hasta = first, first + timedelta(days=total + 5)
+        events = stored_timeline_events(db, company, desde, hasta)
+        again = stored_timeline_events(db, company, desde, hasta)
+    assert len(events) == TIMELINE_MAX_EVENTS
+    assert events == again  # orden estable entre llamadas
+    assert events == sorted(events, key=lambda e: (e["date"], e["id"]), reverse=True)
+    assert len({e["id"] for e in events}) == TIMELINE_MAX_EVENTS
+    assert events[0]["date"] == (first + timedelta(days=total - 1)).isoformat()
+    assert events[-1]["date"] == (first + timedelta(days=total - TIMELINE_MAX_EVENTS)).isoformat()
 
 
 def test_holding_average_cost_and_first_buy():
