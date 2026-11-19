@@ -32,7 +32,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import httpx
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.tenancy import tenant_filters
@@ -158,6 +158,13 @@ class FinnhubProfileBackfill:
         stats = {"ok": 0, "sin_datos": 0, "error": 0, "market_cap": 0}
         attended = 0
         rate_limited: UpstreamRateLimited | None = None
+        # Dedup de market_cap en UNA consulta por corrida (carga perezosa en
+        # el primer cap escribible): antes era un SELECT por compania con
+        # cap fresca (hasta max_companies idas a Postgres por ejecucion;
+        # medido con harness de conteo: 50 chequeos -> 1 para 50 empresas).
+        # Mismos filtros que el count original; cada compania se procesa
+        # una vez por corrida, asi que no hace falta actualizar el set.
+        cap_facts: set[tuple[int, str]] | None = None
         for company in pending:
             try:
                 quote = self._get(QUOTE_URL, company.ticker)
@@ -242,16 +249,18 @@ class FinnhubProfileBackfill:
                 adr_candidates["market_cap_usd_millions"] = str(cap)
             if not unknown_exchange and cap is not None and cap > 0 and quote_date is not None:
                 period = quote_date.isoformat()
-                already = db.scalar(
-                    select(func.count(FinancialFact.id)).where(
-                        FinancialFact.company_id == company.id,
-                        FinancialFact.metric == "market_cap",
-                        FinancialFact.period == period,
-                        FinancialFact.source_type == "Finnhub",
-                        *tenant_filters(db, FinancialFact),
+                if cap_facts is None:
+                    cap_facts = set(
+                        db.execute(
+                            select(FinancialFact.company_id, FinancialFact.period).where(
+                                FinancialFact.company_id.in_([c.id for c in pending]),
+                                FinancialFact.metric == "market_cap",
+                                FinancialFact.source_type == "Finnhub",
+                                *tenant_filters(db, FinancialFact),
+                            )
+                        ).all()
                     )
-                )
-                if not already:
+                if (company.id, period) not in cap_facts:
                     db.add(
                         FinancialFact(
                             company_id=company.id,
