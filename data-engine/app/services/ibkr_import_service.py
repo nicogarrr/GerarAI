@@ -1065,6 +1065,11 @@ def _record_flex_splits(db: Session, splits: list[dict], row_errors: list[str]) 
                     source="ibkr_flex",
                 ))
                 db.flush()
+                # La lista de dedup de la compania se cachea por sesion (#5975): sin
+                # invalidarla, reimportar el mismo Flex en la misma sesion no veia
+                # este split y lo duplicaba. Se descarta (no se amplia) para que un
+                # rollback posterior no deje la cache con una fila que ya no existe.
+                db.info.get(SplitIngestionService._dedup_cache_key, {}).pop(company.id, None)
                 state = "registrada como pendiente"
             else:
                 state = "ya aplicada" if existing.applied else "ya estaba pendiente"
