@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import desc, func, select
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session, aliased, defer
 
 from app.core.tenancy import tenant_filters
 from app.models import (
@@ -116,9 +116,9 @@ class CompanySnapshotService:
         row_number() particionado por company_id, los ultimos 10 cambios por
         empresa con la misma ventana, y los 8 conteos agrupados con GROUP BY:
         ~13 queries para TODO el lote, independientemente de N. El caller
-        acota el lote (MAX_SNAPSHOT_BATCH_TICKERS en la ruta); no hay
-        proyeccion parcial de columnas, se leen las filas completas igual
-        que en build().
+        acota el lote (MAX_SNAPSHOT_BATCH_TICKERS en la ruta). Los payloads
+        completos que no forman parte del bootstrap quedan diferidos con
+        raiseload; acceder a uno por accidente falla en vez de generar N+1.
         """
         if not companies:
             return {}
@@ -180,7 +180,20 @@ class CompanySnapshotService:
             .subquery()
         )
         aliased_entity = aliased(entity, ranked)
-        rows = db.scalars(select(aliased_entity).where(ranked.c.rank_ == 1)).all()
+        # The bootstrap never reads these full report/model payloads. Keep
+        # them deferred with raiseload so an accidental consumer cannot turn
+        # this into one payload query per company.
+        unused_payloads = {
+            ThesisVersion: ("thesis_markdown", "narrative_sections", "invalidation_rules"),
+            FundamentalModelVersion: ("model_snapshot",),
+            ValuationModel: ("calculation_trace",),
+        }
+        rows = db.scalars(
+            select(aliased_entity)
+            .where(ranked.c.rank_ == 1)
+            .options(*(defer(getattr(aliased_entity, name), raiseload=True)
+                       for name in unused_payloads.get(entity, ())))
+        ).all()
         return {row.company_id: row for row in rows}
 
     @staticmethod
