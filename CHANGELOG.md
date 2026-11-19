@@ -7,12 +7,13 @@ Todos los cambios relevantes de GerarAI. Formato inspirado en
 ## Cambios sin publicar (0.6.1)
 
 **0.6.1 NO está etiquetada ni desplegada.** Rango: desde `v0.6.0` (`60d7e8f1`,
-15-nov-2026) hasta `ffe814ca0` en `main` (18-nov-2026): 205 commits en primera
-línea (`git rev-list --count --first-parent v0.6.0..HEAD`) y 208 en el rango
-completo (`git log --oneline v0.6.0..HEAD | Measure-Object -Line` = 208). Por
-prefijo, sobre el rango completo: 103 `fix`, 42 `feat`, 25 `test`, 20 `perf` y el
-resto `chore`, merges y otros. Los títulos son los de cada commit o PR, tal cual;
-la lista completa está en `git log --oneline v0.6.0..HEAD`.
+15-nov-2026) hasta `c192ea94b` en `main` (19-nov-2026, 00:19 CET): **320 commits**
+en el rango completo (`git log --oneline v0.6.0..HEAD | Measure-Object -Line`) y
+**262 en primera línea** (`git log --oneline --first-parent v0.6.0..HEAD |
+Measure-Object -Line`). Por prefijo, sobre el rango completo: **131 `fix`**,
+**44 `feat`**, **42 `test`** y **22 `perf`**; el resto son `docs`, `chore`, `ci`,
+`ops`, `refactor`, merges y otros. Los títulos son los de cada commit o PR, tal
+cual; la lista completa está en `git log --oneline v0.6.0..HEAD`.
 
 ### Lo más destacado
 
@@ -32,17 +33,63 @@ la lista completa está en `git log --oneline v0.6.0..HEAD`.
 - **Multidivisa:** reconstrucción de carteras consistente (#5900).
 - **Terminal:** proyección documental, con repetición de CI con workflow nuevo
   (#5898).
-- **Resto del rango:** el desglose completo (103 `fix`, 42 `feat`, 25 `test` y
-  20 `perf`) incluye cambios en research, chat, cartera, fuentes, cerebro,
+- **Resto del rango:** el desglose completo (131 `fix`, 44 `feat`, 42 `test` y
+  22 `perf`) incluye cambios en research, chat, cartera, fuentes, cerebro,
   watchlist, tesis y workers; no se detallan aquí para no inventar resúmenes no
   verificados.
+
+### Últimos 112 commits (`ffe814ca0..HEAD`, 18-19-nov-2026)
+
+El CHANGELOG cubría hasta `ffe814ca0` (18-nov-2026). Desde ahí hasta `c192ea94b` hay
+**112 commits** nuevos, verificados con `git log --oneline ffe814ca0..HEAD`. Se
+resumen agrupados por tema con sus PRs verificables; no se listan uno a uno para
+no inventar resúmenes no contrastados:
+
+- **Cerebro, citas, chat y tesis:** citas internas abribles y vista de noticias
+  corregida (#5965); enlace entre noticias materiales y cambio de tesis (#5961);
+  puente tesis ↔ evidencia (#5955) y guía de ayuda ajustada al flujo real de
+  tesis y valoración (#5952); etiqueta explícita en fixtures de LibraryChat
+  (#5959, #5960); solapamiento de la pastilla del Cerebro (#5953); contrato TS
+  de `unverified_claims` (#5934) y pruebas de chat sin carreras de reloj (#5930);
+  honestidad y feedback en acciones y tesis (#5956, #5962, #5963, #5967).
+- **Valoración:** orden `bear <= base <= bull` con spread WACC-terminal estrecho
+  (#5940); retirada de proveedor visible en evidencias de valoración (#5949);
+  avisos de lectura del valor justo (#5950) y avisos del motor llevados a la
+  lectura; guardarrail anti-NaN y `cash_native` en `Decimal` (#4986, #5941).
+- **Evidencia y documentos:** tesis sin evidencia conectada con la subida de
+  documentos (#5958); enlaces de documentos protegidos (#5964); exposición de la
+  evidencia de las afirmaciones en la ficha y reconciliación del apéndice ASTS
+  con la captura verificada (#5689).
+- **Accesibilidad y móvil:** texto legible de 11 a 12 px (#5944), zona táctil de
+  44 px en `/research` y `/insider` (#5942) y en el botón de estado del aviso IA,
+  chips de exposición conservados (#5928), sin desbordamiento a 320 px (#5937)
+  ni en el paginador móvil (#5926), navegación alcanzable (#5948), estados vacíos
+  con siguientes acciones (#5947), texto informativo legible a 12 px (#5916) y
+  guard de calidad frontend (#5968).
+- **Fuentes y datos de mercado:** fuente de hechos legible (#5747), puerto
+  validado 80/443 en `public_fetch` (#5302, #5946), notas de retraso medido y
+  fechado como muestra —no latencia garantizada— y saneado del demo CBOE
+  (#5931), y pruebas de Form 144 aisladas de la red real (#5954).
+- **CI, documentación y dependencias:** cierre de auditoría y gates (#5932,
+  #5933), canales de alertas alineados con el código (#5936), defaults de env
+  (#5938), portabilidad de tests en Windows (#5939), guías web y benchmarks
+  manuales (#5692, #5671), e integración de cambios de docs y frontend (#5943),
+  con actualizaciones de dependencias (#5754). Los siete PRs correctores de la
+  auditoría quedaron mergeados: #5932, #5933, #5934, #5935, #5936, #5939 y
+  #5940.
+- **Rendimiento:** conteo de filas company-date sin `DISTINCT` y de sesiones
+  únicas (#5870, con reintento #5886; reintento de #5848 en #5883), además de
+  los benchmarks deterministas separados de los de tiempo de pared (#5671).
 
 ### Notas de actualización
 
 - **Migraciones en el rango:** `0137` (Form 144) y `0138` (índice concurrente).
   Con `0138` la cabeza Alembic actual en `main` queda en 35 migraciones nuevas
   desde `v0.5.0` (de `0104` a `0138`; la etiqueta v0.5.0 iba por `0103`), frente
-  a las 32 (`0104`..`0135`) del tag v0.6.0. Su estado en producción no se
+  a las 32 (`0104`..`0135`) del tag v0.6.0. A 19-nov-2026 hay una sola cabeza,
+  `0138_facts_tenant_company_idx` (138 revisiones únicas, 0 `down_revision`
+  huérfanas, cadena `0135 → 0136 → 0137 → 0138`), comprobado por lectura de los
+  ficheros de migración; **no se ejecutó Alembic**. Su estado en producción no se
   verifica en este documento: re-comprobar en cada despliegue con backup previo
   y `alembic upgrade head`.
 - **Sin despliegue asociado:** al no existir etiqueta ni despliegue de 0.6.1,
