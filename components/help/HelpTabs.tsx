@@ -15,7 +15,7 @@ export default function HelpTabs() {
     { href: '/research', title: t('help.modules.item1.title'), text: t('help.modules.item1.text') },
     { href: '/portfolio', title: t('help.modules.item2.title'), text: t('help.modules.item2.text') },
     { href: '/risk', title: t('help.modules.item3.title'), text: t('help.modules.item3.text') },
-    { href: '/screeners', title: t('help.modules.item4.title'), text: t('help.modules.item4.text') },
+    { href: '/screener', title: t('help.modules.item4.title'), text: t('help.modules.item4.text') },
     { href: '/propicks', title: t('help.modules.item5.title'), text: t('help.modules.item5.text') },
     { href: '/alerts', title: t('help.modules.item6.title'), text: t('help.modules.item6.text') },
     { href: '/insider', title: t('help.modules.item7.title'), text: t('help.modules.item7.text') },

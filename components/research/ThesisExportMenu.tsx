@@ -12,7 +12,8 @@ import {
 /**
  * Salidas de la tesis: leerla bien (pagina dedicada imprimible) y
  * descargarla en PDF o Markdown de la version PUBLICADA. El vault Obsidian
- * completo sigue en /export; Journal y EPUB salen del menu (apenas se usan).
+ * completo sigue en /export; el menu ofrece «Leer la tesis», «Descargar PDF»
+ * y «Descargar Markdown».
  */
 export default function ThesisExportMenu({
   ticker,

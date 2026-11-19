@@ -103,7 +103,7 @@
   },
   "steps": {
     "thesis": "1. Tesis.",
-    "thesisText": "elige la compañía, abre la pestaña «Tesis» y pulsa «Generar tesis» (o «Regenerar tesis» si ya hay una). Revisa la hipótesis, los escenarios con probabilidades, los catalizadores con fecha y qué la invalidaría. El memo y el EPUB se exportan desde la propia vista de tesis («Exportar memo» y «Exportar EPUB»);",
+    "thesisText": "elige la compañía, abre la pestaña «Tesis» y pulsa «Generar tesis» (o «Regenerar tesis» si ya hay una). Revisa la hipótesis, los escenarios con probabilidades, los catalizadores con fecha y qué la invalidaría. En la tesis, el menú «Leer / Descargar» ofrece «Leer la tesis», «Descargar PDF» y «Descargar Markdown»; la vista de lectura añade «Imprimir»;",
     "in": "En",
     "valuation": "2. Valoración.",
     "valuationText": "En la misma ficha, abre la pestaña «Valoración» y revisa la sección «Modelo fundamental a largo plazo»: los supuestos (crecimiento, margen FCF y WACC) y los escenarios Bajista / Base / Alcista con sus spreads antes de fiarte del número.",
