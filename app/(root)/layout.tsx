@@ -10,6 +10,10 @@ import { SIDEBAR_COLLAPSED_COOKIE } from "@/lib/ui/sidebar-preference";
 import OnlineBanner from "@/components/OnlineBanner";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { requireAuthenticatedUser } from "@/lib/auth/require-user";
+import { redirect } from "next/navigation";
+import { AppError } from "@/lib/types/errors";
+import { ACCOUNT_PENDING_CODE, ACCOUNT_REJECTED_CODE } from "@/lib/auth/account-approval";
+import { cuentaPendienteHref } from "@/lib/auth/pending-account";
 import { cookies } from "next/headers";
 import { redirectToSignIn } from "@/lib/auth/sign-in-redirect";
 import React from "react";
@@ -30,7 +34,14 @@ async function getLayoutUser(): Promise<User> {
             name: user.name ?? user.email ?? 'Usuario',
             email: user.email ?? '',
         };
-    } catch {
+    } catch (error) {
+        // Cuenta pending/rejected con sesión viva: pantalla de estado honesta.
+        // Mandarla a /sign-in era un bucle: el shell de auth redirige a /inicio
+        // a quien tiene sesión, y aquí la cuenta inactiva vuelve a caer al 403.
+        if (error instanceof AppError
+            && (error.code === ACCOUNT_PENDING_CODE || error.code === ACCOUNT_REJECTED_CODE)) {
+            redirect(cuentaPendienteHref(error.code === ACCOUNT_REJECTED_CODE ? 'rechazada' : 'pendiente'));
+        }
         return redirectToSignIn();
     }
 }
