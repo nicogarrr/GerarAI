@@ -1,3 +1,5 @@
+from sqlalchemy import event
+
 from app.models import ClaimEvidence, Document, DocumentChunk
 from app.services.moat_checklist import moat_checklist
 from tests.test_moat_service import _claim, _company, db  # noqa: F401
@@ -30,6 +32,45 @@ def test_only_verbatim_company_chunk_with_document_url(db):
     ev.source_url = 'https://example.com/unrelated'
     db.commit()
     assert all(not r['excerpts'] for r in moat_checklist(db, company))
+
+
+def test_documents_and_chunks_are_loaded_in_bulk(db):
+    """Varias evidencias cargan documentos y chunks en una consulta cada uno, no uno por evidencia."""
+    company = _company(db)
+    quote = 'Our competitors introduced a substitute product and challenged our pricing power.'
+    loaded: list[object] = []
+    for i in range(3):
+        claim = _claim(db, company.id, f'claim {i} about pricing power')
+        doc = Document(company_id=company.id, title=f'Informe {i}', source_type='sec_filing',
+                       source_url=f'https://example.com/{i}')
+        db.add(doc)
+        db.flush()
+        chunk = DocumentChunk(document_id=doc.id, chunk_index=0, text=quote)
+        db.add(chunk)
+        db.flush()
+        db.add(ClaimEvidence(claim_id=claim.id, document_id=doc.id, document_chunk_id=chunk.id, quote=quote,
+                             summary='summary', evidence_type='supports'))
+        loaded.extend((doc, chunk))
+    db.commit()
+    # Sesión fresca para esos objetos: con db.get habría una consulta por documento y por chunk.
+    for obj in loaded:
+        db.expunge(obj)
+
+    statements: list[str] = []
+
+    def _count(_conn, _cursor, statement, _params, _context, _many):
+        statements.append(statement)
+
+    bind = db.get_bind()
+    event.listen(bind, 'before_cursor_execute', _count)
+    try:
+        rows = moat_checklist(db, company)
+    finally:
+        event.remove(bind, 'before_cursor_execute', _count)
+
+    assert sum(len(r['excerpts']) for r in rows) == 6  # mismo resultado: 3 documentos × 2 preguntas
+    assert len([s for s in statements if 'FROM documents' in s]) == 1
+    assert len([s for s in statements if 'FROM document_chunks' in s]) == 1
 
 
 def test_quote_from_other_company_is_not_evidence(db):

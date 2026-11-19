@@ -2154,12 +2154,21 @@ class IBKRImportService:
             )
             if not reconcile_blocked:
                 allowed = set(reconcile_sources)
-                for stale in db.scalars(select(Position)).all():
-                    if stale.company_id not in imported_company_ids and stale.source in allowed:
-                        company = db.get(Company, stale.company_id)
-                        positions_closed.append(company.ticker if company else str(stale.company_id))
-                        if not dry_run:
-                            db.delete(stale)
+                # Carga en lote de las empresas de las posiciones obsoletas
+                # (antes: db.get por posición). Mantiene el orden y el resultado.
+                stale_positions = [
+                    stale for stale in db.scalars(select(Position)).all()
+                    if stale.company_id not in imported_company_ids and stale.source in allowed
+                ]
+                stale_company_ids = {stale.company_id for stale in stale_positions}
+                stale_companies: dict[int, Company] = {
+                    c.id: c for c in db.scalars(select(Company).where(Company.id.in_(stale_company_ids))).all()
+                }
+                for stale in stale_positions:
+                    company = stale_companies.get(stale.company_id)
+                    positions_closed.append(company.ticker if company else str(stale.company_id))
+                    if not dry_run:
+                        db.delete(stale)
                 for stale_cash in db.scalars(select(CashBalance)).all():
                     if stale_cash.currency not in imported_cash_currencies and stale_cash.source in allowed:
                         cash_removed.append(stale_cash.currency)

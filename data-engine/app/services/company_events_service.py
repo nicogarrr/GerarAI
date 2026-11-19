@@ -510,6 +510,11 @@ class CompanyEventsService:
 TIMELINE_INSIDER_MIN_VALUE = 100_000.0
 TIMELINE_NEWS_MIN_MATERIALITY = 5
 TIMELINE_FILING_TYPES = frozenset({"new_filing", "ownership_disclosure", "sec_filing"})
+# Tope de eventos por respuesta: acota memoria y tamaño de la respuesta en rangos
+# amplios sin cambiar qué cuenta como evento. Se aplica tras ordenar por fecha
+# (desempate por id), así que conserva los más recientes de forma determinista;
+# con menos eventos que el tope la respuesta no cambia.
+TIMELINE_MAX_EVENTS = 500
 
 
 def _timeline_float(value: Any) -> float | None:
@@ -698,4 +703,4 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             "source_url": row.source_url,
         })
     events.sort(key=lambda e: (e["date"], e["id"]), reverse=True)
-    return events
+    return events[:TIMELINE_MAX_EVENTS]

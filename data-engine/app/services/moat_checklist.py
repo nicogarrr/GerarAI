@@ -8,6 +8,7 @@ import re
 import unicodedata
 from urllib.parse import urlparse
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models import Document, DocumentChunk
@@ -39,14 +40,22 @@ def safe_url(url: str | None) -> bool:
 def moat_checklist(db: Session, company) -> list[dict]:
     rows = [{"id": key, "question": question, "status": "sin_evidencia", "excerpts": []}
             for key, question, _ in QUESTIONS]
+    # Carga en lote de documentos y chunks (antes: db.get por evidencia en el
+    # bucle anidado). El orden de recorrido y las decisiones no cambian.
+    claims = list(live_claims(db, company))
+    evidences = [evidence for claim in claims for evidence in claim.evidence]
+    document_ids = {e.document_id for e in evidences if e.document_id}
+    chunk_ids = {e.document_chunk_id for e in evidences if e.document_chunk_id}
+    docs = {d.id: d for d in db.scalars(select(Document).where(Document.id.in_(document_ids))).all()} if document_ids else {}
+    chunks = {c.id: c for c in db.scalars(select(DocumentChunk).where(DocumentChunk.id.in_(chunk_ids))).all()} if chunk_ids else {}
     seen: set[tuple[str, int, str]] = set()
-    for claim in live_claims(db, company):
+    for claim in claims:
         for evidence in claim.evidence:
             quote = (evidence.quote or "").strip()
             if len(quote) < 30 or not evidence.document_id or not evidence.document_chunk_id:
                 continue
-            doc = db.get(Document, evidence.document_id)
-            chunk = db.get(DocumentChunk, evidence.document_chunk_id)
+            doc = docs.get(evidence.document_id)
+            chunk = chunks.get(evidence.document_chunk_id)
             if not doc or not chunk or doc.company_id != company.id or chunk.document_id != doc.id:
                 continue
             if not safe_url(doc.source_url) or normalized(quote) not in normalized(chunk.text):
