@@ -1,6 +1,8 @@
 /**
- * Puerta de npm audit (scripts/npm-audit-gate.mjs): la excepcion de
- * GHSA-fc5q-39xc-vjpf deja pasar SOLO esa advisory.
+ * Puerta de npm audit (scripts/npm-audit-gate.mjs): sin excepciones activas
+ * (GHSA-fc5q-39xc-vjpf se retiro el 19-nov-2026: GitHub la marco Withdrawn el
+ * 18-nov-2026 y `npm audit` volvio a 0). El mecanismo de excepcion se sigue
+ * probando pasando un set explicito a evaluateAudit.
  *   node --test scripts/npm-audit-gate.test.mjs
  */
 import assert from 'node:assert/strict';
@@ -31,12 +33,19 @@ function report(...roots) {
   return { auditReportVersion: 2, vulnerabilities };
 }
 
-test('la excepcion esta limitada a una sola advisory, la de picomatch', () => {
-  assert.deepEqual([...IGNORED_ADVISORIES], ['GHSA-fc5q-39xc-vjpf']);
+test('no hay excepciones activas (la de picomatch se retiro: advisory Withdrawn)', () => {
+  assert.deepEqual([...IGNORED_ADVISORIES], []);
 });
 
-test('solo la advisory de picomatch: pasa y la declara como ignorada', () => {
+test('la advisory de picomatch (Withdrawn) ya no pasa: bloquea y se nombra', () => {
   const res = evaluateAudit(report(PICOMATCH));
+  assert.equal(res.ok, false);
+  assert.deepEqual(res.blocking.map((b) => b.name), ['picomatch']);
+  assert.deepEqual(res.ignored, []);
+});
+
+test('el mecanismo de excepcion sigue funcionando con un set explicito', () => {
+  const res = evaluateAudit(report(PICOMATCH), new Set(['GHSA-fc5q-39xc-vjpf']));
   assert.equal(res.ok, true);
   assert.deepEqual(res.blocking, []);
   assert.deepEqual(res.ignored, ['ghsa-fc5q-39xc-vjpf']);
@@ -49,11 +58,11 @@ test('otra advisory high sola: sigue fallando y se nombra', () => {
   assert.deepEqual(res.ignored, []);
 });
 
-test('picomatch mas otra advisory: falla solo por la otra', () => {
+test('picomatch mas otra advisory: sin excepcion fallan las dos', () => {
   const res = evaluateAudit(report(PICOMATCH, OTHER));
   assert.equal(res.ok, false);
-  assert.deepEqual(res.blocking.map((b) => b.name), ['left-pad']);
-  assert.deepEqual(res.ignored, ['ghsa-fc5q-39xc-vjpf']);
+  assert.deepEqual(res.blocking.map((b) => b.name), ['picomatch', 'left-pad']);
+  assert.deepEqual(res.ignored, []);
 });
 
 test('una advisory critical distinta falla; una moderate distinta no bloquea (como --audit-level=high)', () => {
@@ -63,7 +72,7 @@ test('una advisory critical distinta falla; una moderate distinta no bloquea (co
 
 test('un id parecido pero distinto no hereda la excepcion', () => {
   const lookalike = { ...PICOMATCH, url: 'https://github.com/advisories/GHSA-fc5q-39xc-vjpg' };
-  assert.equal(evaluateAudit(report(lookalike)).ok, false);
+  assert.equal(evaluateAudit(report(lookalike), new Set(['GHSA-fc5q-39xc-vjpf'])).ok, false);
 });
 
 test('paquete high sin advisory atribuible bloquea', () => {
@@ -105,7 +114,7 @@ test('cadena con una rama rota bloquea aunque otra rama llegue a la advisory ign
       a: { name: 'a', severity: 'high', via: ['picomatch', 'fantasma'] },
       picomatch: { name: 'picomatch', severity: 'high', via: [PICOMATCH] },
     },
-  });
+  }, new Set(['GHSA-fc5q-39xc-vjpf']));
   assert.equal(res.ok, false);
   assert.deepEqual(res.blocking.map((b) => b.name), ['a']);
 });
@@ -124,7 +133,7 @@ test('ciclo sin advisory raiz bloquea; ciclo con salida a la advisory ignorada p
       b: { name: 'b', severity: 'high', via: ['a', 'picomatch'] },
       picomatch: { name: 'picomatch', severity: 'high', via: [PICOMATCH] },
     },
-  });
+  }, new Set(['GHSA-fc5q-39xc-vjpf']));
   assert.equal(conSalida.ok, true);
   assert.deepEqual(conSalida.ignored, ['ghsa-fc5q-39xc-vjpf']);
 });
@@ -138,7 +147,7 @@ test('cadena larga resuelta hasta la raiz ignorada: pasa; hasta una ajena: falla
       [root.name]: { name: root.name, severity: 'high', via: [root] },
     },
   });
-  assert.equal(evaluateAudit(chain(PICOMATCH)).ok, true);
+  assert.equal(evaluateAudit(chain(PICOMATCH), new Set(['GHSA-fc5q-39xc-vjpf'])).ok, true);
   const bad = evaluateAudit(chain(OTHER));
   assert.equal(bad.ok, false);
   assert.deepEqual(bad.blocking.map((b) => b.name), ['left-pad']);
@@ -180,10 +189,16 @@ function runWorkflowCommand(args, fakeStdout) {
   return res;
 }
 
-test('workflow bajo bash -eo pipefail: npm sale 1 con solo picomatch -> rc 0', () => {
-  const res = runWorkflowCommand('--omit=dev', JSON.stringify(report(PICOMATCH)));
+test('workflow bajo bash -eo pipefail: arbol limpio -> rc 0', () => {
+  const res = runWorkflowCommand('--omit=dev', JSON.stringify({ vulnerabilities: {} }));
   assert.equal(res.status, 0, res.stderr);
-  assert.match(res.stdout, /ghsa-fc5q-39xc-vjpf ignorada/);
+  assert.equal(res.npmArgs, 'audit --json --omit=dev');
+});
+
+test('workflow bajo bash -eo pipefail: npm sale 1 con solo picomatch (Withdrawn, sin excepcion) -> rc 1', () => {
+  const res = runWorkflowCommand('--omit=dev', JSON.stringify(report(PICOMATCH)));
+  assert.equal(res.status, 1);
+  assert.match(res.stderr, /picomatch/);
   assert.equal(res.npmArgs, 'audit --json --omit=dev');
 });
 
@@ -200,8 +215,10 @@ test('workflow bajo bash -eo pipefail: salida no JSON o vacia de npm -> rc 1', (
 });
 
 test('--stdin: lee el JSON de stdin', () => {
-  const ok = spawnSync(process.execPath, ['scripts/npm-audit-gate.mjs', '--stdin'], { input: JSON.stringify(report(PICOMATCH)), encoding: 'utf8' });
+  const ok = spawnSync(process.execPath, ['scripts/npm-audit-gate.mjs', '--stdin'], { input: JSON.stringify({ vulnerabilities: {} }), encoding: 'utf8' });
   assert.equal(ok.status, 0);
+  const withdrawn = spawnSync(process.execPath, ['scripts/npm-audit-gate.mjs', '--stdin'], { input: JSON.stringify(report(PICOMATCH)), encoding: 'utf8' });
+  assert.equal(withdrawn.status, 1);
   const bad = spawnSync(process.execPath, ['scripts/npm-audit-gate.mjs', '--stdin'], { input: '', encoding: 'utf8' });
   assert.equal(bad.status, 1);
 });

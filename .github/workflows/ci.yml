@@ -726,9 +726,11 @@ jobs:
       # advisory y `npm audit` del arbol completo vuelve a dar 0 hallazgos, asi
       # que vuelve a bloquear como pedia el recordatorio de #806.
       # Ambos pasos pasan por scripts/npm-audit-gate.mjs: igual que
-      # `--audit-level=high` salvo GHSA-fc5q-39xc-vjpf (picomatch <= 4.0.7, sin
-      # version parcheada upstream a 17-nov-2026; ver el guard para motivo y
-      # condicion de retirada). El script ejecuta npm y decide por su cuenta (un pipe
+      # `--audit-level=high`, sin excepciones activas. La de GHSA-fc5q-39xc-vjpf
+      # (picomatch <= 4.0.7) se retiro el 19-nov-2026: GitHub marco la advisory
+      # como Withdrawn el 18-nov y `npm audit` volvio a 0 sin subir ninguna
+      # version. El mecanismo de excepciones (IGNORED_ADVISORIES) queda para la
+      # siguiente. El script ejecuta npm y decide por su cuenta (un pipe
       # con `npm audit` fallaria bajo `bash -eo pipefail`); falla cerrado si npm
       # no devuelve JSON valido o la cadena de una advisory no se puede atribuir.
       - name: Audit npm dependencies (produccion)

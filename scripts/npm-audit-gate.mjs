@@ -8,28 +8,27 @@
  * `bash -eo pipefail` de GitHub aunque el gate diga que esta permitido.
  * `--stdin` lee el JSON de stdin en vez de ejecutar npm (tests).
  *
- * Equivale a `npm audit --audit-level=high` con UNA excepcion explicita y
- * caducable (IGNORED_ADVISORIES). Cualquier otra advisory high/critical sigue
- * tumbando el job. Falla cerrado: entrada vacia, JSON ilegible o respuesta de
+ * Equivale a `npm audit --audit-level=high` con un mecanismo de excepciones
+ * explicitas y caducables (IGNORED_ADVISORIES, hoy vacio). Cualquier advisory
+ * high/critical sin excepcion tumba el job. Falla cerrado: entrada vacia, JSON ilegible o respuesta de
  * error de npm (registro caido) son rojo, nunca verde.
  */
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
 /**
- * EXCEPCION TEMPORAL (alta 17-nov-2026).
- * GHSA-fc5q-39xc-vjpf (CVE-2026-112366): ReDoS en picomatch <= 4.0.7. GitHub
- * publica first_patched_version = null y npm `latest` es 4.0.7: no hay version
- * a la que subir. Llega por vitest/vite/tinyglobby/fdir (devDependencies;
- * better-auth declara vitest como peer opcional y por eso npm lo cuenta en
- * --omit=dev). La imagen final solo copia .next/standalone: no se envia.
+ * Excepciones activas: NINGUNA.
  *
- * RETIRAR cuando exista picomatch > 4.0.7: subir picomatch (override o
- * lockfile), borrar esta entrada y comprobar que `npm audit` da 0.
- * Revision diaria: `npm view picomatch dist-tags.latest` y
- * https://github.com/advisories/GHSA-fc5q-39xc-vjpf (first_patched_version).
+ * Historial: GHSA-fc5q-39xc-vjpf (ReDoS en picomatch <= 4.0.7, sin version
+ * parcheada) fue excepcion del 17-nov-2026 al 19-nov-2026. GitHub marco la
+ * advisory como Withdrawn el 18-nov-2026 (npm `latest` sigue siendo 4.0.7, no
+ * hizo falta subir nada) y `npm audit` volvio a dar 0 hallazgos tanto en
+ * produccion como en el arbol completo, asi que la excepcion sobraba.
+ *
+ * Para una excepcion futura: anadir el GHSA aqui con motivo y condicion de
+ * retirada en este comentario, y revisarla a diario.
  */
-export const IGNORED_ADVISORIES = new Set(['GHSA-fc5q-39xc-vjpf']);
+export const IGNORED_ADVISORIES = new Set([]);
 
 const BLOCKING = new Set(['high', 'critical']);
 const SEVERITIES = new Set(['info', 'low', 'moderate', 'high', 'critical']);
@@ -127,13 +126,13 @@ export function runGate(raw) {
   const result = evaluateAudit(report);
   if (result.error) return { code: 1, out: [], err: [`npm-audit-gate: ${result.error}`] };
   const out = result.ignored.map(
-    (id) => `npm-audit-gate: ${id} ignorada (excepcion temporal, ver IGNORED_ADVISORIES en scripts/npm-audit-gate.mjs; retirar cuando haya picomatch > 4.0.7).`,
+    (id) => `npm-audit-gate: ${id} ignorada (excepcion temporal, ver IGNORED_ADVISORIES en scripts/npm-audit-gate.mjs).`,
   );
   if (!result.ok) {
     const err = ['npm-audit-gate: advisories high/critical sin excepcion:', ...result.blocking.map((b) => `  - ${b.name} [${b.severity}] ${b.title} ${b.url}`)];
     return { code: 1, out, err };
   }
-  return { code: 0, out: [...out, 'npm-audit-gate: sin advisories high/critical fuera de la excepcion.'], err: [] };
+  return { code: 0, out: [...out, 'npm-audit-gate: sin advisories high/critical.'], err: [] };
 }
 
 /**
