@@ -55,7 +55,7 @@ def _foreign_issuer(db: Session, ticker: str) -> bool | None:
 @router.get("/signals")
 def insider_signals(
     ticker: str = Query(min_length=1, max_length=20),
-    cik: str | None = Query(default=None, max_length=10),
+    cik: str | None = Query(default=None, max_length=10, pattern=r"^\d{1,10}$"),
     limit: int = Query(default=20, ge=1, le=50),
     notify: bool = Query(default=False),
     db: Session = Depends(get_db),
