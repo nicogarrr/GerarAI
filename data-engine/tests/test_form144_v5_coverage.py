@@ -12,11 +12,11 @@ from alembic.operations import Operations
 from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError
 
-from app.models.entities import NewsEvent
+from app.models.entities import Form144Notice, NewsEvent
 from app.services import form144_monitor, form144_news, form144_persistence
 from app.services.connectors import form144
 from tests.test_0137_form144_migration import _create_table, _load
-from tests.test_form144_monitor import REAL_144_XML, _db, _FakeClient
+from tests.test_form144_monitor import REAL_144_XML, SUBMISSIONS_PAYLOAD, _db, _FakeClient
 
 # ---------------- migracion 0137 ----------------
 
@@ -405,6 +405,45 @@ def test_persist_existing_filing_notifies_news_without_duplicate(monkeypatch):
     assert second["filing_created"] is False
     assert second["filing_id"] == first["filing_id"]
     assert seen  # la noticia se recalcula sobre la fila existente
+
+
+def test_news_failure_is_best_effort_and_dedup_survives(monkeypatch):
+    """Un fallo al derivar la noticia no rompe el escaneo ni repite el filing.
+
+    Simula el ValueError de ``int(company.cik)`` con un CIK no numerico,
+    sin tocar el parseo de CIK del monitor ni el de la Company.
+    """
+    db = _db()
+    attempts = {"n": 0}
+
+    def boom(*args, **kwargs):
+        attempts["n"] += 1
+        raise ValueError("invalid literal for int() with base 10: 'NO-NUMERICO'")
+
+    monkeypatch.setattr("app.services.form144_news.ensure_news", boom)
+
+    # El mismo accession dos veces en un solo listado: asi se observa
+    # known_accessions dentro de la corrida, no el dedup de la DB posterior.
+    recent = SUBMISSIONS_PAYLOAD["filings"]["recent"]
+    payload = {"filings": {"recent": {key: [value[0]] * 2 for key, value in recent.items()}}}
+    fetcher = Mock(return_value=REAL_144_XML)
+    stats = form144_monitor.scan(
+        db, client=_FakeClient(payload=payload), fetcher=fetcher, delay_seconds=0
+    )
+
+    # (a) la excepcion no se propaga al monitor: sin form144_filing_error.
+    assert stats["status"] == "ok"
+    assert stats["errors"] == []
+    assert stats["filings_new"] == 1
+    # (b) el aviso queda persistido pese al fallo de la noticia.
+    row = db.scalar(select(Form144Notice))
+    assert row is not None
+    assert row.accession_number == "0000849869-26-000005"
+    assert row.status == "parsed"
+    # (c) el accession se marca como conocido: no se reintenta ni se vuelve
+    # a descargar aunque ensure_news haya fallado.
+    assert attempts["n"] == 1
+    assert fetcher.call_count == 1
 
 
 # ---------------- actor y scheduler ----------------
