@@ -18,12 +18,20 @@ test('covered solo con evidencia individual; el resto unknown, sin adivinar', ()
     assert.equal(classifyFichaCoverage('300183.SZ', false), 'unknown');
 });
 
-test('la búsqueda anota cobertura en ambos caminos (remoto y fallback local)', () => {
+test('la búsqueda anota cobertura en los tres caminos (remoto, fallback local y SEC)', () => {
     const src = readFileSync('lib/actions/finnhub.actions.ts', 'utf8');
     const block = src.slice(src.indexOf('searchStocksWithStatus = cache'));
     assert.ok(block.includes('classifyFichaCoverage'), 'searchStocksWithStatus debe anotar fichaCoverage');
-    assert.ok(block.includes('withCoverage(mergeSpanishListings'), 'camino remoto anotado');
+    // Remoto: la fusión local + master + proveedor se anota entera (el merge
+    // previo a withCoverage es deliberado: permite el respaldo SEC cuando la
+    // fusión queda vacía sin perder la anotación en ninguno de los caminos).
+    assert.ok(/const merged = mergeSpanishListings\(query \?\? '', local, \[\.\.\.master, \.\.\.remote\]\)/.test(block),
+        'el camino remoto fusiona local + master + proveedor');
+    assert.ok(block.includes('withCoverage(merged)'), 'camino remoto anotado');
     assert.ok(block.includes('withCoverage(local)'), 'fallback local anotado');
+    // Respaldo oficial SEC (última instancia): también anotado, nunca sin marcar.
+    assert.ok(block.includes('withCoverage(sec)'), 'respaldo SEC anotado');
+    assert.ok(block.match(/withCoverage\(sec\)/g)?.length === 2, 'respaldo SEC anotado en remoto-vacío y en proveedor caído');
 });
 
 test('la paleta comunica «no comprobada» sin atribuir plan/bolsa y sin filtrar', () => {

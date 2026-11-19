@@ -395,6 +395,11 @@ def test_repeated_ticker_does_not_exhaust_company_limit(db, monkeypatch):
     "price AAPL",
     "what is NVDA trading at",
     "dame el valor de la acción de PLTR",
+    "AAPL price",
+    "MSFT price?",
+    "ANT price",
+    "palantir price",
+    "apple price?",
 ])
 def test_price_phrasings_without_of_trigger_live_quote(question):
     from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
@@ -407,6 +412,10 @@ def test_price_phrasings_without_of_trigger_live_quote(question):
     "the price is too high, should I wait",
     "stock price vs my cost basis",
     "ASTS share price revenue growth",
+    "its price",
+    "current price",
+    "average price",
+    "apple price target",
 ])
 def test_price_phrasings_do_not_hijack_stored_routes(question):
     from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
@@ -445,9 +454,88 @@ def test_each_exclusion_blocks_an_otherwise_matching_ask(question):
     "how much is KO trading at",
     "KO stock price right now",
     "valor de la acción de KO ahora",
+    "AAPL price",
+    "MSFT price?",
 ])
 def test_plain_asks_still_route_live(question):
     assert _routes_live(question)
+
+
+@pytest.mark.parametrize("question", ["AAPL price", "apple price"])
+def test_ticker_first_price_reaches_the_provider(db, monkeypatch, question):
+    from app.services.extended_quote_service import extended_quote_service
+
+    company(db, "AAPL", "Apple Inc")
+    calls = []
+
+    async def spy(ticker):
+        calls.append(ticker)
+        return live_quote(ticker, 231.5)
+
+    monkeypatch.setattr(extended_quote_service, "get", spy)
+    response = asyncio.run(answer_live_question(db, question))
+    assert response is not None
+    assert calls == ["AAPL"]
+
+
+def test_ticker_first_price_with_exclusion_never_calls_provider(db, monkeypatch):
+    from app.services.extended_quote_service import extended_quote_service
+
+    company(db, "AAPL")
+    calls = []
+
+    async def spy(ticker):
+        calls.append(ticker)
+        return live_quote(ticker, 231.5)
+
+    monkeypatch.setattr(extended_quote_service, "get", spy)
+    assert asyncio.run(answer_live_question(db, "AAPL price target")) is None
+    assert asyncio.run(answer_live_question(db, "MSFT price forecast")) is None
+    assert calls == []
+
+
+@pytest.mark.parametrize("question", [
+    "qué dicen de PLTR hoy",
+    "qué se dice de PLTR",
+    "qué dicen sobre PLTR",
+    "PLTR news",
+    "palantir news",
+    "ASTS news",
+    "apple news today",
+])
+def test_news_phrasings_route_live(question):
+    from app.services.brain_live_tools import _NEWS_ASK_RE, _NEWS_EXCLUDE_RE
+
+    assert _NEWS_ASK_RE.search(question) and not _NEWS_EXCLUDE_RE.search(question)
+
+
+@pytest.mark.parametrize("question", [
+    "qué dicen de mis empresas",
+    "qué dicen de mi cartera",
+    "latest news",
+    "breaking news",
+    "the news",
+    "PLTR news sell",
+])
+def test_news_phrasings_do_not_hijack_portfolio_routes(question):
+    from app.services.brain_live_tools import _NEWS_ASK_RE, _NEWS_EXCLUDE_RE
+
+    assert not (_NEWS_ASK_RE.search(question) and not _NEWS_EXCLUDE_RE.search(question))
+
+
+def test_que_dicen_de_reaches_live_news(db, monkeypatch):
+    company(db, "PLTR", "Palantir Technologies")
+    patch_news(monkeypatch, {"articles": [
+        {"title": "Palantir Technologies firma un contrato", "url": "https://example.com/pltr",
+         "seendate": "20270115T100000Z", "domain": "example.com", "language": "spanish"},
+    ]})
+    response = asyncio.run(answer_live_question(db, "qué dicen de PLTR hoy"))
+    assert response is not None
+    assert any(source["type"] == "live_news" for source in response.sources)
+
+    response = asyncio.run(answer_live_question(db, "PLTR news"))
+    assert response is not None
+    assert any(source["type"] == "live_news" for source in response.sources)
 
 
 @pytest.mark.parametrize("question", [
