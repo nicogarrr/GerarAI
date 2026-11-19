@@ -8,11 +8,11 @@ Run from repo root:
     python -m unittest scripts.test_check_scheduler_heartbeat -v
 """
 import os
-from pathlib import Path
 import subprocess
 import tempfile
 import time
 import unittest
+from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent / 'ops' / 'check-scheduler-heartbeat.sh'
 
