@@ -55,10 +55,16 @@ def news_key(url: str | None, title: str | None) -> str | None:
     return f"t:{t}" if t else None
 
 
-def _keys_for_alert(db: Session, alert: ResearchAlert) -> set[str]:
+def _keys_for_alert(
+    db: Session, alert: ResearchAlert, news_by_id: dict[int, NewsEvent] | None = None
+) -> set[str]:
     meta = alert.metadata_ or {}
     keys: set[str] = set()
-    event = db.get(NewsEvent, meta["news_event_id"]) if meta.get("news_event_id") else None
+    news_id = meta.get("news_event_id")
+    if news_by_id is not None:
+        event = news_by_id.get(news_id) if news_id else None
+    else:
+        event = db.get(NewsEvent, news_id) if news_id else None
     url = meta.get("source_url") or (event.url if event else None)
     title = (event.title if event else None) or meta.get("source_headline")
     for candidate in (news_key(url, None), news_key(None, title)):
@@ -67,9 +73,63 @@ def _keys_for_alert(db: Session, alert: ResearchAlert) -> set[str]:
     return keys
 
 
+@dataclass
+class NewsAlertDedupPrefetch:
+    """Precarga de una tanda para ``equivalent_news_alert`` (ver prefetch)."""
+
+    by_company: dict[int, list[ResearchAlert]]
+    news_by_id: dict[int, NewsEvent]
+
+
+def prefetch_news_alert_dedup(
+    db: Session, company_ids, now: datetime | None = None
+) -> NewsAlertDedupPrefetch:
+    """Alertas-noticia recientes de CADA compania de una tanda, en una consulta.
+
+    ``equivalent_news_alert`` por candidata costaba 1 SELECT (tope 300 por
+    compania) + 1 db.get por NewsEvent referenciado; una pagina de N
+    candidatas de la misma compania repetia la misma lectura N veces. La
+    numeracion por ventana mantiene EXACTAMENTE el tope de 300 por compania
+    y el orden id desc de la consulta original; los NewsEvent referenciados
+    en metadata se precargan en otra consulta (db.get no vuelve a salir).
+    """
+    ids = sorted({int(cid) for cid in company_ids if cid is not None})
+    if not ids:
+        return NewsAlertDedupPrefetch(by_company={}, news_by_id={})
+    from sqlalchemy import func
+
+    rn = func.row_number().over(
+        partition_by=ResearchAlert.company_id, order_by=ResearchAlert.id.desc()
+    ).label("rn")
+    sub = select(
+        ResearchAlert.id.label("aid"), rn
+    ).where(
+        ResearchAlert.company_id.in_(ids),
+        ResearchAlert.alert_type.in_(NEWS_ALERT_TYPES),
+    ).subquery()
+    rows = db.scalars(
+        select(ResearchAlert)
+        .where(ResearchAlert.id.in_(select(sub.c.aid).where(sub.c.rn <= 300)))
+        .order_by(ResearchAlert.company_id, ResearchAlert.id.desc())
+    ).all()
+    by_company: dict[int, list[ResearchAlert]] = {cid: [] for cid in ids}
+    for row in rows:
+        by_company[row.company_id].append(row)
+    news_ids = {(alert.metadata_ or {}).get("news_event_id") for alert in rows}
+    news_ids.discard(None)
+    # Referencias FUERTES: el identity map es debil y sin ellas el recolector
+    # soltaba las filas precargadas y cada db.get volvia a salir a la base.
+    news_by_id = (
+        {event.id: event for event in db.scalars(select(NewsEvent).where(NewsEvent.id.in_(news_ids))).all()}
+        if news_ids
+        else {}
+    )
+    return NewsAlertDedupPrefetch(by_company=by_company, news_by_id=news_by_id)
+
+
 def equivalent_news_alert(
     db: Session, *, company_id: int | None, url: str | None, title: str | None,
-    now: datetime | None = None,
+    now: datetime | None = None, _prefetched: NewsAlertDedupPrefetch | None = None,
 ) -> ResearchAlert | None:
     """Alerta de noticia reciente de la misma empresa que ya cubre esta noticia."""
     if company_id is None:
@@ -78,19 +138,24 @@ def equivalent_news_alert(
     if not wanted:
         return None
     since = (now or datetime.now(UTC)) - _DEDUPE_WINDOW
-    rows = db.scalars(
-        select(ResearchAlert).where(
-            ResearchAlert.company_id == company_id,
-            ResearchAlert.alert_type.in_(NEWS_ALERT_TYPES),
-        ).order_by(ResearchAlert.id.desc()).limit(300)
-    ).all()
+    news_by_id = None
+    if _prefetched is not None and company_id in _prefetched.by_company:
+        rows = _prefetched.by_company[company_id]
+        news_by_id = _prefetched.news_by_id
+    else:
+        rows = db.scalars(
+            select(ResearchAlert).where(
+                ResearchAlert.company_id == company_id,
+                ResearchAlert.alert_type.in_(NEWS_ALERT_TYPES),
+            ).order_by(ResearchAlert.id.desc()).limit(300)
+        ).all()
     for alert in rows:
         created = alert.created_at
         if created is not None:
             created = created if created.tzinfo else created.replace(tzinfo=UTC)
             if created < since:
                 continue
-        if _keys_for_alert(db, alert) & wanted:
+        if _keys_for_alert(db, alert, news_by_id) & wanted:
             return alert
     return None
 
