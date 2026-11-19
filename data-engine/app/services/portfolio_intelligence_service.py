@@ -382,10 +382,15 @@ class PortfolioIntelligenceService:
             value_base = position.market_value_base
             if (
                 value_base is None
-                and position.currency == base_currency
                 and (position.market_value_native or position.market_value) > 0
             ):
-                value_base = position.market_value_native or position.market_value
+                # Misma divisa principal pero quiza subunidad (GBp vs GBP):
+                # la igualdad estricta excluia la posicion de pesos/TWR
+                # mientras _xirr si la incluia (/100). Misma regla que _xirr.
+                pos_major, pos_divisor = normalize_currency(position.currency)
+                base_major, _base_divisor = normalize_currency(base_currency)
+                if pos_major == base_major:
+                    value_base = (position.market_value_native or position.market_value) / pos_divisor
             if value_base is None:
                 missing_fx.append(
                     {
@@ -1406,6 +1411,7 @@ class PortfolioIntelligenceService:
             sells = 0.0
             income = 0.0
             fx_missing = False
+            ambiguous_cash = False
             for transaction in ledger:
                 rate = PortfolioFXService.rate_from_table(
                     flow_table,
@@ -1428,8 +1434,24 @@ class PortfolioIntelligenceService:
                         buys += amount + fees
                     elif transaction.action == "sell":
                         sells += amount - fees
-                    elif transaction.action in {"dividend", "interest"}:
-                        income += amount
+                    elif is_cash_action(transaction.action):
+                        # Filas cash: el importe vive en price (quantity 0/1
+                        # NO multiplica). quantity*price hacia invisible todo
+                        # dividendo manual canonico para la contribucion
+                        # mientras el informe fiscal y _xirr si lo declaraban.
+                        # Misma convencion y signos que _xirr (helper compartido).
+                        if not cash_quantity_is_canonical(transaction):
+                            ambiguous_cash = True
+                        else:
+                            gross = float(cash_amount(transaction)) * float(rate)
+                            if transaction.action in {"dividend", "div", "cash_dividend", "interest"}:
+                                income += gross
+                            elif transaction.action == "withholding":
+                                income -= float(withholding_cost(transaction)) * float(rate)
+                            elif transaction.action == "fee":
+                                income -= abs(gross)
+                            else:  # cash_misc: salida, como en _xirr
+                                income -= gross
             start_price_row = prior_prices.get(company.id)
             start_rate = (
                 PortfolioFXService.rate_from_table(
@@ -1448,6 +1470,8 @@ class PortfolioIntelligenceService:
                 reason = "missing_end_value"
             elif fx_missing:
                 reason = "missing_fx"
+            elif ambiguous_cash:
+                reason = "ambiguous_cash"
             elif qty_at_cutoff > 0 and (start_price_row is None or not start_price_row.adj_close):
                 reason = "missing_start_price"
             elif qty_at_cutoff > 0 and start_rate is None:
@@ -1701,14 +1725,24 @@ class PortfolioIntelligenceService:
         all_dividends: dict[int, float] = defaultdict(float)
         ambiguous_dividends: set[int] = set()
         companies_with_dividend_rows: set[int] = set()
+        # Dividendos en la MISMA ventana que el retorno de precio: sumar toda
+        # la historia del ledger sobre el coste actual metia anos fuera del
+        # panel en dividend_return y el residuo absorbia el exceso en silencio.
+        dividend_windows: dict[int, tuple[date, date]] = {
+            cid: (series[0].date, series[-1].date) if series else (cutoff, cutoff)
+            for cid, series in price_series.items()
+        }
         if company_ids:
             for dividend in db.scalars(
                 select(Transaction).where(
                     Transaction.company_id.in_(company_ids),
-                    Transaction.action == "dividend",
+                    Transaction.action.in_(("dividend", "div", "cash_dividend")),
                 )
             ).all():
                 if dividend.company_id is None:
+                    continue
+                window = dividend_windows.get(dividend.company_id)
+                if window is not None and not (window[0] <= dividend.trade_date <= window[1]):
                     continue
                 if not cash_quantity_is_canonical(dividend):
                     # Fila historica no canonica: el importe derivado de
@@ -1761,17 +1795,20 @@ class PortfolioIntelligenceService:
             period_start = prices[0].date if prices else cutoff
             period_end = prices[-1].date if prices else cutoff
             fx_component = self._period_fx_return(fx_table, position, base_currency, period_start, period_end)
-            # El residuo se queda en None cuando el retorno total o el de FX
-            # son desconocidos: restar un componente no medido (o medir uno
-            # con un nivel) daria una cifra con apariencia de cierre.
+            # El residuo se queda en None cuando cualquier componente no esta
+            # medido: restar un desconocido como 0 (crecimiento fundamental,
+            # recompras) daba una cifra con apariencia de cierre que absorbia
+            # en silencio lo no medido. Misma politica null-propagante que el
+            # resto del metodo.
             multiple = (
                 total_return
-                - (fundamental_growth or 0)
+                - fundamental_growth
                 - dividend_return
-                - (buybacks or 0)
-                + (dilution or 0)
+                - buybacks
+                + dilution
                 - fx_component
                 if total_return is not None and fx_component is not None and dividend_return is not None
+                and fundamental_growth is not None and buybacks is not None and dilution is not None
                 else None
             )
             components = {
@@ -1854,6 +1891,9 @@ class PortfolioIntelligenceService:
                 continue
             by_year.setdefault(row.fiscal_year, row)
         annual = [by_year[y] for y in sorted(by_year)]
-        if len(annual) < 2 or not annual[0].value:
+        if len(annual) < 2 or not annual[0].value or annual[0].value < 0:
+            # Base negativa (EPS pre-revenue/turnaround): ultimo/primero-1
+            # invierte el signo economico (-2 -> -1, una mejora, se publicaba
+            # como -50 %). N/D en vez de una cifra con el signo contrario.
             return None
         return float(annual[-1].value / annual[0].value - 1)
