@@ -181,6 +181,9 @@ function rawFetchCalls(file: string): { calls: Call[]; dynamic: number } {
  *  - PersonalizedOverview (2026-11-11): fetchHomeSection(url, …) recibe la URL, pero los únicos valores posibles
  *    son los 3 literales de sus llamadas ('/api/home/portfolio', '/api/home/alerts',
  *    `/api/home/watchlist?limit=${WATCHLIST_PREVIEW_LIMIT}`), que casan con app/api/home/{portfolio,alerts,watchlist}/route.ts.
+ *  - sec-universe-search (2026-11-19): SEC_TICKERS_URL es la constante literal
+ *    'https://www.sec.gov/files/company_tickers_exchange.json' (registro OFICIAL
+ *    de emisores de la SEC, dominio externo fijo); ninguna toca '/api/'.
  */
 const DYNAMIC_KNOWN: Record<string, number> = {
     'lib/research/zip-proxy.ts': 1,
@@ -195,6 +198,7 @@ const DYNAMIC_KNOWN: Record<string, number> = {
     'app/api/logo/[ticker]/route.ts': 1,
     'lib/utils/propicksSignals.ts': 1,
     'components/PersonalizedOverview.tsx': 1,
+    'lib/market/sec-universe-search.ts': 1,
 };
 
 test('contrato: todo fetch() crudo a /api/ apunta a una ruta que existe', () => {
