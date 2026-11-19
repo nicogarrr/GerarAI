@@ -13,7 +13,7 @@ const baseItem: RadarDcaOpportunity = {
     level: 2, level_label: '2X DCA', status: 'forming', signal_date: null,
     close: null, price_date: null, source: 'yfinance', price_verified: true,
     confirmed_level: null, confirmed_period: null, clear_price_signal: false,
-    change: { status: 'no_baseline', changed: null },
+    change: { status: 'not_comparable', changed: null },
     formula_version: 'nico-v1', scan_date: '2026-10-30',
     quality: { passed: false, reasons: [], policy: 'quality-v1', market_cap_usd: null },
 };
@@ -62,7 +62,7 @@ describe('RadarDcaView: variantes de tarjeta y filtros', () => {
 
     it('cambio sin fecha ni niveles: marcadores — en vez de huecos', async () => {
         mockGet.mockResolvedValue(resultOf([
-            { ...baseItem, change: { status: 'compared', changed: true, from_level: null, to_level: null, since_price_date: null } },
+            { ...baseItem, change: { status: 'compared', changed: true } },
         ]));
         render(<RadarDcaView />);
         await waitFor(() => expect(screen.getByText('Cambio —X → —X')).toBeInTheDocument());

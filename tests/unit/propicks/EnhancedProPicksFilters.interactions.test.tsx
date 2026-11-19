@@ -6,8 +6,8 @@ import EnhancedProPicksFilters, { type ProPicksFilters } from '@/components/proP
 const DEFAULTS: ProPicksFilters = { timePeriod: 'month', limit: 20, minScore: 70, sector: 'all', sortBy: 'score' };
 
 describe('EnhancedProPicksFilters: interacciones', () => {
-    let onFiltersChange: ReturnType<typeof vi.fn>;
-    let onApply: ReturnType<typeof vi.fn>;
+    let onFiltersChange: (filters: ProPicksFilters) => void;
+    let onApply: () => void;
 
     beforeEach(() => {
         onFiltersChange = vi.fn();
