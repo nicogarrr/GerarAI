@@ -4,6 +4,7 @@ import random
 from datetime import UTC, datetime, timedelta
 from functools import partial
 
+from apscheduler.events import EVENT_JOB_EXECUTED
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.blocking import BlockingScheduler
 
@@ -227,9 +228,27 @@ def enqueue_once(actor, **kwargs) -> dict:
     return {"actor": actor.actor_name, "queued": [str(message.message_id)]}
 
 
+def _heartbeat_listener(event) -> None:
+    """Latido tras cada job que TERMINA BIEN (quien vigila al vigilante).
+
+    EVENT_JOB_EXECUTED solo se emite en exito: un job fallido no late y el
+    chequeo del host acaba alertando. La escritura es fail-open
+    (scheduler_heartbeat.record_job nunca lanza).
+    """
+    from app.services.scheduler_heartbeat import record_job
+
+    record_job(getattr(event, "job_id", "desconocido"))
+
+
 def build_scheduler(*, background: bool = False) -> BlockingScheduler | BackgroundScheduler:
     scheduler_cls = BackgroundScheduler if background else BlockingScheduler
     scheduler = scheduler_cls(timezone="UTC")
+    # Latido del planificador: cada job que termina bien lo graba en Redis y
+    # scripts/ops/check-scheduler-heartbeat.sh lo vigila desde el host. Los
+    # fakes minimos de los tests de cadencia no tienen add_listener.
+    add_listener = getattr(scheduler, "add_listener", None)
+    if add_listener is not None:
+        add_listener(_heartbeat_listener, EVENT_JOB_EXECUTED)
     # Direct, short outbox check: must not wait behind ingestion on default.
     _register(scheduler, reconcile_thesis_dispatches, "interval",
               job_id="thesis_dispatch_recovery", minutes=1)
