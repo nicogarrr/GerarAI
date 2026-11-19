@@ -113,7 +113,10 @@ function parseRows(payload: SecTickersFile): SecUniverseRow[] {
 async function loadUniverse(): Promise<SecUniverseRow[]> {
     const now = Date.now();
     if (cache && now - cache.at < CACHE_TTL_MS) return cache.rows;
-    if (!cache && now - lastFailureAt < FAILURE_RETRY_MS) return [];
+    // El backoff tras un fallo manda también con copia caducada: sin esto,
+    // pasadas las 24 h y con sec.gov caído, cada búsqueda reintentaba la
+    // descarga al momento (medido por el Auditor 2026-11-19).
+    if (now - lastFailureAt < FAILURE_RETRY_MS) return cache?.rows ?? [];
     try {
         const response = await fetch(SEC_TICKERS_URL, {
             headers: { 'User-Agent': `GerarAI (${SUPPORT_EMAIL})` },

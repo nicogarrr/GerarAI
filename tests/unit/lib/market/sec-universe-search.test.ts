@@ -90,11 +90,67 @@ describe('searchSecUniverse', () => {
         expect(fetchMock).toHaveBeenCalledTimes(2); // pasado el backoff reintenta
     });
 
+    it('filas malformadas del registro se descartan una a una', async () => {
+        vi.stubGlobal('fetch', stubSecFetch({
+            fields: ['cik', 'name', 'ticker', 'exchange'],
+            data: [
+                'no-es-array',
+                [1, 2],
+                [3, '', 'ANT', 'Nasdaq'],
+                [4, 'Anthropic, PBC', 'ANT', 'Nasdaq'],
+                [5, 'Anthropic Dup', 'ANT2', 7],
+            ],
+        }));
+        const result = await searchSecUniverse('Antrophic');
+        expect(result.map((s) => s.symbol)).toEqual(['ANT', 'ANT2']);
+        expect(result[1]?.exchange).toBe('US');
+    });
+
+    it('nombre con «the» inicial y consulta con «the» se pliegan igual', async () => {
+        vi.stubGlobal('fetch', stubSecFetch({
+            fields: ['cik', 'name', 'ticker', 'exchange'],
+            data: [[1, 'The Clorox Company', 'CLX', 'NYSE']],
+        }));
+        expect((await searchSecUniverse('clorxo'))[0]?.symbol).toBe('CLX');
+        resetSecUniverseCacheForTests();
+        vi.stubGlobal('fetch', stubSecFetch({
+            fields: ['cik', 'name', 'ticker', 'exchange'],
+            data: [[1, 'The Clorox Company', 'CLX', 'NYSE']],
+        }));
+        expect((await searchSecUniverse('the clorxo'))[0]?.symbol).toBe('CLX');
+    });
+
     it('payload raro o sin las columnas esperadas -> vacío, nunca revienta el buscador', async () => {
         vi.stubGlobal('fetch', stubSecFetch({ fields: ['otra'], data: 'no-array' }));
         expect(await searchSecUniverse('Antrophic')).toEqual([]);
         resetSecUniverseCacheForTests();
         vi.stubGlobal('fetch', stubSecFetch(null));
         expect(await searchSecUniverse('Antrophic')).toEqual([]);
+    });
+});
+
+describe('backoff con copia caducada (test del Auditor, #6018)', () => {
+    beforeEach(() => {
+        resetSecUniverseCacheForTests();
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-11-19T20:00:00Z'));
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+    });
+
+    it('backs off after failure even when stale rows exist', async () => {
+        const fetch = vi.fn()
+            .mockResolvedValueOnce({ ok: true, json: async () => ({ fields: ['name', 'ticker', 'exchange'], data: [['Microsoft', 'MSFT', 'Nasdaq']] }) })
+            .mockRejectedValue(new Error('offline'));
+        vi.stubGlobal('fetch', fetch);
+        expect(await searchSecUniverse('Mcirosoft')).toHaveLength(1);
+        vi.advanceTimersByTime(24 * 3600 * 1000 + 1);
+        expect(await searchSecUniverse('Mcirosoft')).toHaveLength(1);
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(await searchSecUniverse('Mcirosoft')).toHaveLength(1);
+        expect(fetch).toHaveBeenCalledTimes(2);
     });
 });
