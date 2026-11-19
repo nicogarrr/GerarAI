@@ -57,7 +57,12 @@ def persist_filing(
     if record is not None:
         from app.services.form144_news import ensure_news
 
-        ensure_news(db, filing, news_payload, tenant_id=effective_tenant_id)
+        # Best-effort: el aviso ya existe; un fallo al derivar la noticia no
+        # debe marcar el filing como no visto en el monitor.
+        try:
+            ensure_news(db, filing, news_payload, tenant_id=effective_tenant_id)
+        except Exception:  # noqa: BLE001
+            pass
         return {"filing_created": False, "filing_id": record.id, "status": record.status}
 
     parsed_ok = bool(parsed.get("parsed_ok"))
@@ -102,5 +107,12 @@ def persist_filing(
         db.flush()
     from app.services.form144_news import ensure_news
 
-    ensure_news(db, filing, news_payload, tenant_id=effective_tenant_id)
+    # Best-effort: el savepoint del aviso ya cerro con exito. Si la noticia
+    # derivada falla (p. ej. CIK no numerico), no se propaga: revertir aqui
+    # borraria el Form144Notice ya persistido y el monitor volveria a intentar
+    # el mismo filing por no haber registrado su accession.
+    try:
+        ensure_news(db, filing, news_payload, tenant_id=effective_tenant_id)
+    except Exception:  # noqa: BLE001
+        pass
     return {"filing_created": True, "filing_id": record.id, "status": record.status}
