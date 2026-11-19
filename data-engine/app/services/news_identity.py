@@ -163,6 +163,9 @@ def equivalent_news_alert(
 # Candidatos por URL que mira equivalent_news_event: los 50 más recientes cuyo
 # url contiene «host/path» (sin distinguir mayúsculas).
 _URL_CANDIDATES = 50
+# Titulares recientes por empresa que mira la dedup por titular (mismo tope
+# que la consulta suelta original).
+_TITLE_CANDIDATES = 300
 # Patrones por consulta en la lectura en lote (acota filas devueltas: ≤50 por patrón).
 _BATCH_PATTERNS = 100
 _BATCH_URLS = 500
@@ -190,6 +193,15 @@ class NewsDedupBatch:
     max_id: int
     known_urls: set[str] = field(default_factory=set)
     url_candidates: dict[str, list[tuple[int, str | None]]] = field(default_factory=dict)
+    # Foto incremental de titulares por empresa: (id maximo leido, filas
+    # (id, title) ordenadas por id desc, tope _TITLE_CANDIDATES). La
+    # dedup por titular releia los 300 eventos mas recientes de la empresa
+    # POR NOTICIA; con la foto, la tanda lee una vez y despues solo las
+    # filas nuevas (id > leido, rango de clave primaria), manteniendo el
+    # mismo conjunto «300 mas recientes».
+    title_snapshots: dict[int, tuple[int, list[tuple[int, str | None]]]] = field(
+        default_factory=dict
+    )
 
 
 def prefetch_news_dedup(
@@ -305,6 +317,47 @@ def equivalent_news_event(
                     return event
     wanted_title = normalize_headline(title)
     if wanted_title and company_id is not None:
+        if batch is not None:
+            # Foto incremental por empresa (ver NewsDedupBatch): primera vez,
+            # los 300 mas recientes al empezar la tanda; despues, solo las
+            # filas nuevas (id > lo leido), mas recientes primero, tope 300.
+            entry = batch.title_snapshots.get(company_id)
+            if entry is None:
+                snapshot = [
+                    (row[0], row[1])
+                    for row in db.execute(
+                        select(NewsEvent.id, NewsEvent.title)
+                        .where(
+                            NewsEvent.company_id == company_id,
+                            NewsEvent.id <= batch.max_id,
+                        )
+                        .order_by(NewsEvent.id.desc())
+                        .limit(_TITLE_CANDIDATES)
+                    ).all()
+                ]
+                read_up_to = batch.max_id
+            else:
+                read_up_to, snapshot = entry
+            fresh = db.execute(
+                select(NewsEvent.id, NewsEvent.title)
+                .where(
+                    NewsEvent.company_id == company_id,
+                    NewsEvent.id > read_up_to,
+                )
+                .order_by(NewsEvent.id.desc())
+            ).all()
+            if fresh:
+                snapshot = ([(row[0], row[1]) for row in fresh] + snapshot)[
+                    :_TITLE_CANDIDATES
+                ]
+                read_up_to = max(read_up_to, fresh[0][0])
+            batch.title_snapshots[company_id] = (read_up_to, snapshot)
+            for event_id, event_title in snapshot:
+                if normalize_headline(event_title) == wanted_title:
+                    found = db.get(NewsEvent, event_id)
+                    if found is not None:
+                        return found
+            return None
         recent = db.scalars(
             select(NewsEvent).where(NewsEvent.company_id == company_id)
             .order_by(NewsEvent.id.desc()).limit(300)
