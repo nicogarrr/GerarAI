@@ -61,15 +61,17 @@ def preference_for(
     _cache (solo dispatch_pending) memoiza por categoria la MISMA consulta
     dentro de una llamada; ver subscription_for.
     """
-    from app.services.outbound_alerts import _MISSING, alert_after_opt_in, alert_category
+    from app.services.outbound_alerts import alert_after_opt_in, alert_category
 
     category = alert_category(db, alert)
     if category is None:
         return None
     user = db.info.get("user_id")
     key = ("push", category)
-    row = _cache.get(key, _MISSING) if _cache is not None else _MISSING
-    if row is _MISSING:
+    row: PushPreference | None
+    if _cache is not None and key in _cache:
+        row = _cache[key]
+    else:
         row = db.scalar(select(PushPreference).where(
             PushPreference.tenant_id == alert.tenant_id,
             PushPreference.user_id == user,
