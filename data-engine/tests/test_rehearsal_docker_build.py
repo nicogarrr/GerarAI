@@ -316,3 +316,14 @@ def test_broken_stream_after_stage_aux_is_unconfirmed(engine):
     engine.client_factory = lambda: client
     engine._request()
     assert engine.transport_failed and engine.terminal is None
+
+
+def test_failed_exit_codes_from_immutable_owned_stopped_workers(engine, worker):
+    worker[2]['State'].update(Running=False, ExitCode=17)
+    engine.inspect_workers = Mock(return_value=[worker[2]])
+    assert engine.failed_exit_codes() == [17]
+    worker[2]['State']['ExitCode'] = 0
+    assert engine.failed_exit_codes() == []
+    del worker[2]['State']['ExitCode']
+    with pytest.raises(ValueError):
+        engine.failed_exit_codes()

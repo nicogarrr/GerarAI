@@ -53,7 +53,8 @@ def render(text, run_id, build_id, external_images):
     could introduce work/data not covered by the RUN gates.
     """
     require(isinstance(run_id, str) and re.fullmatch('[a-z0-9][a-z0-9-]{7,47}', run_id), 'Invalid run ID')
-    require(build_id in ('backend', 'frontend'), 'Closed backend/frontend build IDs only')
+    require(build_id in ('backend', 'frontend', 'smoke-success', 'smoke-failure', 'smoke-cancel'),
+            'Closed build IDs only')
     recipe = hashlib.sha256(text.encode()).hexdigest()
     gate = '/tmp/gerarai-bench-release-' + uuid.uuid4().hex
     stages = set()
@@ -153,7 +154,13 @@ def worker_proof(inventory, rendered, worker, docker_info, cgroup_files, members
 
 
 class BuildIncomplete(RuntimeError):
-    """Never accept readiness when build/cancellation evidence is incomplete."""
+    """Typed failure evidence, never permission or a successful build result."""
+    def __init__(self, message, *, reason='other', live_worker_ids=(), worker_exit_codes=(), cleanup_confirmed=False):
+        super().__init__(message)
+        self.reason = reason
+        self.live_worker_ids = tuple(live_worker_ids)
+        self.worker_exit_codes = tuple(worker_exit_codes)
+        self.cleanup_confirmed = cleanup_confirmed
 
 
 def supervise(inventory, rendered, engine, timeout, clock=time.monotonic, sleep=time.sleep):
@@ -174,11 +181,20 @@ def supervise(inventory, rendered, engine, timeout, clock=time.monotonic, sleep=
     proofs = {}
     ids = set()
     failure = None
+    reason = 'other'
+    timeout_live = []
+    worker_exits = []
     try:
         engine.start(inventory, rendered)
         deadline = clock() + timeout
         while True:
-            require(clock() < deadline, 'Build timeout')
+            if clock() >= deadline:
+                reason = 'timeout'
+                for record in engine.snapshot():
+                    proof = worker_proof(inventory, rendered, *record)
+                    if proof['step'] in proofs and proofs[proof['step']]['id'] == proof['id']:
+                        timeout_live.append(proof['id'])
+                raise ValueError('Build timeout')
             snapshot = engine.snapshot()
             for worker, info, files, membership, network in snapshot:
                 proof = worker_proof(inventory, rendered, worker, info, files, membership, network)
@@ -193,7 +209,10 @@ def supervise(inventory, rendered, engine, timeout, clock=time.monotonic, sleep=
                     engine.release(ident, proof['marker'])
             if engine.daemon_settled():
                 result = engine.finish()
-                require(result['exit_code'] == 0, 'Daemon build failed')
+                if result['exit_code'] != 0:
+                    reason = 'daemon_failed'
+                    worker_exits = engine.failed_exit_codes()
+                    raise ValueError('Daemon build failed')
                 require(set(proofs) == set(rendered['steps']), 'Missing real worker proof for some RUNs')
                 image_id(result['image_id'])
                 require(result['recipe'] == rendered['recipe'], 'Final image recipe mismatch')
@@ -212,8 +231,10 @@ def supervise(inventory, rendered, engine, timeout, clock=time.monotonic, sleep=
                 'Daemon cancellation unconfirmed: no readiness and operator follow-up required')
         require(not engine.snapshot(), 'Owned daemon workers remain after cancellation')
     except BaseException as cleanup_error:
-        raise BuildIncomplete('Build failed and daemon cleanup is unconfirmed') from cleanup_error
-    raise BuildIncomplete('Build failed; daemon cancellation confirmed') from failure
+        raise BuildIncomplete('Build failed and daemon cleanup is unconfirmed', reason=reason,
+                              live_worker_ids=timeout_live, worker_exit_codes=worker_exits) from cleanup_error
+    raise BuildIncomplete('Build failed; daemon cancellation confirmed', reason=reason,
+                          live_worker_ids=timeout_live, worker_exit_codes=worker_exits, cleanup_confirmed=True) from failure
 
 
 

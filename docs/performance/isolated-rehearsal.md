@@ -254,3 +254,84 @@ The first VM exercise must be a separately approved tiny local-image offline
 build with an intentionally failing/interruptible RUN. Confirm actual workers,
 network/cgroups, terminal response, no late live worker after cancellation and
 scoped residue inventory before attempting the large build/backup comparison.
+
+## Exact committed input packaging
+
+`rehearsal_context.py` prepares a local tar and separate manifest from
+`git archive` on the full clean SHA. It never reads ignored/untracked working
+files as build inputs. Backend context strips the data-engine/ prefix; frontend
+retains the committed .dockerignore for daemon-side filtering. Tracked symlinks,
+special files, traversing/absolute paths, environment files and generated-recipe
+collisions are rejected or explicitly omitted. The generated gated recipe has
+its own SHA256 and is never mislabelled a committed blob.
+
+The tar manifest includes *all tar inputs*, not merely effective Docker image
+files. Docker may ignore more paths. It records per-input hash, tree/SHA,
+generated recipe hash and streamed archive hash, and never authorizes release.
+Both tar and manifest are created exclusively0600 outside the checkout; the
+caller must use its validated private per-run output directory. On failure a
+partial tar can remain, but no completed manifest is created. Never treat tar
+existence alone as successful packaging. No cleanup rotates old artifacts.
+
+This module does not yet add a CLI, start a build, certify hot-image provenance
+or create/run the dump/restore/A/B runner. Those remain separate review steps.
+
+## Pilot-only minimum offline smoke CLI, not large benchmark
+
+`rehearsal_smoke.py` wires three fixed tiny builds to the audited controller and
+local backend: a printf success, deliberate exit17 and sleep120 cancelled by a
+5-second supervisor timeout. It reads the same source/slice inventory first and
+last and holds the private per-run lock. The exact source SHA must remain clean.
+It requires an explicitly inventoried local shell-capable base image by full
+image ID, with no unsafe ONBUILD/volume/custom shell behavior. No pull, setup,
+SQL, restore, migration, large compilation or rollout occurs. No arbitrary RUN
+body or Docker option can be supplied via inventory or CLI.
+
+The Pilot must receive separate exact-SHA audit and execution approval before
+running this command on the VM. This PR does not grant that approval. It will
+write fixed per-case archives and a0600 smoke.json in an existing0700 output
+directory. It refuses existing tags, case archives and receipts; use a dedicated
+run inventory, not one whose identities are being reused concurrently.
+
+```sh
+python scripts/ops/rehearsal_smoke.py \
+  --inventory /private-audit/run-inventory.json \
+  --repo /isolated/exact-source \
+  --base-image sha256:FULL_LOCAL_IMAGE_ID \
+  --receipt /home/ubuntu/benchmarks/gerarai-6b2b/RUN_ID/serial/smoke.json
+```
+
+The hash and RUN_ID above are templates, not actual image/resource identities.
+Only the Pilot chooses the existing local base and verifies its provenance.
+A true success requires every RUN proof and final image check. Expected failure
+or cancellation additionally requires a released real worker, terminal daemon
+error, positive settled request and no live owned worker. The controller transports a typed reason, worker IDs alive at the requested
+timeout and stopped-worker exit codes before cleanup. smoke-cancel requires
+the timeout reason with an already released worker still alive at that deadline,
+then confirmed cleanup. A generic cancel_request after daemon failure is not
+proof of exercised live cancellation. smoke-failure requires daemon_failed and
+exactly one nonzero stopped RUN exit code17, not sleep missing/exit127 or another
+error. Missing, mixed or unconfirmed evidence fails closed. The CLI records
+per-case progress and observed container IDs even when a case fails. An
+interrupted/failed smoke receipt remains non-green. Keep the receipt private;
+return a sanitized result summary with immutable residue IDs, not raw dumps.
+
+Stopped owned containers/images are deliberately retained for ID-scoped cleanup
+by the Pilot. Missing terminal acknowledgment or an unknown live worker needs
+operator follow-up; no broad prune, name-prefix deletion or retry that hides
+residue. All receipt authority flags stay false even after all three cases
+pass. This only verifies the small exercise on that installed daemon at that
+time; it does not approve the full A/B or establish duration-wide behavior of
+large workloads. The smoke controller itself remains outside the shared slice,
+so its host/API overhead is not claimed bounded or a measured concurrency gain.
+
+The future dump/restore adapter will use trust only inside the isolated
+loopback-only namespace, not passwords or production auth configuration. Source
+must listen only127.0.0.1, with pg_hba local/127.0.0.1 trust, no other interfaces,
+routes, ports or remote connections. A helper shares the validated full source
+ID namespace without mounting its data volume, socket or .env. pg_dump+gzip
+must use pipefail inside the common slice. Restore helper shares the DESTINATION
+namespace, never the source's, and runs ON_ERROR_STOP=1 in a single transaction.
+Private dumps remain0700 directories/0600 files on the VM and never enter
+shared code/evidence artifacts. These DB operations are not implemented by this
+smoke CLI and remain disabled pending the subsequent adapter review.
