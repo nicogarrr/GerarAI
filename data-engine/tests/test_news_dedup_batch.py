@@ -184,3 +184,24 @@ def test_foto_de_titulos_aislada_entre_empresas(db):
     found_b = equivalent_news_event(db, company_id=b.id, url=None, title="Solo de B!!",
                                     batch=batch)
     assert found_b is not None and found_b.company_id == b.id
+
+
+def test_foto_de_titulos_se_invalida_tras_rollback(db):
+    """Contraejemplo del Auditor: 300 titulos, un 301 temporal con flush que
+    entra en la foto (expulsando «t0» de la ventana), rollback, y la via
+    batch debe volver a ver «t0» igual que la suelta."""
+    rng = random.Random(37)
+    company = _seed(db, rng, 300)
+    batch = prefetch_news_dedup(db, [])
+    db.add(NewsEvent(company_id=company.id, title="temporal", source="rss",
+                     url=None, summary="", tenant_id=1))
+    db.flush()
+    # El temporal entra en la foto (id > max_id) y expulsa «t0» de la ventana.
+    assert equivalent_news_event(db, company_id=company.id, url=None,
+                                 title="temporal", batch=batch) is not None
+    db.rollback()
+    single = equivalent_news_event(db, company_id=company.id, url=None, title="t0")
+    batched = equivalent_news_event(db, company_id=company.id, url=None, title="t0",
+                                    batch=batch)
+    assert single is not None, "la via suelta debe seguir viendo «t0» tras el rollback"
+    assert batched is not None and batched.id == single.id

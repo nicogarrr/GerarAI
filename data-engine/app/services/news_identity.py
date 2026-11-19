@@ -15,7 +15,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import String, func, literal, select, union_all
+from sqlalchemy import String, event, func, literal, select, union_all
 from sqlalchemy.orm import Session
 
 from app.models.entities import NewsEvent, ResearchAlert
@@ -199,9 +199,32 @@ class NewsDedupBatch:
     # POR NOTICIA; con la foto, la tanda lee una vez y despues solo las
     # filas nuevas (id > leido, rango de clave primaria), manteniendo el
     # mismo conjunto «300 mas recientes».
+    # INVALIDA tras rollback: una fila vista con flush y luego anulada
+    # quedaria de fantasma (y su expulsion de la ventana, falsa). El
+    # listener after_rollback la limpia (ver _protect_snapshots_against_rollback);
+    # hoy ingest_news_items descarta el lote entero ante cualquier
+    # excepcion, pero el batch queda protegido si algun dia se reutiliza.
     title_snapshots: dict[int, tuple[int, list[tuple[int, str | None]]]] = field(
         default_factory=dict
     )
+    _rollback_listeners: set[int] = field(default_factory=set, repr=False)
+
+
+def _protect_snapshots_against_rollback(db: Session, batch: NewsDedupBatch) -> None:
+    """Limpia las fotos de titulares del batch si la sesion hace rollback.
+
+    Una fila que entro en la foto con flush y luego se anula quedaria de
+    fantasma (y su expulsion de la ventana de 300, falsa: la via suelta
+    vuelve a ver la fila expulsada y la foto, no).
+    """
+    if id(db) in batch._rollback_listeners:
+        return
+    batch._rollback_listeners.add(id(db))
+
+    def _clear(_session) -> None:
+        batch.title_snapshots.clear()
+
+    event.listen(db, "after_rollback", _clear)
 
 
 def prefetch_news_dedup(
@@ -321,6 +344,7 @@ def equivalent_news_event(
             # Foto incremental por empresa (ver NewsDedupBatch): primera vez,
             # los 300 mas recientes al empezar la tanda; despues, solo las
             # filas nuevas (id > lo leido), mas recientes primero, tope 300.
+            _protect_snapshots_against_rollback(db, batch)
             entry = batch.title_snapshots.get(company_id)
             if entry is None:
                 snapshot = [
