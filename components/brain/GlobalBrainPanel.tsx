@@ -237,7 +237,8 @@ export function GlobalBrainPanel({ userId, knowledge, openDetail, messages, setM
         const userMsg = input.trim();
         const history = messages.map(({ role, content }) => ({ role, content }));
         setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-        setInput('');
+        // No borres lo que el usuario haya editado durante la comprobación.
+        setInput(current => current === input ? '' : current);
         setLoading(true);
 
         if (knowledge) {

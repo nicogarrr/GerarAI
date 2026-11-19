@@ -1,6 +1,7 @@
+const availability = vi.hoisted(() => ({ refresh: vi.fn() }));
 // Preflight behavior is covered in ai/AiAvailabilityNotice.test.tsx.
 vi.mock('@/components/ai/AiAvailabilityNotice', () => ({
-    useAiAvailability: () => ({ canStart: true, refresh: async () => true }),
+    useAiAvailability: () => ({ canStart: true, refresh: availability.refresh }),
     AiAvailabilityNotice: () => null,
 }));
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -59,6 +60,7 @@ beforeEach(() => {
     // jsdom no implementa Element.scrollTo (el panel lo usa para ir al último mensaje).
     Element.prototype.scrollTo = vi.fn() as unknown as typeof Element.prototype.scrollTo;
     pathname = '/portfolio';
+    availability.refresh.mockReset().mockResolvedValue(true);
     chatWithPortfolio.mockReset();
     askKnowledge.mockReset();
     askResearchAssistantAction.mockReset();
@@ -289,6 +291,27 @@ describe('GlobalBrain: chat de cartera', () => {
             [{ role: 'assistant', content: expect.stringContaining('Soy el cerebro') }],
         );
         expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    });
+    it('conserva el borrador editado mientras se comprueba disponibilidad', async () => {
+        let resolve!: (allowed: boolean) => void;
+        availability.refresh.mockReturnValue(new Promise<boolean>(r => { resolve = r; }));
+        chatWithPortfolio.mockResolvedValue({ success: true, message: 'Respuesta primera', citations: [] });
+        render(<GlobalBrain userId="u1" />);
+        await open();
+        ask('pregunta original');
+        fireEvent.change(box(), { target: { value: 'borrador siguiente' } });
+        await act(async () => { resolve(true); });
+        expect(chatWithPortfolio).toHaveBeenCalledOnce();
+        expect(chatWithPortfolio.mock.calls[0][0]).toBe('pregunta original');
+        expect(box()).toHaveValue('borrador siguiente');
+    });
+    it('no borra ni envía el borrador cuando disponibilidad lo rechaza', async () => {
+        availability.refresh.mockResolvedValue(false);
+        render(<GlobalBrain userId="u1" />);
+        await open();
+        await act(async () => { ask('pregunta sin disponibilidad'); });
+        expect(chatWithPortfolio).not.toHaveBeenCalled();
+        expect(box()).toHaveValue('pregunta sin disponibilidad');
     });
     it('no envía si el texto es solo espacios (botón desactivado)', async () => {
         render(<GlobalBrain userId="u1" />);
