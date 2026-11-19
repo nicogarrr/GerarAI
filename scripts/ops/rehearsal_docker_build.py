@@ -246,3 +246,15 @@ class DockerBuild:
             # gated and is killed on the next pass. A gated RUN also times out.
             self.sleep(.1)
         return False  # transport/request uncertainty is a blocker, not a green
+
+
+    def failed_exit_codes(self):
+        """Fresh stopped RUN exit codes, not parsed arbitrary build log text."""
+        result = []
+        for worker in self.inspect_workers():
+            if not worker['State']['Running']:
+                code = worker['State'].get('ExitCode')
+                require(isinstance(code, int) and not isinstance(code, bool), 'Worker exit code unavailable')
+                if code != 0:
+                    result.append(code)
+        return result

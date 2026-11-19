@@ -305,8 +305,13 @@ The hash and RUN_ID above are templates, not actual image/resource identities.
 Only the Pilot chooses the existing local base and verifies its provenance.
 A true success requires every RUN proof and final image check. Expected failure
 or cancellation additionally requires a released real worker, terminal daemon
-error, positive settled request and no live owned worker. Cancellation must
-actually reach the cancellation path, not merely fail early. The CLI records
+error, positive settled request and no live owned worker. The controller transports a typed reason, worker IDs alive at the requested
+timeout and stopped-worker exit codes before cleanup. smoke-cancel requires
+the timeout reason with an already released worker still alive at that deadline,
+then confirmed cleanup. A generic cancel_request after daemon failure is not
+proof of exercised live cancellation. smoke-failure requires daemon_failed and
+exactly one nonzero stopped RUN exit code17, not sleep missing/exit127 or another
+error. Missing, mixed or unconfirmed evidence fails closed. The CLI records
 per-case progress and observed container IDs even when a case fails. An
 interrupted/failed smoke receipt remains non-green. Keep the receipt private;
 return a sanitized result summary with immutable residue IDs, not raw dumps.

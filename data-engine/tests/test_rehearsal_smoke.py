@@ -103,7 +103,8 @@ def test_fixed_three_cases_and_expected_daemon_failures(records, tmp_path, monke
         assert engine.archive.exists() and timeout in (5, 30)
         if recipe['build_id'] == 'smoke-success':
             return dict(proofs=[dict(id='1'*64)], image_id='sha256:'+'2'*64)
-        raise smoke.BuildIncomplete('synthetic confirmed')
+        raise smoke.BuildIncomplete('synthetic confirmed', reason='timeout' if recipe['build_id'] == 'smoke-cancel' else 'daemon_failed',
+                                    live_worker_ids=['1'*64], worker_exit_codes=[17], cleanup_confirmed=True)
     monkeypatch.setattr(smoke, 'supervise', supervise)
     progress = []
     results = smoke.exercise(inv, base, tmp_path, engine_factory=Engine, on_progress=progress.append)
@@ -177,3 +178,40 @@ def test_live_progress_survives_failed_smoke_case(runnable, monkeypatch):
     saved = json.loads((output/'smoke.json').read_text())
     assert saved['status'] == 'failed_or_cleanup_unconfirmed'
     assert saved['cases'][1]['all_observed_container_ids'] == ['1'*64]
+
+
+@pytest.mark.parametrize('case,reason,live,codes,confirmed', [
+    ('smoke-cancel', 'daemon_failed', [], [127], True),
+    ('smoke-cancel', 'daemon_failed', ['1'*64], [17], True),
+    ('smoke-cancel', 'timeout', [], [], True),
+    ('smoke-cancel', 'timeout', ['1'*64], [], False),
+    ('smoke-failure', 'daemon_failed', [], [127], True),
+    ('smoke-failure', 'timeout', ['1'*64], [17], True),
+    ('smoke-failure', 'daemon_failed', [], [17, 127], True),
+])
+def test_false_cancellation_or_wrong_deliberate_exit_is_rejected(records, tmp_path, monkeypatch,
+                                                                 case, reason, live, codes, confirmed):
+    inv = records[0]
+    base = dict(Id='sha256:'+'f'*64, Config={})
+    monkeypatch.setattr(smoke, 'CASES', {case: 'sleep 120' if case == 'smoke-cancel' else 'exit 17'})
+    class Engine:
+        def __init__(self, archive, digest, tag):
+            self.tag = tag
+            self.released_proofs = [{'id': '1'*64}]
+            self.terminal = dict(exit_code=1, daemon_error=True)
+            self.cancelled = True
+            self.observed = {'1'*64}
+        def daemon_settled(self):
+            return True
+        def snapshot(self):
+            return []
+        def inspect_workers(self):
+            return []
+    def supervise(*args):
+        error = smoke.BuildIncomplete('synthetic')
+        error.reason, error.live_worker_ids = reason, tuple(live)
+        error.worker_exit_codes, error.cleanup_confirmed = tuple(codes), confirmed
+        raise error
+    monkeypatch.setattr(smoke, 'supervise', supervise)
+    with pytest.raises(ValueError):
+        smoke.exercise(inv, base, tmp_path, engine_factory=Engine)

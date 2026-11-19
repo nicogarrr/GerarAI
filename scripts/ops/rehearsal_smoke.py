@@ -61,18 +61,24 @@ def exercise(inventory, base, output, engine_factory=ObservedBuild, on_progress=
             else:
                 try:
                     supervise(inventory, recipe, engine, 5 if name == 'smoke-cancel' else 30)
-                except BuildIncomplete:
+                except BuildIncomplete as failure:
                     # Expected failure is accepted ONLY after a real RUN was
                     # released and a daemon error conclusively ended the request.
-                    require(engine.released_proofs and engine.daemon_settled() and not engine.snapshot() and
+                    require(failure.cleanup_confirmed and engine.released_proofs and engine.daemon_settled() and not engine.snapshot() and
                             engine.terminal is not None and engine.terminal.get('exit_code') == 1 and
                             engine.terminal.get('daemon_error') is True,
                             'Expected-failure smoke lacks worker release/terminal-error/cleanup proof')
                     if name == 'smoke-cancel':
-                        require(engine.cancelled is True, 'Cancellation case did not reach cancellation path')
+                        require(failure.reason == 'timeout' and failure.live_worker_ids and engine.cancelled is True,
+                                'Cancellation case requires timeout with a released worker still alive')
+                    else:
+                        require(failure.reason == 'daemon_failed' and failure.worker_exit_codes == (17,),
+                                'Failure case requires deliberate worker exit17')
                     result = {'case': name, 'status': 'expected_failure_verified',
                               'released_workers': engine.released_proofs, 'daemon_terminal_error': True,
-                              'daemon_cancellation_confirmed': engine.cancelled}
+                              'daemon_cancellation_confirmed': engine.cancelled, 'failure_reason': failure.reason,
+                              'live_worker_ids_at_timeout': list(failure.live_worker_ids),
+                              'worker_exit_codes_before_cleanup': list(failure.worker_exit_codes)}
                 else:
                     raise RuntimeError('Deliberately failing/cancelled smoke unexpectedly succeeded')
             residues = engine.inspect_workers()

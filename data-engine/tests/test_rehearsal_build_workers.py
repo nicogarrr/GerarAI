@@ -163,6 +163,9 @@ class FakeEngine:
     def finish(self):
         return dict(exit_code=self.result_code, image_id='sha256:'+'8'*64, recipe=self.record[1]['recipe'])
 
+    def failed_exit_codes(self):
+        return [17]
+
     def cancel_request(self):
         self.cancelled = True
         return self.acknowledge
@@ -336,3 +339,29 @@ def test_gate_failure_is_barrier_to_entire_original_body(tmp_path):
     failed = '( exit 1 ) || exit 125; '+original
     result = subprocess.run(['/bin/sh', '-c', failed], check=False)
     assert result.returncode == 125 and not marker.exists()
+
+
+def test_typed_timeout_requires_released_worker_alive_at_deadline(worker):
+    engine = FakeEngine(worker)
+    engine.snapshot = lambda: [] if engine.cancelled else [worker[2:]]
+    engine.daemon_settled = lambda: engine.cancelled
+    ticks = iter([0, 0, 100])
+    with pytest.raises(build.BuildIncomplete) as captured:
+        build.supervise(*worker[:2], engine, 20, clock=lambda: next(ticks), sleep=lambda n: None)
+    failure = captured.value
+    assert failure.reason == 'timeout'
+    assert failure.live_worker_ids == ('f'*64,)
+    assert failure.cleanup_confirmed and engine.released
+    assert failure.worker_exit_codes == ()
+
+
+def test_immediate_daemon_error_is_not_timeout_or_live_cancellation(worker):
+    engine = FakeEngine(worker)
+    engine.result_code = 1
+    engine.failed_exit_codes = lambda: [127]
+    with pytest.raises(build.BuildIncomplete) as captured:
+        build.supervise(*worker[:2], engine, 20, clock=lambda: 0, sleep=lambda n: None)
+    failure = captured.value
+    assert failure.reason == 'daemon_failed' and failure.worker_exit_codes == (127,)
+    assert not failure.live_worker_ids
+    assert failure.cleanup_confirmed and engine.cancelled  # does NOT mean timeout
