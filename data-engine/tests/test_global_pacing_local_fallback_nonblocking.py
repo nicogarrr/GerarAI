@@ -7,7 +7,6 @@ el loop entero (todas las rutas del proceso) se paraba durante el intervalo.
 from __future__ import annotations
 
 import asyncio
-import time
 
 import pytest
 
@@ -112,35 +111,58 @@ def test_local_fallback_revalidates_cooldown_arriving_during_the_wait():
 
 
 def test_redis_eval_runs_off_the_event_loop():
-    """El `eval` sincrono de Redis no debe ejecutarse en el hilo del event loop."""
+    """El `eval` sincrono de Redis no debe ejecutarse en el hilo del event loop.
+
+    Sin relojes de pared: el eval se queda bloqueado hasta que el test lo
+    suelta, y mientras tanto otra corrutina debe seguir avanzando (antes:
+    sleep(0.3) real y >=5 ticks de un ticker a 20 ms, una cota inferior de
+    pared que dependia de la carga del runner).
+    """
     import threading
 
     seen: dict[str, int] = {}
+    eval_started = threading.Event()
+    release_eval = threading.Event()
 
     class SlowRedis:
         def eval(self, *args):
             seen["thread"] = threading.get_ident()
-            time.sleep(0.3)
+            eval_started.set()
+            # Bloqueo «largo» controlado: solo el test lo suelta. El tope
+            # evita colgar la suite si el loop estuviera bloqueado (el test
+            # falla entonces por el assert de hilos, no por un cuelgue).
+            release_eval.wait(timeout=3)
             return 0
 
     pacer = GlobalPacer("redis-offloop", min_interval_seconds=0.1, redis_client_factory=lambda: SlowRedis())
-    ticks: list[float] = []
+    ticks: list[int] = []
 
     async def ticker():
         while True:
-            ticks.append(time.monotonic())
-            await asyncio.sleep(0.02)
+            ticks.append(1)
+            await asyncio.sleep(0)
 
     async def main() -> int:
-        task = asyncio.create_task(ticker())
-        await asyncio.sleep(0)
-        await pacer.wait()
-        task.cancel()
+        tick_task = asyncio.create_task(ticker())
+        wait_task = asyncio.create_task(pacer.wait())
+        loop = asyncio.get_running_loop()
+        start = loop.time()  # solo como guarda anti-cuelgue, no como asercion
+        while not eval_started.is_set():
+            if loop.time() - start > 10:
+                tick_task.cancel()
+                raise AssertionError("el eval no llego a empezar: el hilo executor no progresa")
+            await asyncio.sleep(0)
+        antes = len(ticks)
+        for _ in range(3):
+            await asyncio.sleep(0)
+        assert len(ticks) > antes, "el event loop estuvo bloqueado durante el eval de Redis"
+        release_eval.set()
+        await wait_task
+        tick_task.cancel()
         return threading.get_ident()
 
     loop_thread = asyncio.run(main())
     assert seen["thread"] != loop_thread
-    assert len(ticks) >= 5, f"el event loop estuvo bloqueado por Redis: {len(ticks)} ticks"
 
 
 def test_local_fallback_logs_a_throttled_warning(caplog):
