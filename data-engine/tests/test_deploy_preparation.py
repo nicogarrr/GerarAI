@@ -1,9 +1,11 @@
 """Preparation tooling only; no Docker, network, credentials or production."""
 import importlib.util
 import json
+import os
 import signal
 import subprocess
 import sys
+import time
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -208,3 +210,45 @@ def test_script_plan_entrypoint_does_not_execute_commands(tmp_path):
     result = subprocess.run([sys.executable, str(PATH), 'plan', '--durations', str(durations),
                              '--mode', 'overlap-build-backup'], capture_output=True, text=True, check=True)
     assert json.loads(result.stdout)['release_authorized'] is False
+
+
+
+def test_timeout_kills_term_ignoring_descendant_after_leader_exits(repo, tmp_path):
+    ready = tmp_path / 'descendant.pid'
+    child_code = (
+        'import os,signal,time,pathlib,sys;'
+        'signal.signal(signal.SIGTERM,signal.SIG_IGN);'
+        'pathlib.Path(sys.argv[1]).write_text(str(os.getpid()));'
+        'time.sleep(60)'
+    )
+    leader_code = (
+        'import subprocess,sys,time,pathlib;'
+        'child=subprocess.Popen([sys.executable,"-c",sys.argv[1],sys.argv[2]]);'
+        'ready=pathlib.Path(sys.argv[2]);'
+        'exec("while not ready.exists(): time.sleep(.01)");'
+        'child.wait()'
+    )
+    pid = None
+    try:
+        result = prep.time_phase(*repo, 'backend', tmp_path / 'receipt',
+                                 [sys.executable, '-c', leader_code, child_code, str(ready)], 1)
+        assert result['status'] == 'timeout'
+        pid = int(ready.read_text())
+        # Orphans can remain zombies until the host init reaps them. They are
+        # dead, not live work. Do not mistake kill(pid, 0) success for survival.
+        deadline = time.monotonic() + 2
+        while time.monotonic() < deadline:
+            stat = Path(f'/proc/{pid}/stat')
+            if not stat.exists() or stat.read_text().split()[2] == 'Z':
+                break
+            time.sleep(.01)
+        else:
+            pytest.fail('TERM-ignoring descendant survived timeout cleanup')
+    finally:
+        if pid is None and ready.exists():
+            pid = int(ready.read_text())
+        if pid is not None:
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass

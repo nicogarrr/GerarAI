@@ -45,11 +45,15 @@ def _stop(process):
     try:
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass  # Child exited between timeout and signal; still reap it.
-        process.wait()
+        pass
+    # Reaping the leader does not prove that its process group is empty. A
+    # same-group descendant may ignore TERM after the leader exits. Always
+    # escalate the remaining group, even when wait() above returned promptly.
+    try:
+        os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass  # The entire group has already exited.
+    process.wait()
 
 
 def time_phase(repo: Path, sha: str, phase: str, output: Path,

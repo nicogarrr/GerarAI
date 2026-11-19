@@ -88,7 +88,9 @@ compound script and label all its duration as Pyright, pytest or compilation.
 
 Normal failure, launch failure, timeout, interrupt and source change have
 non-passing receipt states. On timeout/interrupt, the wrapper terminates the
-command's process group and reaps it, escalating to kill after five seconds.
+command's process group, waits up to five seconds for its leader, then always
+sends kill to any remaining group members and reaps the leader. A leader that
+exits promptly does not exempt its descendants from cleanup.
 An external SIGKILL or crash can leave a partial/running receipt. Neither is
 passing evidence. Each retry gets a new receipt path; old evidence is retained.
 
