@@ -253,7 +253,7 @@ def speculative_causal_scenarios(
                 # Tope 0.35 para margenes normales, pero nunca por debajo del
                 # base: con un base alto el bull no puede ser peor que el base.
                 "fcf_margin": max(min(margin + 0.05, 0.35), margin),
-                "wacc": wacc if burn else max(wacc - 0.015, terminal + 0.015),
+                "wacc": wacc if burn else min(wacc, max(wacc - 0.015, terminal + 0.015)),
                 "terminal_growth": terminal,
                 "extra_dilution_pct": max(dilution_pct * 0.5, 0.0),
             },
