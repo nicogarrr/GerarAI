@@ -157,6 +157,16 @@ _GENERIC_SOURCE_TIERS = {"tier_4_reputable_media", "tier_5_data_provider", "tier
 UNRELATED_NEWS_MAX_MATERIALITY = 6
 SOCIAL_NEWS_MAX_MATERIALITY = 2
 
+#: Clave de db.info para la foto de posiciones de UNA tanda de ingesta.
+#: Cada noticia con empresa pagaba un select(Position) completo en
+#: portfolio_weight (medido: 1 lectura de toda la cartera por noticia,
+#: 25 sentencias en un barrido GDELT de 25 items). La tanda la precarga
+#: una vez; fuera de tanda (noticia suelta por API) se lee como siempre.
+#: Solo guarda datos LEIDOS (nunca pendientes), asi que un rollback a
+#: media tanda no deja fantasmas; y las tandas de noticias no tocan
+#: Position, asi que la foto no queda vieja dentro de su vida.
+POSITIONS_SNAPSHOT_KEY = "materiality_positions_snapshot"
+
 
 def mentions_company(text: str, company: Company | None) -> bool:
     """El texto cita el ticker o una palabra distintiva del nombre de la empresa."""
@@ -335,7 +345,15 @@ class MaterialityService:
     def portfolio_weight(self, db: Session, company: Company | None) -> float:
         if company is None:
             return 0.0
-        positions = list(db.scalars(select(Position)).all())
+        snapshot = db.info.get(POSITIONS_SNAPSHOT_KEY)
+        if snapshot is not None:
+            positions = snapshot
+        else:
+            positions = list(db.scalars(select(Position)).all())
+            if POSITIONS_SNAPSHOT_KEY in db.info:
+                # Tanda de ingesta activa (la clave existe aunque valga
+                # None): la primera lectura queda para las demas noticias.
+                db.info[POSITIONS_SNAPSHOT_KEY] = positions
         # El peso es un cociente de importes: solo vale si todos están en la
         # misma divisa. Con una cartera en una sola divisa sirve el importe
         # nativo; si se mezclan (USD, EUR, JPY…) se usa el valor en divisa base
