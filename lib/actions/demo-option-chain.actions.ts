@@ -70,7 +70,10 @@ export async function getDemoOptionChain(rawSymbol: unknown): Promise<DemoOption
         }
         let row = strikes.get(strike);
         if (!row) {
-            row = { strike, call: null, put: null };
+            // Sin call/put inicializados: la AUSENCIA de la clave en la
+            // respuesta significa "lado no listado en la fuente" (distinto
+            // de null = listado sin operación). El selector filtra por tipo.
+            row = { strike };
             strikes.set(strike, row);
         }
         const trade =

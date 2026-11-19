@@ -89,6 +89,26 @@ describe('getDemoOptionChain', () => {
         expect(nov.strikes.map((r) => r.strike)).toEqual([45, 47.5]);
         expect(nov.strikes[0]).toEqual({ strike: 45, call: { price: 3.9, time: '2026-11-17T15:47:12' }, put: null });
         expect(nov.strikes[1].call).toEqual({ price: 2.3, time: '2026-11-17T15:47:12' });
+        // Strike 47.5 solo tiene clave call en la fuente: put AUSENTE (no listado), no null.
+        expect('put' in nov.strikes[1]).toBe(false);
+    });
+
+    it('presencia por tipo: solo-call-listado NO equivale a call+put-listado-sin-trade (negativo del Auditor)', async () => {
+        const onlyCall = new Map<string, Premium>([['AAPL|2026-12-18|call|150000', trade(10)]]);
+        const bothListed = new Map<string, Premium>([
+            ['AAPL|2026-12-18|call|150000', trade(10)],
+            ['AAPL|2026-12-18|put|150000', noTrade],
+        ]);
+        cacheGetChain
+            .mockResolvedValueOnce(attempt(onlyCall))
+            .mockResolvedValueOnce(attempt(bothListed));
+        const absent = await getDemoOptionChain('AAPL');
+        const listed = await getDemoOptionChain('AAPL');
+        if (!absent.ok || !listed.ok) throw new Error('expected ok');
+        // Antes del arreglo ambas respuestas eran EXACTAMENTE iguales.
+        expect(absent).not.toEqual(listed);
+        expect('put' in absent.expiries[0].strikes[0]).toBe(false);
+        expect(listed.expiries[0].strikes[0].put).toBeNull();
     });
 
     it(`limita la respuesta a los ${MAX_CHAIN_EXPIRIES} vencimientos más próximos`, async () => {

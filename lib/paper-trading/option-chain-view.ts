@@ -11,8 +11,13 @@ export type DemoOptionChainTrade = { price: number; time: string };
 
 export type DemoOptionChainStrike = {
     strike: number;
-    call: DemoOptionChainTrade | null;
-    put: DemoOptionChainTrade | null;
+    /**
+     * Presencia POR TIPO (veracidad): lado AUSENTE = contrato no listado en
+     * la fuente; null = listado pero sin operación registrada; objeto =
+     * última operación. Un strike con solo call NO puede ofrecerse como put.
+     */
+    call?: DemoOptionChainTrade | null;
+    put?: DemoOptionChainTrade | null;
 };
 
 export type DemoOptionChainExpiry = { expiry: string; strikes: DemoOptionChainStrike[] };

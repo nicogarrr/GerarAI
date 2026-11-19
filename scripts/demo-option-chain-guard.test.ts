@@ -71,6 +71,29 @@ describe('selector guiado de contrato (cadena CBOE diferida)', () => {
         assert.match(es.ticket.chainFetchedAt, /\{time\}/);
     });
 
+    it('presencia POR TIPO: ausente = no listado, null = listado sin trade; el selector filtra por callPut', () => {
+        assert.match(view, /call\?: DemoOptionChainTrade \| null;/);
+        assert.match(view, /put\?: DemoOptionChainTrade \| null;/);
+        // La acción NO inicializa lados en null: solo pone el lado que trae la fuente.
+        assert.match(action, /row = \{ strike \};/);
+        assert.doesNotMatch(action, /\{ strike, call: null, put: null \}/);
+        // La UI filtra los strikes por el tipo elegido y valida con presencia.
+        assert.match(ticket, /r\[callPut\] !== undefined/);
+        assert.match(ticket, /sideRow === undefined/);
+    });
+
+    it('una resolución obsoleta (símbolo cambiado en vuelo) se descarta: secuencia + correspondencia en render', () => {
+        // Editar/elegir símbolo invalida la secuencia de la petición en vuelo.
+        assert.match(ticket, /chainSeq\.current \+= 1;/);
+        assert.match(ticket, /const seq = \+\+chainSeq\.current;/);
+        // Ok, error y finally se descartan si la secuencia ya no es la vigente.
+        const staleGuards = ticket.match(/seq !== chainSeq\.current/g) ?? [];
+        assert.ok(staleGuards.length >= 2, 'faltan descartes de resoluciones obsoletas');
+        assert.match(ticket, /if \(seq === chainSeq\.current\) setChainLoading\(false\);/);
+        // El render exige correspondencia símbolo-cadena, no solo chain !== null.
+        assert.match(ticket, /\{chain && chainCoversSymbol \? \(/);
+    });
+
     it('el fracaso de la fuente no rompe el ticket: hay estado de error explícito', () => {
         assert.match(ticket, /setChainError\(chainErrorMessage\(ti, result\.reason\)\)/);
         assert.match(ticket, /setChainError\(ti\('paperTrading\.ticket\.chainError\.sourceUnavailable'\)\)/);

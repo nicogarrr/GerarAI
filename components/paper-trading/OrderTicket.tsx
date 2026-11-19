@@ -85,6 +85,16 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
     const [chain, setChain] = useState<DemoOptionChainOk | null>(null);
     const [chainError, setChainError] = useState<string | null>(null);
     const [chainLoading, setChainLoading] = useState(false);
+    // Secuencia de peticiones de cadena: editar/elegir símbolo invalida la
+    // petición en vuelo; una resolución obsoleta (ok, error o finally) se
+    // descarta y nunca repinta selects del subyacente anterior.
+    const chainSeq = useRef(0);
+    function invalidateChain() {
+        chainSeq.current += 1;
+        setChain(null);
+        setChainError(null);
+        setChainLoading(false);
+    }
 
     const [executedAtLocal, setExecutedAtLocal] = useExecutedAtLocal();
     const [invalid, setInvalid] = useState<FieldInvalid>(null);
@@ -103,9 +113,8 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
         selectedSymbol.current = stock.symbol;
         setSymbol(stock.symbol);
         setName(stock.name);
-        // La cadena cargada era del subyacente anterior: se descarta.
-        setChain(null);
-        setChainError(null);
+        // La cadena cargada (o en vuelo) era del subyacente anterior: se descarta.
+        invalidateChain();
     }
     // Si tras elegir se EDITA el simbolo, el nombre autocompletado ya no
     // corresponde: se limpia para no registrar una empresa con el nombre de
@@ -115,8 +124,7 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
             selectedSymbol.current = null;
             setName('');
         }
-        setChain(null);
-        setChainError(null);
+        invalidateChain();
         setSymbol(value);
     }
 
@@ -134,21 +142,27 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
 
     async function onLoadChain() {
         if (!fetchOptionChain || chainLoading) return;
+        const seq = ++chainSeq.current;
         setChainLoading(true);
         setChainError(null);
         try {
             const result = await fetchOptionChain(symbol);
-            if (result.ok) {
+            if (seq !== chainSeq.current) return; // respuesta obsoleta: símbolo ya cambió
+            if (result.ok && result.underlying === symbol.trim().toUpperCase()) {
                 setChain(result);
+            } else if (result.ok) {
+                setChain(null);
+                setChainError(ti('paperTrading.ticket.chainError.sourceUnavailable'));
             } else {
                 setChain(null);
                 setChainError(chainErrorMessage(ti, result.reason));
             }
         } catch {
+            if (seq !== chainSeq.current) return;
             setChain(null);
             setChainError(ti('paperTrading.ticket.chainError.sourceUnavailable'));
         } finally {
-            setChainLoading(false);
+            if (seq === chainSeq.current) setChainLoading(false);
         }
     }
 
@@ -168,8 +182,17 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
         if (!Number.isFinite(parsed)) return { chainRef: undefined, chainListed: undefined };
         const row = chain.expiries.find((e) => e.expiry === expiry)?.strikes.find((r) => r.strike === parsed);
         if (!row) return { chainRef: undefined, chainListed: false };
-        return { chainRef: row[callPut], chainListed: true };
+        // Presencia POR TIPO: lado ausente = contrato NO listado (aviso);
+        // lado null = listado sin operación; objeto = última operación.
+        const sideRow = row[callPut];
+        if (sideRow === undefined) return { chainRef: undefined, chainListed: false };
+        return { chainRef: sideRow, chainListed: true };
     })();
+
+    // Strikes ofrecidos: solo los que tienen EL TIPO elegido listado en la
+    // fuente (un strike con solo call no se ofrece para put).
+    const chainStrikesForKind = (expiryRow: DemoOptionChainOk['expiries'][number] | undefined) =>
+        (expiryRow?.strikes ?? []).filter((r) => r[callPut] !== undefined);
 
     const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, executedAtLocal]);
     const validationError = invalidMessage(invalid, fieldKey);
@@ -440,7 +463,7 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
                             </Button>
                         </div>
                         {chainError ? <p className="text-xs text-amber-400">{chainError}</p> : null}
-                        {chain ? (
+                        {chain && chainCoversSymbol ? (
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1.5">
                                     <Label htmlFor={`${uid}-chain-expiry`}>{ti('paperTrading.ticket.chainExpiry')}</Label>
@@ -464,7 +487,7 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
                                         className="w-full rounded-md border border-gray-800 bg-transparent px-2 text-base sm:text-sm"
                                         style={{ minHeight: 44 }}
                                         value={(() => {
-                                            const strikes = chain.expiries.find((e) => e.expiry === expiry)?.strikes ?? [];
+                                            const strikes = chainStrikesForKind(chain.expiries.find((e) => e.expiry === expiry));
                                             return strikes.some((r) => String(r.strike) === strike) ? strike : '';
                                         })()}
                                         onChange={(event) => {
@@ -472,7 +495,7 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
                                         }}
                                     >
                                         <option value="" disabled>{ti('paperTrading.ticket.chainStrikePh')}</option>
-                                        {(chain.expiries.find((e) => e.expiry === expiry)?.strikes ?? chain.expiries[0]?.strikes ?? []).map((r) => (
+                                        {chainStrikesForKind(chain.expiries.find((e) => e.expiry === expiry) ?? chain.expiries[0]).map((r) => (
                                             <option key={r.strike} value={String(r.strike)}>{r.strike}</option>
                                         ))}
                                     </select>
