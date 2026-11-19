@@ -833,7 +833,9 @@
     "chartType": "Tipo de gráfico",
     "lineMode": "Línea",
     "candlesMode": "Velas",
-    "candlesUnavailable": "Velas disponibles con datos OHLC diarios completos."
+    "candlesUnavailable": "Velas disponibles con datos OHLC diarios completos.",
+    "eventsTruncatedNotice": "Se muestran solo los eventos más recientes del rango. Hay eventos omitidos; el primer día mostrado puede estar incompleto. Reduce el rango de fechas para consultar el resto.",
+    "eventsNotice": "Este tramo tiene {total} eventos guardados; ves los {shown} más recientes."
   },
   "memo": {
     "catalystNextEarnings": "Próximos resultados",

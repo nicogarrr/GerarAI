@@ -81,3 +81,51 @@ describe('getChartEvents: aviso de calidad del coste medio', () => {
         expect(result.targetCurrency).toBeNull();
     });
 });
+
+describe('getChartEvents: aviso de recorte del timeline (#6009)', () => {
+    const EV = (n: number) => Array.from({ length: n }, (_, i) => ({ date: `2026-01-${String(i + 1).padStart(2, '0')}`, source: 'dividend', kind: 'dividend', description: 'x' }));
+    const BACKEND_TIMELINE_NOTICE = 'Se muestran solo los eventos más recientes del rango. Hay eventos omitidos; el primer día mostrado puede estar incompleto. Reduce el rango de fechas para consultar el resto.';
+    beforeEach(() => {
+        vi.clearAllMocks();
+        user.mockResolvedValue({ id: 'tenant-one' });
+        translate.mockImplementation((key: string) => `<${key}>`);
+    });
+
+    it('el notice fijo del backend se sirve traducido', async () => {
+        request.mockImplementation(async (url: string) => url.includes('/events/timeline')
+            ? { events: EV(500), holding: null, total: 1234, truncated: true, returned_desde: '2025-06-01', returned_hasta: '2026-02-01', notice: BACKEND_TIMELINE_NOTICE }
+            : { currency: 'USD', consensus: { mean: null } });
+        const result = await getChartEvents('AAPL', '2026-01-01', '2026-02-01');
+        expect(translate).toHaveBeenCalledWith('research.chart.eventsTruncatedNotice');
+        expect(result.eventsNotice).toBe('<research.chart.eventsTruncatedNotice>');
+        expect(result.holdingNotice).toBeNull();
+    });
+
+    it('un notice desconocido del backend pasa tal cual', async () => {
+        request.mockImplementation(async (url: string) => url.includes('/events/timeline')
+            ? { events: EV(3), holding: null, notice: 'aviso de recorte del motor' }
+            : { currency: null, consensus: null });
+        const result = await getChartEvents('AAPL', '2026-01-01', '2026-02-01');
+        expect(result.eventsNotice).toBe('aviso de recorte del motor');
+        expect(translate).not.toHaveBeenCalledWith('research.chart.eventsTruncatedNotice');
+    });
+
+    it('truncated + total sin notice compone el aviso con shown/total', async () => {
+        request.mockImplementation(async (url: string) => url.includes('/events/timeline')
+            ? { events: EV(500), holding: null, total: 1234, truncated: true }
+            : { currency: null, consensus: null });
+        const result = await getChartEvents('AAPL', '2026-01-01', '2026-02-01');
+        expect(translate).toHaveBeenCalledWith('research.chart.eventsNotice', { shown: 500, total: 1234 });
+        expect(result.eventsNotice).toBe('<research.chart.eventsNotice>');
+    });
+
+    it('sin recorte no hay aviso de eventos', async () => {
+        request.mockImplementation(async (url: string) => url.includes('/events/timeline')
+            ? { events: EV(4), holding: null, total: 4, truncated: false }
+            : { currency: null, consensus: null });
+        const result = await getChartEvents('AAPL', '2026-01-01', '2026-02-01');
+        expect(result.eventsNotice).toBeNull();
+        request.mockResolvedValue({ events: EV(2), holding: null });
+        expect((await getChartEvents('AAPL', '2026-01-01', '2026-02-01')).eventsNotice).toBeNull();
+    });
+});

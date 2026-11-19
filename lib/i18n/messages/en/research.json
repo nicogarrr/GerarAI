@@ -833,7 +833,9 @@
     "chartType": "Chart type",
     "lineMode": "Line",
     "candlesMode": "Candles",
-    "candlesUnavailable": "Candles require complete daily OHLC data."
+    "candlesUnavailable": "Candles require complete daily OHLC data.",
+    "eventsTruncatedNotice": "Only the most recent events in the range are shown. Some events were omitted; the first day shown may be incomplete. Narrow the date range to see the rest.",
+    "eventsNotice": "This range holds {total} stored events; you are seeing the {shown} most recent."
   },
   "memo": {
     "catalystNextEarnings": "Upcoming earnings",
