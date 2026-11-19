@@ -52,10 +52,17 @@ _PRICE_ASK_RE = re.compile(
     r"(?i)\b(?:precio|cotiza\w*|cu[aá]nto\s+vale|a\s+cu[aá]nto\s+est[aá]n?|"
     r"a\s+c[oó]mo\s+est[aá]n?|c[oó]mo\s+(?:va|cotiza)|price\s+of|quote\s+for|"
     # Formas habituales sin «of»: «ASTS stock price», «AAPL share price»,
-    # «price AAPL», «trading at», «valor de la acción». Y el ticker delante
-    # a secas: «AAPL price» (medido 2026-11-19: no enrutaba a la cotización
-    # en vivo). El ticker va en mayúsculas (?-i) para no tragarse palabras.
-    r"(?:stock|share)\s+price|price\s+(?=(?-i:[A-Z]{2,5})\b)|(?-i:\b[A-Z]{2,5})\s+price|trading\s+at|"
+    # «price AAPL», «trading at», «valor de la acción». Y nombre o ticker
+    # delante a secas: «AAPL price», «palantir price» (medido 2026-11-19:
+    # no enrutaba a la cotización en vivo). Las palabras corrientes
+    # («the price», «average price», «its price»...) quedan fuera por la
+    # lista de exclusión del lookahead; la empresa concreta la resuelve
+    # después el catálogo, que es quien decide si hay cotización que dar.
+    r"(?:stock|share)\s+price|price\s+(?=(?-i:[A-Z]{2,5})\b)|"
+    r"\b(?!the\b|a\b|an\b|its\b|my\b|your\b|his\b|her\b|their\b|our\b|this\b|that\b|what\b|whats\b|"
+    r"which\b|any\b|some\b|current\b|average\b|fair\b|expected\b|actual\b|target\b|same\b|"
+    r"low\b|high\b|open\b|close\b|closing\b|ask\b|bid\b|strike\b|spot\b)"
+    r"[a-z][a-z0-9&.'-]{2,}\s+price\b|trading\s+at|"
     r"valor\s+de\s+la\s+acci[oó]n|how\s+much\s+is\s+\w+\s+trading)\b"
 )
 # El coste de compra, la valoración y los fundamentales (PER/BPA) los

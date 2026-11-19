@@ -398,6 +398,8 @@ def test_repeated_ticker_does_not_exhaust_company_limit(db, monkeypatch):
     "AAPL price",
     "MSFT price?",
     "ANT price",
+    "palantir price",
+    "apple price?",
 ])
 def test_price_phrasings_without_of_trigger_live_quote(question):
     from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
@@ -410,6 +412,10 @@ def test_price_phrasings_without_of_trigger_live_quote(question):
     "the price is too high, should I wait",
     "stock price vs my cost basis",
     "ASTS share price revenue growth",
+    "its price",
+    "current price",
+    "average price",
+    "apple price target",
 ])
 def test_price_phrasings_do_not_hijack_stored_routes(question):
     from app.services.brain_live_tools import _PRICE_ASK_RE, _PRICE_EXCLUDE_RE
@@ -455,10 +461,11 @@ def test_plain_asks_still_route_live(question):
     assert _routes_live(question)
 
 
-def test_ticker_first_price_reaches_the_provider(db, monkeypatch):
+@pytest.mark.parametrize("question", ["AAPL price", "apple price"])
+def test_ticker_first_price_reaches_the_provider(db, monkeypatch, question):
     from app.services.extended_quote_service import extended_quote_service
 
-    company(db, "AAPL")
+    company(db, "AAPL", "Apple Inc")
     calls = []
 
     async def spy(ticker):
@@ -466,7 +473,7 @@ def test_ticker_first_price_reaches_the_provider(db, monkeypatch):
         return live_quote(ticker, 231.5)
 
     monkeypatch.setattr(extended_quote_service, "get", spy)
-    response = asyncio.run(answer_live_question(db, "AAPL price"))
+    response = asyncio.run(answer_live_question(db, question))
     assert response is not None
     assert calls == ["AAPL"]
 

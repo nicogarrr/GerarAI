@@ -124,3 +124,14 @@ def test_fuzzy_respects_limit(db: Session):
     out = search_companies(q="antrophic", limit=1, db=db)
 
     assert len(out.results) == 1
+
+
+def test_accents_folded_either_way(db: Session):
+    """«nestle» encuentra «Nestlé S.A.» y «loreal» a «L'Oréal» (y al revés)."""
+    _company(db, "NESN", "Nestlé S.A.")
+    _company(db, "OR", "L'Oréal")
+
+    assert [r.ticker for r in search_companies(q="nestle", db=db).results] == ["NESN"]
+    assert [r.ticker for r in search_companies(q="Nestlé", db=db).results] == ["NESN"]
+    assert [r.ticker for r in search_companies(q="loreal", db=db).results] == ["OR"]
+    assert [r.ticker for r in search_companies(q="L'Oréal", db=db).results] == ["OR"]
