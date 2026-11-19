@@ -74,7 +74,11 @@ data volume at /var/lib/postgresql/data. No source bind mounts or socket. Local
 volume driver options must be empty and inspected mountpoint must match.
 Every other container, stopped ones included, is checked for sharing the source
 volume. Docker-data bind mounts on other containers cause conservative refusal.
-Incomplete production inventory or missing/changed source fails closed.
+Missing denylisted production IDs or missing/changed source fails closed.
+The denylist is verified by the Pilot. This code does not discover or classify
+all production containers: an additional unclassified container without
+conflicting mounts or slice occupancy can pass. Completeness of the production
+classification depends on the Pilot, not this listing check.
 
 ## Resource proof, not flags alone
 
@@ -163,3 +167,88 @@ acceptable only after proving actual process ancestry, containment and cleanup.
 
 All tests for this change use synthetic Docker objects and local temporary
 files. No Docker daemon, VM, production, provider or paid resource is used.
+
+## Offline build workers, library stage
+
+`rehearsal_build_workers.py` and `rehearsal_docker_build.py` now provide the
+worker-control portion of the future runner. They have no CLI and are not wired
+to a benchmark, source setup, live script or CI. The complete backup/build A/B
+runner is still pending. Importing either module performs no Docker operation.
+Only the Pilot may exercise the actual backend on the VM after exact audit and
+separate execution approval. Current tests use fake HTTP/proc objects plus one
+local shell test. They do not prove the VM supports this backend.
+
+The selected experiment is explicitly **warm dependencies, offline compilation**.
+Both arms must use identical immutable local base/dependency images produced
+once before measurement. It is not comparable as the same workload to the
+historical build, which ran apk and npm ci. The frontend derivative removes
+only the exact reviewed apk/npm-ci instructions and substitutes pinned local
+base/deps IDs. It retains `npm run build`. The base/deps images must have all
+three exact SHA256 fingerprint labels, suffixes `lockfile`, `install-hooks` and
+`dockerfile` under `io.gerarai.bench.deps.`. The caller must compute these from
+package-lock.json, scripts/install-hooks.mjs and Dockerfile in the clean exact
+checkout. Matching labels bind explicit image IDs to the Pilot's build record;
+labels by themselves do not prove the image's contents. The Pilot must retain
+one-time dependency-layer production and provenance evidence separately.
+
+Every shell-form RUN gets an independent gate file with a random per-build UUID
+and per-step suffix. A gate cannot persist from an earlier RUN or prebuilt base.
+The gate waits at most about 60 seconds for approval, otherwise exits125 before
+the original command. Unsupported Dockerfile constructs, parser directives,
+ONBUILD in external bases, base volumes/custom shells, dynamic FROMs, exec-form
+RUNs and ownership-label overrides are rejected rather than loosely rewritten.
+External FROMs are replaced with local immutable image IDs; COPY --from may
+reference only declared local stages. Inherited entrypoints are cleared after
+every FROM so they cannot run before a gate. No remote frontend or context is
+supplied. Each RUN's original shell short-circuit/exit behavior
+is retained after release. The generated images contain gate files and are
+benchmark-only artifacts, not release images.
+
+Before releasing a worker, the host controller checks its full immutable ID,
+non-production/non-source identity, exact run/build/recipe/step labels and
+expected gated command. It checks HostConfig.CgroupParent, namespaces,
+privileges, absence of host mounts/socket/volumes, real PID cgroup membership
+and current aggregate limits. It also checks NetworkMode=none and reads the
+worker's actual /proc/PID/net/{dev,route,ipv6_route}: only loopback, no usable
+default route. A reject-only IPv6 ::/0 loopback route is not a usable default.
+The backend repeats these checks immediately before writing only the gate file
+inside that exact worker using a root exec with a positional filename. No
+unreviewed shell body or user-supplied Docker option is interpolated.
+
+The local backend uses the Docker Unix socket directly with the legacy build
+API's version=1 selection, pull=0, nocache=1, networkmode=none and the dedicated
+cgroup parent, plus the reviewed per-build resource flags. It cannot fall back
+to shared BuildKit. It refuses existing output tags/workers. The supplied tar
+must contain a unique generated recipe matching the expected SHA256; absolute,
+traversing, symlink/special or environment-file entries are rejected. Packaging
+only exact tracked build inputs, validating output paths and checking local
+base presence before submission remain the caller's required responsibilities.
+No registry credentials or inherited Docker context/config/proxy are sent.
+
+Cancellation is a daemon operation, not a local CLI signal. The backend keeps
+the build HTTP request open, stops granting gates and repeatedly kills only
+owned, uniquely gated worker IDs, including late workers. It requires a terminal
+daemon success/error frame followed by clean HTTP stream completion, and no live
+owned worker afterward. CLI exit, an intermediate progress message, transport
+loss or an empty instantaneous list cannot produce cancellation confirmation.
+After90seconds without positive completion it reports unconfirmed cleanup.
+The controller stays non-green in every failed/interrupted case. A clean build
+also requires proof for every RUN and a fresh final image ID/tag/recipe check.
+
+No broad resource deletion is implemented. Dead intermediate containers/images
+are retained for the Pilot's ID-scoped follow-up, not pruned automatically.
+A process hard-kill, host failure, lost Docker connection or broken backend can
+still require operator follow-up. Cgroup limits bound admitted work, not the
+shared daemon's context transfer/COPY/commit/tag overhead. That overhead remains
+outside the slice and must be reported as a confounder. The per-RUN approval
+poll adds overhead; do not report those timings as an untouched production build.
+
+Reference implementation checked for API parameter names and response behavior:
+- https://github.com/Moby/moby/blob/v28.5.2/api/server/router/build/build_routes.go
+- https://github.com/Moby/Moby/blob/v28.5.2/builder/dockerfile/builder.go
+
+This source inspection is not a claim about the VM's installed Docker version.
+The first VM exercise must be a separately approved tiny local-image offline
+build with an intentionally failing/interruptible RUN. Confirm actual workers,
+network/cgroups, terminal response, no late live worker after cancellation and
+scoped residue inventory before attempting the large build/backup comparison.
