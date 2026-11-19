@@ -103,7 +103,7 @@
   },
   "steps": {
     "thesis": "1. Thesis.",
-    "thesisText": "choose the company, open the «Thesis» tab and press «Generate thesis» (or «Regenerate thesis» if one already exists). Review the hypothesis, scenarios with probabilities, dated catalysts and what would invalidate it. The memo and the EPUB are exported from the thesis view itself («Export memo» and «Export EPUB»);",
+    "thesisText": "choose the company, open the «Thesis» tab and press «Generate thesis» (or «Regenerate thesis» if one already exists). Review the hypothesis, scenarios with probabilities, dated catalysts and what would invalidate it. In the thesis, the «Leer / Descargar» menu offers «Leer la tesis», «Descargar PDF» and «Descargar Markdown»; the reading view adds «Imprimir»;",
     "in": "In",
     "valuation": "2. Valuation.",
     "valuationText": "In the same page, open the «Valuation» tab and review the «Long-term fundamental model» section: the assumptions (growth, FCF margin and WACC) and the Bear / Base / Bull scenarios with their spreads before trusting the number.",
