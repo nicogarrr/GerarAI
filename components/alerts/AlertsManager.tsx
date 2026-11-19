@@ -300,7 +300,7 @@ function AlertsManager() {
     };
 
     return (
-        <Card className="p-4 sm:p-6 rounded-lg border border-gray-700 bg-gray-800/50">
+        <Card className="p-4 sm:p-6">
             <div className="flex items-center justify-between gap-2 mb-4">
                 <div className="flex items-center gap-3">
                     <Bell aria-hidden="true" className="h-5 w-5 shrink-0 text-teal-400" />

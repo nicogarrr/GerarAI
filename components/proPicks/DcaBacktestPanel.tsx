@@ -130,7 +130,7 @@ export default function DcaBacktestPanel({ defaultSymbol = 'UBER' }: { defaultSy
     const fixed = plans.find((p) => p.key === 'fixed_budget');
 
     return (
-        <Card className="w-full min-w-0 overflow-hidden rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-6" data-testid="dca-backtest">
+        <Card className="w-full min-w-0 overflow-hidden p-4 sm:p-6" data-testid="dca-backtest">
             <div className="mb-4">
                 <div className="mb-2 flex items-center gap-3">
                     <TrendingUp aria-hidden="true" className="h-6 w-6 text-teal-400" />

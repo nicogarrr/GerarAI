@@ -38,7 +38,7 @@ export default function PortfolioAllocation({ holdings, cash, baseCurrency }: Pr
     const hasCash = typeof cash === 'number' && cash !== 0;
     if (holdings.length === 0 && !hasCash) {
         return (
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
                 <CardHeader className="pb-2">
                     <CardTitle className="text-gray-100 flex items-center gap-2">
                         <PieChartIcon className="h-5 w-5 text-teal-400" />

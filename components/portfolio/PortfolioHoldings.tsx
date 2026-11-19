@@ -442,7 +442,7 @@ export default function PortfolioHoldings({ holdings, userId, cash, baseCurrency
   };
 
   return (
-    <Card className="bg-gray-800/50 border-gray-700">
+    <Card>
       <CardHeader className="flex flex-col gap-3 pb-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-1">
           <CardTitle as="h2" className="text-gray-100">{ti('portfolio.holdings.title')}</CardTitle>

@@ -118,7 +118,7 @@ export default function DeepValueView() {
             )}
 
             {!error && data && data.resultados.length === 0 && !(data.pendientes_revision?.length) && (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-sm text-gray-400">
+                <Card className="p-4 text-sm text-gray-400">
                     {t('propicks.deepValue.empty')}
                 </Card>
             )}

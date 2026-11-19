@@ -56,7 +56,7 @@ export function CompanyCard({ company }: { company: InsiderOperationsCompany }) 
     const f = useFormat();
     const { totals } = company;
     return (
-        <Card className="min-w-0 rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-5">
+        <Card className="min-w-0 p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <Link
                     href={`/insider?ticker=${encodeURIComponent(company.ticker)}`}
@@ -183,7 +183,7 @@ export default function InsiderOperationsView({ result, days }: { result: Inside
                 </p>
             ) : null}
             {result.companies.length === 0 ? (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center text-sm text-gray-400">
+                <Card className="p-6 text-center text-sm text-gray-400">
                     {t('insider.operations.empty', { days: daysText })}
                 </Card>
             ) : (

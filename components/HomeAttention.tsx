@@ -48,7 +48,7 @@ export default function HomeAttention() {
     const current = Math.min(page, pages - 1);
     const failed = data && (data.thesis.unavailable || data.dca.unavailable);
     return (
-        <Card className="border-teal-800/60 bg-gray-800/50">
+        <Card className="border-teal-800/60">
             <CardHeader className="border-b border-gray-700/50 pb-3">
                 <div className="flex flex-wrap items-center justify-between gap-x-3">
                     <CardTitle as="h2" className="flex items-center gap-2 text-lg text-gray-100"><BellRing aria-hidden="true" className="h-5 w-5 text-teal-300" />{t('home.attention.title')}</CardTitle>

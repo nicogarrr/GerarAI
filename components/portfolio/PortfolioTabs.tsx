@@ -291,45 +291,45 @@ export default function PortfolioTabs({ summary, transactions, scores, tearsheet
                 {/* Con teclado no hay barra de scroll: la region enfocable deja las
                     pestañas alcanzables con las flechas (WCAG 2.1.1). */}
                 <div ref={tabViewportRef} role="region" aria-label={ti('portfolio.tabs.region')} tabIndex={0} className="-mx-4 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
-                    <TabsList className="bg-[#0a0a0a] border border-gray-800 p-1 rounded-xl mb-6 flex h-auto w-max max-w-none flex-nowrap gap-1 sm:h-9">
+                    <TabsList className="mb-6 flex w-max max-w-none flex-nowrap gap-1">
                     <TabsTrigger
                         value="resumen"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                        className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm sm:py-2"
                     >
                         <LayoutDashboard aria-hidden="true" className="h-4 w-4" />
                         {ti('portfolio.tabs.tabSummary')}
                     </TabsTrigger>
                     <TabsTrigger
                         value="posiciones"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                        className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm sm:py-2"
                     >
                         <Briefcase aria-hidden="true" className="h-4 w-4" />
                         {ti('portfolio.tabs.tabPositions')}
                     </TabsTrigger>
                     <TabsTrigger
                         value="movimientos"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                        className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm sm:py-2"
                     >
                         <History aria-hidden="true" className="h-4 w-4" />
                         {ti('portfolio.tabs.tabTransactions')}
                     </TabsTrigger>
                     <TabsTrigger
                         value="dividendos"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                        className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm sm:py-2"
                     >
                         <Coins aria-hidden="true" className="h-4 w-4" />
                         {ti('portfolio.tabs.tabDividends')}
                     </TabsTrigger>
                     <TabsTrigger
                         value="prevision"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                        className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm sm:py-2"
                     >
                         <TrendingUp aria-hidden="true" className="h-4 w-4" />
                         {ti('portfolio.tabs.tabForecast')}
                     </TabsTrigger>
                     <TabsTrigger
                         value="estrategia"
-                        className="data-[state=active]:bg-gray-800 data-[state=active]:text-white rounded-lg px-4 py-2.5 text-sm text-gray-400 flex items-center gap-2 min-h-[44px] sm:min-h-0 sm:py-2 whitespace-nowrap"
+                        className="flex items-center gap-2 whitespace-nowrap px-4 py-2.5 text-sm sm:py-2"
                     >
                         <Brain aria-hidden="true" className="h-4 w-4" />
                         {ti('portfolio.tabs.tabFactors')}

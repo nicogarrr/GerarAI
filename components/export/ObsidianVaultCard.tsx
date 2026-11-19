@@ -45,7 +45,7 @@ export default function ObsidianVaultCard() {
     };
 
     return (
-        <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
+        <Card>
             <CardHeader className="border-b border-gray-700/50 pb-4">
                 <div className="flex items-center gap-3">
                     <BookDown className="h-5 w-5 text-teal-400" />

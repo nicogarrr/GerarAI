@@ -337,7 +337,7 @@ export default function PlanView({ initialPlan, initialContributions, initialDri
 
             {initialPlan?.plan_exists === true ? <ContributionSplitCard split={initialSplit} /> : null}
 
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
+            <Card>
                 <CardHeader className="border-b border-gray-700/50 pb-4">
                     <div className="flex items-center gap-3">
                         <Crosshair className="h-5 w-5 text-teal-400" />

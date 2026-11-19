@@ -27,7 +27,7 @@ interface DcaSignalsPanelProps {
 export default function DcaSignalsPanel({ data, unavailable, ti = esT, locale = 'es' }: DcaSignalsPanelProps) {
     if (unavailable || !data) {
         return (
-            <Card className="border-gray-700 bg-gray-800/50" data-testid="dca-signals-unavailable">
+            <Card data-testid="dca-signals-unavailable">
                 <CardContent className="px-4 py-4 text-sm text-gray-400">
                     {ti('watchlist.dca.panel.unavailable')}
                 </CardContent>
