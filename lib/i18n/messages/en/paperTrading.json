@@ -165,7 +165,7 @@
     "buyOpen": "Buy (to open)",
     "sellClose": "Sell (to close)",
     "quantity": "Quantity",
-    "quantityPh": "e.g. 10",
+    "quantityPh": "10",
     "unitShares": "shares",
     "unitContracts": "contracts",
     "priceStock": "Price per share",

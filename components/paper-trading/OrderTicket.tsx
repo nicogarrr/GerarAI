@@ -500,12 +500,16 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-side`}>{ti('paperTrading.ticket.sideLabel')}</Label>
+                    {/* flex-1 + px-2: a 4 columnas (sm:) la celda es estrecha;
+                        sin esto Compra/Venta desbordaban e invadian Cantidad
+                        (QA Release 19-nov-2026). */}
                     <div className="flex gap-2" role="group" aria-label={ti('paperTrading.ticket.sideGroup')}>
                         {(['buy', 'sell'] as const).map((value) => (
                             <Button
                                 key={value}
                                 type="button"
                                 size="sm"
+                                className="min-w-0 flex-1 px-2"
                                 variant={side === value ? 'default' : 'outline'}
                                 onClick={() => setSide(value)}
                                 aria-pressed={side === value}
