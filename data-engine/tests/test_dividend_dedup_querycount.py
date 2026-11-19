@@ -165,3 +165,35 @@ def test_legacy_path_ignores_other_sources(db, company):
     db.commit()
     service = _FakeService()
     assert service._existing_record(db, company, row) is None
+
+
+def test_failed_commit_rollback_retry_reingests(db, company, monkeypatch):
+    """Regresion Auditoria: commit fallido + rollback + reintento en la MISMA
+    sesion no debe dedupar contra fantasmas de la cache (perdida silenciosa).
+
+    La cache en db.info solo puede aprender los inserts tras un commit con
+    exito; si los aprende pendientes, el rollback los borra de la BD pero no
+    de la cache y el reintento reporta existing=N con la tabla vacia.
+    """
+    service = _FakeService()
+    real_commit = db.commit
+    calls = {"n": 0}
+
+    def fail_first_commit():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("commit caido (simulado)")
+        return real_commit()
+
+    monkeypatch.setattr(db, "commit", fail_first_commit)
+    with pytest.raises(RuntimeError, match="commit caido"):
+        asyncio.run(service.sync_company(db, ticker="PAYER"))
+    db.rollback()
+    result = asyncio.run(service.sync_company(db, ticker="PAYER"))
+    assert result["status"] == "ok"
+    assert result["inserted"] == N, (
+        f"reintento tras rollback perdio la ingesta: {result['inserted']} inserts, "
+        f"{result['existing']} 'existentes' fantasma"
+    )
+    assert result["existing"] == 0
+    assert db.query(DividendRecord).filter_by(company_id=company.id).count() == N

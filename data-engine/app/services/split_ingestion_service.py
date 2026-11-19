@@ -153,6 +153,13 @@ class ProviderIngestionService:
         Sin esto, una segunda sync de la MISMA compania en la misma sesion
         reutilizaria la lista precargada antes del insert y duplicaria filas
         que la busqueda por fila original siempre veia ya persistidas.
+
+        SOLO se llama tras un commit con exito: si la cache aprende filas
+        aun sin confirmar y el commit falla, un rollback posterior las
+        borra de la BD pero no de la cache; el reintento en la misma sesion
+        las trataria como existentes y la ingesta se perderia en silencio
+        (contraejemplo medido por Auditoria: 120 dividendos, commit fallido,
+        rollback, reintento -> inserted 0 con la tabla vacia).
         """
         company_records = db.info.get(cache_key, {}).get(company.id)
         if company_records is not None:
@@ -205,6 +212,7 @@ class ProviderIngestionService:
         inserted = 0
         existing = 0
         skipped: dict[str, int] = {}
+        new_records: list[Any] = []
         for row in rows:
             if not self._row_is_ingestible(row):
                 reason = self._skip_reason(row)
@@ -217,10 +225,15 @@ class ProviderIngestionService:
                 continue
             record = self._new_record(company, row, source, fetched_at)
             db.add(record)
-            if self._dedup_cache_key:
-                self._track_new_record(db, company, record, self._dedup_cache_key)
+            new_records.append(record)
             inserted += 1
         db.commit()
+        # La cache de dedup aprende los inserts SOLO cuando ya son filas
+        # reales: aprenderlos pendientes dejaba fantasmas tras un rollback
+        # (reintento en la misma sesion: existing=N, tabla vacia).
+        if self._dedup_cache_key:
+            for record in new_records:
+                self._track_new_record(db, company, record, self._dedup_cache_key)
         return {
             "ticker": company.ticker,
             "status": "ok",
