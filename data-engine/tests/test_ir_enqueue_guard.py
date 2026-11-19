@@ -85,8 +85,8 @@ def _run_ir(monkeypatch, *, tracked: list[str], known_urls: set[str], n_items: i
     )
     monkeypatch.setattr(
         dramatiq_app,
-        "_document_url_ingested",
-        lambda db_, url: url in known_urls,
+        "_document_urls_ingested",
+        lambda db_, urls: {u for u in urls if u in known_urls},
     )
     monkeypatch.setattr(dramatiq_app, "process_document", _FakeProcessDocument)
     monkeypatch.setattr(dramatiq_app, "_redis_client", lambda: _FakeRedis())
