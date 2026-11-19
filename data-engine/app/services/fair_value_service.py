@@ -436,10 +436,14 @@ def thesis_candidates(
         .join(ranked, ThesisVersion.id == ranked.c.id)
         .where(ranked.c.rank == 1)
     ).all()
+    # Empty latest-thesis set needs neither publication checks nor generation
+    # dependencies. Keep cold read paths away from thesis_service imports.
+    if not rows:
+        return {}
     reasons = thesis_withheld_reasons(db, list(rows))
     from app.services.thesis_service import engine_stale
 
-    freshness = _thesis_input_freshness(db, list(rows)) if rows else {}
+    freshness = _thesis_input_freshness(db, list(rows))
     # engine_stale: None = versión no registrada (tesis anterior a la señal):
     # no se afirma vigente ni desactualizado y NO desplaza la cifra revisada.
     model_current: dict[int, bool | None] = {}
