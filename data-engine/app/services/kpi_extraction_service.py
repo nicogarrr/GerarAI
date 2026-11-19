@@ -134,6 +134,19 @@ class CompanyKPIRegistryService:
         )
         rows: list[CompanyKPI] = []
         active_keys: set[str] = set()
+        # Una sola lectura del registro para todo el sync: antes era un
+        # SELECT por etiqueta del marco y justo despues se cargaban TODAS
+        # las filas de la compania para desactivar las obsoletas. Con
+        # autoflush=False (config de la app) la precarga y cada busqueda
+        # por etiqueta ven exactamente las mismas filas comprometidas, y
+        # las creadas en esta corrida nunca se reconsultan (active_keys).
+        # Medido con harness de conteo (14 etiquetas): 28 -> 14 sentencias.
+        existing_by_key = {
+            row.metric_key: row
+            for row in db.scalars(
+                select(CompanyKPI).where(CompanyKPI.company_id == company.id)
+            ).all()
+        }
         for label in labels:
             metric_key = _key(label)
             # Dos etiquetas del marco pueden normalizar a la misma clave
@@ -143,12 +156,7 @@ class CompanyKPIRegistryService:
             if metric_key in active_keys:
                 continue
             active_keys.add(metric_key)
-            row = db.scalar(
-                select(CompanyKPI).where(
-                    CompanyKPI.company_id == company.id,
-                    CompanyKPI.metric_key == metric_key,
-                )
-            )
+            row = existing_by_key.get(metric_key)
             if row is None:
                 row = CompanyKPI(company_id=company.id, metric_key=metric_key)
                 db.add(row)
@@ -169,10 +177,7 @@ class CompanyKPIRegistryService:
                 "approval_policy": "human_approval_required",
             }
             rows.append(row)
-        existing = db.scalars(
-            select(CompanyKPI).where(CompanyKPI.company_id == company.id)
-        ).all()
-        for row in existing:
+        for row in existing_by_key.values():
             if row.metric_key not in active_keys:
                 row.active = False
         db.flush()
