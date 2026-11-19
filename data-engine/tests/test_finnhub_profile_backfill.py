@@ -409,3 +409,46 @@ def test_backfill_error_de_transporte_cuenta_y_no_escribe_document(db):
     assert client.calls == 2  # quote + profile, ambas fallan
     assert pacer.cooldowns == []  # un fallo de red no cierra la ventana de nadie
     assert db.scalar(select(Document)) is None
+
+
+def test_backfill_market_cap_dedup_en_lote_sin_duplicar(db):
+    """El dedup de market_cap se hace en UNA consulta por corrida (set en
+    memoria) y sigue sin duplicar: un hecho ya escrito para la misma sesion
+    no se reinserta, y el de OTRA fuente/periodo no bloquea."""
+    from sqlalchemy import func
+
+    quote = {"c": 25.5, "t": int(datetime(2026, 10, 16, 20, 0, tzinfo=UTC).timestamp())}
+    profile = {
+        "name": "Real", "exchange": "NASDAQ NMS - GLOBAL MARKET", "currency": "USD",
+        "country": "US", "finnhubIndustry": "Technology", "marketCapitalization": 1234.0,
+    }
+    dup = _company(db, "DUP", exchange="NASDAQ")
+    new = _company(db, "NEW", exchange="NASDAQ")
+    # Hecho existente de la MISMA sesion para DUP: no se debe duplicar.
+    db.add(FinancialFact(
+        company_id=dup.id, metric="market_cap", value=Decimal("1"), unit="USD",
+        period="2026-10-16", source_id=None, source_type="Finnhub",
+        is_reported=True, confidence=Decimal("0.75"),
+    ))
+    # Hecho de OTRA fuente para NEW, mismo periodo: NO bloquea el de Finnhub.
+    db.add(FinancialFact(
+        company_id=new.id, metric="market_cap", value=Decimal("2"), unit="USD",
+        period="2026-10-16", source_id=None, source_type="Manual",
+        is_reported=True, confidence=Decimal("1"),
+    ))
+    db.commit()
+    client = _Client(quotes={"DUP": quote, "NEW": quote}, profiles={"DUP": profile, "NEW": profile})
+    result = FinnhubProfileBackfill(settings=_Settings(), client=client, pacer=_FakePacer()).backfill(
+        db, today=date(2026, 10, 17))
+    assert result["market_cap"] == 1  # solo NEW
+    rows = db.scalars(
+        select(FinancialFact).where(
+            FinancialFact.metric == "market_cap",
+            FinancialFact.source_type == "Finnhub",
+        )
+    ).all()
+    assert len(rows) == 2  # el preexistente de DUP + el nuevo de NEW
+    assert {r.company_id for r in rows} == {dup.id, new.id}
+    n_dup = db.scalar(select(func.count(FinancialFact.id)).where(
+        FinancialFact.company_id == dup.id, FinancialFact.source_type == "Finnhub"))
+    assert n_dup == 1  # sin duplicado
