@@ -47,21 +47,42 @@ def test_local_fallback_wait_yields_to_the_event_loop():
 
 
 def test_local_fallback_keeps_the_interval_between_concurrent_waiters():
-    pacer = GlobalPacer("fallback-concurrent", min_interval_seconds=0.1, redis_client_factory=lambda: None)
+    """Tiempo virtual: cada durmiente despierta EXACTAMENTE en su hueco, sin cotas
+    de pared (antes: marks con time.monotonic y gaps >= 0.08; un durmiente que
+    despertaba tarde con el loop cargado acercaba su marca a la del siguiente)."""
+    import heapq
+
+    now = [100.0]
+    pending: list = []
+    seq = [0]
+
+    async def sleep_async(seconds):
+        fut = asyncio.get_running_loop().create_future()
+        seq[0] += 1
+        heapq.heappush(pending, (now[0] + seconds, seq[0], fut))
+        await fut
+
+    pacer = GlobalPacer("fallback-concurrent", min_interval_seconds=0.1, redis_client_factory=lambda: None,
+                        monotonic=lambda: now[0], sleep_async=sleep_async)
 
     async def main() -> list[float]:
         marks: list[float] = []
 
         async def one():
             await pacer.wait()
-            marks.append(time.monotonic())
+            marks.append(now[0])
 
-        await asyncio.gather(one(), one(), one())
-        return sorted(marks)
+        tasks = [asyncio.create_task(one()) for _ in range(3)]
+        while not all(t.done() for t in tasks):
+            await asyncio.sleep(0)  # los durmientes ya estan en su sleep
+            if pending:
+                target, _, fut = heapq.heappop(pending)
+                now[0] = max(now[0], target)
+                fut.set_result(None)
+        return marks
 
     marks = asyncio.run(main())
-    assert marks[1] - marks[0] >= 0.08
-    assert marks[2] - marks[1] >= 0.08
+    assert [round(m - 100.0, 6) for m in marks] == [0.0, 0.1, 0.2]  # un hueco por waiter, a su hora
 
 
 def test_local_fallback_revalidates_cooldown_arriving_during_the_wait():
