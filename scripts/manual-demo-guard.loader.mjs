@@ -29,6 +29,7 @@ const REAL = {
     '@/lib/market/quote-freshness': '../lib/market/quote-freshness.ts',
     '@/lib/market/quote-cache': '../lib/market/quote-cache.ts',
     '@/lib/market/cboe-options': '../lib/market/cboe-options.ts',
+    '@/lib/market/cboe-chain-cache': '../lib/market/cboe-chain-cache.ts',
 };
 
 export async function resolve(specifier, context, nextResolve) {

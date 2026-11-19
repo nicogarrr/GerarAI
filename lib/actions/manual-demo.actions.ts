@@ -39,7 +39,8 @@ import { formatNumber } from '@/lib/format';
 import { mapBackendYahooQuote, sanitizeFinnhubQuote } from '@/lib/market/quote-freshness';
 import { researchIdentityHeaders } from '@/lib/auth/research-identity';
 import { combineAbortSignals, createQuoteCache, type CachedQuote, type QuoteFetchAttempt } from '@/lib/market/quote-cache';
-import { cboeContractKey, createCboeChainCache, type CachedCboeChain } from '@/lib/market/cboe-options';
+import { cboeContractKey, type CachedCboeChain } from '@/lib/market/cboe-options';
+import { sharedCboeChainCache } from '@/lib/market/cboe-chain-cache';
 import {
     parseListingCurrencies,
     symbolFromKey,
@@ -823,12 +824,12 @@ async function finnhubOnlyQuote(symbol: string, signal?: AbortSignal): Promise<Q
 const valuationQuoteCache = createQuoteCache();
 
 /**
- * Caché dedupe de cadenas de opciones de CBOE (lib/market/cboe-options.ts):
- * misma disciplina que valuationQuoteCache pero por SUBYACENTE (la cadena
- * entera, ~0,5 MB, sirve a todos los contratos de ese subyacente de la
- * cuenta). TTL 60 s, máx. 8 fetches en curso, backoff con Retry-After.
+ * Caché dedupe de cadenas de opciones de CBOE: la instancia COMPARTIDA de
+ * lib/market/cboe-chain-cache.ts (misma disciplina que valuationQuoteCache
+ * pero por SUBYACENTE; la cadena entera, ~0,5 MB, sirve a todos los
+ * contratos de ese subyacente y también al selector guiado del ticket).
  */
-const cboeChainCache = createCboeChainCache();
+const cboeChainCache = sharedCboeChainCache;
 
 /** Tope de subyacentes de opción consultados por valoración (cadenas pesadas). */
 const MAX_OPTION_UNDERLYINGS = 10;

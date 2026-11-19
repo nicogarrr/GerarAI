@@ -14,10 +14,13 @@ import { expirationState, isRealDate } from '@/lib/paper-trading/options';
 import { clientOrderIdAfter, parseEsNumber } from './submit';
 import { invalidMessage, TicketFeedbackMessages, useExecutedAtLocal, type FieldInvalid } from './ticket-feedback';
 import type { DemoStateView, FillSubmit, SubmitFill } from './submit';
+import type { DemoOptionChainOk, DemoOptionChainResult } from '@/lib/paper-trading/option-chain-view';
 
 type Kind = 'accion' | 'opcion';
 
 const EXPIRY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+
 
 function newClientOrderId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -39,11 +42,15 @@ function newClientOrderId(): string {
  * Guiado (Nico, 21-oct-2026): el simbolo/subyacente se busca por nombre o
  * ticker con el TickerSearchInput compartido (misma busqueda real que el
  * buscador global) y al elegir se rellenan simbolo y nombre; el resto del
- * ticket sigue manual porque registra una operacion YA ejecutada. No hay
- * selector de cadena de opciones: sin fuente gratuita verificable de
- * strikes/vencimientos, la identidad del contrato queda manual y etiquetada.
- * La divisa nunca se preselecciona desde el buscador (su exchange no es
- * prueba de divisa): el toggle manual manda.
+ * ticket sigue manual porque registra una operacion YA ejecutada.
+ * Selector guiado de contrato de opción: con la cadena REAL diferida de
+ * CBOE (>= 15 min, vía la acción demo-option-chain) el usuario elige
+ * vencimiento y strike de contratos listados de verdad; la última
+ * operación del contrato se muestra como referencia ETIQUETADA (nunca
+ * como precio actual: el precio de la orden lo escribe el usuario) y la
+ * vía manual queda siempre disponible. La divisa nunca se preselecciona
+ * desde el buscador (su exchange no es prueba de divisa): el toggle
+ * manual manda.
  *
  * Guiado con datos REALES de la cuenta (prop `account`, del servidor): el
  * ticket muestra el saldo disponible en la divisa elegida y, cuando el
@@ -53,7 +60,7 @@ function newClientOrderId(): string {
  * saldo/posición sigue siendo solo del servidor; esto es información, no
  * una barrera. Sin `account` no se muestra nada (nunca se inventa).
  */
-export function OrderTicket({ submitFill, disabled, account = null }: { submitFill: SubmitFill; disabled?: boolean; account?: DemoStateView | null }) {
+export function OrderTicket({ submitFill, disabled, account = null, fetchOptionChain = null }: { submitFill: SubmitFill; disabled?: boolean; account?: DemoStateView | null; fetchOptionChain?: ((underlying: string) => Promise<DemoOptionChainResult>) | null }) {
     const ti = useT();
     const locale = useLocale();
     const f = useFormat();
@@ -73,6 +80,22 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
     const [strike, setStrike] = useState('');
     const [expiry, setExpiry] = useState('');
 
+    // Selector guiado de contrato (cadena CBOE diferida): solo consulta a
+    // petición del usuario; un error nunca bloquea la vía manual.
+    const [chain, setChain] = useState<DemoOptionChainOk | null>(null);
+    const [chainError, setChainError] = useState<string | null>(null);
+    const [chainLoading, setChainLoading] = useState(false);
+    // Secuencia de peticiones de cadena: editar/elegir símbolo invalida la
+    // petición en vuelo; una resolución obsoleta (ok, error o finally) se
+    // descarta y nunca repinta selects del subyacente anterior.
+    const chainSeq = useRef(0);
+    function invalidateChain() {
+        chainSeq.current += 1;
+        setChain(null);
+        setChainError(null);
+        setChainLoading(false);
+    }
+
     const [executedAtLocal, setExecutedAtLocal] = useExecutedAtLocal();
     const [invalid, setInvalid] = useState<FieldInvalid>(null);
     // Feedback del envío (rechazo/fallo de la acción): persiste hasta el próximo envío.
@@ -90,6 +113,8 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
         selectedSymbol.current = stock.symbol;
         setSymbol(stock.symbol);
         setName(stock.name);
+        // La cadena cargada (o en vuelo) era del subyacente anterior: se descarta.
+        invalidateChain();
     }
     // Si tras elegir se EDITA el simbolo, el nombre autocompletado ya no
     // corresponde: se limpia para no registrar una empresa con el nombre de
@@ -99,8 +124,75 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
             selectedSymbol.current = null;
             setName('');
         }
+        invalidateChain();
         setSymbol(value);
     }
+
+    // Razón de fallo -> texto i18n con claves LITERALES (el checker de uso
+    // i18n no sigue claves compuestas en runtime).
+    function chainErrorMessage(ti: ReturnType<typeof useT>, reason: string): string {
+        switch (reason) {
+            case 'invalidSymbol': return ti('paperTrading.ticket.chainError.invalidSymbol');
+            case 'notCovered': return ti('paperTrading.ticket.chainError.notCovered');
+            case 'saturated': return ti('paperTrading.ticket.chainError.saturated');
+            case 'noAuth': return ti('paperTrading.ticket.chainError.noAuth');
+            default: return ti('paperTrading.ticket.chainError.sourceUnavailable');
+        }
+    }
+
+    async function onLoadChain() {
+        if (!fetchOptionChain || chainLoading) return;
+        const seq = ++chainSeq.current;
+        setChainLoading(true);
+        setChainError(null);
+        try {
+            const result = await fetchOptionChain(symbol);
+            if (seq !== chainSeq.current) return; // respuesta obsoleta: símbolo ya cambió
+            if (result.ok && result.underlying === symbol.trim().toUpperCase()) {
+                setChain(result);
+            } else if (result.ok) {
+                setChain(null);
+                setChainError(ti('paperTrading.ticket.chainError.sourceUnavailable'));
+            } else {
+                setChain(null);
+                setChainError(chainErrorMessage(ti, result.reason));
+            }
+        } catch {
+            if (seq !== chainSeq.current) return;
+            setChain(null);
+            setChainError(ti('paperTrading.ticket.chainError.sourceUnavailable'));
+        } finally {
+            if (seq === chainSeq.current) setChainLoading(false);
+        }
+    }
+
+    // ¿Cubre la cadena cargada el subyacente del ticket? Si el usuario edita
+    // el símbolo tras consultar, la cadena se descarta; este candado evita
+    // además juzgar un contrato contra la cadena de OTRO subyacente.
+    const chainCoversSymbol = chain !== null && chain.underlying === symbol.trim().toUpperCase();
+
+    // Referencia de la última operación del contrato elegido (si la cadena
+    // la registra). Es dato DIFERIDO de CBOE, nunca el precio actual.
+    // chainListed: false = el par vencimiento/strike NO aparece en la muestra
+    // consultada (aviso, no error: puede existir fuera de los vencimientos
+    // mostrados o haberse escrito a mano).
+    const { chainRef, chainListed } = (() => {
+        if (!chainCoversSymbol || !chain || !expiry) return { chainRef: undefined, chainListed: undefined };
+        const parsed = parseEsNumber(strike);
+        if (!Number.isFinite(parsed)) return { chainRef: undefined, chainListed: undefined };
+        const row = chain.expiries.find((e) => e.expiry === expiry)?.strikes.find((r) => r.strike === parsed);
+        if (!row) return { chainRef: undefined, chainListed: false };
+        // Presencia POR TIPO: lado ausente = contrato NO listado (aviso);
+        // lado null = listado sin operación; objeto = última operación.
+        const sideRow = row[callPut];
+        if (sideRow === undefined) return { chainRef: undefined, chainListed: false };
+        return { chainRef: sideRow, chainListed: true };
+    })();
+
+    // Strikes ofrecidos: solo los que tienen EL TIPO elegido listado en la
+    // fuente (un strike con solo call no se ofrece para put).
+    const chainStrikesForKind = (expiryRow: DemoOptionChainOk['expiries'][number] | undefined) =>
+        (expiryRow?.strikes ?? []).filter((r) => r[callPut] !== undefined);
 
     const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, executedAtLocal]);
     const validationError = invalidMessage(invalid, fieldKey);
@@ -310,6 +402,7 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
             </div>
 
             {kind === 'opcion' ? (
+                <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <div className="space-y-1.5">
                         <Label htmlFor={`${uid}-callput`}>{ti('paperTrading.ticket.callPutLabel')}</Label>
@@ -355,17 +448,91 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
                         <p className="text-xs text-gray-500">{ti('paperTrading.ticket.expiryHint')}</p>
                     </div>
                 </div>
+                {fetchOptionChain ? (
+                    <div className="space-y-2 rounded-lg border border-gray-800 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-gray-400">{ti('paperTrading.ticket.chainHint')}</p>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={chainLoading || !symbol.trim()}
+                                onClick={onLoadChain}
+                            >
+                                {chainLoading ? ti('paperTrading.ticket.chainLoading') : ti('paperTrading.ticket.chainLoad')}
+                            </Button>
+                        </div>
+                        {chainError ? <p className="text-xs text-amber-400">{chainError}</p> : null}
+                        {chain && chainCoversSymbol ? (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor={`${uid}-chain-expiry`}>{ti('paperTrading.ticket.chainExpiry')}</Label>
+                                    <select
+                                        id={`${uid}-chain-expiry`}
+                                        className="w-full rounded-md border border-gray-800 bg-transparent px-2 text-base sm:text-sm"
+                                        style={{ minHeight: 44 }}
+                                        value={chain.expiries.some((e) => e.expiry === expiry) ? expiry : ''}
+                                        onChange={(event) => setExpiry(event.target.value)}
+                                    >
+                                        <option value="" disabled>{ti('paperTrading.ticket.chainExpiryPh')}</option>
+                                        {chain.expiries.map((e) => (
+                                            <option key={e.expiry} value={e.expiry}>{e.expiry}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor={`${uid}-chain-strike`}>{ti('paperTrading.ticket.chainStrike')}</Label>
+                                    <select
+                                        id={`${uid}-chain-strike`}
+                                        className="w-full rounded-md border border-gray-800 bg-transparent px-2 text-base sm:text-sm"
+                                        style={{ minHeight: 44 }}
+                                        value={(() => {
+                                            const strikes = chainStrikesForKind(chain.expiries.find((e) => e.expiry === expiry));
+                                            return strikes.some((r) => String(r.strike) === strike) ? strike : '';
+                                        })()}
+                                        onChange={(event) => {
+                                            if (event.target.value) setStrike(event.target.value);
+                                        }}
+                                    >
+                                        <option value="" disabled>{ti('paperTrading.ticket.chainStrikePh')}</option>
+                                        {chainStrikesForKind(chain.expiries.find((e) => e.expiry === expiry) ?? chain.expiries[0]).map((r) => (
+                                            <option key={r.strike} value={String(r.strike)}>{r.strike}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <p className="col-span-2 text-xs text-gray-500">
+                                    {ti('paperTrading.ticket.chainFetchedAt', { time: new Date(chain.fetchedAt).toLocaleTimeString(locale) })}
+                                </p>
+                                {chainListed === false ? (
+                                    <p className="col-span-2 text-xs text-amber-400">{ti('paperTrading.ticket.chainNotListed')}</p>
+                                ) : null}
+                                {chainRef !== undefined ? (
+                                    <p className="col-span-2 text-xs text-gray-500">
+                                        {chainRef
+                                            ? ti('paperTrading.ticket.chainRefTrade', { price: chainRef.price, time: chainRef.time.replace('T', ' ') })
+                                            : ti('paperTrading.ticket.chainNoTrade')}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
+                </>
             ) : null}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 <div className="space-y-1.5">
                     <Label htmlFor={`${uid}-side`}>{ti('paperTrading.ticket.sideLabel')}</Label>
+                    {/* flex-1 + px-2: a 4 columnas (sm:) la celda es estrecha;
+                        sin esto Compra/Venta desbordaban e invadian Cantidad
+                        (QA Release 19-nov-2026). */}
                     <div className="flex gap-2" role="group" aria-label={ti('paperTrading.ticket.sideGroup')}>
                         {(['buy', 'sell'] as const).map((value) => (
                             <Button
                                 key={value}
                                 type="button"
                                 size="sm"
+                                className="min-w-0 flex-1 px-2"
                                 variant={side === value ? 'default' : 'outline'}
                                 onClick={() => setSide(value)}
                                 aria-pressed={side === value}

@@ -11,6 +11,7 @@ import {
     placeManualOrder,
 } from '@/lib/actions/manual-demo.actions';
 import { getManualDemoHistory } from '@/lib/actions/manual-demo.actions';
+import { getDemoOptionChain } from '@/lib/actions/demo-option-chain.actions';
 import type { RefreshResult } from '@/components/paper-trading/ManualDemoPanel';
 import { getT } from '@/lib/i18n/server';
 import type { DemoValuation } from '@/lib/market/demo-valuation';
@@ -258,6 +259,7 @@ export default async function PaperTradingPage() {
                 loadMoreHistory={loadMoreHistory}
                 submitFill={submitFill}
                 submitFx={submitFx}
+                fetchOptionChain={getDemoOptionChain}
                 valuation={valuation}
                 valuationAsOf={valuationAsOf}
                 refreshValuation={refreshValuation}

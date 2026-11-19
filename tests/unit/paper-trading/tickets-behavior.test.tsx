@@ -76,6 +76,157 @@ describe('manual fill ticket', () => {
     });
 });
 
+describe('guided option chain picker (CBOE delayed chain)', () => {
+    const chainOk = {
+        ok: true as const,
+        underlying: 'MSFT',
+        fetchedAt: 1_763_000_000_000,
+        expiries: [
+            { expiry: '2026-12-18', strikes: [
+                { strike: 400, call: { price: 12.3, time: '2026-11-17T15:47:12' }, put: null },
+                { strike: 410, call: null, put: null },
+            ] },
+        ],
+    };
+    const renderOptionTicket = (fetchOptionChain: (u: string) => Promise<unknown>) => {
+        const view = render(<LocaleProvider locale="en"><OrderTicket submitFill={vi.fn()} fetchOptionChain={fetchOptionChain as never} /></LocaleProvider>);
+        fireEvent.click(screen.getByRole('button', { name: /option/i }));
+        fireEvent.click(screen.getByRole('button', { name: 'Select Microsoft' }));
+        return view;
+    };
+    it('loads the chain on demand and picking expiry+strike fills the manual fields', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        expect(fetchOptionChain).toHaveBeenCalledWith('MSFT');
+        const expirySelect = await screen.findByLabelText(/expiry \(chain\)/i);
+        fireEvent.change(expirySelect, { target: { value: '2026-12-18' } });
+        fireEvent.change(screen.getByLabelText(/strike \(chain\)/i), { target: { value: '400' } });
+        expect((screen.getByLabelText('Strike') as HTMLInputElement).value).toBe('400');
+        expect((screen.getByLabelText(/expiry/i, { selector: 'input' }) as HTMLInputElement).value).toBe('2026-12-18');
+        expect(screen.getByText(/last delayed trade: 12.3 USD/i)).toBeInTheDocument();
+        // El precio de la orden NUNCA se autorrellena desde la cadena.
+        expect((screen.getByLabelText(/premium per share/i) as HTMLInputElement).value).toBe('');
+    });
+    it('a contract without a recorded trade says so instead of inventing a premium', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        const expirySelect = await screen.findByLabelText(/expiry \(chain\)/i);
+        fireEvent.change(expirySelect, { target: { value: '2026-12-18' } });
+        fireEvent.change(screen.getByLabelText(/strike \(chain\)/i), { target: { value: '410' } });
+        expect(screen.getByText(/no recorded trade in this chain/i)).toBeInTheDocument();
+    });
+    it('a source failure is labelled and the manual inputs stay available', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue({ ok: false, reason: 'sourceUnavailable' });
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        expect(await screen.findByText(/not responding right now/i)).toBeInTheDocument();
+        expect(screen.getByLabelText('Strike')).toBeInTheDocument();
+        expect(screen.queryByLabelText(/strike \(chain\)/i)).not.toBeInTheDocument();
+    });
+    it('warns when the typed contract is not in the fetched chain sample, without blocking it', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        const expirySelect = await screen.findByLabelText(/expiry \(chain\)/i);
+        fireEvent.change(expirySelect, { target: { value: '2026-12-18' } });
+        // Strike escrito a mano que no esta en la muestra: aviso, no error.
+        fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '999' } });
+        expect(screen.getByText(/not in the fetched sample/i)).toBeInTheDocument();
+        // Vuelve a un strike listado: el aviso desaparece.
+        fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '400' } });
+        expect(screen.queryByText(/not in the fetched sample/i)).not.toBeInTheDocument();
+    });
+    it('labels when the chain was fetched', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        expect(await screen.findByText(/chain fetched at/i)).toBeInTheDocument();
+    });
+    it('never judges a contract against another underlying chain: editing the symbol discards it', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        await screen.findByLabelText(/expiry \(chain\)/i);
+        fireEvent.change(screen.getByLabelText(/symbol|ticker/i), { target: { value: 'AAPL' } });
+        expect(screen.queryByLabelText(/expiry \(chain\)/i)).not.toBeInTheDocument();
+    });
+    it('discards a stale chain response that resolves after the symbol changed (no repaint over the new ticket)', async () => {
+        let resolveChain!: (r: unknown) => void;
+        const fetchOptionChain = vi.fn(() => new Promise((r) => { resolveChain = r; }));
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        expect(fetchOptionChain).toHaveBeenCalledWith('MSFT');
+        // Símbolo cambia a AAPL con la petición de MSFT aún pendiente.
+        fireEvent.change(screen.getByLabelText(/symbol|ticker/i), { target: { value: 'AAPL' } });
+        await act(async () => { resolveChain(chainOk); });
+        // La respuesta tardía de MSFT no repinta expiry/strike sobre el ticket de AAPL...
+        expect(screen.queryByLabelText(/expiry \(chain\)/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/strike \(chain\)/i)).not.toBeInTheDocument();
+        // ...y el botón queda libre para pedir la cadena del nuevo símbolo.
+        expect(screen.getByRole('button', { name: /show real chain/i })).toBeEnabled();
+    });
+    it('a stale chain failure after the symbol changed paints no error and frees the button', async () => {
+        let rejectChain!: (e: unknown) => void;
+        const fetchOptionChain = vi.fn(() => new Promise((_r, j) => { rejectChain = j; }));
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        fireEvent.change(screen.getByLabelText(/symbol|ticker/i), { target: { value: 'AAPL' } });
+        await act(async () => { rejectChain(new Error('late network failure')); });
+        expect(screen.queryByText(/not responding right now/i)).not.toBeInTheDocument();
+        expect(screen.queryByLabelText(/expiry \(chain\)/i)).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /show real chain/i })).toBeEnabled();
+    });
+    it('a chain whose underlying does not match the symbol never renders its selects', async () => {
+        const mismatched = { ...chainOk, underlying: 'AAPL' }; // respuesta de otro subyacente
+        const fetchOptionChain = vi.fn().mockResolvedValue(mismatched);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        expect(screen.queryByLabelText(/expiry \(chain\)/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/not responding right now/i)).toBeInTheDocument();
+    });
+    it('a strike listed only as call is not offered nor validated as put (per-side presence)', async () => {
+        const asymChain = {
+            ...chainOk,
+            expiries: [
+                { expiry: '2026-12-18', strikes: [
+                    { strike: 400, call: { price: 16.1, time: '2026-11-17T15:47:12' } }, // put AUSENTE: no listado
+                ] },
+            ],
+        };
+        const fetchOptionChain = vi.fn().mockResolvedValue(asymChain);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        const expirySelect = await screen.findByLabelText(/expiry \(chain\)/i);
+        fireEvent.change(expirySelect, { target: { value: '2026-12-18' } });
+        // Con Call el strike 400 se ofrece; al pasar a Put desaparece del select...
+        const strikeSelect = screen.getByLabelText(/strike \(chain\)/i);
+        expect(strikeSelect.querySelector('option[value="400"]')).not.toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'Put' }));
+        expect(strikeSelect.querySelector('option[value="400"]')).toBeNull();
+        // ...y si se escribe a mano, el aviso es "no listado", nunca "sin operacion".
+        fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '400' } });
+        expect(screen.getByText(/not in the fetched sample/i)).toBeInTheDocument();
+        expect(screen.queryByText(/no recorded trade in this chain/i)).not.toBeInTheDocument();
+        // De vuelta a Call: listado de verdad y con su referencia.
+        fireEvent.click(screen.getByRole('button', { name: 'Call' }));
+        expect(screen.queryByText(/not in the fetched sample/i)).not.toBeInTheDocument();
+        expect(screen.getByText(/last delayed trade: 16.1 USD/i)).toBeInTheDocument();
+    });
+    it('a rejected fetch (throw) degrades to the same honest note', async () => {
+        const fetchOptionChain = vi.fn().mockRejectedValue(new Error('network'));
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        expect(await screen.findByText(/not responding right now/i)).toBeInTheDocument();
+    });
+    it('without the chain action wired, the picker is not offered', () => {
+        render(<LocaleProvider locale="en"><OrderTicket submitFill={vi.fn()} /></LocaleProvider>);
+        fireEvent.click(screen.getByRole('button', { name: /option/i }));
+        expect(screen.queryByRole('button', { name: /show real chain/i })).not.toBeInTheDocument();
+    });
+});
+
 describe.each(['stock', 'fx'] as const)('%s feedback and idempotency', kind => {
     it.each([['filled', null, false], ['rejected', 'Insufficient cash', false], ['duplicate', 'Insufficient cash', false], ['duplicate', null, true]] as const)('%s reason=%s keeps id=%s for the next attempt', async (outcome, reason, keepsId) => {
         const submit = vi.fn().mockResolvedValue(result(outcome, reason)); const ui = setup(kind, submit); ui.fill(); await ui.send();
