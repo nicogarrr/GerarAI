@@ -317,7 +317,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
         <div className="grid gap-6">
 
 
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
+            <Card>
                 <CardHeader className="border-b border-gray-700/50 pb-4">
                     <div className="flex items-center gap-3">
                         <Gauge className="h-5 w-5 text-teal-400" aria-hidden="true" />
@@ -363,7 +363,7 @@ export default function RiskDashboardView({ initialDashboard }: RiskDashboardVie
                 emptyMessage={t('risk.summary.empty')}
             />
 
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
+            <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 border-b border-gray-700/50 pb-4">
                     <div className="flex items-center gap-3">
                         <Briefcase className="h-5 w-5 text-teal-400" aria-hidden="true" />

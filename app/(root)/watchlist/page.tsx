@@ -558,7 +558,7 @@ export default async function WatchlistPage({
                     </CardContent>
                 </Card>
             ) : watchlistStocks.length === 0 ? (
-                <Card className="border-gray-700 bg-gray-800/50">
+                <Card>
                     <CardContent className="flex flex-col items-center justify-center px-4 py-12 text-center sm:py-16">
                         <Eye className="mb-4 h-12 w-12 text-gray-500 sm:h-16 sm:w-16" aria-hidden="true" />
                         <h2 className="mb-2 text-lg font-semibold text-gray-300 sm:text-xl">{t('watchlist.page.empty.title')}</h2>

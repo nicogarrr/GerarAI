@@ -79,7 +79,7 @@ export default function GemsView() {
             </p>
 
             {gems !== null && gems.length === 0 && !error && (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
+                <Card className="p-6 text-center">
                     <p className="font-medium text-gray-300">{t('propicks.gems.emptyTitle')}</p>
                     <p className="mt-2 text-sm text-gray-500">
                         {t('propicks.gems.emptyDescription')}

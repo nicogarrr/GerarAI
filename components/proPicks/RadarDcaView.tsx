@@ -89,7 +89,7 @@ function OpportunityCard({ item }: { item: RadarDcaOpportunity }) {
     const locale = useLocale();
     return (
         <li>
-            <Card className="space-y-2 rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+            <Card className="space-y-2 p-4">
                 <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                         <span className="font-semibold text-gray-100">{item.ticker}</span>
@@ -215,7 +215,7 @@ export default function RadarDcaView() {
             )}
 
             {!loading && !error && result && result.items.length === 0 && (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-sm text-gray-400">
+                <Card className="p-6 text-sm text-gray-400">
                     {t('propicks.radarDca.empty')}
                 </Card>
             )}

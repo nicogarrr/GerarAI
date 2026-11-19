@@ -107,7 +107,7 @@ export default function TrackRecordView() {
     }, []);
 
     return (
-        <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+        <Card className="p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                     <h4 className="flex items-center gap-2 text-base font-bold text-gray-100">

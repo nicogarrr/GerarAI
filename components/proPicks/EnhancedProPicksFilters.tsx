@@ -75,7 +75,7 @@ export default function EnhancedProPicksFilters({ filters, disabled = false, neu
     .filter((key) => filters[key] !== DEFAULT_FILTERS[key]).length;
 
   return (
-    <Card className="w-full min-w-0 border-gray-700 bg-gray-800/50">
+    <Card className="w-full min-w-0">
       <fieldset disabled={disabled} className="contents">
         <CardHeader>
           <div className="flex items-center justify-between gap-2">

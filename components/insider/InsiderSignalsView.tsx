@@ -276,7 +276,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                             {analyzedCountCopy(initialResult.status, initialResult, (v) => countText(f, v), f.locale)}).
                         </p>
                     ) : (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
+                <Card>
                     <CardHeader className="flex flex-col gap-3 space-y-0 border-b border-gray-700/50 pb-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-3">
                             <Users aria-hidden="true" className="h-5 w-5 text-teal-400" />
@@ -397,7 +397,7 @@ export default function InsiderSignalsView({ initialTicker, initialResult, initi
                 </>
             )}
             {initialTicker && initialFilings && initialFilings.status === 'ok' && initialFilings.filings.length > 0 ? (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50">
+                <Card>
                     <CardHeader className="border-b border-gray-700/50 pb-4">
                         <CardTitle className="text-lg font-semibold text-gray-100">
                             {ti('insider.filings.title', { count: String(initialFilings.total ?? initialFilings.count) })}

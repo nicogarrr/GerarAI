@@ -110,7 +110,7 @@ export default function StrategyFactsheet({
 
     if (!available) {
         return (
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
+            <Card className="p-6 text-center">
                 <Badge variant="outline" className="mb-3 border-amber-500/50 text-amber-300">
                     {t('propicks.factsheet.unavailableBadge')}
                 </Badge>
@@ -126,7 +126,7 @@ export default function StrategyFactsheet({
 
     if (loading && !backtest) {
         return (
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6 text-center">
+            <Card className="p-6 text-center">
                 <p className="text-sm text-gray-400">{t('propicks.factsheet.loading', { name })}</p>
             </Card>
         );
@@ -137,7 +137,7 @@ export default function StrategyFactsheet({
 
     if ((error && !backtest) || !hasWalkForward) {
         return (
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-6">
+            <Card className="p-6">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-semibold text-gray-100">{name}</h3>
                     <Badge variant="outline" className="border-gray-600 text-gray-300">
@@ -192,7 +192,7 @@ export default function StrategyFactsheet({
     const period = m.period;
 
     return (
-        <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-6">
+        <Card className="p-4 sm:p-6">
             <div className="mb-1 flex flex-wrap items-center gap-2">
                 <h3 className="text-lg font-semibold text-gray-100">{name}</h3>
                 <Badge variant="outline" className="border-teal-500/50 text-teal-300">

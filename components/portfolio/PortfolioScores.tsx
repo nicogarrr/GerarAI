@@ -29,7 +29,7 @@ export default function PortfolioScores({ scores }: PortfolioScoresProps) {
     const missing = scoreItems.filter((item) => item.value == null).map((item) => item.label);
 
     return (
-        <Card className="bg-gray-800/50 border-gray-700">
+        <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle as="h2" className="text-lg text-gray-100">{ti('portfolio.scoresExtra.title')}</CardTitle>
                 <Link href="/metodologia" className="inline-flex min-h-[44px] items-center text-sm text-purple-300 underline-offset-2 hover:text-purple-200 hover:underline">

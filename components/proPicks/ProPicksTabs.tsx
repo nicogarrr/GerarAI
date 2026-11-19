@@ -216,7 +216,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 pestañas obligaba a saltar para ver si el rebalanceo que se
                 leía era el de la estrategia elegida. */}
             <TabsContent value="estrategia" className="mt-6 space-y-4">
-                <Card className="flex min-w-0 flex-col gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4 md:flex-row md:items-center md:justify-between">
+                <Card className="flex min-w-0 flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
                     <StrategySelector
                         strategies={strategies.map((s) => localizeStrategy(s, locale, t))}
                         catalog={STRATEGY_CATALOG.map((s) => localizeStrategy(s, locale, t))}
@@ -250,7 +250,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                     es la evidencia que de verdad le importa a Nico. */}
                 <TrackRecordView />
 
-                <Card className="flex min-w-0 flex-col gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4 md:flex-row md:items-center md:justify-between">
+                <Card className="flex min-w-0 flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between">
                     <p className="max-w-xl text-sm leading-6 text-gray-400">
                         {t('propicks.tabs.baselineNote')}
                     </p>
@@ -301,7 +301,7 @@ export default function ProPicksTabs({ strategies, initialPicks, generatedAt, pa
                 {walkForward && !loading && <WalkForwardResults result={walkForward} />}
 
                 {!loading && !error && !walkForward && (
-                    <Card className="flex flex-col items-center gap-3 rounded-lg border border-gray-700 bg-gray-800/50 p-10 text-gray-500">
+                    <Card className="flex flex-col items-center gap-3 p-10 text-gray-500">
                         <BarChart3 aria-hidden="true" className="h-10 w-10 text-gray-500" />
                         <p className="text-sm">{t('propicks.tabs.backtestEmpty')}</p>
                     </Card>

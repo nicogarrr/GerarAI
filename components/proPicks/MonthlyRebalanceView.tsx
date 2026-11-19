@@ -153,7 +153,7 @@ export default function MonthlyRebalanceView({
 
     return (
         <div className="space-y-4">
-            <Card className="flex min-w-0 flex-col gap-4 rounded-lg border border-gray-700 bg-gray-800/50 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <Card className="flex min-w-0 flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                         <ArrowRightLeft className="h-5 w-5 text-teal-400" />
@@ -204,7 +204,7 @@ export default function MonthlyRebalanceView({
             </Card>
 
             {picksStatus === 'loading' && (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4 text-center">
+                <Card className="p-4 text-center">
                     <p className="text-sm text-gray-400">{t('propicks.rebalance.loadingPicks')}</p>
                 </Card>
             )}
@@ -229,7 +229,7 @@ export default function MonthlyRebalanceView({
             )}
 
             {picksStatus !== 'ready' ? null : !diff.hasPrevious ? (
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                <Card className="p-4">
                     <div className="mb-3 flex flex-wrap items-center gap-2">
                         <h4 className="text-sm font-semibold text-gray-200">
                             {t('propicks.rebalance.currentSelection', { month: monthLabel(month, locale) })}
@@ -251,7 +251,7 @@ export default function MonthlyRebalanceView({
             ) : (
                 <>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                <Card className="p-4">
                     <div className="mb-3 flex items-center gap-2">
                         <h4 className="text-sm font-semibold text-gray-200">{t('propicks.rebalance.entered')}</h4>
                         <Badge variant="outline" className="border-green-500/50 text-green-300">
@@ -260,7 +260,7 @@ export default function MonthlyRebalanceView({
                     </div>
                     <MoveList moves={diff.entered} tone="in" />
                 </Card>
-                <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+                <Card className="p-4">
                     <div className="mb-3 flex items-center gap-2">
                         <h4 className="text-sm font-semibold text-gray-200">{t('propicks.rebalance.exited')}</h4>
                         <Badge variant="outline" className="border-red-500/50 text-red-300">
@@ -271,7 +271,7 @@ export default function MonthlyRebalanceView({
                 </Card>
             </div>
 
-            <Card className="rounded-lg border border-gray-700 bg-gray-800/50 p-4">
+            <Card className="p-4">
                 <p className="text-sm text-gray-400">
                     {t('propicks.rebalance.kept', { count: formatNumber(diff.kept.length, { maximumFractionDigits: 0 }) })}
                     {diff.kept.length > 0 && (

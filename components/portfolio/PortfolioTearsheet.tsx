@@ -21,7 +21,7 @@ export default function PortfolioTearsheet({ tearsheet }: Props) {
 
     if (!tearsheet || !metrics || metrics.n_observations < 2) {
         return (
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
                 <CardHeader className="pb-2">
                     <CardTitle className="text-lg text-gray-100">{ti('portfolio.tearsheetExtra.title')}</CardTitle>
                 </CardHeader>
@@ -43,7 +43,7 @@ export default function PortfolioTearsheet({ tearsheet }: Props) {
     ];
 
     return (
-        <Card className="bg-gray-800/50 border-gray-700">
+        <Card>
             <CardHeader className="pb-2">
                 <CardTitle className="text-lg text-gray-100">{ti('portfolio.tearsheetExtra.title')}</CardTitle>
             </CardHeader>

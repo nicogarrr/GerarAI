@@ -544,7 +544,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
                 portfolioSummary detrás): leer valor y frase juntos es una decisión,
                 no dos. Si la lectura de cartera falla, la tarjeta es la que muestra
                 el error y su reintento, porque es la dueña del dato. */}
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Wallet aria-hidden="true" className="h-5 w-5 text-blue-400" />
@@ -655,7 +655,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
             <HomeAttention />
 
             {/* 2 · Alertas: la sección que faltaba en el inicio pese a existir /alerts. */}
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <BellRing aria-hidden="true" className="h-5 w-5 text-amber-400" />
@@ -758,7 +758,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
             {afterAlerts}
 
             {/* 3 · Watchlist: mirada de 3 filas. La lista completa es /watchlist. */}
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Eye aria-hidden="true" className="h-5 w-5 text-yellow-400" />
@@ -835,7 +835,7 @@ function PersonalizedOverviewForUser({ userId, afterAlerts }: PersonalizedOvervi
 
             {/* 4 · Oportunidades por valor intrínseco. Mientras carga, o sin candidatas y sin error, el bloque no se pinta (así no aparece y desaparece): una tarjeta que solo dice «ninguna» no aporta. */}
             {!opportunitiesLoading && (opportunitiesError || opportunities.length > 0) && (
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card>
                 <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-x-2 pb-2 border-b border-gray-700/50">
                     <CardTitle as="h2" className="text-lg text-gray-100 flex items-center gap-2">
                         <Gem aria-hidden="true" className="h-5 w-5 text-purple-400" />

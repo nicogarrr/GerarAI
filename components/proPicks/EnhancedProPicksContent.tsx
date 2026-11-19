@@ -195,7 +195,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                 />
 
                 {/* Refresh Button */}
-                <Card className="mt-4 p-4 border-gray-700 bg-gray-800/50">
+                <Card className="mt-4 p-4">
                     <Button
                         onClick={handleRefresh}
                         disabled={loading}
@@ -275,7 +275,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                 )}
 
                 {picks.length === 0 && !error ? (
-                    <Card className="p-8 rounded-lg border border-gray-700 bg-gray-800/50 text-center">
+                    <Card className="p-8 text-center">
                         <Sparkles aria-hidden="true" className="h-12 w-12 mx-auto mb-4 text-gray-500" />
                         <p className="text-gray-300 font-medium">
                             {!lastGenerated ? t('propicks.noPublished') : passedCount === 0 ? t('propicks.noEligible') : t('propicks.noResults')}
@@ -310,7 +310,7 @@ export default function EnhancedProPicksContent({ initialPicks, generatedAt, ini
                                 href={`/research/${pick.symbol}`}
                                 className="block"
                             >
-                                <Card className="h-full min-w-0 rounded-lg border border-gray-700 bg-gray-800/50 p-4 transition-all duration-200 group hover:bg-gray-800 sm:p-5">
+                                <Card className="h-full min-w-0 p-4 transition-all duration-200 group hover:bg-gray-800 sm:p-5">
                                     <div className="mb-3 flex min-w-0 items-start justify-between gap-3">
                                         <div className="min-w-0 flex-1">
                                             <div className="flex items-center gap-2 mb-1">

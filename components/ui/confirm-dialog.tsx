@@ -38,7 +38,7 @@ export function ConfirmDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-gray-900 border-gray-700 max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="text-gray-100">{title}</DialogTitle>
           <DialogDescription className="text-gray-400">{description}</DialogDescription>
@@ -49,7 +49,7 @@ export function ConfirmDialog({
           </Button>
           <Button
             type="button"
-            className={tone === 'destructive' ? 'bg-red-600 hover:bg-red-700' : undefined}
+            variant={tone === 'destructive' ? 'destructive' : 'default'}
             onClick={() => {
               onOpenChange(false);
               onConfirm();

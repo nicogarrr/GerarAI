@@ -40,7 +40,7 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
     // previos o no hay cierre de salida; ver runWalkForwardBacktest).
     if (result.tablaMensual.length === 0) {
         return (
-            <Card className="w-full min-w-0 overflow-hidden rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-6">
+            <Card className="w-full min-w-0 overflow-hidden p-4 sm:p-6">
                 <div className="mb-4 flex items-center gap-3">
                     <BarChart3 aria-hidden="true" className="h-6 w-6 text-teal-400" />
                     <h3 className="text-xl font-bold text-gray-100">{t('propicks.walkForward.title')}</h3>
@@ -55,7 +55,7 @@ export default function WalkForwardResults({ result }: WalkForwardResultsProps) 
     }
 
     return (
-        <Card className="w-full min-w-0 overflow-hidden rounded-lg border border-gray-700 bg-gray-800/50 p-4 sm:p-6">
+        <Card className="w-full min-w-0 overflow-hidden p-4 sm:p-6">
             <div className="mb-6">
                 <div className="mb-2 flex items-center gap-3">
                     <BarChart3 aria-hidden="true" className="h-6 w-6 text-teal-400" />
