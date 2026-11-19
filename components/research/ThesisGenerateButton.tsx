@@ -54,9 +54,10 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
     // Reloj local: se fija en cada sondeo y avanza cada 1 s mientras el job
     // corre, para que los segundos no salten de 3 en 3 con el polling.
     const [polledAt, setPolledAt] = useState(0);
-    // El resultado solo se anuncia para el trabajo lanzado en esta sesión: el
-    // último job guardado puede ser de una versión anterior a la vigente.
-    const [startedHere, setStartedHere] = useState(false);
+    // El click por sí solo no convierte el último éxito en un resultado nuevo.
+    // undefined = no hubo click; null = se lanzó sin job previo conocido.
+    const [previousJobIdAtStart, setPreviousJobIdAtStart] = useState<number | null | undefined>(undefined);
+    const startedHere = previousJobIdAtStart !== undefined && job !== null && job.id !== previousJobIdAtStart;
 
     const active = job !== null && ['queued', 'running', 'retrying', 'dispatch_failed'].includes(job.status);
     const busy = recovering || starting || active;
@@ -152,27 +153,30 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
     const start = async () => {
         if (busy || startingRef.current) return;
         if (!availability.canStart) return;
-        if (!await availability.refresh()) return;
+        // El lock cubre también la comprobación remota: dos clicks mientras
+        // está pendiente no deben lanzar dos generaciones independientes.
         startingRef.current = true;
-        // Fuera del try: generar la clave no es enviar nada. Si fallase, el
-        // catch de abajo no debe decir "envio no confirmado" (mentira).
-        const requestId = newRequestId();
-        setStarting(true);
-        setStartedHere(true);
-        setError(null);
         try {
-            setJob(await startThesisJob(ticker, true, requestId));
-        } catch {
-            // Enqueue may have committed before the connection dropped. Read
-            // it back rather than suggesting that another click is needed.
+            if (!await availability.refresh()) return;
+            // Fuera del catch de envío: crear la clave aún no envía nada.
+            const requestId = newRequestId();
+            setStarting(true);
+            setPreviousJobIdAtStart(job?.id ?? null);
+            setError(null);
             try {
-                setJob(await getLatestThesisJob(ticker));
+                setJob(await startThesisJob(ticker, true, requestId));
             } catch {
+                // Enqueue may have committed before the connection dropped. Read
+                // it back rather than suggesting that another click is needed.
+                try {
+                    setJob(await getLatestThesisJob(ticker));
+                } catch {
+                    setRecovering(true);
+                }
                 setRecovering(true);
+                setRecoveryCycle((cycle) => cycle + 1);
+                setError(t('research.thesisGenerate.submitUnconfirmed'));
             }
-            setRecovering(true);
-            setRecoveryCycle((cycle) => cycle + 1);
-            setError(t('research.thesisGenerate.submitUnconfirmed'));
         } finally {
             startingRef.current = false;
             setStarting(false);

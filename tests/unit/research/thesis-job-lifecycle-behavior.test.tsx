@@ -22,6 +22,29 @@ describe('thesis job lifecycle without any model call', () => {
     it('checks fresh availability before explicit start and deduplicates repeated clicks', async () => {
         let resolve!: (v: unknown) => void; m.start.mockImplementation(() => new Promise(r => { resolve = r; })); await mount(); const button = screen.getByRole('button'); await act(async () => { fireEvent.click(button); }); expect(m.available).toHaveBeenCalledOnce(); expect(m.start).toHaveBeenCalledWith('A/B', true, expect.any(String)); expect(button).toBeDisabled(); fireEvent.click(button); expect(m.start).toHaveBeenCalledOnce(); await act(async () => resolve(job('queued'))); expect(m.poll).toHaveBeenCalledWith(71);
     });
+    it('locks repeated clicks while the fresh availability check is still pending', async () => {
+        let resolve!: (allowed: boolean) => void;
+        const pending = new Promise<boolean>(r => { resolve = r; });
+        m.available.mockReturnValue(pending);
+        await mount();
+        const button = screen.getByRole('button');
+        fireEvent.click(button);
+        fireEvent.click(button);
+        await act(async () => { resolve(true); });
+        expect(m.start).toHaveBeenCalledOnce();
+        expect(m.available).toHaveBeenCalledOnce();
+        expect(m.start).toHaveBeenCalledWith('A/B', true, expect.any(String));
+    });
+    it('releases the pending availability lock after denial so a later click can retry', async () => {
+        m.available.mockResolvedValueOnce(false).mockResolvedValue(true);
+        await mount();
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(m.start).not.toHaveBeenCalled();
+        expect(screen.getByRole('button')).toBeEnabled();
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(m.available).toHaveBeenCalledTimes(2);
+        expect(m.start).toHaveBeenCalledOnce();
+    });
     it.each([false, true])('does not start when availability denies the request (initial denied=%s)', async denied => {
         m.canStart = !denied; m.available.mockResolvedValue(false); await mount(); await act(async () => { fireEvent.click(screen.getByRole('button')); }); expect(m.start).not.toHaveBeenCalled(); expect(m.available).toHaveBeenCalledTimes(denied ? 0 : 1);
     });
@@ -33,6 +56,37 @@ describe('thesis job lifecycle without any model call', () => {
     });
     it('reports failure and stops polling without refreshing or silently restarting', async () => {
         m.latest.mockResolvedValue(job('queued')); m.poll.mockResolvedValue(job('failed', { error_class: 'provider_unavailable' })); await mount(); expect(screen.getByText(/provider_unavailable/)).toBeInTheDocument(); await advance(10000); expect(m.poll).toHaveBeenCalledOnce(); expect(m.start).not.toHaveBeenCalled(); expect(m.refresh).not.toHaveBeenCalled();
+    });
+    it('does not relabel an old successful job as fresh when submission fails', async () => {
+        m.latest.mockResolvedValue(job('succeeded', { result: { version: 8 } }));
+        m.start.mockRejectedValue(new Error('submission offline'));
+        await mount();
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(m.start).toHaveBeenCalledOnce();
+        expect(screen.queryByRole('link', { name: /View thesis/i })).not.toBeInTheDocument();
+        expect(m.refresh).not.toHaveBeenCalled();
+        expect(m.scroll).not.toHaveBeenCalled();
+    });
+    it('keeps the old success quiet while a new submission is still pending', async () => {
+        let resolve!: (value: unknown) => void;
+        m.latest.mockResolvedValue(job('succeeded', { result: { version: 8 } }));
+        m.start.mockImplementation(() => new Promise(r => { resolve = r; }));
+        await mount();
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(screen.queryByRole('link', { name: /View thesis/i })).not.toBeInTheDocument();
+        await act(async () => { resolve(job('succeeded', { id: 72, result: { version: 9 } })); });
+        expect(screen.getByRole('link', { name: 'View thesis v9' })).toBeInTheDocument();
+    });
+    it('announces a genuinely new job recovered after an uncertain submission', async () => {
+        m.latest.mockResolvedValueOnce(job('succeeded', { result: { version: 8 } }))
+            .mockResolvedValue(job('running', { id: 72 }));
+        m.start.mockRejectedValue(new Error('response lost'));
+        m.poll.mockResolvedValue(job('succeeded', { id: 72, result: { version: 9 } }));
+        await mount();
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(m.start).toHaveBeenCalledOnce();
+        expect(screen.getByRole('link', { name: 'View thesis v9' })).toBeInTheDocument();
+        expect(m.refresh).not.toHaveBeenCalled();
     });
     it('recovers a start whose response was lost rather than submitting another job', async () => {
         m.start.mockRejectedValue(new Error('lost response')); m.latest.mockResolvedValueOnce(null).mockResolvedValue(job('running')); await mount(); await act(async () => { fireEvent.click(screen.getByRole('button')); }); expect(m.start).toHaveBeenCalledOnce(); expect(m.latest.mock.calls.length).toBeGreaterThanOrEqual(2); expect(m.poll).toHaveBeenCalledWith(71); expect(screen.getByRole('button')).toBeDisabled();
