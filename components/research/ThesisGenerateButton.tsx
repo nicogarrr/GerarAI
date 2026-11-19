@@ -67,6 +67,9 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
         let disposed = false;
         let timer: ReturnType<typeof setTimeout> | undefined;
         const recover = async () => {
+            // Focus/visibilidad sustituyen el reintento pendiente, no añaden
+            // otra cadena de sondeos cuando la conexión sigue caída.
+            clearTimeout(timer);
             if (startingRef.current) return;
             const request = ++recoveryRequestRef.current;
             try {

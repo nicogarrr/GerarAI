@@ -19,6 +19,34 @@ describe('thesis job lifecycle without any model call', () => {
     it('retries an uncertain recovery instead of offering a duplicate generation', async () => {
         m.latest.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(null); await mount(); expect(screen.getByRole('button')).toBeDisabled(); await advance(3000); expect(m.latest).toHaveBeenCalledTimes(2); expect(screen.getByRole('button')).toBeEnabled(); expect(m.start).not.toHaveBeenCalled();
     });
+    it('keeps only one recovery retry after repeated offline focus events', async () => {
+        m.latest.mockRejectedValue(new Error('offline'));
+        await mount();
+        await act(async () => { window.dispatchEvent(new Event('focus')); });
+        await act(async () => { window.dispatchEvent(new Event('focus')); });
+        expect(m.latest).toHaveBeenCalledTimes(3);
+        await advance(3000);
+        expect(m.latest).toHaveBeenCalledTimes(4);
+        expect(m.start).not.toHaveBeenCalled();
+    });
+    it('cancels a pending recovery retry after focus successfully recovers', async () => {
+        m.latest.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(null);
+        await mount();
+        await act(async () => { window.dispatchEvent(new Event('focus')); });
+        expect(screen.getByRole('button')).toBeEnabled();
+        await advance(3000);
+        expect(m.latest).toHaveBeenCalledTimes(2);
+        expect(m.start).not.toHaveBeenCalled();
+    });
+    it('leaves no recovery retries behind after an offline unmount', async () => {
+        m.latest.mockRejectedValue(new Error('offline'));
+        const ui = await mount();
+        await act(async () => { window.dispatchEvent(new Event('focus')); });
+        expect(m.latest).toHaveBeenCalledTimes(2);
+        ui.unmount();
+        await advance(9000);
+        expect(m.latest).toHaveBeenCalledTimes(2);
+    });
     it('checks fresh availability before explicit start and deduplicates repeated clicks', async () => {
         let resolve!: (v: unknown) => void; m.start.mockImplementation(() => new Promise(r => { resolve = r; })); await mount(); const button = screen.getByRole('button'); await act(async () => { fireEvent.click(button); }); expect(m.available).toHaveBeenCalledOnce(); expect(m.start).toHaveBeenCalledWith('A/B', true, expect.any(String)); expect(button).toBeDisabled(); fireEvent.click(button); expect(m.start).toHaveBeenCalledOnce(); await act(async () => resolve(job('queued'))); expect(m.poll).toHaveBeenCalledWith(71);
     });
