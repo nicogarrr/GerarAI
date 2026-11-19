@@ -271,7 +271,24 @@ def test_handle_error_429_agotado_ack_sin_dead_letter():
 # --- kpi_queue_depth --------------------------------------------------------------
 
 def test_kpi_queue_depth_sin_redis_y_con_redis(monkeypatch):
+    # "Sin Redis" se simula: sin este parche el caso depende del entorno.
+    # Con REDIS_URL apuntando a un Redis real alcanzable (suite del Piloto:
+    # TEST_REDIS_EPHEMERAL=1), _redis_client() conecta y una cola VACIA
+    # devuelve 0, no None (None = Redis no disponible, no cola vacia).
+    monkeypatch.setattr(worker, "_redis_client", lambda: None)
     assert worker.kpi_queue_depth(None) is None
+
+
+def test_kpi_queue_depth_con_redis_alcanzable_y_cola_vacia_es_cero(monkeypatch):
+    # El caso del Piloto: Redis efimero real arriba, hashes aun no creados.
+    # 0 es la respuesta correcta (la admission gate no debe frenar), y fijarlo
+    # aqui evita que nadie "arregle" la funcion para devolver None.
+    class EmptyRedis:
+        def hlen(self, key):
+            return 0
+
+    monkeypatch.setattr(worker, "_redis_client", lambda: EmptyRedis())
+    assert worker.kpi_queue_depth(None) == 0
     redis = FakeRedis()
     broker = dramatiq.get_broker()
     base = f"{broker.namespace}:{worker.KPI_QUEUE_NAME}"
