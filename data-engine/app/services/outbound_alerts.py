@@ -64,20 +64,40 @@ def alert_after_opt_in(created_at: datetime, enabled_at: datetime) -> bool:
     return created >= since
 
 
-def subscription_for(db: Session, alert: ResearchAlert) -> AlertSubscription | None:
+_MISSING = object()
+
+
+def subscription_for(
+    db: Session, alert: ResearchAlert, *, _cache: dict | None = None
+) -> AlertSubscription | None:
+    # _cache (solo dispatch_pending): memoiza por categoria/par usuario-chat
+    # las MISMAS consultas de siempre; una pagina de 100 alertas pasaba de
+    # ~4 SELECTs por alerta a uno por categoria. La consulta y sus filtros
+    # no cambian; solo se repite menos dentro de UNA llamada.
     category = alert_category(db, alert)
     if category is None:
         return None
-    row = db.scalar(select(AlertSubscription).where(
-        AlertSubscription.tenant_id == alert.tenant_id,
-        AlertSubscription.event_type == category,
-        AlertSubscription.enabled.is_(True),
-    ))
+    sub_key = ("sub", category)
+    row = _cache.get(sub_key, _MISSING) if _cache is not None else _MISSING
+    if row is _MISSING:
+        row = db.scalar(select(AlertSubscription).where(
+            AlertSubscription.tenant_id == alert.tenant_id,
+            AlertSubscription.event_type == category,
+            AlertSubscription.enabled.is_(True),
+        ))
+        if _cache is not None:
+            _cache[sub_key] = row
     if not row or row.user_id != db.info.get("user_id"):
         return None
     from app.services.telegram_link import binding_for
 
-    if not binding_for(db, alert.tenant_id, row.user_id, row.chat_id):
+    bind_key = ("binding", row.user_id, row.chat_id)
+    bound = _cache.get(bind_key, _MISSING) if _cache is not None else _MISSING
+    if bound is _MISSING:
+        bound = binding_for(db, alert.tenant_id, row.user_id, row.chat_id)
+        if _cache is not None:
+            _cache[bind_key] = bound
+    if not bound:
         return None
     return row if alert_after_opt_in(alert.created_at, row.enabled_at) else None
 
@@ -135,8 +155,21 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         or_(*categories),
     ).order_by(ResearchAlert.id).limit(limit)))
     stats = {"candidates": len(candidates), "redispatched": 0, "errors": []}
+    # Precarga en UNA consulta los NewsEvent de las tracked_news candidatas:
+    # event_type los resuelve con db.get, que tras esto no sale a la base.
+    news_ids = {
+        (alert.metadata_ or {}).get("news_event_id")
+        for alert in candidates
+        if alert.alert_type == "tracked_news"
+    }
+    news_ids.discard(None)
+    if news_ids:
+        list(db.scalars(select(NewsEvent).where(NewsEvent.id.in_(news_ids))).all())
+    coverage_cache: dict = {}
     for alert in candidates:
-        if subscription_for(db, alert) is None and preference_for(db, alert) is None:
+        if subscription_for(db, alert, _cache=coverage_cache) is None and preference_for(
+            db, alert, _cache=coverage_cache
+        ) is None:
             # Record terminal skip without HTTP. Prevents a page of non-filing
             # news or events from before a later opt-in starving newer alerts.
             svc = NotificationService()

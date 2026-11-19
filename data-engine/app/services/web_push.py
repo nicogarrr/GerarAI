@@ -53,20 +53,31 @@ def is_configured(settings) -> bool:
                 and settings.vapid_private_key and settings.vapid_subject)
 
 
-def preference_for(db: Session, alert: ResearchAlert) -> PushPreference | None:
-    """Preferencia de push que cubre esta alerta, o None. Mismas garantias que Telegram."""
-    from app.services.outbound_alerts import alert_after_opt_in, alert_category
+def preference_for(
+    db: Session, alert: ResearchAlert, *, _cache: dict | None = None
+) -> PushPreference | None:
+    """Preferencia de push que cubre esta alerta, o None. Mismas garantias que Telegram.
+
+    _cache (solo dispatch_pending) memoiza por categoria la MISMA consulta
+    dentro de una llamada; ver subscription_for.
+    """
+    from app.services.outbound_alerts import _MISSING, alert_after_opt_in, alert_category
 
     category = alert_category(db, alert)
     if category is None:
         return None
     user = db.info.get("user_id")
-    row = db.scalar(select(PushPreference).where(
-        PushPreference.tenant_id == alert.tenant_id,
-        PushPreference.user_id == user,
-        PushPreference.event_type == category,
-        PushPreference.enabled.is_(True),
-    ))
+    key = ("push", category)
+    row = _cache.get(key, _MISSING) if _cache is not None else _MISSING
+    if row is _MISSING:
+        row = db.scalar(select(PushPreference).where(
+            PushPreference.tenant_id == alert.tenant_id,
+            PushPreference.user_id == user,
+            PushPreference.event_type == category,
+            PushPreference.enabled.is_(True),
+        ))
+        if _cache is not None:
+            _cache[key] = row
     if row is None:
         return None
     return row if alert_after_opt_in(alert.created_at, row.enabled_at) else None
