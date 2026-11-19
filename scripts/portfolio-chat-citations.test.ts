@@ -2,6 +2,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 // @ts-expect-error Node strip-types requires explicit extension.
 import { citationKindLabelFor, toPortfolioChatCitations } from '../lib/chat/citations.ts';
+// @ts-expect-error Node strip-types requires explicit extension.
+import { createTranslator } from '../lib/i18n/translate.ts';
+
+const es = createTranslator('es');
 test('preserves backend URL, page and locator; internal source has no invented URL', () => {
     const result = toPortfolioChatCitations([
         { type: 'document_chunk', id: 8, title: 'Informe anual de prueba', page_number: 12, url: 'https://example.org/report.pdf' },
@@ -57,8 +61,8 @@ test('Cerebro no repite la misma fuente ni la etiqueta de tipo si el título ya 
         { type: 'position', id: 7, title: 'Posición GOOGL', url: '/portfolio' },
     ] as never);
     assert.equal(result.length, 1);
-    assert.equal(citationKindLabelFor(result[0]), null);
-    assert.equal(citationKindLabelFor({ locator: 'position:9', document: 'GOOGL' }), 'Posición');
+    assert.equal(citationKindLabelFor(result[0], es), null);
+    assert.equal(citationKindLabelFor({ locator: 'position:9', document: 'GOOGL' }, es), 'Posición');
 });
 
 test('B5: el mismo documento citado por varios fragmentos no se repite en Fuentes', () => {

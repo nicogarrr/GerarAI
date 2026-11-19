@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({ revoke: vi.fn(), create: vi.fn(), toastError: vi.fn() }));
@@ -39,5 +39,25 @@ describe('SubscriptionManager', () => {
         await waitFor(() => expect(m.toastError).toHaveBeenCalledWith('No se pudo copiar el enlace. Cópialo manualmente desde el campo.'));
         expect(writeText).toHaveBeenCalledWith('https://gerarai.com/api/calendar-feed/abc.ics');
         expect(screen.queryByRole('button', { name: 'Copiado' })).not.toBeInTheDocument();
+    });
+
+    it('el temporizador que revierte «Copiado» se limpia al desmontar', async () => {
+        vi.useFakeTimers();
+        try {
+            const writeText = vi.fn().mockResolvedValue(undefined);
+            Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+            const { unmount } = render(<SubscribeButtons origin="https://gerarai.com" token="abc" />);
+            await act(async () => {
+                fireEvent.click(screen.getByRole('button', { name: 'Copiar' }));
+            });
+            expect(screen.getByRole('button', { name: 'Copiado' })).toBeInTheDocument();
+            unmount();
+            await act(async () => {
+                vi.advanceTimersByTime(2500);
+            });
+            expect(vi.getTimerCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
     });
 });

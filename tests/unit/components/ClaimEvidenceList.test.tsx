@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { ClaimEvidenceList } from '@/components/research/ClaimEvidenceList';
 import type { ResearchClaimEvidence } from '@/lib/actions/research.actions';
 import { createTranslator } from '@/lib/i18n/translate';
+import { naFor } from '@/lib/format';
 
 const evidence = (over: Record<string, unknown> = {}): ResearchClaimEvidence => ({
   id: 7,
@@ -46,7 +47,7 @@ describe('ClaimEvidenceList: cadena de evidencia en la ficha', () => {
     expect(screen.getByText('#42')).toBeInTheDocument();
   });
 
-  it('sin URL válida ni documento no inventa destino', () => {
+  it('sin URL válida ni documento no inventa destino: etiqueta canónica N/D, no SIN_DATOS', () => {
     render(
       <ClaimEvidenceList
         evidence={[evidence({ source_url: 'no-es-una-url', document_id: null })]}
@@ -56,7 +57,8 @@ describe('ClaimEvidenceList: cadena de evidencia en la ficha', () => {
     );
 
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
-    expect(screen.getByText('SIN_DATOS')).toBeInTheDocument();
+    expect(screen.getByText(naFor('es'))).toBeInTheDocument();
+    expect(screen.queryByText('SIN_DATOS')).not.toBeInTheDocument();
   });
 
   it('sin evidencia no pinta nada', () => {
@@ -75,5 +77,16 @@ describe('ClaimEvidenceList: cadena de evidencia en la ficha', () => {
   it('respeta el locale para la etiqueta del tier', () => {
     render(<ClaimEvidenceList evidence={[evidence()]} locale="en" t={createTranslator('en')} />);
     expect(screen.getByText('Regulatory · T1')).toBeInTheDocument();
+  });
+
+  it('sin documento usa el placeholder del locale activo', () => {
+    render(
+      <ClaimEvidenceList
+        evidence={[evidence({ source_url: 'no-es-una-url', document_id: null })]}
+        locale="en"
+        t={createTranslator('en')}
+      />,
+    );
+    expect(screen.getByText(naFor('en'))).toBeInTheDocument();
   });
 });

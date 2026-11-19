@@ -5,6 +5,7 @@ import {
     toPortfolioChatCitations, type ChatSource,
 } from '@/lib/chat/citations';
 import { asView, canonicalViewUrl, viewAnchor } from '@/lib/research/research-views';
+import { createTranslator } from '@/lib/i18n/translate';
 
 describe('toChatCitations', () => {
     it('sin sources devuelve []', () => {
@@ -119,13 +120,21 @@ describe('isInternalSourcePath: las vistas internas abren contenido real', () =>
 });
 
 describe('citationKindLabel / citationKindLabelFor', () => {
+    const es = createTranslator('es');
+    const en = createTranslator('en');
     it('traduce tipos conocidos y devuelve null en desconocidos', () => {
-        expect(citationKindLabel('thesis_version:3')).toBe('Tesis');
-        expect(citationKindLabel('knowledge_chunk:1')).toBe('Biblioteca');
-        expect(citationKindLabel('cosa_rara:1')).toBeNull();
+        expect(citationKindLabel('thesis_version:3', es)).toBe('Tesis');
+        expect(citationKindLabel('knowledge_chunk:1', es)).toBe('Biblioteca');
+        expect(citationKindLabel('cosa_rara:1', es)).toBeNull();
+    });
+    it('usa el traductor activo: el panel en inglés no muestra etiquetas en español', () => {
+        expect(citationKindLabel('thesis_version:3', en)).toBe('Thesis');
+        expect(citationKindLabel('financial_fact:1', en)).toBe('Financial fact');
+        expect(citationKindLabel('document_chunk:1', en)).toBe('Document');
+        expect(citationKindLabelFor({ locator: 'position:2', document: 'GOOGL' }, en)).toBe('Position');
     });
     it('no repite la etiqueta si el documento ya empieza por ella', () => {
-        expect(citationKindLabelFor({ locator: 'position:2', document: 'Posición GOOGL' })).toBeNull();
-        expect(citationKindLabelFor({ locator: 'position:2', document: 'SAN' })).toBe('Posición');
+        expect(citationKindLabelFor({ locator: 'position:2', document: 'Posición GOOGL' }, es)).toBeNull();
+        expect(citationKindLabelFor({ locator: 'position:2', document: 'SAN' }, es)).toBe('Posición');
     });
 });
