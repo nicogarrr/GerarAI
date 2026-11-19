@@ -52,8 +52,10 @@ _PRICE_ASK_RE = re.compile(
     r"(?i)\b(?:precio|cotiza\w*|cu[aá]nto\s+vale|a\s+cu[aá]nto\s+est[aá]n?|"
     r"a\s+c[oó]mo\s+est[aá]n?|c[oó]mo\s+(?:va|cotiza)|price\s+of|quote\s+for|"
     # Formas habituales sin «of»: «ASTS stock price», «AAPL share price»,
-    # «price AAPL», «trading at», «valor de la acción».
-    r"(?:stock|share)\s+price|price\s+(?=(?-i:[A-Z]{2,5})\b)|trading\s+at|"
+    # «price AAPL», «trading at», «valor de la acción». Y el ticker delante
+    # a secas: «AAPL price» (medido 2026-11-19: no enrutaba a la cotización
+    # en vivo). El ticker va en mayúsculas (?-i) para no tragarse palabras.
+    r"(?:stock|share)\s+price|price\s+(?=(?-i:[A-Z]{2,5})\b)|(?-i:\b[A-Z]{2,5})\s+price|trading\s+at|"
     r"valor\s+de\s+la\s+acci[oó]n|how\s+much\s+is\s+\w+\s+trading)\b"
 )
 # El coste de compra, la valoración y los fundamentales (PER/BPA) los
@@ -77,6 +79,9 @@ _PRICE_EXCLUDE_RE = re.compile(
 )
 _NEWS_ASK_RE = re.compile(
     r"(?i)\b(?:noticias?|novedades?|[úu]ltima\s+hora|qu[eé]\s+ha\s+pasado|"
+    # «qué dicen de PLTR hoy» / «qué se dice de PLTR»: noticias sin la
+    # palabra «noticias» (medido 2026-11-19: no enrutaba a GDELT en vivo).
+    r"qu[eé]\s+(?:dicen|se\s+dice)\s+(?:de|sobre)|"
     r"qu[eé]\s+pasa\s+con|news\s+(?:on|about)|latest\s+on)\b"
 )
 # «Noticias de mis empresas / mi cartera» ya las responde la ruta guardada
