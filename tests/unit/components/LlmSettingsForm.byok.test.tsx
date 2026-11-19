@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import type { LlmSettings } from '@/lib/actions/llm-settings.actions';
 vi.mock('@/lib/actions/llm-settings.actions', () => ({
     testLlmConnection: vi.fn(),
@@ -16,6 +16,13 @@ const base: LlmSettings = {
     message: 'Usando el proveedor de GerarAI.',
     providers: [{ id: 'opencode-go', label: 'OpenCode Go', base_url: 'https://example.com/v1', default_model: 'model', requires_custom_url: false }],
 };
+
+// Calentamiento del primer render; rojo de 5000 ms visto una vez en la suite
+// completa, causa no reproducida.
+beforeAll(() => {
+    render(<LlmSettingsForm initial={base} />);
+    cleanup();
+});
 
 // Orden de Nico (31-oct): un usuario nuevo debe ver claro que la IA funciona
 // con SU clave y SU modelo, y que GerarAI no asume ese coste.
