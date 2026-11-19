@@ -14,7 +14,6 @@ const FIXED = [
     ['app/(root)/screeners/page.tsx', 'font-mono text-base sm:text-xs', 1],
     ['app/(root)/screeners/page.tsx', 'px-3 text-base text-gray-200 sm:text-sm', 1],
     ['components/screeners/FilterFields.tsx', 'px-3 text-base text-gray-200 sm:text-sm', 1],
-    ['components/ui/textarea.tsx', 'px-3 py-2 text-base ring-offset-background md:text-sm', 1],
 ] as const;
 
 function* walk(dir: string): Generator<string> {
@@ -32,6 +31,16 @@ describe('guard móvil: inputs sin zoom automático de iOS (text-base en móvil)
             const n = src.split(needle).length - 1;
             assert.equal(n, count, `${file} debe tener ${count} controles con "${needle}"`);
         }
+    });
+    it('Textarea: fuente de móvil >=16px, sin fijar padding ni anillo', () => {
+        // Contrato discriminante (Auditor, 19-nov): #6020 unifico la receta de
+        // Textarea (px-4, borde gray-600, foco teal) y el guard fijaba la vieja
+        // literalmente. Lo que no se negocia es la fuente: text-base sin
+        // breakpoint en movil y cualquier reduccion solo desde sm:/md:.
+        const src = readFileSync('components/ui/textarea.tsx', 'utf8');
+        const classes = [...src.matchAll(/"([^"]*(?:text-base|text-sm|text-xs)[^"]*)"/g)].map((m) => m[1]).join(' ');
+        assert.ok(/(^|\s)text-base(\s|$)/.test(classes), 'text-base sin prefijo de breakpoint (movil >=16px)');
+        assert.ok(!/(^|\s)text-(sm|xs)(\s|$)/.test(classes), 'ningun text-sm/xs sin breakpoint en la receta');
     });
     it('ningún control de app/ o components/ queda con text-sm/xs sin text-base', () => {
         // El salto hasta className atraviesa handlers inline (`onChange={(e) => ...}`):
