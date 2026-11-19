@@ -1,10 +1,12 @@
 # Checklist de revisión y despliegue
 
-La versión en preparación es **0.6.1**, sobre `main` = `ffe814ca0`
-(18-nov-2026). La última etiqueta es **v0.6.0**
-(`60d7e8f1f67be9487525e0687b38eecb773a5504`, 15-nov-2026). 0.6.1 **no está
-etiquetada ni desplegada**: nada de lo que se mergeó después del tag se presenta
-aquí como desplegado.
+La versión en preparación es **0.6.1**, sobre `main` = `c192ea94b`
+(19-nov-2026, 00:19 CET). El rango `v0.6.0..HEAD` tiene **320 commits** (262 en
+primera línea: 131 `fix`, 44 `feat`, 42 `test` y 22 `perf`). La última etiqueta
+es **v0.6.0** (`60d7e8f1f67be9487525e0687b38eecb773a5504`, 15-nov-2026). 0.6.1
+**no está etiquetada ni desplegada**: nada de lo que se mergeó después del tag se
+presenta aquí como desplegado. Solo se crea una nueva etiqueta o release cuando
+Nico lo pida.
 
 El tag `v0.6.0` se validó de forma **acotada**, según el mensaje del propio tag:
 el corte se preparó en #5441 (merge `102e8d5a`), se etiquetó sobre el SHA
@@ -21,10 +23,20 @@ cada despliegue. Cada nuevo despliegue requiere revisar CI, auditoría, backups 
 el entorno real.
 
 Estado al escribirlo: 27-oct-2026, cabeza Alembic `0082`.
-Actualizado 18-nov-2026: cabeza Alembic `0138` (35 migraciones nuevas desde la
-etiqueta v0.5.0, que iba por `0103`). Último estado verificado: CI en verde en
-main (14/14 jobs superados); el `deploy-effective.json` de producción debe
-incluir `worker-kpis` con su healthcheck activo (gate en sección 3).
+Actualizado 19-nov-2026: cabeza Alembic `0138` (35 migraciones nuevas desde la
+etiqueta v0.5.0, que iba por `0103`). Comprobado por lectura de los ficheros de
+migración: una sola cabeza `0138_facts_tenant_company_idx`, 138 revisiones
+únicas, 0 `down_revision` huérfanas y cadena `0135 → 0136 → 0137 → 0138`.
+**No se ejecutó Alembic**; el round trip y el estado en producción siguen sin
+verificar aquí y requieren backup previo en cada despliegue.
+
+**CI en rojo en `c192ea94b`** (19-nov-2026): la auditoría registró 7 de 8
+workflows en `failure`; la consulta de solo lectura al actualizar este documento
+muestra 8 de 9 runs fallidos (el único `success` es el smoke no bloqueante
+«user-flows E2E»). Los jobs terminan en ~2 s con `steps: []` y sin logs:
+**sin runner / fallo de infraestructura de CI, no verificado como fallo de
+código**. No hay ningún run verde del HEAD que se pueda presentar como evidencia.
+
 Histórico: en el tag v0.6.0 (15-nov-2026, `60d7e8f1`) la cabeza Alembic era
 `0135` (32 migraciones nuevas) y su mensaje registra `worker-kpis` presente y
 healthy. Estado reportado el 13-nov-2026 (ya superado por el tag): el
@@ -54,9 +66,15 @@ Las casillas de abajo no se marcan sin un run en verde del commit de `main` que 
 | 4 | **Fundamentales trimestrales y TTM** | agentes | #2342 (TTM) y su continuación en la ficha |
 | 5 | **gitleaks** en CI y pre-commit | agentes | #2269 |
 
-No bloquean pero conviene antes de anunciarla: purga del historial (opcional,
-decisión de Nico, sección 4 de `docs/ROTACION_CLAVES.md`) y activar *Secret
-scanning* + *Push protection* en GitHub.
+No bloquea pero conviene antes de anunciarla: purga del historial (opcional,
+decisión de Nico, sección 4 de `docs/ROTACION_CLAVES.md`).
+
+**Secret scanning y Push protection YA están activos en GitHub** (verificado el
+19-nov-2026 con `gh api repos/nicogarrr/GerarAI`): `secret_scanning=enabled`,
+`secret_scanning_push_protection=enabled` y
+`dependabot_security_updates=enabled`. Matiz: `secret_scanning_non_provider_patterns`
+y `secret_scanning_validity_checks` siguen `disabled`. Queda como decisión de
+Nico valorar esos dos refuerzos; no presentar el escaneo como «sin activar».
 
 ## 1. CI en verde
 
@@ -71,9 +89,13 @@ scanning* + *Push protection* en GitHub.
       chat, run de `c78fcec3`) se arregla en #2319.
 - [ ] Ninguna PR abierta de la cola queda en rojo por un fallo que también esté en `main`.
 
-Nota: las casillas de esta sección quedan sin marcar. El estado real de los
-checks en `ffe814ca0` no se ha comprobado en esta revisión: pendiente de verificar
-con `gh run list / gh pr checks`.
+Nota: las casillas de esta sección quedan **sin marcar**. El estado de los checks
+en `c192ea94b` sí se ha consultado (19-nov-2026, `gh api .../actions/runs`), pero
+es rojo por infraestructura: 8 de 9 runs en `failure`, con jobs de ~2 s y
+`steps: []`, sin logs. Solo el smoke no bloqueante «user-flows E2E» está en
+`success`. Es un **sin runner / fallo de infraestructura de CI, no verificado como
+fallo de código**; no equivale a una comprobación de los checks ni permite marcar
+ninguna casilla. Re-verificar cuando vuelva a haber runners.
 
 Comprobación rápida:
 
@@ -89,22 +111,28 @@ gh pr checks <número>          # para cada PR de la cola
       `tests/test_alembic_chain.py` (prefijos de 4 dígitos sin repetir).
 - [ ] Cada migración nueva tiene `downgrade` y pasa el round trip upgrade → downgrade → upgrade.
 
-Migraciones en PRs abiertas al escribir esto (`main` acaba en `0082`):
+**Tabla histórica, obsoleta.** La tabla de migraciones en PRs abiertos se
+escribió cuando `main` acababa en `0082`; ya no describe el estado actual:
 
-| Número | PR | Nota |
+| Número | PR | Nota histórica |
 |---|---|---|
-| `0083_dca_signal_states` | #2310 | #2318 va apilada encima (misma migración) |
+| `0083_dca_signal_states` | #2310 | #2318 iba apilada encima (misma migración) |
 | `0084_knowledge_document_ticker` | #2312 | |
 | `0085_thesis_invalidation_rules` | #2315 | |
 | `0086_journal_transaction_link` | diario ↔ IBKR (en preparación) | |
 
-Si se mergean en otro orden, la que llegue después **se renumera** (nombre de
-fichero, `revision` y `down_revision` apuntando a la cabeza real de `main`) antes
-de mergearla. Nunca dos ficheros con el mismo prefijo.
+Hoy `0138_facts_tenant_company_idx` está mergeada y es la única cabeza (138
+revisiones, 0 huérfanas, cadena `0135 → 0138`), comprobado el 19-nov-2026 por
+lectura de ficheros sin ejecutar Alembic. La regla de renumeración sigue vigente
+para migraciones futuras: si se mergean en otro orden, la que llegue después se
+renumera (nombre de fichero, `revision` y `down_revision` apuntando a la cabeza
+real de `main`) antes de mergearla. Nunca dos ficheros con el mismo prefijo.
 
 - [ ] Antes de desplegar en producción: backup de Postgres (ver
       `docs/BACKUP_RESTORE.md`) y `alembic upgrade head` probado sobre una copia
-      restaurada. Desde la referencia histórica del 18-oct-2026 a la fecha de esta lista hay 22 migraciones (`0061` → `0082`) más las de la cola.
+      restaurada. Referencia histórica del 18-oct-2026: 22 migraciones
+      (`0061` → `0082`) más las de la cola de entonces; el recuento actual es
+      `0138` como cabeza única y debe re-verificarse en cada despliegue.
 
 ## 3. Smoke e2e
 
