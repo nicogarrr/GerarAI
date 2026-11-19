@@ -8,14 +8,6 @@
     --color-foreground: var(--foreground);
     --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-    --color-sidebar-ring: var(--sidebar-ring);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar: var(--sidebar);
     --color-chart-5: var(--chart-5);
     --color-chart-4: var(--chart-4);
     --color-chart-3: var(--chart-3);
@@ -94,11 +86,15 @@
     --muted-foreground: #a1a1aa;
     --accent: #18181b;
     --accent-foreground: #d4d4d8;
-    --destructive: oklch(0.704 0.191 22.216);
+    /* red-600 (#dc2626): blanco encima 4.83:1 (AA). El anterior #ff6467
+       daba 2.89:1 con texto blanco: Button y Badge destructive fallaban AA.
+       Como texto sobre superficies oscuras se usa la tinta semantica
+       `text-bad` (9.3:1), no este token (3.7:1). */
+    --destructive: oklch(0.577 0.245 27.325);
     /* El Badge destructive lo usa (badge.tsx): sin este token la clase
        text-destructive-foreground no existia y el texto heredaba un color
        ilegible sobre el rojo. */
-    --destructive-foreground: oklch(0.95 0.005 247.858);
+    --destructive-foreground: oklch(1 0 0);
     --border: oklch(1 0 0 / 8%);
     --input: oklch(1 0 0 / 8%);
     --ring: #14b8a6;
@@ -107,31 +103,31 @@
     --chart-3: oklch(0.769 0.188 70.08);
     --chart-4: oklch(0.627 0.265 303.9);
     --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: #101010;
-    --sidebar-foreground: #d4d4d8;
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.95 0.005 247.858);
-    --sidebar-accent: oklch(0.22 0.03 260.031);
-    --sidebar-accent-foreground: oklch(0.95 0.005 247.858);
-    --sidebar-border: oklch(1 0 0 / 8%);
-    --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
 /* === CUSTOM COLOR THEME === */
 @theme {
     /*
-     * Escala de grises del producto. OJO: estos valores NO son los de Tailwind.
-     * gray-400/500 son tonos de tinta claros (#d4d4d8 / #a1a1aa) y
-     * gray-600..900 son superficies oscuras. Escribir `text-gray-400` esperando
-     * el gris medio de Tailwind produce texto casi blanco. Para superficies usa
-     * los tokens semanticos de abajo, no los numeros.
+     * Escala de grises del producto (familia neutra zinc, 50..950 completa).
+     * OJO: estos valores NO son los de Tailwind. gray-400/500 son tonos de
+     * tinta claros (#d4d4d8 / #a1a1aa) y gray-600..950 son superficies oscuras.
+     * Escribir `text-gray-400` esperando el gris medio de Tailwind produce
+     * texto casi blanco. Para superficies usa los tokens semanticos de abajo,
+     * no los numeros. gray-50..300 completan la rampa de tintas claras: antes
+     * caian en los defaults azulados de Tailwind y mezclaban dos familias de
+     * gris en la misma pantalla.
      */
+    --color-gray-950: #050506; /* tinta sobre botones claros / fondo bottom-nav */
     --color-gray-900: #0a0a0b; /* fondo de la app (body) */
     --color-gray-800: #18181b; /* superficie elevada / header */
     --color-gray-700: #27272a; /* borde visible / hover */
     --color-gray-600: #3f3f46; /* borde fuerte. NO usar como texto (1.7:1) */
     --color-gray-500: #a1a1aa; /* tinta secundaria (7.4:1) */
     --color-gray-400: #d4d4d8; /* tinta principal (13:1) */
+    --color-gray-300: #e4e4e7; /* tinta clara, hover de gray-400/500 (15.6:1) */
+    --color-gray-200: #f4f4f5; /* tinta muy clara */
+    --color-gray-100: #fafafa; /* tinta casi blanca (titulares) */
+    --color-gray-50: #ffffff;  /* tinta blanca (titulares de tesis) */
 
     /*
      * Superficies semanticas. Sustituyen a los hex literales que cada pagina
