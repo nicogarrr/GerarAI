@@ -5,9 +5,12 @@
 # Frontend Oracle aparte en docker-compose.frontend.yml; auth en Atlas.
 # Comprobar tarifa real OCI: una cuota o presupuesto no es un tope monetario.
 #
-# Presupuesto de memoria: la suma de `memory` de TODOS los servicios es
-# 13.568 MiB (13,25 GiB); worker default con 4 GiB tras OOM medido (3 GiB con
-# 1 hilo + margen por concurrencia). El resto de la VM queda para el kernel, page cache y una swap de
+# Presupuesto de memoria: la suma de `memory` de los 20 servicios es
+# 19.712 MiB (19,25 GiB); worker default con 4 GiB tras OOM medido (3 GiB con
+# 1 hilo + margen por concurrencia). El guard
+# test_memory_limits_fit_the_24gb_vm_with_host_reserve fija el techo en 20.480 MiB,
+# asi que la configuracion actual queda 768 MiB por debajo y no lo rompe.
+# El resto de la VM queda para el kernel, page cache y una swap de
 # 2-4 GB (ver docs/oracle-setup.md). Los `cpus` son techos por servicio, no
 # reservas: la VM tiene 4 OCPU y varios servicios pueden turnarse. No se
 # supera este techo: el carril "computed" lo consume el worker-alerts (jobs
@@ -183,8 +186,9 @@ services:
         limits:
           # CPU alineada con el contenedor vivo (docker inspect 2026-11-13: 2 CPU,
           # subido a mano). Con 0.75 el cgroup medido acumula nr_throttled 404.863.
-          # La memoria (vivo 3 GiB) sigue en 896M: 3G rompe el guard de 16 GiB de
-          # test_memory_limits_fit_the_24gb_vm_with_host_reserve (suma 18.304 MiB).
+          # La memoria (vivo 3 GiB) sigue en 896M: 3G rompe el guard de 20.480 MiB
+          # de test_memory_limits_fit_the_24gb_vm_with_host_reserve
+          # (suma actual 19.712 MiB en 20 servicios; ver cabecera).
           cpus: "2.00"
           memory: 896M
 
@@ -394,7 +398,8 @@ services:
       resources:
         limits:
           cpus: "2.00"
-          # KPI +576 MiB reasignados del backend: stack total 16 GiB.
+          # KPI +576 MiB reasignados del backend: stack total 19.712 MiB
+          # (19,25 GiB), bajo el guard de 20.480 MiB.
           # Pico backend 965.8 MiB en ~3 h, no 24 h; validar antes de deploy.
           memory: 1472M
 
@@ -841,7 +846,8 @@ services:
     # y snapshot mensual - todo trabajos cortos y acreditados) la consume ESTE
     # mismo worker:
     # son jobs cortos y diarios, y el presupuesto de memoria del stack ya esta
-    # en su techo de 10 GiB (un contenedor nuevo lo romperia; hay test). Peor
+    # en 19.712 MiB (19,25 GiB) frente al guard de 20.480 MiB: solo quedan
+    # 768 MiB, asi que un contenedor nuevo lo romperia (hay test). Peor
     # caso: una corrida del embudo (minutos, una vez al dia) retrasa un ciclo
     # de alertas menos que su propia cadencia de 5-15 min; el otro hilo sigue
     # libre. CPU acotada a 0.75 para rafagas cortas; validar throttling/latencia
@@ -1062,7 +1068,7 @@ services:
       resources:
         limits:
           # 1 CPU: la ingesta no compite con la web. 1G = el presupuesto que
-          # quedaba en el techo del stack (16 GiB, test_documents_queue) y
+          # quedaba en el techo del stack (20.480 MiB, test_documents_queue) y
           # sigue el precedente de Docling en worker-knowledge (512-640M).
           # Con fastembed cacheado el ONNX cabe holgado; si el fallback
           # sentence-transformers (~2,3 GiB medido) llegara a cargar, el
