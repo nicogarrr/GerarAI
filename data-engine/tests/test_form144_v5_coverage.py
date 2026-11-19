@@ -407,6 +407,51 @@ def test_persist_existing_filing_notifies_news_without_duplicate(monkeypatch):
     assert seen  # la noticia se recalcula sobre la fila existente
 
 
+@pytest.mark.parametrize("error", [ValueError, RuntimeError, KeyError])
+def test_news_failure_is_logged_without_payload_new_and_existing_filing(monkeypatch, error):
+    """Semgrep gerarai-broad-except-pass: el fallo ya no se traga en silencio.
+    Se registra accession y clase del error en el aviso nuevo Y en el existente.
+    El log RENDERIZADO (handler real + Formatter, con el filtro de redaccion de la
+    app) no contiene ni el mensaje de la excepcion ni su traceback: record.getMessage()
+    no formatea exc_info y por eso no basta para comprobarlo."""
+    import io
+    import logging
+
+    from app.core.log_redaction import SecretRedactingFilter
+
+    marker = "MARCADOR-SINTETICO-DEL-PAYLOAD"
+    stream = io.StringIO()
+    handler = logging.StreamHandler(stream)
+    handler.setFormatter(logging.Formatter("%(levelname)s %(message)s"))
+    handler.addFilter(SecretRedactingFilter())
+    target = logging.getLogger("app.services.form144_persistence")
+    target.addHandler(handler)
+    previous_level = target.level
+    target.setLevel(logging.WARNING)
+    db = _db()
+
+    def boom(*args, **kwargs):
+        raise error(marker)
+
+    monkeypatch.setattr("app.services.form144_news.ensure_news", boom)
+    parsed = form144.parse_form144_xml(REAL_144_XML)
+    try:
+        first = form144_persistence.persist_filing(db, dict(_FILING), parsed, raw_text=REAL_144_XML)
+        second = form144_persistence.persist_filing(db, dict(_FILING), parsed, raw_text=REAL_144_XML)
+    finally:
+        target.removeHandler(handler)
+        target.setLevel(previous_level)
+    assert first["filing_created"] is True and second["filing_created"] is False
+    assert second["filing_id"] == first["filing_id"]
+    rendered = stream.getvalue()
+    lines = [line for line in rendered.splitlines() if "no se pudo derivar la noticia" in line]
+    assert len(lines) == 2  # uno por la rama de aviso nuevo y otro por la del existente
+    for line in lines:
+        assert _FILING["accession_number"] in line and error.__name__ in line
+    assert marker not in rendered  # ni el mensaje de la excepcion...
+    assert "Traceback" not in rendered  # ...ni el traceback
+
+
 def test_news_failure_is_best_effort_and_dedup_survives(monkeypatch):
     """Un fallo al derivar la noticia no rompe el escaneo ni repite el filing.
 
