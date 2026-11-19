@@ -184,7 +184,7 @@ const SignInForm = ({ passwordResetAvailable, publicSignUpOpen = false, redirect
                 {passwordResetAvailable ? (
                     <div className="text-right">
                         <Link
-                            className="text-sm text-gray-400 underline-offset-4 transition-colors hover:text-teal-300 hover:underline"
+                            className="inline-flex min-h-6 items-center text-sm text-gray-400 underline-offset-4 transition-colors hover:text-teal-300 hover:underline"
                             href="/forgot-password"
                         >
                             {t('auth.signIn.forgotLink')}

@@ -42,10 +42,10 @@ export default async function PublicLanding() {
                 <p className="inline-flex max-w-full items-center gap-2 rounded-full border border-teal-400/30 bg-teal-400/10 px-4 py-2 text-xs font-semibold uppercase leading-5 tracking-[0.16em] text-teal-300 sm:tracking-[0.2em]">
                     {t('landing.hero.kicker')}
                 </p>
-                <h1 className="mx-auto mt-4 max-w-3xl text-balance text-[clamp(2.7rem,11vw,3.1rem)] font-semibold leading-[1.12] tracking-[-0.015em] text-gray-100 sm:mt-6 sm:text-7xl">
+                <h1 className="mx-auto mt-4 max-w-3xl text-balance text-[clamp(2.5rem,5.5vw,4.25rem)] font-semibold leading-[1.08] tracking-[-0.02em] text-gray-100 sm:mt-6">
                     {t('landing.hero.titlePre')}<span className="italic text-teal-300" style={{ fontFamily: "var(--font-editorial), Georgia, serif" }}>{t('landing.hero.titleHighlight')}</span>{t('landing.hero.titlePost')}
                 </h1>
-                <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-gray-400 sm:mt-6 sm:text-balance sm:text-lg sm:leading-8">
+                <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-gray-500 sm:mt-6 sm:text-balance sm:text-lg sm:leading-8">
                     {t('landing.hero.subtitle')}
                 </p>
                 <div className="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-center">
