@@ -22,6 +22,29 @@ describe('thesis job lifecycle without any model call', () => {
     it('checks fresh availability before explicit start and deduplicates repeated clicks', async () => {
         let resolve!: (v: unknown) => void; m.start.mockImplementation(() => new Promise(r => { resolve = r; })); await mount(); const button = screen.getByRole('button'); await act(async () => { fireEvent.click(button); }); expect(m.available).toHaveBeenCalledOnce(); expect(m.start).toHaveBeenCalledWith('A/B', true, expect.any(String)); expect(button).toBeDisabled(); fireEvent.click(button); expect(m.start).toHaveBeenCalledOnce(); await act(async () => resolve(job('queued'))); expect(m.poll).toHaveBeenCalledWith(71);
     });
+    it('locks repeated clicks while the fresh availability check is still pending', async () => {
+        let resolve!: (allowed: boolean) => void;
+        const pending = new Promise<boolean>(r => { resolve = r; });
+        m.available.mockReturnValue(pending);
+        await mount();
+        const button = screen.getByRole('button');
+        fireEvent.click(button);
+        fireEvent.click(button);
+        await act(async () => { resolve(true); });
+        expect(m.start).toHaveBeenCalledOnce();
+        expect(m.available).toHaveBeenCalledOnce();
+        expect(m.start).toHaveBeenCalledWith('A/B', true, expect.any(String));
+    });
+    it('releases the pending availability lock after denial so a later click can retry', async () => {
+        m.available.mockResolvedValueOnce(false).mockResolvedValue(true);
+        await mount();
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(m.start).not.toHaveBeenCalled();
+        expect(screen.getByRole('button')).toBeEnabled();
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(m.available).toHaveBeenCalledTimes(2);
+        expect(m.start).toHaveBeenCalledOnce();
+    });
     it.each([false, true])('does not start when availability denies the request (initial denied=%s)', async denied => {
         m.canStart = !denied; m.available.mockResolvedValue(false); await mount(); await act(async () => { fireEvent.click(screen.getByRole('button')); }); expect(m.start).not.toHaveBeenCalled(); expect(m.available).toHaveBeenCalledTimes(denied ? 0 : 1);
     });
