@@ -160,6 +160,14 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
             AlertAnalysis.alert_id.in_([alert.id for alert in prior_by_fp.values()]),
             AlertAnalysis.version == ANALYSIS_VERSION,
         )).all()) if prior_by_fp else set()
+        # Dedup cruzado (misma noticia avisada por otra via) precargado por
+        # pagina: una consulta para TODAS las companias en vez de una por
+        # candidata (con sus db.get de NewsEvent a continuacion).
+        from app.services.news_identity import prefetch_news_alert_dedup
+
+        alert_dedup = prefetch_news_alert_dedup(
+            db, {event.company_id for event in candidates}, now
+        )
         for event in candidates:
             stats["examined"] += 1
             url = _valid_source_url(event.url)
@@ -211,7 +219,10 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
                 continue
             from app.services.news_identity import equivalent_news_alert
 
-            if equivalent_news_alert(db, company_id=company.id, url=url, title=event.title, now=now) is not None:
+            if equivalent_news_alert(
+                db, company_id=company.id, url=url, title=event.title, now=now,
+                _prefetched=alert_dedup,
+            ) is not None:
                 # La misma noticia ya avisó por otra vía (revisión de tesis o regla news).
                 stats["duplicates"] += 1
                 continue
@@ -257,6 +268,10 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
             # Otra noticia de esta misma página con la misma URL y empresa la ve
             # como ya avisada, igual que con la consulta por fila.
             prior_by_fp[fp] = alert
+            # Y el dedup cruzado precargado también (id más alto: va primero),
+            # igual que la consulta por candidata que lo habría visto ya.
+            alert_dedup.by_company.setdefault(company.id, []).insert(0, alert)
+            alert_dedup.news_by_id[event.id] = event
             # Persist baseline work before enqueue: a Redis failure must not
             # erase a valid alert. Only a newly gated alert gets one analysis.
             from app.services.alert_analysis_service import queue_analysis
