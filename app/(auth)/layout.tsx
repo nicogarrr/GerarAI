@@ -1,4 +1,5 @@
 import { readSessionWhenCookies } from "@/lib/anonymous-session";
+import { isAccountActive } from "@/lib/auth/account-approval";
 import { publicSans } from "@/lib/public-fonts";
 import Link from "next/link";
 import React from "react";
@@ -23,7 +24,14 @@ const Layout = async ({ children }: { children : React.ReactNode }) => {
             const auth = await getAuth();
             return auth.api.getSession({ headers: requestHeaders });
         });
-        if (session?.user) redirect('/inicio');
+        // Solo una cuenta ACTIVA va al panel. Una sesión viva de cuenta
+        // pending/rejected (p.ej. aprobada y después rechazada: el rechazo no
+        // revoca sesiones) rebotaría en bucle: (root)/layout la rechaza con
+        // 403 → /sign-in → este layout → /inicio → 403… Sin redirect, el shell
+        // de auth renderiza: /cuenta-pendiente muestra el estado honesto y el
+        // sign-in enruta a esa pantalla al enviar (endpoint.ts).
+        const accountStatus = (session?.user as { accountStatus?: unknown } | undefined)?.accountStatus;
+        if (session?.user && isAccountActive(accountStatus)) redirect('/inicio');
     }
     return (
         <main className={`auth-layout ${publicSans.className}`}>
