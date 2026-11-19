@@ -78,7 +78,12 @@ def default_headers(user_agent: str | None = None) -> dict[str, str]:
 
 
 def _pad_cik(cik: str | int) -> str:
-    return str(cik).strip().zfill(10)
+    """CIK a 10 digitos, validado ANTES de construir la URL (mismo contrato
+    que edgar_common._pad_cik: los CIK de la SEC son numericos, max 10)."""
+    digits = str(cik).strip()
+    if not digits.isascii() or not digits.isdigit() or len(digits) > 10:
+        raise ValueError(f"CIK debe ser numerico (max 10 digitos): {str(cik)!r}")
+    return digits.zfill(10)
 
 
 def _snapshot_path_for(url: str) -> Path | None:

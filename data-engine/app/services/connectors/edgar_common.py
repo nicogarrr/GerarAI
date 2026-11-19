@@ -102,7 +102,18 @@ def default_headers() -> dict[str, str]:
 
 
 def _pad_cik(cik: str | int) -> str:
-    return str(cik).strip().zfill(10)
+    """CIK a 10 digitos, validado ANTES de construir la URL.
+
+    Sin la validacion un CIK basura (p.ej. ``123abc`` desde la API, que admite
+    cualquier cadena de <=10 chars) salia a la SEC con ``CIK0000123abc.json``,
+    y segun la ruta acababa en 404 poco claro o en un ValueError de ``int()``
+    DESPUES de la llamada de red. Fallar aqui da un error limpio sin salir a
+    internet. Los CIK de la SEC son numericos y de 10 digitos como maximo.
+    """
+    digits = str(cik).strip()
+    if not digits.isascii() or not digits.isdigit() or len(digits) > 10:
+        raise ValueError(f"CIK debe ser numerico (max 10 digitos): {str(cik)!r}")
+    return digits.zfill(10)
 
 
 def filing_index_url(cik: str | int, accession_number: str) -> str:
