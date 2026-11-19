@@ -10,7 +10,7 @@ import re
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import and_, desc, select, tuple_
+from sqlalchemy import and_, desc, func, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -168,6 +168,31 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
         alert_dedup = prefetch_news_alert_dedup(
             db, {event.company_id for event in candidates}, now
         )
+        # Cooldown por compania precargado por pagina: una consulta con la
+        # MISMA ordenacion (last_triggered_at DESC; mismo dialecto, misma
+        # lectura de NULLs) via funcion ventana, en vez de un SELECT por
+        # candidata superviviente.
+        page_company_ids = {event.company_id for event in candidates if event.company_id is not None}
+        if page_company_ids:
+            rn = func.row_number().over(
+                partition_by=ResearchAlert.company_id,
+                order_by=desc(ResearchAlert.last_triggered_at),
+            ).label("rn")
+            sub = select(ResearchAlert.id.label("aid"), rn).where(
+                ResearchAlert.tenant_id == tenant_id,
+                ResearchAlert.company_id.in_(page_company_ids),
+                ResearchAlert.alert_type == "tracked_news",
+            ).subquery()
+            recent_by_company = {
+                alert.company_id: alert
+                for alert in db.scalars(
+                    select(ResearchAlert).where(
+                        ResearchAlert.id.in_(select(sub.c.aid).where(sub.c.rn == 1))
+                    )
+                ).all()
+            }
+        else:
+            recent_by_company = {}
         for event in candidates:
             stats["examined"] += 1
             url = _valid_source_url(event.url)
@@ -226,11 +251,7 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
                 # La misma noticia ya avisó por otra vía (revisión de tesis o regla news).
                 stats["duplicates"] += 1
                 continue
-            recent = db.scalar(select(ResearchAlert).where(
-                ResearchAlert.tenant_id == tenant_id,
-                ResearchAlert.company_id == company.id,
-                ResearchAlert.alert_type == "tracked_news",
-            ).order_by(desc(ResearchAlert.last_triggered_at)).limit(1))
+            recent = recent_by_company.get(company.id)
             if recent is not None:
                 last_triggered = _aware(recent.last_triggered_at or recent.created_at)
                 # Cooldown-suppressed backlog cannot burst out six hours later.
@@ -272,6 +293,8 @@ def evaluate(db: Session, *, now: datetime | None = None, limit: int = 500) -> d
             # igual que la consulta por candidata que lo habría visto ya.
             alert_dedup.by_company.setdefault(company.id, []).insert(0, alert)
             alert_dedup.news_by_id[event.id] = event
+            # Y el cooldown: la consulta por candidata la habria visto ya.
+            recent_by_company[company.id] = alert
             # Persist baseline work before enqueue: a Redis failure must not
             # erase a valid alert. Only a newly gated alert gets one analysis.
             from app.services.alert_analysis_service import queue_analysis
