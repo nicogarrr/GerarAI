@@ -53,7 +53,8 @@ def render(text, run_id, build_id, external_images):
     could introduce work/data not covered by the RUN gates.
     """
     require(isinstance(run_id, str) and re.fullmatch('[a-z0-9][a-z0-9-]{7,47}', run_id), 'Invalid run ID')
-    require(build_id in ('backend', 'frontend'), 'Closed backend/frontend build IDs only')
+    require(build_id in ('backend', 'frontend', 'smoke-success', 'smoke-failure', 'smoke-cancel'),
+            'Closed build IDs only')
     recipe = hashlib.sha256(text.encode()).hexdigest()
     gate = '/tmp/gerarai-bench-release-' + uuid.uuid4().hex
     stages = set()
