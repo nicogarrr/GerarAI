@@ -89,6 +89,11 @@ _NEWS_ASK_RE = re.compile(
     # «qué dicen de PLTR hoy» / «qué se dice de PLTR»: noticias sin la
     # palabra «noticias» (medido 2026-11-19: no enrutaba a GDELT en vivo).
     r"qu[eé]\s+(?:dicen|se\s+dice)\s+(?:de|sobre)|"
+    # «PLTR news» / «palantir news» (medido 2026-11-19: tampoco enrutaba).
+    # Las formas genéricas («latest news», «breaking news», «the news»)
+    # quedan fuera por el lookahead; la empresa la resuelve el catálogo.
+    r"\b(?!the\b|latest\b|breaking\b|any\b|some\b|good\b|bad\b|this\b|that\b|my\b|your\b|"
+    r"our\b|world\b|market\b|stock\b|share\b)[a-z][a-z0-9&.'-]{2,}\s+news\b|"
     r"qu[eé]\s+pasa\s+con|news\s+(?:on|about)|latest\s+on)\b"
 )
 # «Noticias de mis empresas / mi cartera» ya las responde la ruta guardada

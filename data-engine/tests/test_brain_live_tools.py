@@ -498,6 +498,10 @@ def test_ticker_first_price_with_exclusion_never_calls_provider(db, monkeypatch)
     "qué dicen de PLTR hoy",
     "qué se dice de PLTR",
     "qué dicen sobre PLTR",
+    "PLTR news",
+    "palantir news",
+    "ASTS news",
+    "apple news today",
 ])
 def test_news_phrasings_route_live(question):
     from app.services.brain_live_tools import _NEWS_ASK_RE, _NEWS_EXCLUDE_RE
@@ -508,6 +512,10 @@ def test_news_phrasings_route_live(question):
 @pytest.mark.parametrize("question", [
     "qué dicen de mis empresas",
     "qué dicen de mi cartera",
+    "latest news",
+    "breaking news",
+    "the news",
+    "PLTR news sell",
 ])
 def test_news_phrasings_do_not_hijack_portfolio_routes(question):
     from app.services.brain_live_tools import _NEWS_ASK_RE, _NEWS_EXCLUDE_RE
@@ -522,6 +530,10 @@ def test_que_dicen_de_reaches_live_news(db, monkeypatch):
          "seendate": "20270115T100000Z", "domain": "example.com", "language": "spanish"},
     ]})
     response = asyncio.run(answer_live_question(db, "qué dicen de PLTR hoy"))
+    assert response is not None
+    assert any(source["type"] == "live_news" for source in response.sources)
+
+    response = asyncio.run(answer_live_question(db, "PLTR news"))
     assert response is not None
     assert any(source["type"] == "live_news" for source in response.sources)
 
