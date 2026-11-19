@@ -118,3 +118,41 @@ def test_ingest_news_items_reads_catalog_once(db):
     NewsService().ingest_news_items(db, items, connector="gdelt", default_source="gdelt")
     assert counter["n"] == 1, f"N+1 del catalogo en ingesta: {counter['n']} lecturas completas"
     assert _PIN_KEY not in db.info
+
+
+def test_resolve_company_uses_pinned_catalog_without_sql(db):
+    """resolve_company con el catalogo pineado: match exacto sin SELECT.
+
+    Las 2 lecturas indexadas por noticia ingerida (dedup + analyze) pasan a
+    0; solo los fallbacks (referencia FIGI, variantes de clase, sufijo de
+    bolsa) siguen consultando la BD cuando el exacto falla.
+    """
+    from app.services.company_resolver import resolve_company
+
+    with pinned_catalog(db):
+        counter = _full_reads(db)
+        indexed = {"n": 0}
+
+        @event.listens_for(db.get_bind(), "before_cursor_execute")
+        def _count_idx(conn, cursor, statement, parameters, context, executemany):
+            if "from companies" in statement.lower():
+                indexed["n"] += 1
+
+        company = resolve_company(db, "AAPL")
+        assert company is not None and company.ticker == "AAPL"
+        assert indexed["n"] == 0, f"resolve_company consulto la BD con el catalogo pineado: {indexed['n']}"
+        assert counter["n"] == 0
+
+
+def test_resolve_company_fallback_still_queries_db(db):
+    """Ticker con sufijo de mercado sin match exacto: el fallback SQL sigue."""
+    from app.services.company_resolver import resolve_company
+
+    with pinned_catalog(db):
+        company = resolve_company(db, "AAPL.NOEXISTE")
+        assert company is None  # sufijo desconocido: sin fallback
+        db.add(_company("IBE"))
+        db.flush()
+        # Pin invalidado por la escritura: ahora SI consulta y la ve.
+        found = resolve_company(db, "IBE")
+        assert found is not None and found.ticker == "IBE"

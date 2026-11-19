@@ -63,6 +63,32 @@ def all_companies(db: Session) -> list[Company]:
     return rows
 
 
+def catalog_if_loaded(db: Session) -> list[Company] | None:
+    """El catalogo SOLO si ya esta en memoria (pin o cache de transaccion).
+
+    Nunca lee: para resolvedores que prefieren una busqueda indexada a
+    cargar las ~2.100 filas cuando el catalogo no esta caliente (p.ej.
+    resolve_company). Mismos guards que all_companies.
+    """
+    pinned = db.info.get(_PIN_KEY)
+    if (
+        pinned is not None
+        and not db.expire_on_commit
+        and not _has_pending_company_writes(db)
+    ):
+        return pinned
+    tx = db.get_transaction()
+    cached = db.info.get(_CACHE_KEY)
+    if (
+        tx is not None
+        and cached is not None
+        and cached[0] is tx
+        and not _has_pending_company_writes(db)
+    ):
+        return cached[1]
+    return None
+
+
 @contextmanager
 def pinned_catalog(db: Session):
     """Fija el catalogo para una tanda de lecturas intensiva (p.ej. ingesta).

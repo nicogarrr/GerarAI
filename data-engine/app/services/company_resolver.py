@@ -130,9 +130,23 @@ def resolve_company(db: Session, ticker: str) -> Company | None:
     funciona exacto igual que hoy; un desconocido sigue siendo None.
     """
     normalized = ticker.strip().upper()
-    company = db.scalar(select(Company).where(Company.ticker == normalized))
-    if company is not None:
-        return company
+    # Catalogo ya en memoria (tanda de ingesta pineada o cache de
+    # transaccion): el match exacto es una busqueda en la lista, no un
+    # SELECT por noticia (medido: 2 lecturas indexadas por item ingerido).
+    # Solo el match exacto usa la lista; los fallbacks de abajo (referencia
+    # FIGI, variantes de clase, sufijo de bolsa) necesitan la BD fresca y
+    # siguen consultando.
+    from app.services.company_catalog import catalog_if_loaded
+
+    catalog = catalog_if_loaded(db)
+    if catalog is not None:
+        company = next((c for c in catalog if c.ticker == normalized), None)
+        if company is not None:
+            return company
+    else:
+        company = db.scalar(select(Company).where(Company.ticker == normalized))
+        if company is not None:
+            return company
     for candidate in _reference_company_candidates(db, normalized):
         company = db.scalar(select(Company).where(Company.ticker == candidate))
         if company is not None:

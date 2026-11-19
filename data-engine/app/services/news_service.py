@@ -220,6 +220,12 @@ def _ticker_evidence(ticker: str, name: str | None, text: str) -> bool:
 # desvincularia.
 _FEED_TICKER_TRUSTED_CONNECTORS = frozenset({"sec", "ir"})
 
+#: Clave de db.info con la foto (company_ids con Position, symbols de
+#: WatchItem) para el flag tracked de UNA tanda: 2 EXISTS por noticia
+#: (Position + WatchItem) pasan a 2 lecturas por tanda. Solo datos LEIDOS;
+#: la tanda no escribe Position ni WatchItem.
+_TRACKED_SNAPSHOT_KEY = "news_tracked_snapshot"
+
 
 def _feed_ticker_needs_evidence(ticker: str) -> bool:
     """Siglas que son palabras o abreviaturas corrientes: el ticker que trae
@@ -600,27 +606,38 @@ class NewsService:
                 mark_only,
             )
 
-            tracked = bool(
-                company
-                and (
-                    db.scalar(
-                        select(Position.id)
-                        .where(
-                            Position.company_id == company.id,
-                            *tenant_filters(db, Position),
+            # Por tanda: 2 EXISTS (Position + WatchItem) por noticia para el
+            # flag tracked (medido: 6 sentencias en 3 items). La tanda las
+            # precarga una vez en db.info; noticia suelta: como siempre.
+            tracked_snapshot = db.info.get(_TRACKED_SNAPSHOT_KEY)
+            if tracked_snapshot is not None:
+                tracked_ids, tracked_symbols = tracked_snapshot
+                tracked = bool(
+                    company
+                    and (company.id in tracked_ids or company.ticker in tracked_symbols)
+                )
+            else:
+                tracked = bool(
+                    company
+                    and (
+                        db.scalar(
+                            select(Position.id)
+                            .where(
+                                Position.company_id == company.id,
+                                *tenant_filters(db, Position),
+                            )
+                            .limit(1)
                         )
-                        .limit(1)
-                    )
-                    or db.scalar(
-                        select(WatchItem.id)
-                        .where(
-                            WatchItem.symbol == company.ticker,
-                            *tenant_filters(db, WatchItem),
+                        or db.scalar(
+                            select(WatchItem.id)
+                            .where(
+                                WatchItem.symbol == company.ticker,
+                                *tenant_filters(db, WatchItem),
+                            )
+                            .limit(1)
                         )
-                        .limit(1)
                     )
                 )
-            )
             if source.lower() == "gdelt" and company:
                 mark = mark_only(
                     "universe_relevance",
@@ -820,6 +837,26 @@ class NewsService:
         if owns_snapshot:
             db.info[POSITIONS_SNAPSHOT_KEY] = None
 
+        owns_tracked = _TRACKED_SNAPSHOT_KEY not in db.info
+        if owns_tracked:
+            from app.models import Position as _Pos
+            from app.models import WatchItem as _WI
+
+            db.info[_TRACKED_SNAPSHOT_KEY] = (
+                set(
+                    db.scalars(
+                        select(_Pos.company_id).where(*tenant_filters(db, _Pos)).distinct()
+                    ).all()
+                ),
+                {
+                    str(sym)
+                    for sym in db.scalars(
+                        select(_WI.symbol).where(*tenant_filters(db, _WI)).distinct()
+                    ).all()
+                    if sym
+                },
+            )
+
         # El catalogo de empresas se lee por transaccion y la tanda commitea
         # por item: cada noticia re-leia las ~2.100 filas y reconstruia el
         # matcher de alias (medido: 25 lecturas completas y ~154 ms/item en
@@ -913,6 +950,8 @@ class NewsService:
         finally:
             if owns_snapshot:
                 db.info.pop(POSITIONS_SNAPSHOT_KEY, None)
+            if owns_tracked:
+                db.info.pop(_TRACKED_SNAPSHOT_KEY, None)
 
         return NewsIngestResponse(
             status="ingested",
