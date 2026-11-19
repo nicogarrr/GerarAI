@@ -148,6 +148,8 @@
     "chainStrike": "Strike (chain)",
     "chainStrikePh": "Choose strike",
     "chainNoTrade": "No recorded trade in this chain for this contract.",
+    "chainFetchedAt": "Chain fetched at {time}.",
+    "chainNotListed": "This contract is not in the fetched sample (nearest expiries); check strike and expiry.",
     "chainRefTrade": "Last delayed trade: {price} USD · {time} (New York). Reference, not the current price.",
     "chainError": {
       "invalidSymbol": "Enter a valid symbol to query the chain.",

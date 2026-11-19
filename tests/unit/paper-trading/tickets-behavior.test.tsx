@@ -125,6 +125,33 @@ describe('guided option chain picker (CBOE delayed chain)', () => {
         expect(screen.getByLabelText('Strike')).toBeInTheDocument();
         expect(screen.queryByLabelText(/strike \(chain\)/i)).not.toBeInTheDocument();
     });
+    it('warns when the typed contract is not in the fetched chain sample, without blocking it', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        const expirySelect = await screen.findByLabelText(/expiry \(chain\)/i);
+        fireEvent.change(expirySelect, { target: { value: '2026-12-18' } });
+        // Strike escrito a mano que no esta en la muestra: aviso, no error.
+        fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '999' } });
+        expect(screen.getByText(/not in the fetched sample/i)).toBeInTheDocument();
+        // Vuelve a un strike listado: el aviso desaparece.
+        fireEvent.change(screen.getByLabelText('Strike'), { target: { value: '400' } });
+        expect(screen.queryByText(/not in the fetched sample/i)).not.toBeInTheDocument();
+    });
+    it('labels when the chain was fetched', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        expect(await screen.findByText(/chain fetched at/i)).toBeInTheDocument();
+    });
+    it('never judges a contract against another underlying chain: editing the symbol discards it', async () => {
+        const fetchOptionChain = vi.fn().mockResolvedValue(chainOk);
+        renderOptionTicket(fetchOptionChain);
+        await act(async () => { fireEvent.click(screen.getByRole('button', { name: /show real chain/i })); });
+        await screen.findByLabelText(/expiry \(chain\)/i);
+        fireEvent.change(screen.getByLabelText(/symbol|ticker/i), { target: { value: 'AAPL' } });
+        expect(screen.queryByLabelText(/expiry \(chain\)/i)).not.toBeInTheDocument();
+    });
     it('a rejected fetch (throw) degrades to the same honest note', async () => {
         const fetchOptionChain = vi.fn().mockRejectedValue(new Error('network'));
         renderOptionTicket(fetchOptionChain);

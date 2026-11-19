@@ -152,15 +152,23 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
         }
     }
 
+    // ¿Cubre la cadena cargada el subyacente del ticket? Si el usuario edita
+    // el símbolo tras consultar, la cadena se descarta; este candado evita
+    // además juzgar un contrato contra la cadena de OTRO subyacente.
+    const chainCoversSymbol = chain !== null && chain.underlying === symbol.trim().toUpperCase();
+
     // Referencia de la última operación del contrato elegido (si la cadena
     // la registra). Es dato DIFERIDO de CBOE, nunca el precio actual.
-    const chainRef = (() => {
-        if (!chain || !expiry) return undefined;
+    // chainListed: false = el par vencimiento/strike NO aparece en la muestra
+    // consultada (aviso, no error: puede existir fuera de los vencimientos
+    // mostrados o haberse escrito a mano).
+    const { chainRef, chainListed } = (() => {
+        if (!chainCoversSymbol || !chain || !expiry) return { chainRef: undefined, chainListed: undefined };
         const parsed = parseEsNumber(strike);
-        if (!Number.isFinite(parsed)) return undefined;
+        if (!Number.isFinite(parsed)) return { chainRef: undefined, chainListed: undefined };
         const row = chain.expiries.find((e) => e.expiry === expiry)?.strikes.find((r) => r.strike === parsed);
-        if (!row) return null;
-        return row[callPut];
+        if (!row) return { chainRef: undefined, chainListed: false };
+        return { chainRef: row[callPut], chainListed: true };
     })();
 
     const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, executedAtLocal]);
@@ -455,7 +463,10 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
                                         id={`${uid}-chain-strike`}
                                         className="w-full rounded-md border border-gray-800 bg-transparent px-2 text-base sm:text-sm"
                                         style={{ minHeight: 44 }}
-                                        value=""
+                                        value={(() => {
+                                            const strikes = chain.expiries.find((e) => e.expiry === expiry)?.strikes ?? [];
+                                            return strikes.some((r) => String(r.strike) === strike) ? strike : '';
+                                        })()}
                                         onChange={(event) => {
                                             if (event.target.value) setStrike(event.target.value);
                                         }}
@@ -466,6 +477,12 @@ export function OrderTicket({ submitFill, disabled, account = null, fetchOptionC
                                         ))}
                                     </select>
                                 </div>
+                                <p className="col-span-2 text-xs text-gray-500">
+                                    {ti('paperTrading.ticket.chainFetchedAt', { time: new Date(chain.fetchedAt).toLocaleTimeString(locale) })}
+                                </p>
+                                {chainListed === false ? (
+                                    <p className="col-span-2 text-xs text-amber-400">{ti('paperTrading.ticket.chainNotListed')}</p>
+                                ) : null}
                                 {chainRef !== undefined ? (
                                     <p className="col-span-2 text-xs text-gray-500">
                                         {chainRef

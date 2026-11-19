@@ -58,6 +58,19 @@ describe('selector guiado de contrato (cadena CBOE diferida)', () => {
         assert.match(es.ticket.chainError['notCovered'], /escribe el contrato a mano/);
     });
 
+    it('avisa si el contrato no está en la muestra consultada, sin bloquearlo ni juzgar con otra cadena', () => {
+        assert.match(ticket, /chain\.underlying === symbol\.trim\(\)\.toUpperCase\(\)/);
+        assert.match(ticket, /paperTrading\.ticket\.chainNotListed/);
+        assert.match(es.ticket.chainNotListed, /muestra consultada/);
+        // Es un aviso informativo, nunca un error de validación que bloquee.
+        assert.match(ticket, /text-amber-400\"\>\{ti\('paperTrading\.ticket\.chainNotListed'\)/);
+    });
+
+    it('la edad de la cadena consultada queda etiquetada (fetchedAt de la fuente)', () => {
+        assert.match(ticket, /paperTrading\.ticket\.chainFetchedAt/);
+        assert.match(es.ticket.chainFetchedAt, /\{time\}/);
+    });
+
     it('el fracaso de la fuente no rompe el ticket: hay estado de error explícito', () => {
         assert.match(ticket, /setChainError\(chainErrorMessage\(ti, result\.reason\)\)/);
         assert.match(ticket, /setChainError\(ti\('paperTrading\.ticket\.chainError\.sourceUnavailable'\)\)/);

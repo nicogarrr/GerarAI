@@ -148,6 +148,8 @@
     "chainStrike": "Strike (cadena)",
     "chainStrikePh": "Elige strike",
     "chainNoTrade": "Sin operación registrada en esta cadena para este contrato.",
+    "chainFetchedAt": "Cadena consultada a las {time}.",
+    "chainNotListed": "Este contrato no aparece en la muestra consultada (los vencimientos más próximos); comprueba strike y vencimiento.",
     "chainRefTrade": "Última operación diferida: {price} USD · {time} (Nueva York). Referencia, no precio actual.",
     "chainError": {
       "invalidSymbol": "Escribe un símbolo válido para consultar la cadena.",
