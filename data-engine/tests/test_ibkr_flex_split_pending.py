@@ -119,3 +119,23 @@ def test_applying_the_flex_split_preserves_cost_basis_and_holds_valuation(db):
     assert Decimal(position.average_cost) == Decimal("100")
     assert Decimal(position.quantity) * Decimal(position.average_cost) == Decimal("10000")  # coste total intacto
     assert position.valuation_hold_reason
+
+
+def test_split_deleted_between_imports_is_registered_again(db):
+    # La cache de dedup es de sesion: si la fila ya no existe, reimportar vuelve a
+    # registrarla en vez de darla por «pendiente» con una entrada obsoleta.
+    IBKRImportService().import_flex_xml(db, _flex(TRADE, SPLIT))
+    for action in _actions(db):
+        db.delete(action)
+    db.commit()
+    assert _actions(db) == []
+    result = IBKRImportService().import_flex_xml(db, _flex(TRADE, SPLIT))
+    assert len(_actions(db)) == 1
+    assert any("registrada como pendiente" in e for e in result["row_errors"])
+
+
+def test_two_splits_same_flex_each_registered_once_across_reimports(db):
+    flex = _flex(TRADE, SPLIT, REVERSE)
+    for _ in range(3):
+        IBKRImportService().import_flex_xml(db, flex)
+    assert sorted(a.ratio for a in _actions(db)) == [Decimal("0.1"), Decimal("10")]
