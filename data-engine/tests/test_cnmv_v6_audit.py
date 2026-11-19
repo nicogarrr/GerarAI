@@ -16,51 +16,59 @@ from app.services.connectors.global_pacing import GlobalPacer
 OIR_HTML = (Path(__file__).parent / "fixtures" / "cnmv_oir_results.html").read_text(encoding="utf-8")
 
 
-def test_wait_sync_thread_does_not_block_async_waiter_or_loop():
+def test_wait_sync_thread_does_not_block_async_waiter_or_loop(monkeypatch):
+    """Reloj simulado y puertas por evento (antes: cooldown real de 0,3 s y
+    `max(gaps) < 0.08`, una cota de pared que la CPU cargada rompe).
+
+    El hilo sync queda DORMIDO esperando el cooldown (puerta). Mientras tanto el
+    event loop hace la espera async de OIR y descarga: si wait_sync durmiera con
+    _local_lock tomado, la espera async se quedaria bloqueada en el lock y el
+    perro guardian soltaria la puerta (marca `watchdog`)."""
     pacer = cnmv_pacer.cnmv_pacer
+    clock = [1000.0]
+    entered, gate = threading.Event(), threading.Event()
+    watchdog: list[bool] = []
+    slept_async: list[float] = []
+
+    def gated_sleep(seconds):
+        entered.set()  # el hilo YA esta durmiendo esperando el cooldown
+        gate.wait(10)
+
+    async def fake_sleep_async(seconds):
+        slept_async.append(seconds)
+        clock[0] += seconds  # el cooldown vence en tiempo simulado
+
+    monkeypatch.setattr(pacer, "_factory", None)  # ruta local, aunque haya Redis
+    monkeypatch.setattr(pacer, "_monotonic", lambda: clock[0])
+    monkeypatch.setattr(pacer, "_sleep", gated_sleep)
+    monkeypatch.setattr(pacer, "_sleep_async", fake_sleep_async)
     pacer.reset()
-    t0 = time.monotonic()
     pacer.cool_down(0.3)
     sync_done: list[float] = []
-    sleeping = threading.Event()
-    real_sleep = pacer._sleep
-
-    def spy_sleep(seconds):
-        sleeping.set()  # el hilo YA esta durmiendo esperando el cooldown
-        real_sleep(seconds)
-
-    pacer._sleep = spy_sleep
-    worker = threading.Thread(target=lambda: (pacer.wait_sync(), sync_done.append(time.monotonic() - t0)))
-    worker.start()
-    assert sleeping.wait(2)
-    gaps: list[float] = []
-
-    async def heartbeat(stop: asyncio.Event):
-        last = time.monotonic()
-        while not stop.is_set():
-            await asyncio.sleep(0.01)
-            now = time.monotonic()
-            gaps.append(now - last)
-            last = now
-
-    async def run():
-        stop = asyncio.Event()
-        beat = asyncio.create_task(heartbeat(stop))
-        await asyncio.sleep(0.03)  # el latido ya esta en marcha antes de que OIR espere
-        handler = lambda r: httpx.Response(200, text=OIR_HTML)  # noqa: E731
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            await cnmv.fetch_oir_filings(days=1, client=client)
-        stop.set()
-        await beat
-
+    worker = threading.Thread(target=lambda: (pacer.wait_sync(), sync_done.append(clock[0])))
+    guard = threading.Timer(5, lambda: (watchdog.append(True), gate.set()))
     try:
+        worker.start()
+        assert entered.wait(5)
+        guard.start()
+
+        async def run():
+            handler = lambda r: httpx.Response(200, text=OIR_HTML)  # noqa: E731
+            async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+                await asyncio.wait_for(cnmv.fetch_oir_filings(days=1, client=client), 4)
+
         asyncio.run(run())
+        assert worker.is_alive() and not sync_done  # el hilo sigue dormido: el loop avanzo sin el
+        assert not watchdog  # la espera async no dependio de que el hilo soltara el lock
+        assert slept_async and slept_async[0] >= 0.29  # OIR espero el cooldown (simulado)
+        gate.set()
+        worker.join(5)
     finally:
-        worker.join(3)
-        pacer._sleep = real_sleep
+        guard.cancel()
+        gate.set()
+        worker.join(5)
         pacer.reset()
-    assert sync_done and sync_done[0] >= 0.29  # el hilo sync SI espera el cooldown
-    assert len(gaps) >= 5 and max(gaps) < 0.08
+    assert sync_done and sync_done[0] >= 1000.3  # el hilo sync SI respeta el cooldown al despertar
 
 
 def test_wait_sync_revalidates_cooldown_added_while_sleeping():
