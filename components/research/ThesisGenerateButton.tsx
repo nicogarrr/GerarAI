@@ -54,9 +54,10 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
     // Reloj local: se fija en cada sondeo y avanza cada 1 s mientras el job
     // corre, para que los segundos no salten de 3 en 3 con el polling.
     const [polledAt, setPolledAt] = useState(0);
-    // El resultado solo se anuncia para el trabajo lanzado en esta sesión: el
-    // último job guardado puede ser de una versión anterior a la vigente.
-    const [startedHere, setStartedHere] = useState(false);
+    // El click por sí solo no convierte el último éxito en un resultado nuevo.
+    // undefined = no hubo click; null = se lanzó sin job previo conocido.
+    const [previousJobIdAtStart, setPreviousJobIdAtStart] = useState<number | null | undefined>(undefined);
+    const startedHere = previousJobIdAtStart !== undefined && job !== null && job.id !== previousJobIdAtStart;
 
     const active = job !== null && ['queued', 'running', 'retrying', 'dispatch_failed'].includes(job.status);
     const busy = recovering || starting || active;
@@ -160,7 +161,7 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
             // Fuera del catch de envío: crear la clave aún no envía nada.
             const requestId = newRequestId();
             setStarting(true);
-            setStartedHere(true);
+            setPreviousJobIdAtStart(job?.id ?? null);
             setError(null);
             try {
                 setJob(await startThesisJob(ticker, true, requestId));
