@@ -88,7 +88,7 @@ function ErrorFallback({ error, errorInfo, onReset }: { error: Error | null; err
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <div className="flex items-center gap-2">
-                        <AlertCircle className="h-5 w-5 text-destructive" />
+                        <AlertCircle className="h-5 w-5 text-bad" />
                         <CardTitle>{t('shell.error.title')}</CardTitle>
                     </div>
                     <CardDescription>
