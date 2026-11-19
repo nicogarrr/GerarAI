@@ -14,10 +14,13 @@ import { expirationState, isRealDate } from '@/lib/paper-trading/options';
 import { clientOrderIdAfter, parseEsNumber } from './submit';
 import { invalidMessage, TicketFeedbackMessages, useExecutedAtLocal, type FieldInvalid } from './ticket-feedback';
 import type { DemoStateView, FillSubmit, SubmitFill } from './submit';
+import type { DemoOptionChainOk, DemoOptionChainResult } from '@/lib/paper-trading/option-chain-view';
 
 type Kind = 'accion' | 'opcion';
 
 const EXPIRY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+
 
 function newClientOrderId(): string {
     return typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -39,11 +42,15 @@ function newClientOrderId(): string {
  * Guiado (Nico, 21-oct-2026): el simbolo/subyacente se busca por nombre o
  * ticker con el TickerSearchInput compartido (misma busqueda real que el
  * buscador global) y al elegir se rellenan simbolo y nombre; el resto del
- * ticket sigue manual porque registra una operacion YA ejecutada. No hay
- * selector de cadena de opciones: sin fuente gratuita verificable de
- * strikes/vencimientos, la identidad del contrato queda manual y etiquetada.
- * La divisa nunca se preselecciona desde el buscador (su exchange no es
- * prueba de divisa): el toggle manual manda.
+ * ticket sigue manual porque registra una operacion YA ejecutada.
+ * Selector guiado de contrato de opción: con la cadena REAL diferida de
+ * CBOE (>= 15 min, vía la acción demo-option-chain) el usuario elige
+ * vencimiento y strike de contratos listados de verdad; la última
+ * operación del contrato se muestra como referencia ETIQUETADA (nunca
+ * como precio actual: el precio de la orden lo escribe el usuario) y la
+ * vía manual queda siempre disponible. La divisa nunca se preselecciona
+ * desde el buscador (su exchange no es prueba de divisa): el toggle
+ * manual manda.
  *
  * Guiado con datos REALES de la cuenta (prop `account`, del servidor): el
  * ticket muestra el saldo disponible en la divisa elegida y, cuando el
@@ -53,7 +60,7 @@ function newClientOrderId(): string {
  * saldo/posición sigue siendo solo del servidor; esto es información, no
  * una barrera. Sin `account` no se muestra nada (nunca se inventa).
  */
-export function OrderTicket({ submitFill, disabled, account = null }: { submitFill: SubmitFill; disabled?: boolean; account?: DemoStateView | null }) {
+export function OrderTicket({ submitFill, disabled, account = null, fetchOptionChain = null }: { submitFill: SubmitFill; disabled?: boolean; account?: DemoStateView | null; fetchOptionChain?: ((underlying: string) => Promise<DemoOptionChainResult>) | null }) {
     const ti = useT();
     const locale = useLocale();
     const f = useFormat();
@@ -73,6 +80,12 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
     const [strike, setStrike] = useState('');
     const [expiry, setExpiry] = useState('');
 
+    // Selector guiado de contrato (cadena CBOE diferida): solo consulta a
+    // petición del usuario; un error nunca bloquea la vía manual.
+    const [chain, setChain] = useState<DemoOptionChainOk | null>(null);
+    const [chainError, setChainError] = useState<string | null>(null);
+    const [chainLoading, setChainLoading] = useState(false);
+
     const [executedAtLocal, setExecutedAtLocal] = useExecutedAtLocal();
     const [invalid, setInvalid] = useState<FieldInvalid>(null);
     // Feedback del envío (rechazo/fallo de la acción): persiste hasta el próximo envío.
@@ -90,6 +103,9 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
         selectedSymbol.current = stock.symbol;
         setSymbol(stock.symbol);
         setName(stock.name);
+        // La cadena cargada era del subyacente anterior: se descarta.
+        setChain(null);
+        setChainError(null);
     }
     // Si tras elegir se EDITA el simbolo, el nombre autocompletado ya no
     // corresponde: se limpia para no registrar una empresa con el nombre de
@@ -99,8 +115,53 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
             selectedSymbol.current = null;
             setName('');
         }
+        setChain(null);
+        setChainError(null);
         setSymbol(value);
     }
+
+    // Razón de fallo -> texto i18n con claves LITERALES (el checker de uso
+    // i18n no sigue claves compuestas en runtime).
+    function chainErrorMessage(ti: ReturnType<typeof useT>, reason: string): string {
+        switch (reason) {
+            case 'invalidSymbol': return ti('paperTrading.ticket.chainError.invalidSymbol');
+            case 'notCovered': return ti('paperTrading.ticket.chainError.notCovered');
+            case 'saturated': return ti('paperTrading.ticket.chainError.saturated');
+            case 'noAuth': return ti('paperTrading.ticket.chainError.noAuth');
+            default: return ti('paperTrading.ticket.chainError.sourceUnavailable');
+        }
+    }
+
+    async function onLoadChain() {
+        if (!fetchOptionChain || chainLoading) return;
+        setChainLoading(true);
+        setChainError(null);
+        try {
+            const result = await fetchOptionChain(symbol);
+            if (result.ok) {
+                setChain(result);
+            } else {
+                setChain(null);
+                setChainError(chainErrorMessage(ti, result.reason));
+            }
+        } catch {
+            setChain(null);
+            setChainError(ti('paperTrading.ticket.chainError.sourceUnavailable'));
+        } finally {
+            setChainLoading(false);
+        }
+    }
+
+    // Referencia de la última operación del contrato elegido (si la cadena
+    // la registra). Es dato DIFERIDO de CBOE, nunca el precio actual.
+    const chainRef = (() => {
+        if (!chain || !expiry) return undefined;
+        const parsed = parseEsNumber(strike);
+        if (!Number.isFinite(parsed)) return undefined;
+        const row = chain.expiries.find((e) => e.expiry === expiry)?.strikes.find((r) => r.strike === parsed);
+        if (!row) return null;
+        return row[callPut];
+    })();
 
     const fieldKey = JSON.stringify([kind, symbol, name, side, quantity, price, currency, callPut, strike, expiry, executedAtLocal]);
     const validationError = invalidMessage(invalid, fieldKey);
@@ -310,6 +371,7 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
             </div>
 
             {kind === 'opcion' ? (
+                <>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <div className="space-y-1.5">
                         <Label htmlFor={`${uid}-callput`}>{ti('paperTrading.ticket.callPutLabel')}</Label>
@@ -355,6 +417,67 @@ export function OrderTicket({ submitFill, disabled, account = null }: { submitFi
                         <p className="text-xs text-gray-500">{ti('paperTrading.ticket.expiryHint')}</p>
                     </div>
                 </div>
+                {fetchOptionChain ? (
+                    <div className="space-y-2 rounded-lg border border-gray-800 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs text-gray-400">{ti('paperTrading.ticket.chainHint')}</p>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={chainLoading || !symbol.trim()}
+                                onClick={onLoadChain}
+                            >
+                                {chainLoading ? ti('paperTrading.ticket.chainLoading') : ti('paperTrading.ticket.chainLoad')}
+                            </Button>
+                        </div>
+                        {chainError ? <p className="text-xs text-amber-400">{chainError}</p> : null}
+                        {chain ? (
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor={`${uid}-chain-expiry`}>{ti('paperTrading.ticket.chainExpiry')}</Label>
+                                    <select
+                                        id={`${uid}-chain-expiry`}
+                                        className="w-full rounded-md border border-gray-800 bg-transparent px-2 text-base sm:text-sm"
+                                        style={{ minHeight: 44 }}
+                                        value={chain.expiries.some((e) => e.expiry === expiry) ? expiry : ''}
+                                        onChange={(event) => setExpiry(event.target.value)}
+                                    >
+                                        <option value="" disabled>{ti('paperTrading.ticket.chainExpiryPh')}</option>
+                                        {chain.expiries.map((e) => (
+                                            <option key={e.expiry} value={e.expiry}>{e.expiry}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor={`${uid}-chain-strike`}>{ti('paperTrading.ticket.chainStrike')}</Label>
+                                    <select
+                                        id={`${uid}-chain-strike`}
+                                        className="w-full rounded-md border border-gray-800 bg-transparent px-2 text-base sm:text-sm"
+                                        style={{ minHeight: 44 }}
+                                        value=""
+                                        onChange={(event) => {
+                                            if (event.target.value) setStrike(event.target.value);
+                                        }}
+                                    >
+                                        <option value="" disabled>{ti('paperTrading.ticket.chainStrikePh')}</option>
+                                        {(chain.expiries.find((e) => e.expiry === expiry)?.strikes ?? chain.expiries[0]?.strikes ?? []).map((r) => (
+                                            <option key={r.strike} value={String(r.strike)}>{r.strike}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                {chainRef !== undefined ? (
+                                    <p className="col-span-2 text-xs text-gray-500">
+                                        {chainRef
+                                            ? ti('paperTrading.ticket.chainRefTrade', { price: chainRef.price, time: chainRef.time.replace('T', ' ') })
+                                            : ti('paperTrading.ticket.chainNoTrade')}
+                                    </p>
+                                ) : null}
+                            </div>
+                        ) : null}
+                    </div>
+                ) : null}
+                </>
             ) : null}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

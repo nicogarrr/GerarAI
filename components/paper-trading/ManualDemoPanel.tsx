@@ -17,6 +17,7 @@ import { useT, useLocale, useFormat } from '@/lib/i18n/client';
 import { paperTradingMessage } from '@/lib/paper-trading/messages-en';
 import { valuationMatches, type DemoValuation } from '@/lib/market/demo-valuation';
 import type { DemoStateView, HistoryPageResult, HistoryRow, SubmitFill, SubmitFx } from './submit';
+import type { DemoOptionChainResult } from '@/lib/paper-trading/option-chain-view';
 
 export type ManualDemoPanelProps = {
     /** Vista de la cuenta devuelta por la acción; null mientras no está conectada. */
@@ -30,6 +31,8 @@ export type ManualDemoPanelProps = {
     loadMoreHistory?: (before: string) => Promise<HistoryPageResult>;
     submitFill: SubmitFill;
     submitFx: SubmitFx;
+    /** Cadena de opciones real diferida (CBOE) para el selector guiado del ticket. */
+    fetchOptionChain?: ((underlying: string) => Promise<DemoOptionChainResult>) | null;
     /** Valoración inicial con cotizaciones reales (null = no disponible). */
     valuation?: DemoValuation | null;
     /** Epoch ms en que se consultaron las cotizaciones de `valuation`. */
@@ -109,7 +112,7 @@ function ValuationSummary({ valuation, asOf, onRefresh, pending, error }: {
  * Lo único automático es la reconsulta de la valoración mostrada (cada 60 s
  * con la pestaña visible), nunca el precio de los fills.
  */
-export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuation: initialValuation = null, valuationAsOf = null, refreshValuation, historyHasMore = false, historyNextBefore = null, loadMoreHistory }: ManualDemoPanelProps) {
+export function ManualDemoPanel({ account, ledger, submitFill, submitFx, fetchOptionChain = null, valuation: initialValuation = null, valuationAsOf = null, refreshValuation, historyHasMore = false, historyNextBefore = null, loadMoreHistory }: ManualDemoPanelProps) {
     const ti = useT();
     const locale = useLocale();
     const wired = account !== null;
@@ -276,7 +279,7 @@ export function ManualDemoPanel({ account, ledger, submitFill, submitFx, valuati
                     <Panel title={ti('paperTrading.panel.tradePanel')}>
                         {/* account real del servidor: el ticket guía con saldo
                             y posición en la divisa elegida (sin inventar). */}
-                        <OrderTicket submitFill={submitFill} disabled={!wired} account={account} />
+                        <OrderTicket submitFill={submitFill} disabled={!wired} account={account} fetchOptionChain={fetchOptionChain} />
                         {!wired ? (
                             <p className="mt-3 text-xs text-gray-500">
                                 {ti('paperTrading.panel.notWired')}

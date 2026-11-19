@@ -136,10 +136,15 @@ describe('ticket demo guiado (buscador de instrumento)', () => {
         assert.match(search, /<p role="status" aria-live="polite" className="mt-1 text-sm text-gray-500">\{ti\('search\.noResultsFor'/);
     });
 
-    it('la identidad del contrato de opción sigue manual y etiquetada (sin cadena fabricada)', () => {
-        // i18n: la nota vive en el diccionario (ticket.expiryHint).
+    it('la identidad del contrato solo sale de la cadena REAL o de la vía manual (nunca fabricada)', () => {
+        // Desde la cadena CBOE diferida (fuente gratuita verificable, ya en
+        // la valoración) el selector ofrece contratos listados de verdad; la
+        // prima diferida es referencia etiquetada y el precio de la orden lo
+        // escribe el usuario. La vía manual queda intacta (expiryHint).
         assert.match(ticket, /paperTrading\.ticket\.expiryHint/);
-        assert.doesNotMatch(ticket, /optionChain|cadena de contratos|strikesDisponibles/i);
+        assert.match(ticket, /paperTrading\.ticket\.chainRefTrade/);
+        assert.doesNotMatch(ticket, /setPrice\([^)]*chain/);
+        assert.doesNotMatch(ticket, /strikesDisponibles|cadena de contratos/i);
     });
 
     it('mantiene la advertencia de fill manual (no ejecución de mercado)', () => {
