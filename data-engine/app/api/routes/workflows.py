@@ -237,15 +237,19 @@ def run_workflow(
             tenant_external_id=str(tenant_id),
             idempotency_key=key,
         )
-        run_id = db.scalar(
-            select(WorkflowRun.id)
-            .where(
-                WorkflowRun.workflow_name == name,
-                *tenant_filters(db, WorkflowRun),
+        # El run lo devuelve el servicio (envelope). Runs grabados antes de
+        # este cambio no lo llevan: se re-consulta por clave de idempotencia
+        # (scoped por tenant), nunca "el último del tenant": con dos
+        # aprobaciones en marcha referenciaba el run equivocado.
+        run_id = result.get("run_id")
+        if run_id is None and key is not None:
+            run_id = db.scalar(
+                select(WorkflowRun.id).where(
+                    WorkflowRun.workflow_name == name,
+                    WorkflowRun.idempotency_key == key,
+                    *tenant_filters(db, WorkflowRun),
+                )
             )
-            .order_by(WorkflowRun.id.desc())
-            .limit(1)
-        )
         return {
             "status": result.get("status"),
             "workflow": name,

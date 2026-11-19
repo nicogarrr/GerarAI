@@ -229,5 +229,27 @@ def begin_run(
             )
         )
         if raced is not None:
-            return WorkflowEnvelope(db, raced, replayed=raced.status == "succeeded")
+            if raced.status == "failed" and tenant_id is not None:
+                # Misma normalización que el reintento sin carrera: reutilizar
+                # la fila y subir attempt. Devolverla "failed" tal cual hacía
+                # que los steps de la nueva ejecución colisionaran con
+                # uq_workflow_step_runs_position_attempt (traza perdida).
+                raced.execution_mode = execution_mode or raced.execution_mode
+                raced.input_payload = input_payload or {}
+                raced.status = "running"
+                raced.attempt = (raced.attempt or 1) + 1
+                raced.started_at = _utcnow()
+                raced.finished_at = None
+                raced.error_class = None
+                raced.error_message = None
+                raced.result_payload = None
+                db.add(raced)
+                _safe_commit(db, "run retry (raced)")
+                return WorkflowEnvelope(db, raced)
+            # "running": la otra petición sigue ejecutando; no se lanza una
+            # segunda en paralelo (mismo contrato que la reentrega sin carrera
+            # de arriba: replayed=True y el llamador no repite efectos).
+            return WorkflowEnvelope(
+                db, raced, replayed=raced.status in ("succeeded", "running")
+            )
     return WorkflowEnvelope(db, run)
