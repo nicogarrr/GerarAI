@@ -35,7 +35,7 @@ def worker(records):
     marker = recipe['gate_prefix'] + '-1'
     obj = dict(Id=ident, Config=dict(Labels={build.RUN: inv['run_id'], build.ROLE: 'build-worker',
                                            build.BUILD: 'frontend', build.STEP: '1', build.RECIPE: recipe['recipe']},
-                                   Cmd=['/bin/sh', '-c', f'n=0; while [ ! -f {marker} ]; do placeholder']),
+                                   Cmd=['/bin/sh', '-c', f'( n=0; while [ ! -f {marker} ]; do placeholder']),
                HostConfig=dict(CgroupParent=inv['cgroup_parent'], Privileged=False, NetworkMode='none'),
                State=dict(Pid=456, Running=True), Mounts=[], NetworkSettings=dict(Ports={}))
     return inv, recipe, obj, {'CgroupVersion': '2', 'CgroupDriver': 'systemd'}, cgroup_files(), \
@@ -49,7 +49,7 @@ def test_each_run_gets_unique_marker_and_local_pinned_base():
     assert result['gate_prefix'] + '-1' in result['dockerfile']
     assert result['gate_prefix'] + '-2' in result['dockerfile']
     assert result['gate_prefix'] != rendered()['gate_prefix']
-    assert result['dockerfile'].count('exit 125') == 2
+    assert result['dockerfile'].count('done ) || exit 125;') == 2
     assert build.render('FROM node:22-alpine AS base\nFROM base AS next\nRUN echo a \\\n && echo b\n',
                         'bench-20261119-a', 'frontend', BASE)['steps'] == ['1']
 
@@ -297,3 +297,42 @@ def test_remote_copy_source_and_inherited_entrypoint_are_not_allowed():
     text = 'FROM node:22-alpine AS deps\nRUN true\nFROM deps AS final\nCOPY --from=deps /app /app\nRUN true'
     recipe = build.render(text, 'bench-20261119-a', 'frontend', BASE)
     assert recipe['dockerfile'].count('ENTRYPOINT []') == 2
+
+
+
+@pytest.mark.parametrize('existing', [None, 'preexisting-exported'])
+def test_gate_counter_does_not_change_original_shell_or_environment(existing):
+    import os
+    import subprocess
+    body = 'printf "shell_n=%s\\n" "${n-unset}"; env | grep "^n=" || true'
+    recipe = build.render('FROM node:22-alpine\nRUN '+body+'\n', 'bench-20261119-a', 'frontend', BASE)
+    run = next(line[4:] for line in recipe['dockerfile'].splitlines() if line.startswith('RUN '))
+    environment = dict(os.environ)
+    environment.pop('n', None)
+    if existing is not None:
+        environment['n'] = existing
+    gate = Path(recipe['gate_prefix']+'-1')
+    gate.touch()
+    try:
+        original = subprocess.run(['/bin/sh', '-c', body], env=environment, capture_output=True, text=True)
+        generated = subprocess.run(['/bin/sh', '-c', run], env=environment, capture_output=True, text=True)
+        assert generated.returncode == original.returncode == 0
+        assert generated.stdout == original.stdout
+        assert ('shell_n=unset' in generated.stdout) if existing is None else ('n='+existing in generated.stdout)
+    finally:
+        gate.unlink()
+
+
+def test_gate_failure_is_barrier_to_entire_original_body(tmp_path):
+    import subprocess
+    marker = tmp_path/'must-not-run'
+    body = 'touch '+str(marker)+'; false || true'
+    recipe = build.render('FROM node:22-alpine\nRUN '+body+'\n', 'bench-20261119-a', 'frontend', BASE)
+    run = next(line[4:] for line in recipe['dockerfile'].splitlines() if line.startswith('RUN '))
+    # Replace the gate's wait with a deterministic failure, never weaken the
+    # original body. This proves || in the original cannot bypass failed gate.
+    prefix, original = run.rsplit('done ) || exit 125; ', 1)
+    assert prefix.startswith('( n=0;')
+    failed = '( exit 1 ) || exit 125; '+original
+    result = subprocess.run(['/bin/sh', '-c', failed], check=False)
+    assert result.returncode == 125 and not marker.exists()

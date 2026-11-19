@@ -194,7 +194,9 @@ one-time dependency-layer production and provenance evidence separately.
 Every shell-form RUN gets an independent gate file with a random per-build UUID
 and per-step suffix. A gate cannot persist from an earlier RUN or prebuilt base.
 The gate waits at most about 60 seconds for approval, otherwise exits125 before
-the original command. Unsupported Dockerfile constructs, parser directives,
+the original command. Its counter loop runs in a subshell; a failed gate exits
+the parent before any original body, while successful gating leaves shell
+variables and exported environment unchanged (including an existing n). Unsupported Dockerfile constructs, parser directives,
 ONBUILD in external bases, base volumes/custom shells, dynamic FROMs, exec-form
 RUNs and ownership-label overrides are rejected rather than loosely rewritten.
 External FROMs are replaced with local immutable image IDs; COPY --from may

@@ -104,8 +104,8 @@ def render(text, run_id, build_id, external_images):
                 # Release uses a per-step nonce-like path to prevent earlier RUN
                 # layers from granting future RUNs. Never use a shared gate file.
                 marker = gate + '-' + step
-                prefix = (f'n=0; while [ ! -f {shlex.quote(marker)} ]; do '
-                          'n=$((n+1)); [ "$n" -le 60 ] || exit 125; sleep 1; done; ')
+                prefix = (f'( n=0; while [ ! -f {shlex.quote(marker)} ]; do '
+                          'n=$((n+1)); [ "$n" -le 60 ] || exit 125; sleep 1; done ) || exit 125; ')
                 # Keep original command exit status, shell short-circuit and
                 # USER semantics. No set -e or shared shell state is injected.
                 lines.append('RUN ' + prefix + body)
@@ -147,7 +147,7 @@ def worker_proof(inventory, rendered, worker, docker_info, cgroup_files, members
     marker = rendered['gate_prefix'] + '-' + step
     cmd = worker['Config']['Cmd']
     require(isinstance(cmd, list) and cmd[:2] == ['/bin/sh', '-c'] and len(cmd) == 3 and
-            cmd[2].startswith('n=0; while [ ! -f ' + shlex.quote(marker) + ' ]; do '),
+            cmd[2].startswith('( n=0; while [ ! -f ' + shlex.quote(marker) + ' ]; do '),
             'Worker is not executing expected blocked RUN')
     return {'id': ident, 'pid': pid, 'step': step, 'cgroup': membership.strip(), 'marker': marker}
 

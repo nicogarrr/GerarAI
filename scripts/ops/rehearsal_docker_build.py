@@ -75,7 +75,7 @@ class DockerBuild:
         # matching label alone does not authorize kill or exec.
         cmd = item['Config'].get('Cmd') or []
         require(len(cmd) == 3 and cmd[:2] == ['/bin/sh', '-c'] and
-                cmd[2].startswith('n=0; while [ ! -f ' + self.rendered['gate_prefix'] + '-'),
+                cmd[2].startswith('( n=0; while [ ! -f ' + self.rendered['gate_prefix'] + '-'),
                 'Worker gate identity mismatch')
         return ident
 
@@ -91,7 +91,7 @@ class DockerBuild:
             require(inspected['Id'] == ident, 'Worker inspection ID mismatch')
             cmd = inspected['Config'].get('Cmd') or []
             is_gated = len(cmd) == 3 and cmd[:2] == ['/bin/sh', '-c'] and cmd[2].startswith(
-                'n=0; while [ ! -f ' + self.rendered['gate_prefix'] + '-')
+                '( n=0; while [ ! -f ' + self.rendered['gate_prefix'] + '-')
             # Classic LABEL/COPY/etc commits can leave non-running metadata
             # containers with inherited labels but no gated RUN command. They
             # are not released or killed as workers. A running mismatch fails.
