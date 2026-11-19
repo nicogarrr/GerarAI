@@ -90,9 +90,9 @@ def test_evaluate_statement_budget(db):
     stats = evaluate(db, now=now)
     assert stats["examined"] == N_CANDIDATES
     assert stats["created"] == 1  # la primera; el cooldown frena las demas
-    # ANTES: 1250. DESPUES: ~52 (precarga de la pagina + cooldown por
-    # candidata superviviente + la escritura de la alerta creada).
-    assert statements <= 120, f"N+1 de dedup cruzado: {statements} sentencias"
+    # ANTES: 1250. DESPUES: ~23 (precargas de la pagina + la escritura de
+    # la alerta creada; el cooldown por compania tambien va precargado).
+    assert statements <= 60, f"N+1 de dedup cruzado: {statements} sentencias"
 
 
 def test_prefetched_dedup_matches_same_news(db):
