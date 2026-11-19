@@ -43,6 +43,7 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
     const [recoveryCycle, setRecoveryCycle] = useState(0);
     const [starting, setStarting] = useState(false);
     const startingRef = useRef(false);
+    const recoveryRequestRef = useRef(0);
     // Polling agotado por job: derivado del id del job (no un booleano que
     // hay que resetear en un efecto al cambiar de job).
     const [exhaustedJobId, setExhaustedJobId] = useState<number | null>(null);
@@ -67,15 +68,16 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
         let timer: ReturnType<typeof setTimeout> | undefined;
         const recover = async () => {
             if (startingRef.current) return;
+            const request = ++recoveryRequestRef.current;
             try {
                 const latest = await getLatestThesisJob(ticker);
-                if (!disposed && !startingRef.current) {
+                if (!disposed && request === recoveryRequestRef.current && !startingRef.current) {
                     setJob(latest);
                     setRecovering(false);
                     setError(null);
                 }
             } catch {
-                if (!disposed) {
+                if (!disposed && request === recoveryRequestRef.current) {
                     setError(t('research.thesisGenerate.recoverFailed'));
                     timer = setTimeout(recover, POLL_MS);
                 }
@@ -112,6 +114,8 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
             try {
                 const next = await getThesisJobStatus(jobId);
                 if (disposed) return;
+                // Un sondeo confirmado invalida recuperaciones aún pendientes.
+                recoveryRequestRef.current += 1;
                 setJob(next);
                 setPolledAt(Date.now());
                 setPollFailedJobId(null);
@@ -156,6 +160,8 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
         // El lock cubre también la comprobación remota: dos clicks mientras
         // está pendiente no deben lanzar dos generaciones independientes.
         startingRef.current = true;
+        // Una lectura iniciada antes del click no puede reemplazar su resultado.
+        recoveryRequestRef.current += 1;
         try {
             if (!await availability.refresh()) return;
             // Fuera del catch de envío: crear la clave aún no envía nada.

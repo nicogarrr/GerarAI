@@ -97,6 +97,55 @@ describe('thesis job lifecycle without any model call', () => {
     it('after 600 unsuccessful polls reports unknown state rather than faking endless progress', async () => {
         m.latest.mockResolvedValue(job('queued')); m.poll.mockRejectedValue(new Error('offline')); await mount(); for(let i=0;i<599;i++) await advance(3000); expect(m.poll).toHaveBeenCalledTimes(600); expect(screen.getByText(/unknown/i)).toBeInTheDocument(); await advance(30000); expect(m.poll).toHaveBeenCalledTimes(600); expect(m.start).not.toHaveBeenCalled();
     });
+    it('ignores a focus recovery started before a new job was submitted', async () => {
+        let resolveOld!: (value: unknown) => void;
+        m.latest.mockResolvedValueOnce(job('succeeded', { result: { version: 8 } }))
+            .mockImplementationOnce(() => new Promise(r => { resolveOld = r; }));
+        m.start.mockResolvedValue(job('queued', { id: 72 }));
+        m.poll.mockResolvedValue(job('running', { id: 72 }));
+        await mount();
+        window.dispatchEvent(new Event('focus'));
+        await act(async () => { fireEvent.click(screen.getByRole('button')); });
+        expect(m.poll).toHaveBeenCalledWith(72);
+        await act(async () => { resolveOld(job('succeeded', { result: { version: 8 } })); });
+        expect(screen.getByRole('button')).toBeDisabled();
+        await advance(3000);
+        expect(m.poll).toHaveBeenLastCalledWith(72);
+        expect(m.poll).toHaveBeenCalledTimes(2);
+        expect(m.start).toHaveBeenCalledOnce();
+    });
+    it('keeps the latest focus recovery when an older request resolves last', async () => {
+        let resolveOld!: (value: unknown) => void;
+        m.latest.mockResolvedValueOnce(null)
+            .mockImplementationOnce(() => new Promise(r => { resolveOld = r; }))
+            .mockResolvedValue(job('running', { id: 72 }));
+        m.poll.mockResolvedValue(job('running', { id: 72 }));
+        await mount();
+        window.dispatchEvent(new Event('focus'));
+        await act(async () => { window.dispatchEvent(new Event('focus')); });
+        expect(m.poll).toHaveBeenCalledWith(72);
+        await act(async () => { resolveOld(null); });
+        expect(screen.getByRole('button')).toBeDisabled();
+        await advance(3000);
+        expect(m.poll).toHaveBeenCalledTimes(2);
+        expect(m.start).not.toHaveBeenCalled();
+    });
+    it('does not let a pending focus snapshot undo a terminal polling result', async () => {
+        let resolveRecovery!: (value: unknown) => void;
+        let resolvePoll!: (value: unknown) => void;
+        m.latest.mockResolvedValueOnce(job('running'))
+            .mockImplementationOnce(() => new Promise(r => { resolveRecovery = r; }));
+        m.poll.mockImplementationOnce(() => new Promise(r => { resolvePoll = r; }));
+        await mount();
+        window.dispatchEvent(new Event('focus'));
+        await act(async () => { resolvePoll(job('succeeded', { result: { version: 8 } })); });
+        expect(screen.getByRole('button')).toBeEnabled();
+        await act(async () => { resolveRecovery(job('running')); });
+        expect(screen.getByRole('button')).toBeEnabled();
+        await advance(3000);
+        expect(m.poll).toHaveBeenCalledOnce();
+        expect(m.start).not.toHaveBeenCalled();
+    });
     it('rechecks the server on focus and visibility but detaches listeners on unmount', async () => {
         const ui = await mount(); await act(async () => { window.dispatchEvent(new Event('focus')); }); expect(m.latest).toHaveBeenCalledTimes(2); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' }); await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); expect(m.latest).toHaveBeenCalledTimes(2); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); await act(async () => { document.dispatchEvent(new Event('visibilitychange')); }); expect(m.latest).toHaveBeenCalledTimes(3); ui.unmount(); window.dispatchEvent(new Event('focus')); expect(m.latest).toHaveBeenCalledTimes(3);
     });
