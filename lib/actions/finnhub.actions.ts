@@ -1,6 +1,7 @@
 'use server';
 
 import { mergeSpanishListings, searchSpanishListings } from '@/lib/market/spanish-search';
+import { searchSecUniverse } from '@/lib/market/sec-universe-search';
 import { classifyFichaCoverage, EXCHANGE_LABEL_BY_SUFFIX } from '@/lib/market/search-coverage';
 import { withFetchDeadline } from '@/lib/upstream/fetch-deadline';
 
@@ -443,13 +444,25 @@ export const searchStocksWithStatus = cache(async (query?: string): Promise<Sear
         }));
     try {
         const remote = await withFetchDeadline(() => searchStocksOrThrow(query), 4500);
-        return { status: 'ok', stocks: withCoverage(mergeSpanishListings(query ?? '', local, [...master, ...remote])) };
+        const merged = mergeSpanishListings(query ?? '', local, [...master, ...remote]);
+        if (merged.length === 0) {
+            // Nada en local/master/proveedor: registro OFICIAL de la SEC
+            // (gratis, sin cuota). Cubre erratas («Antrophic» -> ANT) y
+            // emisores tan nuevos que Finnhub aún no indexa (IPO del día).
+            const sec = await searchSecUniverse(query ?? '');
+            if (sec.length) return { status: 'ok', stocks: withCoverage(sec) };
+        }
+        return { status: 'ok', stocks: withCoverage(merged) };
     } catch (err) {
         console.error('Error in stock search:', err);
         // Fallback local + master: ambos caminos conservan la anotacion de
         // cobertura de ficha (withCoverage es idempotente).
         const fallback = mergeSpanishListings(query ?? '', withCoverage(local), withCoverage(master));
         if (fallback.length) return { status: 'ok', stocks: fallback };
+        // Proveedor caído Y sin nada local: el registro SEC aún puede
+        // ofrecer candidatas reales en vez de un error a secas.
+        const sec = await searchSecUniverse(query ?? '');
+        if (sec.length) return { status: 'ok', stocks: withCoverage(sec) };
         return { status: 'error', stocks: [] };
     }
 });

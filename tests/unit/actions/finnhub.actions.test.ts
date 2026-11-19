@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { requireAuthenticatedUser, fetchJSON, researchIdentityHeaders, getNewsWithFallback } = vi.hoisted(() => ({
+const { requireAuthenticatedUser, fetchJSON, researchIdentityHeaders, getNewsWithFallback, searchSecUniverse } = vi.hoisted(() => ({
     requireAuthenticatedUser: vi.fn(),
     fetchJSON: vi.fn(),
     researchIdentityHeaders: vi.fn(),
     getNewsWithFallback: vi.fn(),
+    searchSecUniverse: vi.fn(),
 }));
 vi.mock('@/lib/auth/require-user', () => ({ requireAuthenticatedUser }));
 vi.mock('@/lib/upstream/finnhub', () => ({ fetchJSON }));
 vi.mock('@/lib/auth/research-identity', () => ({ researchIdentityHeaders }));
+vi.mock('@/lib/market/sec-universe-search', () => ({ searchSecUniverse }));
 vi.mock('@/lib/cache/memoryTTL', () => ({ cachedFetch: (_k: string, fetcher: () => Promise<unknown>) => fetcher() }));
 vi.mock('@/lib/actions/newsSources.actions', () => ({ getNewsWithFallback }));
 
@@ -27,6 +29,7 @@ beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {});
     requireAuthenticatedUser.mockResolvedValue({ id: 'tenant-one' });
     researchIdentityHeaders.mockResolvedValue({});
+    searchSecUniverse.mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -211,6 +214,39 @@ describe('searchStocksWithStatus', () => {
         fetchJSON.mockRejectedValue(new Error('429'));
         const result = await searchStocksWithStatus('zzqnotastock');
         expect(result).toEqual({ status: 'error', stocks: [] });
+    });
+
+    it('cero resultados en todas las fuentes pero la SEC conoce la empresa -> ok con la candidata oficial', async () => {
+        const { searchStocksWithStatus } = await loadModule('key');
+        fetchJSON.mockResolvedValue({ result: [] });
+        searchSecUniverse.mockResolvedValue([
+            { symbol: 'ANT', name: 'Anthropic, PBC', exchange: 'US', type: 'Stock', isInWatchlist: false },
+        ]);
+        const result = await searchStocksWithStatus('Antrophic');
+        expect(searchSecUniverse).toHaveBeenCalledWith('Antrophic');
+        expect(result.status).toBe('ok');
+        expect(result.stocks.map((s) => s.symbol)).toEqual(['ANT']);
+    });
+
+    it('con resultados del proveedor la SEC NO se consulta (última instancia, nunca desplaza)', async () => {
+        const { searchStocksWithStatus } = await loadModule('key');
+        fetchJSON.mockResolvedValue({
+            result: [{ symbol: 'AAPL', displaySymbol: 'AAPL', description: 'Apple', type: 'Common Stock' }],
+        });
+        const result = await searchStocksWithStatus('apple');
+        expect(result.stocks[0]?.symbol).toBe('AAPL');
+        expect(searchSecUniverse).not.toHaveBeenCalled();
+    });
+
+    it('proveedor caído y la SEC con candidata -> ok con la candidata (mejor que un error a secas)', async () => {
+        const { searchStocksWithStatus } = await loadModule('key');
+        fetchJSON.mockRejectedValue(new Error('429'));
+        searchSecUniverse.mockResolvedValue([
+            { symbol: 'ANT', name: 'Anthropic, PBC', exchange: 'US', type: 'Stock', isInWatchlist: false },
+        ]);
+        const result = await searchStocksWithStatus('Antrophic');
+        expect(result.status).toBe('ok');
+        expect(result.stocks[0]?.symbol).toBe('ANT');
     });
 });
 

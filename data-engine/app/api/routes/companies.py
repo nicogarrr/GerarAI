@@ -672,11 +672,30 @@ def list_companies(
 
 MAX_BASICS_BATCH_TICKERS = 100
 _COMPANY_SEARCH_DEFAULT_LIMIT = 15
+# Tope del barrido aproximado: acota el coste por consulta aunque el master
+# crezca; el orden por ticker lo hace determinista.
+_COMPANY_SEARCH_FUZZY_SCAN_CAP = 20000
 
 
 def _like_escape(term: str) -> str:
     """Escapa los comodines LIKE para que la busqueda sea siempre literal."""
     return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def _fuzzy_company_matches(db: Session, term: str, limit: int) -> list[Company]:
+    """Respaldo de erratas de /search: candidatas del master a una o dos letras.
+
+    Solo se llama cuando la búsqueda literal no devuelve NADA, así nunca
+    desplaza coincidencias literales. La política de umbrales (≥ 5 letras,
+    distancia 1 hasta 7 letras y 2 desde 8) es la misma del Cerebro
+    (app.services.company_names): una sola definición de «errata pequeña».
+    """
+    from app.services.company_names import ranked_name_matches
+
+    candidates = db.scalars(
+        select(Company).order_by(Company.ticker).limit(_COMPANY_SEARCH_FUZZY_SCAN_CAP)
+    ).all()
+    return ranked_name_matches(term, candidates, max_results=limit)
 
 
 @router.get("/search", response_model=CompanySearchOut)
@@ -691,6 +710,10 @@ def search_companies(
     proveedor externo (60 req/min en plan free, compartida por toda la
     app) y devuelve los tickers CANONICOS del master. Orden: ticker
     exacto, prefijo de ticker, prefijo de nombre y resto de parciales.
+    Sin ninguna coincidencia literal hay un respaldo tolerante a erratas
+    (caso real 2026-11-19: «Antrophic» no devolvía nada y la app solo
+    ofrecía «Abrir la ficha de ANTROPHIC», una ficha vacía, el mismo día
+    de la IPO de Anthropic).
     """
     term = q.strip()
     escaped = _like_escape(term)
@@ -702,17 +725,21 @@ def search_companies(
         (Company.name.ilike(prefix, escape="\\"), 2),
         else_=3,
     )
-    rows = db.scalars(
-        select(Company)
-        .where(
-            or_(
-                Company.ticker.ilike(contains, escape="\\"),
-                Company.name.ilike(contains, escape="\\"),
+    rows = list(
+        db.scalars(
+            select(Company)
+            .where(
+                or_(
+                    Company.ticker.ilike(contains, escape="\\"),
+                    Company.name.ilike(contains, escape="\\"),
+                )
             )
-        )
-        .order_by(rank, Company.ticker)
-        .limit(limit)
-    ).all()
+            .order_by(rank, Company.ticker)
+            .limit(limit)
+        ).all()
+    )
+    if not rows:
+        rows = _fuzzy_company_matches(db, term, limit)
     return CompanySearchOut(
         results=[
             CompanySearchItemOut(

@@ -233,3 +233,64 @@ def company_misspelled_in(
     if len(found) != 1:
         return None
     return by_id[next(iter(found))]
+
+
+def _name_keys(name: str) -> set[str]:
+    """Claves de errata de un nombre: primera palabra y nombre completo pegado.
+
+    Misma extracción que ``company_misspelled_in`` (palabras núcleo sin forma
+    jurídica, «the» inicial fuera, ≥ 5 letras, no genéricas); se factoriza
+    para que el buscador y el Cerebro apliquen la MISMA política de erratas.
+    """
+    words = _core_words(name)
+    if words and words[0] == "the" and len(words) >= 2:
+        words = words[1:]
+    if not words:
+        return set()
+    keys = {words[0]}
+    if len(words) >= 2:
+        keys.add("".join(words))
+    return {key for key in keys if len(key) >= 5 and key not in _GENERIC_FIRST_WORDS and key.isalpha()}
+
+
+def ranked_name_matches(
+    term: str, companies: Iterable[Company], *, max_results: int
+) -> list[Company]:
+    """Empresas cuyo nombre encaja con ``term`` salvo una errata pequeña.
+
+    Caso real 2026-11-19: «Antrophic» en el buscador no devolvía nada en el
+    master (ILIKE literal) y la app solo ofrecía «Abrir la ficha de
+    ANTROPHIC», una ficha vacía. La política de umbrales es la de
+    ``company_misspelled_in`` (≥ 5 letras; una letra de diferencia hasta 7,
+    dos desde 8, con transposición de vecinas vía ``_osa_distance``), pero el
+    buscador sí puede mostrar varias candidatas: se devuelven ordenadas por
+    distancia y ticker, hasta ``max_results``. Sin candidata clara se
+    devuelve []: nunca se inventa una empresa.
+    """
+    words = _words(term)
+    if words and words[0] == "the" and len(words) >= 2:
+        words = words[1:]
+    if not words:
+        return []
+    query_keys = {words[0]}
+    if len(words) >= 2:
+        query_keys.add("".join(words))
+    query_keys = {key for key in query_keys if len(key) >= 5 and key.isalpha()}
+    if not query_keys:
+        return []
+    scored: list[tuple[int, str, Company]] = []
+    for company in companies:
+        keys = _name_keys(company.name or "")
+        if not keys:
+            continue
+        best: int | None = None
+        for query_key in query_keys:
+            limit = 1 if len(query_key) <= 7 else 2
+            for key in keys:
+                distance = _osa_distance(query_key, key, limit)
+                if distance <= limit and (best is None or distance < best):
+                    best = distance
+        if best is not None:
+            scored.append((best, company.ticker, company))
+    scored.sort(key=lambda item: (item[0], item[1]))
+    return [company for _, _, company in scored[:max_results]]
