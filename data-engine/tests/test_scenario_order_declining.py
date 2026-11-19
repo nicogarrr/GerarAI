@@ -80,6 +80,59 @@ def test_wacc_bull_dentro_de_la_banda_para_cualquier_spread(spread):
     assert terminal < bull.assumptions["wacc"] <= base.assumptions["wacc"]
 
 
+def test_especulativo_spread_wacc_terminal_de_5pb_no_invierte_el_orden():
+    """Espejo del caso evdcf16 en el motor speculative (mismo defecto que #5940).
+
+    Con wacc=0.035 y terminal=0.030 (spread 5pb), el bull usaba
+    max(0.035 - 0.015, 0.030 + 0.015) = 0.045, por encima del 0.035 del base:
+    con el valor terminal dividido por (wacc - g), el denominador del bull era
+    0.015 contra 0.005 del base y el bull valia 264,7297 < 388,8115 del base.
+    El suelo g + 1,5pp solo protege la perpetuidad; nunca debe subir el WACC
+    del bull por encima del base. Valores a mano con la misma formula FCFF de
+    5 anos + Gordon del dataset: R0=2000, deuda neta 400, 200 acciones.
+    """
+    bear, base, bull = speculative_causal_scenarios(0.08, 0.15, 0.035, 0.03, 0.0, 0.9)
+
+    def value(assumptions):
+        return run_dcf(
+            DCFInputs(
+                2000.0,
+                assumptions["revenue_growth"],
+                assumptions["fcf_margin"],
+                assumptions["wacc"],
+                assumptions["terminal_growth"],
+                400.0,
+                200.0,
+            )
+        ).value_per_share
+
+    assert bull.assumptions["wacc"] == pytest.approx(base.assumptions["wacc"])
+    assert bull.assumptions["wacc"] > base.assumptions["terminal_growth"]
+    assert value(bear.assumptions) == pytest.approx(11.2662536099, rel=1e-9)
+    assert value(base.assumptions) == pytest.approx(388.811510822, rel=1e-9)
+    assert value(bull.assumptions) == pytest.approx(806.6822273188, rel=1e-9)
+    assert value(bear.assumptions) <= value(base.assumptions) <= value(bull.assumptions)
+
+
+@pytest.mark.parametrize("spread", [0.005, 0.010, 0.020])
+def test_wacc_bull_especulativo_dentro_de_la_banda_para_cualquier_spread(spread):
+    """El bull nunca desconta mas que el base ni cae sobre el terminal.
+
+    El orden bear <= base <= bull ya se cumplia con spread >= 1pp y el fix no
+    lo cambia: a 2pp (por encima del umbral de 1,5pp donde manda el suelo
+    g + 1,5pp) el WACC del bull coincide exactamente con la formula anterior.
+    Solo en el regimen de spread estrecho (5pb, 1pp) el tope al alza evita
+    que el suelo empuje el WACC del bull por encima del base.
+    """
+    terminal = 0.03
+    _, base, bull = speculative_causal_scenarios(0.08, 0.15, terminal + spread, terminal, 0.0, 0.9)
+    assert terminal < bull.assumptions["wacc"] <= base.assumptions["wacc"]
+    if spread >= 0.015:
+        assert bull.assumptions["wacc"] == pytest.approx(
+            max(terminal + spread - 0.015, terminal + 0.015)
+        )
+
+
 _GRID = list(
     itertools.product(
         [-0.15, -0.10, -0.06, -0.02, 0.05, 0.30], [0.05, 0.20, 0.50], [0.07, 0.10, 0.14], [0.0, 0.025]
