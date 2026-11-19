@@ -19,7 +19,7 @@ def harness(monkeypatch):
     monkeypatch.setattr(actors.settings, "sec_document_jobs_enabled", False)
     monkeypatch.setattr(actors.refresh_sec_filings, "send", lambda **k: sends.append(k))
     monkeypatch.setattr(actors.process_document, "send", lambda *a, **k: documents.append((a, k)))
-    monkeypatch.setattr(actors, "_document_url_ingested", lambda *a: False)
+    monkeypatch.setattr(actors, "_document_urls_ingested", lambda db, urls: set())
     monkeypatch.setattr(actors, "_document_ingest_excluded", lambda *a: False)
     errors = {}
     items = []
@@ -141,7 +141,7 @@ def test_document_dedup_opt_out_and_missing_url(harness, monkeypatch):
     harness.items[:] = [SimpleNamespace(url=None), item, item]
     result = actors.refresh_sec_filings.fn()
     assert result["documents_queued"] == 1
-    monkeypatch.setattr(actors, "_document_url_ingested", lambda *a: True)
+    monkeypatch.setattr(actors, "_document_urls_ingested", lambda db, urls: set(urls))
     result = actors.refresh_sec_filings.fn()
     assert result["documents_skipped_known"] == 2
     monkeypatch.setattr(actors, "_document_ingest_excluded", lambda *a: True)

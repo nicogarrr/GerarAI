@@ -922,19 +922,38 @@ def _document_url_ingested(db, url: str) -> bool:
     estuvieran ingeridos, y cada tarea descargaba el documento antes de
     deduplicar por checksum (5-nov-2026, KRKNF).
     """
+    return url in _document_urls_ingested(db, [url])
+
+
+def _document_urls_ingested(db, urls: list[str]) -> set[str]:
+    """URLs ya ingeridas por el tenant, en UNA consulta por lote.
+
+    Mismo criterio que `_document_url_ingested` (source_url + filtros de
+    tenant) pero por empresa y pasada: el encolado de refresh_sec_filings y
+    refresh_ir_pages hacia una SELECT por candidato (medido 2026-11-19 en
+    SQLite: 24 documentos nuevos de 3 empresas = 24 SELECTs; con el lote, 3,
+    una por empresa). El conjunto devuelto es identico; solo cambia cuantas
+    consultas lo construyen. Troceo a 500 por el tope de bind params.
+    """
     from sqlalchemy import select
 
     from app.core.tenancy import tenant_filters
     from app.models import Document
 
-    return (
-        db.scalar(
-            select(Document.id)
-            .where(Document.source_url == url, *tenant_filters(db, Document))
-            .limit(1)
+    unique = list(dict.fromkeys(url for url in urls if url))
+    if not unique:
+        return set()
+    known: set[str] = set()
+    for start in range(0, len(unique), 500):
+        chunk = unique[start : start + 500]
+        known.update(
+            db.scalars(
+                select(Document.source_url).where(
+                    Document.source_url.in_(chunk), *tenant_filters(db, Document)
+                )
+            ).all()
         )
-        is not None
-    )
+    return known
 
 
 def _price_tracked_companies(db):
@@ -3296,6 +3315,9 @@ def refresh_sec_filings(
                         processed += 1
                     ingested += int(ingestion.get("created", 0))
                     if settings.sec_document_jobs_enabled:
+                        known_urls = _document_urls_ingested(
+                            db, [item.url for item in result.items if item.url]
+                        )
                         for item in result.items:
                             if not item.url:
                                 continue
@@ -3308,7 +3330,7 @@ def refresh_sec_filings(
                             if queued_documents >= remaining_documents:
                                 enqueue_capped = True
                                 break
-                            if _document_url_ingested(db, item.url):
+                            if item.url in known_urls:
                                 skipped_known += 1
                                 continue
                             emitted.add(fingerprint)
@@ -3423,6 +3445,9 @@ def refresh_ir_pages(
                     if result.status != "error":
                         processed += 1
                     ingested += int(ingestion.get("created", 0))
+                    known_urls = _document_urls_ingested(
+                        db, [item.url for item in result.items if item.url]
+                    )
                     for item in result.items:
                         if not item.url:
                             continue
@@ -3438,7 +3463,7 @@ def refresh_ir_pages(
                         if queued_documents >= settings.document_enqueue_max_per_poll:
                             enqueue_capped = True
                             break
-                        if _document_url_ingested(db, item.url):
+                        if item.url in known_urls:
                             skipped_known += 1
                             continue
                         emitted.add(fingerprint)

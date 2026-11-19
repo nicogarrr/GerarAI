@@ -175,7 +175,7 @@ def _run_ir(monkeypatch, *, result=None, ir_url="https://ir.example/n", excluded
     monkeypatch.setattr(worker, "_session", lambda t, u: db)
     monkeypatch.setattr(worker, "_companies", lambda d, ticker=None: [company])
     monkeypatch.setattr(worker, "_tracked_companies", lambda d: [SimpleNamespace(ticker="KRKNF")])
-    monkeypatch.setattr(worker, "_document_url_ingested", lambda d, url: False)
+    monkeypatch.setattr(worker, "_document_urls_ingested", lambda d, urls: set())
     monkeypatch.setattr(worker, "_document_ingest_excluded", lambda tenant, ticker: excluded)
     monkeypatch.setattr(worker, "process_document", _Send)
     monkeypatch.setattr(worker, "_redis_client", lambda: _Redis())
