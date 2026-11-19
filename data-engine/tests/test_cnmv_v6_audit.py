@@ -11,6 +11,7 @@ from pathlib import Path
 import httpx
 
 from app.services.connectors import cnmv, cnmv_pacer
+from app.services.connectors.global_pacing import GlobalPacer
 
 OIR_HTML = (Path(__file__).parent / "fixtures" / "cnmv_oir_results.html").read_text(encoding="utf-8")
 
@@ -63,40 +64,36 @@ def test_wait_sync_thread_does_not_block_async_waiter_or_loop():
 
 
 def test_wait_sync_revalidates_cooldown_added_while_sleeping():
-    """Determinista: el cooldown ampliado se anade EXACTAMENTE cuando el hilo
-    ya esta durmiendo (puerta por evento, sin depender de time.sleep(0.02))."""
-    pacer = cnmv_pacer.cnmv_pacer
-    pacer.reset()
+    """Determinista: reloj simulado, sin hilos ni sleeps reales. El cooldown
+    ampliado llega EXACTAMENTE durante el primer sueno (lo inyecta el propio
+    sleep falso). Antes usaba el pacer global con cooldown real de 50 ms: con la
+    CPU cargada el cooldown vencia antes de que el hilo empezara a esperar, no
+    habia sueno y el test fallaba; y con Redis vivo ni siquiera usaba la ruta local."""
+    clock = [100.0]
+    sleeps: list[float] = []
+    pacer = GlobalPacer(
+        "cnmv-test", min_interval_seconds=0.01, redis_client_factory=None,
+        monotonic=lambda: clock[0], sleep=lambda seconds: slept(seconds),
+    )
+
+    def slept(seconds):
+        sleeps.append(round(seconds, 6))
+        if len(sleeps) == 1:
+            pacer.cool_down(0.2)  # llega un Retry-After mayor mientras el hilo duerme
+        clock[0] += seconds
+
     pacer.cool_down(0.05)
-    entered, released = threading.Event(), threading.Event()
-    real_sleep = pacer._sleep
-
-    def gated_sleep(seconds):
-        entered.set()
-        released.wait(3)
-        real_sleep(seconds)
-
-    pacer._sleep = gated_sleep
-    t0 = time.monotonic()
-    worker = threading.Thread(target=pacer.wait_sync)
-    try:
-        worker.start()
-        assert entered.wait(3)
-        pacer.cool_down(0.2)  # llega un Retry-After mayor mientras el hilo duerme
-        released.set()
-        worker.join(3)
-        elapsed = time.monotonic() - t0
-    finally:
-        pacer._sleep = real_sleep
-        pacer.reset()
-    assert elapsed >= 0.19  # revalidado: respeta el cooldown ampliado
+    started = clock[0]
+    pacer.wait_sync()
+    assert sleeps[0] == 0.05
+    assert len(sleeps) == 2  # revalido al despertar y espero el resto
+    assert clock[0] - started >= 0.2  # respeta el cooldown ampliado (0,05 + 0,15)
+    assert pacer.blocked_for() == 0
 
 
 # ---- cobertura por rama de global_pacing.py (fichero entero tocado) ----
 
 import pytest  # noqa: E402
-
-from app.services.connectors.global_pacing import GlobalPacer  # noqa: E402
 
 
 class _FakeRedis:
