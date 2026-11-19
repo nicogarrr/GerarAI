@@ -26,7 +26,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
-from sqlalchemy import event, select
+from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 
 from app.models import Company
@@ -34,6 +34,21 @@ from app.models import Company
 _CACHE_KEY = "_company_catalog_all"
 _HOOK_KEY = "_company_catalog_invalidation_hook"
 _PIN_KEY = "_company_catalog_pin"
+
+
+def _probe(db: Session) -> tuple:
+    """Firma barata del catalogo en UNA fila agregada: (filas, max updated, max id).
+
+    Un alta mueve count y max(id); una baja, count; una edicion ORM mueve
+    max(updated_at) (``onupdate``). La sonda se lee ANTES de la lista: una
+    escritura que aterrice entre sonda y lectura deja la firma vieja y el
+    siguiente ``pinned_catalog`` relee (nunca sirve una firma mas nueva que
+    los datos). Escrituras bulk por SQL sin ``onupdate`` no la mueven:
+    mismo caveat del modulo.
+    """
+    return db.execute(
+        select(func.count(Company.id), func.max(Company.updated_at), func.max(Company.id))
+    ).one()
 
 
 def all_companies(db: Session) -> list[Company]:
@@ -47,7 +62,7 @@ def all_companies(db: Session) -> list[Company]:
         and not db.expire_on_commit
         and not _has_pending_company_writes(db)
     ):
-        return pinned
+        return pinned[1]
     tx = db.get_transaction()
     cached = db.info.get(_CACHE_KEY)
     if (
@@ -76,7 +91,7 @@ def catalog_if_loaded(db: Session) -> list[Company] | None:
         and not db.expire_on_commit
         and not _has_pending_company_writes(db)
     ):
-        return pinned
+        return pinned[1]
     tx = db.get_transaction()
     cached = db.info.get(_CACHE_KEY)
     if (
@@ -97,10 +112,38 @@ def pinned_catalog(db: Session):
     reutilizan aunque haya commits intermedios. La tanda de ingesta no
     escribe Company, y si lo hiciera el guard de escrituras pendientes y
     el hook after_flush invalidan el pin en el acto.
+
+    Reentrante y validado por sonda: un pin anidado (la ingesta dentro de
+    un barrido que ya pinea, p.ej. refresh_news por empresa) NO relee las
+    ~2.100 filas ni retira el pin del exterior; comprueba la sonda
+    agregada de una fila (``_probe``) y solo relee si el catalogo cambio
+    desde que se fijo (p.ej. otra sesion dio de alta una empresa a mitad
+    de barrido). Medido: un barrido de 30 tandas pasaba de 30 lecturas
+    completas del catalogo a 1 lectura + 30 sondas de una fila.
     """
-    rows = all_companies(db)
     _install_invalidation_hook(db)
-    db.info[_PIN_KEY] = rows
+    pin = db.info.get(_PIN_KEY)
+    if (
+        pin is not None
+        and not db.expire_on_commit
+        and not _has_pending_company_writes(db)
+    ):
+        sig, rows = pin
+        if _probe(db) == sig:
+            yield rows
+            return
+        # Catalogo cambiado a mitad de pin: relee y sustituye (el pin lo
+        # sigue poseyendo el exterior; no se retira aqui). Sonda ANTES de
+        # la lectura, como en la entrada: una escritura entre ambas deja
+        # la firma vieja y la siguiente sonda fuerza otra relectura.
+        sig = _probe(db)
+        rows = list(db.scalars(select(Company)).all())
+        db.info[_PIN_KEY] = (sig, rows)
+        yield rows
+        return
+    sig = _probe(db)
+    rows = all_companies(db)
+    db.info[_PIN_KEY] = (sig, rows)
     try:
         yield rows
     finally:

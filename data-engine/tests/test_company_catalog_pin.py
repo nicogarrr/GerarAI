@@ -42,7 +42,20 @@ def _full_reads(db):
     @event.listens_for(db.get_bind(), "before_cursor_execute")
     def _count(conn, cursor, statement, parameters, context, executemany):
         s = statement.lower()
-        if "from companies" in s and "where" not in s:
+        # La sonda agregada del pin (count/max) no es una lectura completa.
+        if "from companies" in s and "where" not in s and "count(" not in s:
+            counter["n"] += 1
+
+    return counter
+
+
+def _probes(db):
+    counter = {"n": 0}
+
+    @event.listens_for(db.get_bind(), "before_cursor_execute")
+    def _count(conn, cursor, statement, parameters, context, executemany):
+        s = statement.lower()
+        if "from companies" in s and "count(" in s:
             counter["n"] += 1
 
     return counter
@@ -58,6 +71,47 @@ def test_pin_survives_commits(db):
         db.commit()
         all_companies(db)
     assert counter["n"] == 1, f"catalogo re-leido bajo pin: {counter['n']} lecturas completas"
+
+
+def test_nested_pin_probes_instead_of_rereading(db):
+    """Pin anidado (ingesta dentro de un barrido): sonda de una fila, no
+    relectura; el pin del exterior sobrevive al bloque interior."""
+    reads = _full_reads(db)
+    probes = _probes(db)
+    with pinned_catalog(db) as outer:
+        with pinned_catalog(db) as inner:
+            assert inner is outer
+        # El pin exterior sigue activo tras salir del anidado.
+        assert _PIN_KEY in db.info
+        assert all_companies(db) is outer
+    assert _PIN_KEY not in db.info
+    assert reads["n"] == 1, f"lecturas completas: {reads['n']}"
+    assert probes["n"] >= 1, "el pin anidado debe sondear, no releer"
+
+
+def test_company_write_between_batches_visible_to_nested_pin(db):
+    """Alta de empresa a mitad del barrido: el pin anidado la ve (el hook
+    after_flush retira el pin y la entrada anidada relee fresco)."""
+    with pinned_catalog(db) as outer:
+        db.add(_company("MSFT"))
+        db.commit()  # commit de tanda como el de la ingesta por item
+        with pinned_catalog(db) as inner:
+            assert inner is not outer
+            assert any(c.ticker == "MSFT" for c in inner)
+
+
+def test_nested_pin_rereads_on_probe_mismatch(db):
+    """Sonda que no casa (catalogo cambiado por OTRA sesion): el pin anidado
+    relee, sustituye el pin y NO lo retira (lo posee el exterior)."""
+    with pinned_catalog(db) as outer:
+        sig, rows = db.info[_PIN_KEY]
+        db.info[_PIN_KEY] = ((sig[0] + 1, sig[1], sig[2]), rows)  # firma vieja simulada
+        with pinned_catalog(db) as inner:
+            assert inner is not outer
+            assert {c.ticker for c in inner} == {c.ticker for c in outer}
+        # El pin sustituido sigue activo para el exterior.
+        assert db.info[_PIN_KEY][1] is inner
+    assert _PIN_KEY not in db.info
 
 
 def test_pin_removed_after_block(db):
