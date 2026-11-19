@@ -120,9 +120,64 @@ class ProviderIngestionService:
         """Motivo observable cuando una fila valida no se ingiere (None = no aplica)."""
         return None
 
+    #: Clave de cache de dedup en ``db.info`` usada por la subclase, o None.
+    _dedup_cache_key: str | None = None
+
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
         raise NotImplementedError
+
+    @staticmethod
+    def _company_records(db: Session, company: Company, model: type, cache_key: str) -> list:
+        """Filas persistidas de la compania, una lectura por compania y sesion.
+
+        El proveedor devuelve el historial COMPLETO en cada sync (Yahoo chart
+        con period1=0): el dedup por fila costaba una consulta por evento
+        (~250 en un pagador antiguo, a diario en dividendos). La cache vive
+        en ``db.info`` (vida de sesion): con autoflush=False las busquedas
+        por fila originales tampoco veian los pendientes de esta corrida,
+        asi que el resultado es identico; cada compania se sincroniza una
+        vez por corrida y sesion en todos los llamantes.
+        """
+        cache = db.info.setdefault(cache_key, {})
+        if company.id not in cache:
+            cache[company.id] = db.scalars(
+                select(model).where(model.company_id == company.id).order_by(model.id)
+            ).all()
+        return cache[company.id]
+
+    @staticmethod
+    def _track_new_record(db: Session, company: Company, record: Any, cache_key: str) -> None:
+        """Registra un insert nuevo en la cache de dedup de la compania.
+
+        Sin esto, una segunda sync de la MISMA compania en la misma sesion
+        reutilizaria la lista precargada antes del insert y duplicaria filas
+        que la busqueda por fila original siempre veia ya persistidas.
+
+        SOLO se llama tras un commit con exito: si la cache aprende filas
+        aun sin confirmar y el commit falla, un rollback posterior las
+        borra de la BD pero no de la cache; el reintento en la misma sesion
+        las trataria como existentes y la ingesta se perderia en silencio
+        (contraejemplo medido por Auditoria: 120 dividendos, commit fallido,
+        rollback, reintento -> inserted 0 con la tabla vacia).
+        """
+        company_records = db.info.get(cache_key, {}).get(company.id)
+        if company_records is not None:
+            company_records.append(record)
+
+    @staticmethod
+    def _pending_records(db: Session, company: Company, model: type) -> list:
+        """Filas de la compania insertadas EN ESTA corrida (aun sin flush).
+
+        Las busquedas por fila originales las veian via autoflush (un payload
+        con la misma fila dos veces dedupaba la segunda); hay que seguir
+        viendolas o un duplicado intra-descarga se insertaria dos veces.
+        """
+        return [
+            pending
+            for pending in db.new
+            if isinstance(pending, model) and pending.company_id == company.id
+        ]
 
     @staticmethod
     def _new_record(
@@ -157,6 +212,7 @@ class ProviderIngestionService:
         inserted = 0
         existing = 0
         skipped: dict[str, int] = {}
+        new_records: list[Any] = []
         for row in rows:
             if not self._row_is_ingestible(row):
                 reason = self._skip_reason(row)
@@ -167,9 +223,17 @@ class ProviderIngestionService:
             if duplicate is not None:
                 existing += 1
                 continue
-            db.add(self._new_record(company, row, source, fetched_at))
+            record = self._new_record(company, row, source, fetched_at)
+            db.add(record)
+            new_records.append(record)
             inserted += 1
         db.commit()
+        # La cache de dedup aprende los inserts SOLO cuando ya son filas
+        # reales: aprenderlos pendientes dejaba fantasmas tras un rollback
+        # (reintento en la misma sesion: existing=N, tabla vacia).
+        if self._dedup_cache_key:
+            for record in new_records:
+                self._track_new_record(db, company, record, self._dedup_cache_key)
         return {
             "ticker": company.ticker,
             "status": "ok",
@@ -247,6 +311,7 @@ class ProviderIngestionService:
 
 class SplitIngestionService(ProviderIngestionService):
     _PROVENANCE_SOURCE = "Yahoo Finance chart/splits (fallback FMP stable/splits)"
+    _dedup_cache_key = "dedup_corporate_actions"
     _PROVENANCE_NOTE = (
         "Splits arrive unapplied; verify against issuer/exchange notices before applying to the ledger."
     )
@@ -334,18 +399,24 @@ class SplitIngestionService(ProviderIngestionService):
 
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
-        return db.scalar(
-            select(CorporateAction).where(
-                CorporateAction.company_id == company.id,
-                # +-3 dias: Yahoo y FMP (el respaldo) fechan el mismo split con
-                # un dia de diferencia; con fecha exacta, un fallo puntual de
-                # Yahoo duplicaba el evento con la fecha del otro proveedor.
-                CorporateAction.effective_date >= row["effective_date"] - timedelta(days=_SAME_EVENT_DAYS),
-                CorporateAction.effective_date <= row["effective_date"] + timedelta(days=_SAME_EVENT_DAYS),
-                CorporateAction.ratio == row["ratio"],
-                CorporateAction.action_type.in_(["split", "reverse_split"]),
+        # +-3 dias: Yahoo y FMP (el respaldo) fechan el mismo split con
+        # un dia de diferencia; con fecha exacta, un fallo puntual de
+        # Yahoo duplicaba el evento con la fecha del otro proveedor.
+        low = row["effective_date"] - timedelta(days=_SAME_EVENT_DAYS)
+        high = row["effective_date"] + timedelta(days=_SAME_EVENT_DAYS)
+        candidates = list(
+            ProviderIngestionService._company_records(
+                db, company, CorporateAction, "dedup_corporate_actions"
             )
-        )
+        ) + ProviderIngestionService._pending_records(db, company, CorporateAction)
+        for record in candidates:
+            if (
+                low <= record.effective_date <= high
+                and record.ratio == row["ratio"]
+                and record.action_type in ("split", "reverse_split")
+            ):
+                return record
+        return None
 
     @staticmethod
     def _new_record(

@@ -31,6 +31,7 @@ from app.valuation.currency import is_currency_code
 
 class DividendIngestionService(ProviderIngestionService):
     _PROVENANCE_SOURCE = "Yahoo Finance chart/dividends (fallback FMP stable/dividends)"
+    _dedup_cache_key = "dedup_dividend_records"
     _PROVENANCE_NOTE = (
         "Dividends from data providers (Yahoo amounts are split-adjusted, not the original "
         "declared per-share figure); reconcile against issuer/regulator "
@@ -238,29 +239,28 @@ class DividendIngestionService(ProviderIngestionService):
 
     @staticmethod
     def _existing_record(db: Session, company: Company, row: dict[str, Any]) -> Any:
-        record = db.scalar(
-            select(DividendRecord).where(
-                DividendRecord.company_id == company.id,
-                DividendRecord.ex_date == row["ex_date"],
-                DividendRecord.amount == row["amount"],
+        records = list(
+            ProviderIngestionService._company_records(
+                db, company, DividendRecord, "dedup_dividend_records"
             )
-        )
+        ) + ProviderIngestionService._pending_records(db, company, DividendRecord)
+        for record in records:
+            if record.ex_date == row["ex_date"] and record.amount == row["amount"]:
+                return record
         legacy = row.get("legacy_utc_ex_date")
-        if record is not None or legacy is None or legacy == row["ex_date"]:
-            return record
+        if legacy is None or legacy == row["ex_date"]:
+            return None
         # Fila guardada con la fecha UTC (un dia antes en ASX/NZX): se corrige
         # en sitio en vez de duplicar el cobro.
-        record = db.scalar(
-            select(DividendRecord).where(
-                DividendRecord.company_id == company.id,
-                DividendRecord.ex_date == legacy,
-                DividendRecord.amount == row["amount"],
-                DividendRecord.source == "yahoo_finance",
-            )
-        )
-        if record is not None:
-            record.ex_date = row["ex_date"]
-        return record
+        for record in records:
+            if (
+                record.ex_date == legacy
+                and record.amount == row["amount"]
+                and record.source == "yahoo_finance"
+            ):
+                record.ex_date = row["ex_date"]  # corrige en sitio, como antes
+                return record
+        return None
 
     @staticmethod
     def _new_record(
