@@ -3260,6 +3260,43 @@
               }
             ]
           },
+          "limit": {
+            "title": "Limit",
+            "type": "integer"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
+          },
+          "returned_desde": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Desde"
+          },
+          "returned_hasta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Hasta"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -3267,6 +3304,14 @@
           "ticker": {
             "title": "Ticker",
             "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
           }
         },
         "required": [
@@ -3274,6 +3319,12 @@
           "desde",
           "hasta",
           "events",
+          "total",
+          "limit",
+          "truncated",
+          "returned_desde",
+          "returned_hasta",
+          "notice",
           "source"
         ],
         "title": "CompanyTimelineEventsOut",
@@ -54438,6 +54489,7 @@
               "anyOf": [
                 {
                   "maxLength": 10,
+                  "pattern": "^[0-9]{1,10}$",
                   "type": "string"
                 },
                 {

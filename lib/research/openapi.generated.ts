@@ -8311,10 +8311,22 @@ export interface components {
             /** Hasta */
             hasta: string;
             holding?: components["schemas"]["TimelineHoldingOut"] | null;
+            /** Limit */
+            limit: number;
+            /** Notice */
+            notice: string | null;
+            /** Returned Desde */
+            returned_desde: string | null;
+            /** Returned Hasta */
+            returned_hasta: string | null;
             /** Source */
             source: string;
             /** Ticker */
             ticker: string;
+            /** Total */
+            total: number;
+            /** Truncated */
+            truncated: boolean;
         };
         /** CompanyTrackRecordOut */
         CompanyTrackRecordOut: {
