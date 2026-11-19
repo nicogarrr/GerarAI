@@ -9,11 +9,28 @@ export type ChartEvents = {
     averageCost: number | null;
     firstBuyDate: string | null;
     holdingNotice: string | null;
+    eventsNotice: string | null;
     target: number | null;
     targetCurrency: string | null;
 };
 
-type TimelineOut = { events?: PriceEvent[]; holding?: { average_cost?: number | null; first_buy_date?: string | null; notice?: string | null } | null };
+type TimelineOut = {
+    events?: PriceEvent[];
+    holding?: { average_cost?: number | null; first_buy_date?: string | null; notice?: string | null } | null;
+    // #6009: el timeline viene acotado (500 eventos); el backend informa del
+    // recorte con total/truncated/returned_* y un notice fijo. Sin estos campos
+    // el aviso se descartaba y el grafico mentia por omision.
+    total?: number | null;
+    truncated?: boolean | null;
+    returned_desde?: string | null;
+    returned_hasta?: string | null;
+    notice?: string | null;
+};
+
+// Texto fijo que emite el backend (company_events timeline) cuando el tramo
+// viene recortado. Se sirve traducido; un aviso desconocido pasa tal cual
+// (precedente: BACKEND_HOLDING_NOTICE).
+const BACKEND_TIMELINE_NOTICE = 'Se muestran solo los eventos más recientes del rango. Hay eventos omitidos; el primer día mostrado puede estar incompleto. Reduce el rango de fechas para consultar el resto.';
 
 // Texto fijo que emite el backend (company_events_service.stored_holding) cuando el coste medio no
 // es comparable. Es un aviso de calidad del dato, no una etiqueta de fuente; se sirve traducido
@@ -37,12 +54,24 @@ export async function getChartEvents(ticker: string, desde: string, hasta: strin
         researchRequest<TargetsOut>(`/api/companies/${symbol}/analyst-targets`, { timeoutMs: 14000 }).catch(() => null),
     ]);
     const notice = timeline?.holding?.notice ?? null;
+    const events = (timeline?.events ?? []).filter((e) => e && e.date && e.source);
+    // Aviso de recorte del timeline (distinto del holdingNotice: habla del
+    // numero de eventos mostrados, no de la calidad del coste medio). Prioridad:
+    // el texto fijo del backend traducido; un notice desconocido pasa tal cual;
+    // sin notice, se compone desde total/truncated.
+    const timelineNotice = timeline?.notice ?? null;
+    const eventsNotice = timelineNotice === BACKEND_TIMELINE_NOTICE
+        ? t('research.chart.eventsTruncatedNotice')
+        : timelineNotice ?? (timeline?.truncated && typeof timeline?.total === 'number' && timeline.total > events.length
+            ? t('research.chart.eventsNotice', { shown: events.length, total: timeline.total })
+            : null);
     const mean = targets?.consensus?.mean;
     return {
-        events: (timeline?.events ?? []).filter((e) => e && e.date && e.source),
+        events,
         averageCost: timeline?.holding?.average_cost ?? null,
         firstBuyDate: timeline?.holding?.first_buy_date ?? null,
         holdingNotice: notice === BACKEND_HOLDING_NOTICE ? t('research.chart.holdingNotice') : notice,
+        eventsNotice,
         target: typeof mean === 'number' && Number.isFinite(mean) && mean > 0 ? mean : null,
         targetCurrency: targets?.currency ?? null,
     };

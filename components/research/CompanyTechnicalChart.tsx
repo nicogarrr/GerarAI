@@ -89,6 +89,9 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
     // Aviso de calidad del dato: solo cuando hay posición pero el coste medio no es comparable
     // (sin línea «Tu precio medio»). No es una etiqueta de fuente.
     const holdingNotice = averageCost == null ? (eventData?.holdingNotice ?? null) : null;
+    // Aviso de recorte del timeline (#6009): el tramo puede no mostrar todos
+    // los eventos. Distinto del holdingNotice (calidad del coste medio).
+    const eventsNotice = eventData?.eventsNotice ?? null;
     // Distancia al objetivo (objetivo frente al último precio del tramo), junto a la etiqueta de la línea:
     // sustituye al antiguo panel «Distancia al objetivo» bajo el precio (lo pidió el dueño, 3-nov-2026).
     const lastClose = visible.at(-1)?.close ?? null;
@@ -130,6 +133,7 @@ export default function CompanyTechnicalChart({ snapshot }: { snapshot: CompanyM
                         {!candlesAvailable ? <span className="text-xs text-gray-500">{t('research.chart.candlesUnavailable')}</span> : null}
                     </div>
                     {needsRemote && requestState === 'loading' ? <div className="grid h-[280px] place-items-center text-xs text-gray-500 sm:h-[360px]" role="status">{t('research.chart.loadingRange', { range: t(RANGE_KEYS[range]) })}</div> : needsRemote && requestState === 'error' ? <div className="grid h-[280px] place-items-center text-sm text-gray-500 sm:h-[360px]" role="alert">{t('research.chart.rangeError')}</div> : <PriceCanvas candleMode={chartType === 'candles' && candlesAvailable} bars={visible} levels={chartLevels} currency={visibleCurrency} hourly={hourly} spikes={spikes} markers={markers} priceLines={priceLines} focusDate={focusDate} />}
+                    {eventsNotice ? <p className="mb-3 text-xs text-gray-400" role="status" data-testid="chart-events-notice">{eventsNotice}</p> : null}
                     {holdingNotice ? <p className="mb-3 text-xs text-amber-300/90" role="status" data-testid="chart-holding-notice">{holdingNotice}</p> : null}
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex w-full flex-wrap gap-1 sm:w-auto" aria-label={t('research.chart.rangeAria')}>
