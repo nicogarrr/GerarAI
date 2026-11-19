@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import desc, event, select
+from sqlalchemy import desc, event, func, select
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -184,6 +184,32 @@ class AlertRuleService:
         # ticker (festivo de Madrid, Londres o la NYSE, fin de semana); la regla
         # queda como estaba. «Hoy» es el día de Madrid del usuario.
         market_day = market_day or local_today()
+        # Ultimos 2 cierres de TODA compania con regla de precio en UNA
+        # consulta (funcion ventana: mismo orden date desc y tope 2 por
+        # compania que el SELECT por regla). Cada regla de precio repetia
+        # esa lectura cada 5 min; con 600 reglas eran 600 SELECTs.
+        price_company_ids = {
+            rule.company_id
+            for rule in rules
+            if str((rule.target or {}).get("kind") or "") in _PRICE_KINDS
+            and rule.company_id is not None
+        }
+        prices_by_company: dict[int, list[MarketPrice]] = {}
+        if price_company_ids:
+            rn = func.row_number().over(
+                partition_by=MarketPrice.company_id, order_by=desc(MarketPrice.date)
+            ).label("rn")
+            sub = select(MarketPrice.id.label("pid"), rn).where(
+                MarketPrice.company_id.in_(price_company_ids)
+            ).subquery()
+            for price in db.scalars(
+                select(MarketPrice)
+                .where(MarketPrice.id.in_(select(sub.c.pid).where(sub.c.rn <= 2)))
+                .order_by(MarketPrice.company_id, desc(MarketPrice.date))
+            ).all():
+                prices_by_company.setdefault(price.company_id, []).append(price)
+            for company_id in price_company_ids:
+                prices_by_company.setdefault(company_id, [])
         companies: dict[int, Company | None] = {}
         results: list[dict[str, Any]] = []
         for rule in rules:
@@ -200,12 +226,17 @@ class AlertRuleService:
                         "market_day": market_day.isoformat(),
                     })
                     continue
-            results.append(self.evaluate(db, rule, commit=False))
+            results.append(self.evaluate(db, rule, commit=False, _prices=prices_by_company))
         db.commit()
         return results
 
     def evaluate(
-        self, db: Session, rule: AlertRule, *, commit: bool = True
+        self,
+        db: Session,
+        rule: AlertRule,
+        *,
+        commit: bool = True,
+        _prices: dict[int, list[MarketPrice]] | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(UTC)
         company = db.get(Company, rule.company_id)
@@ -217,7 +248,7 @@ class AlertRuleService:
                 db.commit()
             return result
 
-        observed, observation = self._observe(db, rule)
+        observed, observation = self._observe(db, rule, _prices=_prices)
         event_kind = observation.get("kind") in _EVENT_KINDS
         stale_observation = observation.get("status") == "stale"
         session_gap = observation.get("status") == "session_gap"
@@ -374,10 +405,21 @@ class AlertRuleService:
         company = db.get(Company, rule.company_id) if rule.company_id is not None else None
         return (company.exchange, company.ticker) if company is not None else (None, None)
 
-    def _observe(self, db: Session, rule: AlertRule) -> tuple[Any, dict[str, Any]]:
+    def _observe(
+        self,
+        db: Session,
+        rule: AlertRule,
+        *,
+        _prices: dict[int, list[MarketPrice]] | None = None,
+    ) -> tuple[Any, dict[str, Any]]:
         kind = str((rule.target or {}).get("kind") or "")
-        if kind == "market_price":
-            prices = list(
+
+        def _latest_prices() -> list[MarketPrice]:
+            # Con precarga de evaluate_all: [] = compania SIN cierres (la
+            # consulta original devolvia lo mismo); sin precarga, consulta.
+            if _prices is not None and rule.company_id in _prices:
+                return _prices[rule.company_id]
+            return list(
                 db.scalars(
                     select(MarketPrice)
                     .where(MarketPrice.company_id == rule.company_id)
@@ -385,6 +427,9 @@ class AlertRuleService:
                     .limit(2)
                 ).all()
             )
+
+        if kind == "market_price":
+            prices = _latest_prices()
             if prices:
                 age_days = (date.today() - prices[0].date).days
                 # El umbral se pide «en <divisa de la empresa>» (ficha): el
@@ -461,14 +506,7 @@ class AlertRuleService:
                 else (None, {"kind": kind, "status": "missing"})
             )
         if kind == "price_change_percent":
-            prices = list(
-                db.scalars(
-                    select(MarketPrice)
-                    .where(MarketPrice.company_id == rule.company_id)
-                    .order_by(desc(MarketPrice.date))
-                    .limit(2)
-                ).all()
-            )
+            prices = _latest_prices()
             if len(prices) < 2:
                 return None, {"kind": kind, "status": "missing_two_prices"}
             latest, previous = prices
