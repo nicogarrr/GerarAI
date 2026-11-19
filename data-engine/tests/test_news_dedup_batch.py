@@ -121,3 +121,119 @@ def test_patron_no_precargado_usa_la_consulta_suelta(db):
     found = equivalent_news_event(db, company_id=None, url="https://y.example.com/p",
                                   title=None, batch=batch)
     assert found is not None and found.id == real.id
+
+
+def test_titulo_en_lote_igual_que_suelto(db):
+    rng = random.Random(23)
+    company = _seed(db, rng, 350)  # más de 300: ejercita el tope de la foto
+    batch = prefetch_news_dedup(db, [])
+    # «T299!!» y «t349» casan (misma normalización); «t0» queda fuera de la
+    # ventana de 300 más recientes y no debe casar en ninguna de las dos vías.
+    probes = ["T299!!", "t349", "t0", "t1", "no-existe", "t150", None, ""]
+    for title in probes:
+        single = equivalent_news_event(db, company_id=company.id, url=None, title=title)
+        batched = equivalent_news_event(
+            db, company_id=company.id, url=None, title=title, batch=batch
+        )
+        assert (single.id if single else None) == (batched.id if batched else None), title
+
+
+def test_titulo_insertado_durante_la_tanda_cuenta(db):
+    rng = random.Random(29)
+    company = _seed(db, rng, 10)
+    batch = prefetch_news_dedup(db, [])
+    service = NewsService()
+    titles = ["Primera Noticia", "segunda noticia!", "tercera"]
+    for i, title in enumerate(titles):
+        # Igual que la ingesta: cada noticia nueva se guarda antes de la siguiente.
+        db.add(NewsEvent(company_id=company.id, title=title, source="rss",
+                         url=f"https://n.example.com/{i}", summary="", tenant_id=1))
+        db.flush()
+        probe = title.upper()  # misma normalización, distinta forma
+        single = service._is_duplicate(db, company, probe, None)
+        batched = service._is_duplicate(db, company, probe, None, dedup_batch=batch)
+        assert single == batched is True, title
+    # Y un título nuevo no casa en ninguna de las dos vías.
+    assert service._is_duplicate(db, company, "titulo nunca visto", None) is False
+    assert (
+        service._is_duplicate(db, company, "titulo nunca visto", None, dedup_batch=batch)
+        is False
+    )
+
+
+def test_foto_de_titulos_aislada_entre_empresas(db):
+    rng = random.Random(31)
+    a = _seed(db, rng, 5)  # titulares «t0»..«t4»
+    b = Company(
+        ticker="DDU2", name="Dedup Co 2", exchange="NASDAQ", currency="USD",
+        sector="Tech", industry="Tech", company_type="holding",
+        valuation_model="unassigned", special_sources=[], special_risks=[], factor_tags=[],
+    )
+    db.add(b)
+    db.commit()
+    db.add(NewsEvent(company_id=b.id, title="solo de b", source="rss",
+                     url=None, summary="", tenant_id=1))
+    db.commit()
+    batch = prefetch_news_dedup(db, [])
+    # El titular de A no aparece en la foto de B y viceversa.
+    assert equivalent_news_event(db, company_id=b.id, url=None, title="t0", batch=batch) is None
+    assert (
+        equivalent_news_event(db, company_id=a.id, url=None, title="solo de b", batch=batch)
+        is None
+    )
+    found_b = equivalent_news_event(db, company_id=b.id, url=None, title="Solo de B!!",
+                                    batch=batch)
+    assert found_b is not None and found_b.company_id == b.id
+
+
+def test_foto_de_titulos_se_invalida_tras_rollback(db):
+    """Contraejemplo del Auditor: 300 titulos, un 301 temporal con flush que
+    entra en la foto (expulsando «t0» de la ventana), rollback, y la via
+    batch debe volver a ver «t0» igual que la suelta."""
+    # Determinista y single-tenant: exactamente 300 filas del tenant 1 (la
+    # ventana de la foto), sin azar multi-tenant que pudiera dejar menos.
+    company = _company(db)
+    for i in range(300):
+        _add(db, NewsEvent(company_id=company.id, title=f"t{i}", source="rss",
+                           url=None, summary=""), tenant=1)
+    db.commit()
+    batch = prefetch_news_dedup(db, [])
+    db.add(NewsEvent(company_id=company.id, title="temporal", source="rss",
+                     url=None, summary="", tenant_id=1))
+    db.flush()
+    # El temporal entra en la foto (id > max_id) y expulsa «t0» de la ventana.
+    assert equivalent_news_event(db, company_id=company.id, url=None,
+                                 title="temporal", batch=batch) is not None
+    db.rollback()
+    single = equivalent_news_event(db, company_id=company.id, url=None, title="t0")
+    batched = equivalent_news_event(db, company_id=company.id, url=None, title="t0",
+                                    batch=batch)
+    assert single is not None, "la via suelta debe seguir viendo «t0» tras el rollback"
+    assert batched is not None and batched.id == single.id
+
+
+def test_un_solo_listener_por_sesion_para_todos_los_batches(db):
+    """Un barrido crea muchos batches por sesion: un listener por batch
+    retendria todas sus fotos hasta el fin de la sesion. Uno solo por sesion,
+    con refs debiles, limpia todos y no retiene batches muertos."""
+    import app.services.news_identity as ni
+
+    company = _company(db)
+    _add(db, NewsEvent(company_id=company.id, title="x", source="rss",
+                       url=None, summary=""), tenant=1)
+    db.commit()
+    batches = [prefetch_news_dedup(db, []) for _ in range(3)]
+    for batch in batches:
+        equivalent_news_event(db, company_id=company.id, url=None, title="x",
+                              batch=batch)
+    watchers = db.info[ni._SNAPSHOT_WATCHERS_KEY]
+    assert len(watchers) == 3
+    assert len(db.dispatch.after_rollback.listeners) == 1  # uno por sesion
+    assert all(batch.title_snapshots for batch in batches)
+    del batches  # refs debiles: la sesion no los retiene
+    db.rollback()  # no rompe con refs muertas
+    batch = prefetch_news_dedup(db, [])
+    equivalent_news_event(db, company_id=company.id, url=None, title="x", batch=batch)
+    assert batch.title_snapshots
+    db.rollback()
+    assert not batch.title_snapshots

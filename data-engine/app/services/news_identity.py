@@ -10,12 +10,13 @@ normalizado. Una alerta por noticia y empresa.
 from __future__ import annotations
 
 import re
+import weakref
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from urllib.parse import urlsplit
 
-from sqlalchemy import String, func, literal, select, union_all
+from sqlalchemy import String, event, func, literal, select, union_all
 from sqlalchemy.orm import Session
 
 from app.models.entities import NewsEvent, ResearchAlert
@@ -163,6 +164,10 @@ def equivalent_news_alert(
 # Candidatos por URL que mira equivalent_news_event: los 50 más recientes cuyo
 # url contiene «host/path» (sin distinguir mayúsculas).
 _URL_CANDIDATES = 50
+# Titulares recientes por empresa que mira la dedup por titular (mismo tope
+# que la consulta suelta original).
+_TITLE_CANDIDATES = 300
+_SNAPSHOT_WATCHERS_KEY = "news_title_snapshot_watchers"
 # Patrones por consulta en la lectura en lote (acota filas devueltas: ≤50 por patrón).
 _BATCH_PATTERNS = 100
 _BATCH_URLS = 500
@@ -190,6 +195,50 @@ class NewsDedupBatch:
     max_id: int
     known_urls: set[str] = field(default_factory=set)
     url_candidates: dict[str, list[tuple[int, str | None]]] = field(default_factory=dict)
+    # Foto incremental de titulares por empresa: (id maximo leido, filas
+    # (id, title) ordenadas por id desc, tope _TITLE_CANDIDATES). La
+    # dedup por titular releia los 300 eventos mas recientes de la empresa
+    # POR NOTICIA; con la foto, la tanda lee una vez y despues solo las
+    # filas nuevas (id > leido, rango de clave primaria), manteniendo el
+    # mismo conjunto «300 mas recientes».
+    # INVALIDA tras rollback: una fila vista con flush y luego anulada
+    # quedaria de fantasma (y su expulsion de la ventana, falsa). El
+    # listener after_rollback la limpia (ver _protect_snapshots_against_rollback);
+    # hoy ingest_news_items descarta el lote entero ante cualquier
+    # excepcion, pero el batch queda protegido si algun dia se reutiliza.
+    title_snapshots: dict[int, tuple[int, list[tuple[int, str | None]]]] = field(
+        default_factory=dict
+    )
+    _rollback_listeners: set[int] = field(default_factory=set, repr=False)
+
+
+def _protect_snapshots_against_rollback(db: Session, batch: NewsDedupBatch) -> None:
+    """Limpia las fotos de titulares del batch si la sesion hace rollback.
+
+    Una fila que entro en la foto con flush y luego se anula quedaria de
+    fantasma (y su expulsion de la ventana de 300, falsa: la via suelta
+    vuelve a ver la fila expulsada y la foto, no).
+
+    UN listener por sesion (no por batch): un barrido crea ~30 batches por
+    sesion y un listener por batch retendria todas sus fotos hasta el fin de
+    la sesion. El registro vive en db.info (scratch de sesion) con refs
+    debiles: el batch se libera al soltarlo el llamador.
+    """
+    if id(db) in batch._rollback_listeners:
+        return
+    batch._rollback_listeners.add(id(db))
+    watchers: list[weakref.ref] | None = db.info.get(_SNAPSHOT_WATCHERS_KEY)
+    if watchers is None:
+        watchers = db.info[_SNAPSHOT_WATCHERS_KEY] = []
+
+        def _clear_all(_session) -> None:
+            for ref in list(watchers):
+                watched = ref()
+                if watched is not None:
+                    watched.title_snapshots.clear()
+
+        event.listen(db, "after_rollback", _clear_all)
+    watchers.append(weakref.ref(batch))
 
 
 def prefetch_news_dedup(
@@ -305,6 +354,48 @@ def equivalent_news_event(
                     return event
     wanted_title = normalize_headline(title)
     if wanted_title and company_id is not None:
+        if batch is not None:
+            # Foto incremental por empresa (ver NewsDedupBatch): primera vez,
+            # los 300 mas recientes al empezar la tanda; despues, solo las
+            # filas nuevas (id > lo leido), mas recientes primero, tope 300.
+            _protect_snapshots_against_rollback(db, batch)
+            entry = batch.title_snapshots.get(company_id)
+            if entry is None:
+                snapshot = [
+                    (row[0], row[1])
+                    for row in db.execute(
+                        select(NewsEvent.id, NewsEvent.title)
+                        .where(
+                            NewsEvent.company_id == company_id,
+                            NewsEvent.id <= batch.max_id,
+                        )
+                        .order_by(NewsEvent.id.desc())
+                        .limit(_TITLE_CANDIDATES)
+                    ).all()
+                ]
+                read_up_to = batch.max_id
+            else:
+                read_up_to, snapshot = entry
+            fresh = db.execute(
+                select(NewsEvent.id, NewsEvent.title)
+                .where(
+                    NewsEvent.company_id == company_id,
+                    NewsEvent.id > read_up_to,
+                )
+                .order_by(NewsEvent.id.desc())
+            ).all()
+            if fresh:
+                snapshot = ([(row[0], row[1]) for row in fresh] + snapshot)[
+                    :_TITLE_CANDIDATES
+                ]
+                read_up_to = max(read_up_to, fresh[0][0])
+            batch.title_snapshots[company_id] = (read_up_to, snapshot)
+            for event_id, event_title in snapshot:
+                if normalize_headline(event_title) == wanted_title:
+                    found = db.get(NewsEvent, event_id)
+                    if found is not None:
+                        return found
+            return None
         recent = db.scalars(
             select(NewsEvent).where(NewsEvent.company_id == company_id)
             .order_by(NewsEvent.id.desc()).limit(300)

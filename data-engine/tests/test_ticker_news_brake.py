@@ -91,6 +91,13 @@ def _env(monkeypatch, service, client):
     monkeypatch.setattr(
         "app.services.feed_ingestion_service.FeedIngestionService", lambda: service
     )
+    # El pin de catalogo del barrido es SQLAlchemy real; la sesion falsa no
+    # lo soporta y la ingesta esta simulada, asi que no se ejerce aqui.
+    import contextlib
+
+    monkeypatch.setattr(
+        "app.services.company_catalog.pinned_catalog", lambda db: contextlib.nullcontext([])
+    )
 
 
 def test_429_streak_trips_brake_and_lanes_stop(monkeypatch):

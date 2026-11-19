@@ -3830,49 +3830,56 @@ def refresh_news(
             # 300 s: el ultimo query puede entrar con 429+reintentos y 30 items;
             # el margen real hasta los 600 s del TimeLimit es de 5 min.
             deadline = Deadline(300)
-            for company in companies:
-                if deadline.expired():
-                    break
-                try:
-                    query = _gdelt_company_query(company)
-                    result = _run(
-                        service.poll_gdelt(
-                            query,
-                            ticker=company.ticker,
-                            max_records=max_records,
-                        )
-                    )
-                    if result.errors:
-                        errors.extend(
-                            {"ticker": company.ticker, "source": "gdelt", "message": error}
-                            for error in result.errors
-                        )
-                    ingested += ingest_in_chunks(
-                        lambda part, _c=company: service.ingest_news_result(db, part, ticker=_c.ticker),
-                        result,
-                        deadline,
-                    )
-                    if result.status != "error":
-                        processed += 1
-                        _gdelt_success_recorded(gdelt_client)
-                except Exception as exc:
-                    _rollback(db)
-                    from app.services.connectors.gdelt import GdeltRateLimited
+            # Catalogo fijado para TODO el barrido: cada tanda de ingesta lo
+            # releia entero (medido: 30 lecturas de ~2.100 filas en un barrido
+            # de 30 empresas). El pin anidado de la ingesta solo sondea una
+            # fila agregada por tanda y relee si el catalogo cambio.
+            from app.services.company_catalog import pinned_catalog
 
-                    if isinstance(exc, GdeltRateLimited):
-                        # Ventana cerrada: se para el barrido aqui (no se
-                        # quema cuota en las empresas restantes) y el lote se
-                        # reencola tras el Retry-After del servidor.
-                        _raise_gdelt_retry(exc)
-                    errors.append(
-                        {
-                            "ticker": company.ticker,
-                            "source": "gdelt",
-                            "type": type(exc).__name__,
-                            "message": str(exc),
-                        }
-                    )
-                deadline.expired()  # post-unidad: la ultima empresa tambien cuenta
+            with pinned_catalog(db):
+                for company in companies:
+                    if deadline.expired():
+                        break
+                    try:
+                        query = _gdelt_company_query(company)
+                        result = _run(
+                            service.poll_gdelt(
+                                query,
+                                ticker=company.ticker,
+                                max_records=max_records,
+                            )
+                        )
+                        if result.errors:
+                            errors.extend(
+                                {"ticker": company.ticker, "source": "gdelt", "message": error}
+                                for error in result.errors
+                            )
+                        ingested += ingest_in_chunks(
+                            lambda part, _c=company: service.ingest_news_result(db, part, ticker=_c.ticker),
+                            result,
+                            deadline,
+                        )
+                        if result.status != "error":
+                            processed += 1
+                            _gdelt_success_recorded(gdelt_client)
+                    except Exception as exc:
+                        _rollback(db)
+                        from app.services.connectors.gdelt import GdeltRateLimited
+
+                        if isinstance(exc, GdeltRateLimited):
+                            # Ventana cerrada: se para el barrido aqui (no se
+                            # quema cuota en las empresas restantes) y el lote se
+                            # reencola tras el Retry-After del servidor.
+                            _raise_gdelt_retry(exc)
+                        errors.append(
+                            {
+                                "ticker": company.ticker,
+                                "source": "gdelt",
+                                "type": type(exc).__name__,
+                                "message": str(exc),
+                            }
+                        )
+                    deadline.expired()  # post-unidad: la ultima empresa tambien cuenta
             return {
                 "status": finalize_status(_batch_status(processed, errors), deadline.truncated),
                 "actor": actor_name,
@@ -4059,15 +4066,20 @@ def refresh_ticker_news(
                     news_lane=part.metadata.get("news_lane"),
                 )
 
-            outcome = sweep(
-                companies,
-                _lanes,
-                _fetch,
-                _ingest,
-                deadline,
-                pause=lambda: time.sleep(1.5),
-                on_error=lambda: _rollback(db),
-            )
+            # Mismo pin de catalogo que refresh_news: la ingesta anidada
+            # sondea una fila por tanda en vez de releer las ~2.100.
+            from app.services.company_catalog import pinned_catalog
+
+            with pinned_catalog(db):
+                outcome = sweep(
+                    companies,
+                    _lanes,
+                    _fetch,
+                    _ingest,
+                    deadline,
+                    pause=lambda: time.sleep(1.5),
+                    on_error=lambda: _rollback(db),
+                )
             processed, ingested, errors = (
                 outcome["processed"],
                 outcome["ingested"],
@@ -4366,17 +4378,22 @@ def persist_ticker_news_universe(tenant_id: int | None = None, user_id: str | No
                     news_lane=part.metadata.get("news_lane"),
                 )
 
-            outcome = sweep(
-                companies,
-                _lanes,
-                _fetch,
-                _ingest,
-                deadline,
-                # La red ya se pago en la descarga global: el pacing de 1,5 s
-                # solo aplica a los fail-open en vivo.
-                pause=lambda: time.sleep(1.5) if state["live"] else None,
-                on_error=lambda: _rollback(db),
-            )
+            # Mismo pin de catalogo que refresh_news: la ingesta anidada
+            # sondea una fila por tanda en vez de releer las ~2.100.
+            from app.services.company_catalog import pinned_catalog
+
+            with pinned_catalog(db):
+                outcome = sweep(
+                    companies,
+                    _lanes,
+                    _fetch,
+                    _ingest,
+                    deadline,
+                    # La red ya se pago en la descarga global: el pacing de 1,5 s
+                    # solo aplica a los fail-open en vivo.
+                    pause=lambda: time.sleep(1.5) if state["live"] else None,
+                    on_error=lambda: _rollback(db),
+                )
             processed, ingested, errors = (
                 outcome["processed"],
                 outcome["ingested"],

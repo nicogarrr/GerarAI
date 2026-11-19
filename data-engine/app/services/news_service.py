@@ -220,6 +220,12 @@ def _ticker_evidence(ticker: str, name: str | None, text: str) -> bool:
 # desvincularia.
 _FEED_TICKER_TRUSTED_CONNECTORS = frozenset({"sec", "ir"})
 
+#: Clave de db.info con la foto (company_ids con Position, symbols de
+#: WatchItem) para el flag tracked de UNA tanda: 2 EXISTS por noticia
+#: (Position + WatchItem) pasan a 2 lecturas por tanda. Solo datos LEIDOS;
+#: la tanda no escribe Position ni WatchItem.
+_TRACKED_SNAPSHOT_KEY = "news_tracked_snapshot"
+
 
 def _feed_ticker_needs_evidence(ticker: str) -> bool:
     """Siglas que son palabras o abreviaturas corrientes: el ticker que trae
@@ -600,27 +606,38 @@ class NewsService:
                 mark_only,
             )
 
-            tracked = bool(
-                company
-                and (
-                    db.scalar(
-                        select(Position.id)
-                        .where(
-                            Position.company_id == company.id,
-                            *tenant_filters(db, Position),
+            # Por tanda: 2 EXISTS (Position + WatchItem) por noticia para el
+            # flag tracked (medido: 6 sentencias en 3 items). La tanda las
+            # precarga una vez en db.info; noticia suelta: como siempre.
+            tracked_snapshot = db.info.get(_TRACKED_SNAPSHOT_KEY)
+            if tracked_snapshot is not None:
+                tracked_ids, tracked_symbols = tracked_snapshot
+                tracked = bool(
+                    company
+                    and (company.id in tracked_ids or company.ticker in tracked_symbols)
+                )
+            else:
+                tracked = bool(
+                    company
+                    and (
+                        db.scalar(
+                            select(Position.id)
+                            .where(
+                                Position.company_id == company.id,
+                                *tenant_filters(db, Position),
+                            )
+                            .limit(1)
                         )
-                        .limit(1)
-                    )
-                    or db.scalar(
-                        select(WatchItem.id)
-                        .where(
-                            WatchItem.symbol == company.ticker,
-                            *tenant_filters(db, WatchItem),
+                        or db.scalar(
+                            select(WatchItem.id)
+                            .where(
+                                WatchItem.symbol == company.ticker,
+                                *tenant_filters(db, WatchItem),
+                            )
+                            .limit(1)
                         )
-                        .limit(1)
                     )
                 )
-            )
             if source.lower() == "gdelt" and company:
                 mark = mark_only(
                     "universe_relevance",
@@ -810,86 +827,131 @@ class NewsService:
             pattern_urls=[item.url for item in items if item.headline_from_source],
         ) if items else None
 
-        for item in items:
-            # Captacion de demandantes de despachos: no es un hecho de la empresa.
-            if is_law_firm_solicitation(item.title, item.text):
-                continue
-            # Fila sin contenido: titular y cuerpo son solo el enlace del visor.
-            if is_viewer_link_only(item.title, item.text):
-                continue
-            # F175: el ticker solo prefija el texto si el título no lo trae ya;
-            # si no, el titular guardado salía «COST COST 8-K».
-            # Cuerpo sin el titular repetido ni la firma de la fuente: feeds
-            # (Simply Wall Street, MarketBeat) repiten el titular al inicio de
-            # la descripción y la cierran con el nombre del medio; sin limpiar,
-            # el titular guardado salía duplicado («Meta (META) ... Glasses
-            # Meta (META) ... Glasses Simply Wall Street»).
-            body = (item.text or "").strip()
-            headline_txt = (item.title or "").strip()
-            if headline_txt and body.casefold().startswith(headline_txt.casefold()):
-                body = body[len(headline_txt):].lstrip(" \t\r\n:–—-|·")
-            source_name = (item.source or "").strip()
-            if source_name and body.casefold().endswith(source_name.casefold()):
-                body = body[: -len(source_name)].rstrip(" \t\r\n:–—-|·")
-            parts = [item.title, body]
-            # Límite de palabra: «COSTCO Wholesale...» no empieza por el
-            # ticker «COST» a efectos de prefijo.
-            if item.ticker and not re.match(
-                rf"^\s*{re.escape(item.ticker)}\b", item.title or "", flags=re.IGNORECASE
-            ):
-                parts.insert(0, item.ticker)
-            text = " ".join(part for part in parts if part)
-            # El ticker es autoritativo cuando el carril lo garantiza (SEC/IR)
-            # o cuando lo envia la API manual (connector=None = envio explicito).
-            # GDELT/RSS por consulta traen aciertos de palabra clave: ahi las
-            # siglas ambiguas exigen cita de la empresa en el texto.
-            feed_ticker_trusted = connector is None or connector in _FEED_TICKER_TRUSTED_CONNECTORS
-            company = (
-                self._company_for_item(
-                    db, text, item.ticker, feed_ticker_trusted=feed_ticker_trusted
-                )
-                if detect_company
-                else None
+        # Foto de posiciones para toda la tanda: el peso de cartera de cada
+        # noticia (materiality) leia TODAS las Position por item (medido:
+        # 1 sentencia/noticia, 25 en un barrido GDELT de 25). La clave
+        # existe solo durante la tanda; la primera lectura la puebla.
+        from app.services.materiality_service import POSITIONS_SNAPSHOT_KEY
+
+        owns_snapshot = POSITIONS_SNAPSHOT_KEY not in db.info
+        if owns_snapshot:
+            db.info[POSITIONS_SNAPSHOT_KEY] = None
+
+        owns_tracked = _TRACKED_SNAPSHOT_KEY not in db.info
+        if owns_tracked:
+            from app.models import Position as _Pos
+            from app.models import WatchItem as _WI
+
+            db.info[_TRACKED_SNAPSHOT_KEY] = (
+                set(
+                    db.scalars(
+                        select(_Pos.company_id).where(*tenant_filters(db, _Pos)).distinct()
+                    ).all()
+                ),
+                {
+                    str(sym)
+                    for sym in db.scalars(
+                        select(_WI.symbol).where(*tenant_filters(db, _WI)).distinct()
+                    ).all()
+                    if sym
+                },
             )
-            # Noticia de un competidor etiquetada con el ticker del feed (RKLB
-            # bajo ASTS): sin cita de la empresa no se vincula a ella.
-            if (
-                company is not None
-                and item.ticker
-                and is_competitor_only(
-                    company, f"{item.title or ''} {item.text or ''}", _ticker_evidence_level
-                )
-            ):
-                continue
-            if self._is_duplicate(
-                db, company, text, item.url,
-                title_is_identity=item.headline_from_source or not item.url,
-                headline=item.title if item.headline_from_source else None,
-                dedup_batch=dedup_batch,
-            ):
-                skipped_duplicates += 1
-                continue
-            created_events.append(
-                self._analyze_news(
-                    db=db,
-                    text=text,
-                    source=item.source or default_source,
-                    url=item.url,
-                    ticker=item.ticker,
-                    published_at=item.published_at,
-                    connector=connector,
-                    date_source_label=date_source_label,
-                    source_headline=(
-                        item.title[:500] if item.title and item.headline_from_source else None
-                    ),
-                    headline_from_source=item.headline_from_source,
-                    news_lane=news_lane,
-                    llm_deadline=llm_deadline,
-                    macro_theme=macro_theme,
-                    detect_company=detect_company,
-                    feed_ticker_trusted=feed_ticker_trusted,
-                )
-            )
+
+        # El catalogo de empresas se lee por transaccion y la tanda commitea
+        # por item: cada noticia re-leia las ~2.100 filas y reconstruia el
+        # matcher de alias (medido: 25 lecturas completas y ~154 ms/item en
+        # una tanda de 25). El pin lo fija para toda la tanda; la tanda no
+        # escribe Company y un rollback retira el pin (ver company_catalog).
+        from app.services.company_catalog import pinned_catalog
+
+        try:
+            with pinned_catalog(db):
+                for item in items:
+                    # Captacion de demandantes de despachos: no es un hecho de la empresa.
+                    if is_law_firm_solicitation(item.title, item.text):
+                        continue
+                    # Fila sin contenido: titular y cuerpo son solo el enlace del visor.
+                    if is_viewer_link_only(item.title, item.text):
+                        continue
+                    # F175: el ticker solo prefija el texto si el título no lo trae ya;
+                    # si no, el titular guardado salía «COST COST 8-K».
+                    # Cuerpo sin el titular repetido ni la firma de la fuente: feeds
+                    # (Simply Wall Street, MarketBeat) repiten el titular al inicio de
+                    # la descripción y la cierran con el nombre del medio; sin limpiar,
+                    # el titular guardado salía duplicado («Meta (META) ... Glasses
+                    # Meta (META) ... Glasses Simply Wall Street»).
+                    body = (item.text or "").strip()
+                    headline_txt = (item.title or "").strip()
+                    if headline_txt and body.casefold().startswith(headline_txt.casefold()):
+                        body = body[len(headline_txt):].lstrip(" \t\r\n:–—-|·")
+                    source_name = (item.source or "").strip()
+                    if source_name and body.casefold().endswith(source_name.casefold()):
+                        body = body[: -len(source_name)].rstrip(" \t\r\n:–—-|·")
+                    parts = [item.title, body]
+                    # Límite de palabra: «COSTCO Wholesale...» no empieza por el
+                    # ticker «COST» a efectos de prefijo.
+                    if item.ticker and not re.match(
+                        rf"^\s*{re.escape(item.ticker)}\b", item.title or "", flags=re.IGNORECASE
+                    ):
+                        parts.insert(0, item.ticker)
+                    text = " ".join(part for part in parts if part)
+                    # El ticker es autoritativo cuando el carril lo garantiza (SEC/IR)
+                    # o cuando lo envia la API manual (connector=None = envio explicito).
+                    # GDELT/RSS por consulta traen aciertos de palabra clave: ahi las
+                    # siglas ambiguas exigen cita de la empresa en el texto.
+                    feed_ticker_trusted = connector is None or connector in _FEED_TICKER_TRUSTED_CONNECTORS
+                    company = (
+                        self._company_for_item(
+                            db, text, item.ticker, feed_ticker_trusted=feed_ticker_trusted
+                        )
+                        if detect_company
+                        else None
+                    )
+                    # Noticia de un competidor etiquetada con el ticker del feed (RKLB
+                    # bajo ASTS): sin cita de la empresa no se vincula a ella.
+                    if (
+                        company is not None
+                        and item.ticker
+                        and is_competitor_only(
+                            company, f"{item.title or ''} {item.text or ''}", _ticker_evidence_level
+                        )
+                    ):
+                        continue
+                    if self._is_duplicate(
+                        db, company, text, item.url,
+                        title_is_identity=item.headline_from_source or not item.url,
+                        headline=item.title if item.headline_from_source else None,
+                        dedup_batch=dedup_batch,
+                    ):
+                        skipped_duplicates += 1
+                        continue
+                    created_events.append(
+                        self._analyze_news(
+                            db=db,
+                            text=text,
+                            source=item.source or default_source,
+                            url=item.url,
+                            ticker=item.ticker,
+                            published_at=item.published_at,
+                            connector=connector,
+                            date_source_label=date_source_label,
+                            source_headline=(
+                                item.title[:500] if item.title and item.headline_from_source else None
+                            ),
+                            headline_from_source=item.headline_from_source,
+                            news_lane=news_lane,
+                            llm_deadline=llm_deadline,
+                            macro_theme=macro_theme,
+                            detect_company=detect_company,
+                            feed_ticker_trusted=feed_ticker_trusted,
+                        )
+                    )
+
+        finally:
+            if owns_snapshot:
+                db.info.pop(POSITIONS_SNAPSHOT_KEY, None)
+            if owns_tracked:
+                db.info.pop(_TRACKED_SNAPSHOT_KEY, None)
 
         return NewsIngestResponse(
             status="ingested",
