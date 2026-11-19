@@ -79,8 +79,10 @@ def subscription_for(
     if category is None:
         return None
     sub_key = ("sub", category)
-    row = _cache.get(sub_key, _MISSING) if _cache is not None else _MISSING
-    if row is _MISSING:
+    row: AlertSubscription | None
+    if _cache is not None and sub_key in _cache:
+        row = _cache[sub_key]
+    else:
         row = db.scalar(select(AlertSubscription).where(
             AlertSubscription.tenant_id == alert.tenant_id,
             AlertSubscription.event_type == category,
