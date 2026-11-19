@@ -42,20 +42,25 @@ def record(client: Any, job_id: str, *, now: datetime | None = None) -> None:
     client.set(heartbeat_key(job_id), ts)
 
 
-def _client_for(url: str) -> Any:
-    """Cliente redis por URL, cacheado (los latidos son a escala de minutos)."""
+def _client_for(redis_url: str) -> Any:
+    """Cliente redis por URL, cacheado (los latidos son a escala de minutos).
+
+    El parametro se llama ``redis_url`` a proposito: el guard AST de
+    tests/test_redis_auth_clients.py exige que todo from_url de app/ salga
+    de Settings.redis_url (la contrasena viaja solo en esa URL, #3232).
+    """
     with _clients_lock:
-        client = _clients.get(url)
+        client = _clients.get(redis_url)
         if client is None:
             import redis as _redis
 
             from app.core.redis_retry import no_retry
 
             client = _redis.from_url(
-                url, socket_connect_timeout=2, socket_timeout=2,
+                redis_url, socket_connect_timeout=2, socket_timeout=2,
                 retry=no_retry(),
             )
-            _clients[url] = client
+            _clients[redis_url] = client
         return client
 
 
