@@ -43,6 +43,7 @@ from app.services.connectors.sec import SECClient
 from app.services.document_visibility import without_archive_duplicates
 from app.services.holding_period import current_holding_starts
 from app.services.pdmr_monetary_quality import transaction_value
+from app.services.timeline_collection import TimelineCollector, TimelineEvents
 
 logger = logging.getLogger(__name__)
 
@@ -569,20 +570,20 @@ def stored_holding(db: Session, company: Company) -> dict[str, Any] | None:
     return {"average_cost": round(average, 4), "first_buy_date": start}
 
 
-def stored_timeline_events(db: Session, company: Company, desde: date, hasta: date) -> list[dict[str, Any]]:
+def stored_timeline_events(db: Session, company: Company, desde: date, hasta: date) -> TimelineEvents:
     """Eventos fechados y con fuente entre ``desde`` y ``hasta`` (ambos incluidos), más recientes primero."""
     from app.services.earnings_dates_service import STALE_AFTER
 
     now = _utcnow()
-    events: list[dict[str, Any]] = []
+    events = TimelineCollector(TIMELINE_MAX_EVENTS)
     ticker = (company.ticker or "").upper()
     for row in db.scalars(
         select(EarningsDate).where(
             func.upper(EarningsDate.ticker) == ticker,
             EarningsDate.event_date >= desde,
             EarningsDate.event_date <= hasta,
-        )
-    ).all():
+        ).execution_options(yield_per=128)
+    ):
         source = row.source_label or row.source
         if not source:
             continue
@@ -650,8 +651,8 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             NewsEvent.date >= start_dt,
             NewsEvent.date < end_dt,
             *tenant_filters(db, NewsEvent),
-        )
-    ).all():
+        ).execution_options(yield_per=128)
+    ):
         is_filing = bool(row.sec_filing_identity) or row.event_type in TIMELINE_FILING_TYPES
         if not is_filing and (row.materiality_score or 0) < TIMELINE_NEWS_MIN_MATERIALITY:
             continue
@@ -669,8 +670,8 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
     for row in db.scalars(
         select(InsiderTransaction).where(
             func.upper(InsiderTransaction.issuer_ticker) == ticker, *tenant_filters(db, InsiderTransaction)
-        )
-    ).all():
+        ).execution_options(yield_per=128)
+    ):
         value = _timeline_float(transaction_value(row))
         day = _timeline_day(row.tx_date)
         if day is None or not (desde <= day <= hasta):
@@ -702,5 +703,4 @@ def stored_timeline_events(db: Session, company: Company, desde: date, hasta: da
             "source": source,
             "source_url": row.source_url,
         })
-    events.sort(key=lambda e: (e["date"], e["id"]), reverse=True)
-    return events[:TIMELINE_MAX_EVENTS]
+    return events.result()

@@ -14,7 +14,12 @@ from app.core.database import get_db
 from app.core.local_date import local_today
 from app.core.ui_errors import ui_error
 from app.services.async_bridge import run_from_any_context
-from app.services.company_events_service import CompanyEventsService, stored_holding, stored_timeline_events
+from app.services.company_events_service import (
+    TIMELINE_MAX_EVENTS,
+    CompanyEventsService,
+    stored_holding,
+    stored_timeline_events,
+)
 from app.services.company_resolver import resolve_company
 
 router = APIRouter()
@@ -105,6 +110,12 @@ class CompanyTimelineEventsOut(BaseModel):
     hasta: str
     holding: TimelineHoldingOut | None = None
     events: list[TimelineEventOut]
+    total: int
+    limit: int
+    truncated: bool
+    returned_desde: str | None
+    returned_hasta: str | None
+    notice: str | None
     source: str
 
 
@@ -144,6 +155,16 @@ def get_company_timeline_events(
         "hasta": end.isoformat(),
         "holding": stored_holding(db, company),
         "events": events,
+        "total": events.total,
+        "limit": TIMELINE_MAX_EVENTS,
+        "truncated": events.truncated,
+        "returned_desde": events[-1]["date"] if events else None,
+        "returned_hasta": events[0]["date"] if events else None,
+        "notice": (
+            "Se muestran solo los eventos más recientes del rango. Hay eventos omitidos; "
+            "el primer día mostrado puede estar incompleto. Reduce el rango de fechas para consultar el resto."
+            if events.truncated else None
+        ),
         "source": "Datos guardados en GerarAI",
     }
 

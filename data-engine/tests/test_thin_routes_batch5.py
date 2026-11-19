@@ -27,6 +27,7 @@ from fastapi import HTTPException
 
 from app.api.routes import company_events as events_route
 from app.api.routes import research_assistant as assistant_route
+from app.services.timeline_collection import TimelineEvents
 
 COMPANY = SimpleNamespace(ticker="ASTS", currency="USD")
 
@@ -57,7 +58,7 @@ def test_timeline_desde_posterior_a_hasta_es_400(monkeypatch):
 def test_timeline_recorta_a_30_anios(monkeypatch):
     """Un rango mayor que TIMELINE_MAX_DAYS se recorta por abajo."""
     monkeypatch.setattr(events_route, "resolve_company", lambda db, t: COMPANY)
-    monkeypatch.setattr(events_route, "stored_timeline_events", lambda db, c, s, e: [])
+    monkeypatch.setattr(events_route, "stored_timeline_events", lambda db, c, s, e: TimelineEvents([], 0))
     monkeypatch.setattr(events_route, "stored_holding", lambda db, c: None)
     result = events_route.get_company_timeline_events(
         "ASTS", desde=date(1990, 1, 1), hasta=date(2026, 1, 1), db=Mock()
