@@ -1,6 +1,7 @@
 import type { ResearchClaimEvidence } from '@/lib/actions/research.actions';
 import type { Locale } from '@/lib/i18n/locale';
 import type { TranslateFn } from '@/lib/i18n/translate';
+import { naFor } from '@/lib/format';
 import { etiquetaTierFuente } from '@/lib/labels';
 
 const MAX_ITEMS = 5;
@@ -27,7 +28,7 @@ export function safeHttpUrl(value: string | null | undefined): string | null {
 /**
  * Cadena Fuente→Documento→Chunk→Afirmación: expone los campos de evidencia
  * que el backend ya devuelve y la ficha descartaba. Sin URL http válida no se
- * inventa enlace: cae al documento_id persistido (o SIN_DATOS).
+ * inventa enlace: cae al documento_id persistido (o N/D según locale).
  */
 export function ClaimEvidenceList({
   evidence,
@@ -56,7 +57,7 @@ export function ClaimEvidenceList({
               {safeUrl ? (
                 <a className="text-teal-300 underline decoration-gray-700 underline-offset-4 hover:text-teal-200" href={safeUrl} rel="noopener noreferrer" target="_blank">{safeUrl}</a>
               ) : (
-                <span>{item.document_id !== null ? `#${item.document_id}` : 'SIN_DATOS'}</span>
+                <span>{item.document_id !== null ? `#${item.document_id}` : naFor(locale)}</span>
               )}
             </li>
           );

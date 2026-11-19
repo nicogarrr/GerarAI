@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const m = vi.hoisted(() => ({
-    // Objeto estable: el efecto de polling lleva `router` en sus dependencias.
+    // Objeto estable: el botón usa `router.refresh()` en el enlace a la tesis.
     router: { refresh: vi.fn(), push: vi.fn() },
     searchParams: { get: vi.fn(() => null) },
     start: vi.fn(),
@@ -34,6 +34,7 @@ vi.mock('@/lib/actions/thesis-jobs.actions', () => ({
 }));
 
 import ThesisGenerateButton from '@/components/research/ThesisGenerateButton';
+import { LocaleProvider } from '@/lib/i18n/client';
 import type { ThesisJobStatus } from '@/lib/actions/thesis-jobs.actions';
 
 const realCrypto = globalThis.crypto;
@@ -104,5 +105,18 @@ describe('ThesisGenerateButton: feedback honesto', () => {
         expect(m.status).toHaveBeenCalledTimes(2);
         expect(m.status).toHaveBeenCalledWith(42);
         expect(m.router.refresh).not.toHaveBeenCalled();
+    }, 20000);
+
+    it('el aviso de recuperación cambia de idioma si el locale cambia con el componente montado', async () => {
+        m.latest.mockRejectedValue(new Error('offline'));
+        const { rerender } = render(
+            <LocaleProvider locale="es"><ThesisGenerateButton ticker="TEST" /></LocaleProvider>,
+        );
+        expect(await screen.findByText('No se pudo recuperar la generación. Reintentando…')).toBeInTheDocument();
+
+        rerender(
+            <LocaleProvider locale="en"><ThesisGenerateButton ticker="TEST" /></LocaleProvider>,
+        );
+        await waitFor(() => expect(screen.getByText('The generation could not be recovered. Retrying…')).toBeInTheDocument());
     }, 20000);
 });

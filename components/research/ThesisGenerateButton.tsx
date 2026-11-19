@@ -99,7 +99,7 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
             document.removeEventListener('visibilitychange', onVisible);
             window.removeEventListener('focus', recover);
         };
-    }, [ticker, recoveryCycle]);
+    }, [ticker, recoveryCycle, t]);
 
     const jobId = job?.id;
     // Job nuevo (o cambio de job): ventana de polling nueva. El agotamiento
@@ -148,7 +148,7 @@ export default function ThesisGenerateButton({ ticker, label, emptyCopy }: { tic
             disposed = true;
             clearTimeout(timer);
         };
-    }, [active, jobId, router, pollExhausted, pollRetryCycle]);
+    }, [active, jobId, pollExhausted, pollRetryCycle]);
 
     const running = job?.status === 'running';
     useEffect(() => {

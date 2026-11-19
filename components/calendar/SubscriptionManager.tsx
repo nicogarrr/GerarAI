@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,10 @@ export function SubscribeButtons({ origin, token }: { origin: string; token: str
     const ti = useT();
     const [provider, setProvider] = useState<Provider>('apple');
     const [copied, setCopied] = useState(false);
+    const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => {
+        if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    }, []);
     const urls = feedUrls(origin, token, ti('calendar.subscription.feedName'));
     const href = provider === 'apple' ? urls.webcal : provider === 'google' ? urls.google : urls.outlook;
     const PROVIDER_STEPS: Record<Provider, string[]> = {
@@ -51,7 +55,8 @@ export function SubscribeButtons({ origin, token }: { origin: string; token: str
         try {
             await navigator.clipboard.writeText(urls.https);
             setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
+            if (copiedTimer.current) clearTimeout(copiedTimer.current);
+            copiedTimer.current = setTimeout(() => setCopied(false), 2000);
         } catch {
             toast.error(ti('calendar.subscription.copyFailed'));
         }

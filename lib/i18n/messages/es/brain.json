@@ -8,7 +8,19 @@
   "sources": {
     "aria": "Fuentes de esta respuesta",
     "title": "Fuentes",
-    "page": " · Página {page}"
+    "page": " · Página {page}",
+    "kind": {
+      "thesisVersion": "Tesis",
+      "thesisSection": "Sección de tesis",
+      "financialFact": "Dato financiero",
+      "claim": "Afirmación",
+      "claimEvidence": "Evidencia",
+      "document": "Documento",
+      "memoryItem": "Nota guardada",
+      "portfolio": "Cartera",
+      "position": "Posición",
+      "library": "Biblioteca"
+    }
   },
   "guide": {
     "header": "Guía de {kind} · Sin escritura: solo lectura, no modifica nada.",

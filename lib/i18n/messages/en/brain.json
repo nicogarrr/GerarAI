@@ -8,7 +8,19 @@
   "sources": {
     "aria": "Sources for this answer",
     "title": "Sources",
-    "page": " · Page {page}"
+    "page": " · Page {page}",
+    "kind": {
+      "thesisVersion": "Thesis",
+      "thesisSection": "Thesis section",
+      "financialFact": "Financial fact",
+      "claim": "Claim",
+      "claimEvidence": "Evidence",
+      "document": "Document",
+      "memoryItem": "Saved note",
+      "portfolio": "Portfolio",
+      "position": "Position",
+      "library": "Library"
+    }
   },
   "guide": {
     "header": "{kind} guide · Read-only: it doesn't modify anything.",
