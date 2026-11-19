@@ -3,9 +3,10 @@
 Cada alerta candidata pagaba ~4 SELECTs de cobertura (NewsEvent del
 event_type, suscripcion, binding de Telegram, preferencia push) en cada
 pasada; una pagina de 100 candidatas costaba >700 sentencias. La cobertura
-se resuelve ahora una vez por categoria/par usuario-chat y los NewsEvent se
-precargan en una consulta; las escrituras del outbox (una fila de entrega
-por alerta, con su commit por carrera entre workers) se mantienen igual.
+se resuelve ahora una vez por categoria/par usuario-chat, los NewsEvent se
+precargan en una consulta (con referencia fuerte: el identity map es debil)
+y las marcas "skipped" del outbox se escriben en lote (INSERT multi-fila
+con repliegue a savepoint por fila ante carrera + un UPDATE + un commit).
 """
 
 from datetime import UTC, datetime, timedelta
@@ -78,9 +79,9 @@ def test_dispatch_pending_statement_budget(db):
     stats = dispatch_pending(db)
     assert stats["candidates"] == N_NEWS + N_FILING
     assert stats["redispatched"] == 0  # sin binding de Telegram ni push: todo skipped
-    # ANTES: 723. DESPUES: ~427 (las ~400 escrituras del outbox son por
-    # diseno, una entrega por alerta; los SELECTs de cobertura quedan en ~4).
-    assert statements <= 500, f"N+1 de cobertura: {statements} sentencias"
+    # ANTES: 723. DESPUES: ~11 (cobertura precargada por categoria, skips
+    # del outbox en lote: 1 INSERT multi-fila + 1 UPDATE + 1 commit).
+    assert statements <= 40, f"N+1 de cobertura: {statements} sentencias"
 
 
 def test_preference_for_push_with_cache(db):
@@ -118,6 +119,41 @@ def test_preference_for_push_with_cache(db):
         fingerprint="fc-old", channels=["in_app"], created_at=now - timedelta(days=2),
     )
     assert preference_for(db, late) is None
+
+
+def test_skips_are_recorded_and_not_repicked(db):
+    """Toda candidata saltada queda marcada skipped y no vuelve a entrar."""
+    from app.models.entities import AlertDelivery
+    from app.services.outbound_alerts import dispatch_pending
+
+    _seed_100_candidates(db)
+    stats = dispatch_pending(db)
+    assert stats["candidates"] == N_NEWS + N_FILING
+    rows = db.query(AlertDelivery).filter_by(channel="telegram").all()
+    assert len(rows) == N_NEWS + N_FILING
+    assert {row.status for row in rows} == {"skipped"}
+    # La consulta de candidatas excluye alertas con fila de entrega: 2a pasada = 0.
+    again = dispatch_pending(db)
+    assert again["candidates"] == 0
+
+
+def test_record_skips_fallback_on_race(db):
+    """Una fila ya creada por otro worker: repliegue a savepoint por fila."""
+    from app.models.entities import AlertDelivery, ResearchAlert
+    from app.services.outbound_alerts import _record_skips
+
+    _seed_100_candidates(db)
+    alerts = db.query(ResearchAlert).limit(5).all()
+    db.add(
+        AlertDelivery(
+            tenant_id=alerts[0].tenant_id, alert_id=alerts[0].id, channel="telegram"
+        )
+    )
+    db.commit()
+    _record_skips(db, alerts)  # no revienta; repliegue por fila
+    rows = db.query(AlertDelivery).filter_by(channel="telegram").all()
+    assert len(rows) == 5
+    assert {row.status for row in rows} == {"skipped"}
 
 
 def test_coverage_cache_keeps_scalar_semantics(db):
