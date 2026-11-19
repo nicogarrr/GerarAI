@@ -1,7 +1,8 @@
 """Opt-in routing over the durable research-alert/outbox pipeline. No provider reads."""
 from datetime import UTC, datetime
 
-from sqlalchemy import exists, or_, select
+from sqlalchemy import exists, or_, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models import AlertDelivery, AlertSubscription, NewsEvent, PushPreference, ResearchAlert
@@ -64,20 +65,40 @@ def alert_after_opt_in(created_at: datetime, enabled_at: datetime) -> bool:
     return created >= since
 
 
-def subscription_for(db: Session, alert: ResearchAlert) -> AlertSubscription | None:
+_MISSING = object()
+
+
+def subscription_for(
+    db: Session, alert: ResearchAlert, *, _cache: dict | None = None
+) -> AlertSubscription | None:
+    # _cache (solo dispatch_pending): memoiza por categoria/par usuario-chat
+    # las MISMAS consultas de siempre; una pagina de 100 alertas pasaba de
+    # ~4 SELECTs por alerta a uno por categoria. La consulta y sus filtros
+    # no cambian; solo se repite menos dentro de UNA llamada.
     category = alert_category(db, alert)
     if category is None:
         return None
-    row = db.scalar(select(AlertSubscription).where(
-        AlertSubscription.tenant_id == alert.tenant_id,
-        AlertSubscription.event_type == category,
-        AlertSubscription.enabled.is_(True),
-    ))
+    sub_key = ("sub", category)
+    row = _cache.get(sub_key, _MISSING) if _cache is not None else _MISSING
+    if row is _MISSING:
+        row = db.scalar(select(AlertSubscription).where(
+            AlertSubscription.tenant_id == alert.tenant_id,
+            AlertSubscription.event_type == category,
+            AlertSubscription.enabled.is_(True),
+        ))
+        if _cache is not None:
+            _cache[sub_key] = row
     if not row or row.user_id != db.info.get("user_id"):
         return None
     from app.services.telegram_link import binding_for
 
-    if not binding_for(db, alert.tenant_id, row.user_id, row.chat_id):
+    bind_key = ("binding", row.user_id, row.chat_id)
+    bound = _cache.get(bind_key, _MISSING) if _cache is not None else _MISSING
+    if bound is _MISSING:
+        bound = binding_for(db, alert.tenant_id, row.user_id, row.chat_id)
+        if _cache is not None:
+            _cache[bind_key] = bound
+    if not bound:
         return None
     return row if alert_after_opt_in(alert.created_at, row.enabled_at) else None
 
@@ -135,13 +156,33 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         or_(*categories),
     ).order_by(ResearchAlert.id).limit(limit)))
     stats = {"candidates": len(candidates), "redispatched": 0, "errors": []}
+    skipped_alerts: list[ResearchAlert] = []
+    # Precarga en UNA consulta los NewsEvent de las tracked_news candidatas:
+    # event_type los resuelve con db.get, que tras esto no sale a la base.
+    news_ids = {
+        (alert.metadata_ or {}).get("news_event_id")
+        for alert in candidates
+        if alert.alert_type == "tracked_news"
+    }
+    news_ids.discard(None)
+    # Referencia FUERTE viva durante el bucle: el identity map es debil y
+    # sin ella el recolector soltaba las filas y cada db.get reconsultaba.
+    primed_news = (  # noqa: F841 - la referencia viva ES su funcion (identity map debil)
+        list(db.scalars(select(NewsEvent).where(NewsEvent.id.in_(news_ids))).all())
+        if news_ids
+        else []
+    )
+    coverage_cache: dict = {}
     for alert in candidates:
-        if subscription_for(db, alert) is None and preference_for(db, alert) is None:
+        if subscription_for(db, alert, _cache=coverage_cache) is None and preference_for(
+            db, alert, _cache=coverage_cache
+        ) is None:
             # Record terminal skip without HTTP. Prevents a page of non-filing
             # news or events from before a later opt-in starving newer alerts.
-            svc = NotificationService()
-            svc._ensure_delivery_row(db, alert, "telegram")
-            svc._finish_delivery(db, alert, "telegram", "skipped", "Sin consentimiento aplicable")
+            # La marca se escribe EN LOTE tras el bucle: el camino por alerta
+            # (SELECT + INSERT + COMMIT + UPDATE + COMMIT) costaba ~4
+            # sentencias y 2 commits por alerta saltada.
+            skipped_alerts.append(alert)
             continue
         try:
             alert.channels = list(dict.fromkeys([*alert.channels, "telegram"]))
@@ -151,4 +192,53 @@ def dispatch_pending(db: Session, *, limit: int = 100) -> dict:
         except Exception:
             db.rollback()
             stats["errors"].append(f"alert_id={alert.id}")
+    if skipped_alerts:
+        _record_skips(db, skipped_alerts)
+    del primed_news  # fin de la zona donde los db.get la necesitan viva
     return stats
+
+
+def _record_skips(db: Session, alerts: list[ResearchAlert]) -> None:
+    """Marca "skipped" el canal telegram de toda la tanda: ~3 sentencias y UN
+    commit en total, con la misma seguridad de carrera que el camino por
+    alerta (savepoint por fila: otro worker que cree la fila primero no
+    rompe el lote). "skipped" es terminal e idempotente: si el commit final
+    falla, la siguiente pasada lo vuelve a marcar. Las filas no preexisten
+    de pasadas anteriores: la consulta de candidatas excluye cualquier
+    alerta con fila de entrega telegram/push.
+    """
+    alert_ids = [alert.id for alert in alerts]
+    try:
+        # Camino comun: UNA sentencia multi-fila. Si choca con un worker
+        # concurrente (UNIQUE alert_id+channel), savepoint por fila.
+        db.execute(
+            AlertDelivery.__table__.insert(),
+            [
+                {"tenant_id": alert.tenant_id, "alert_id": alert.id, "channel": "telegram"}
+                for alert in alerts
+            ],
+        )
+        db.flush()
+    except IntegrityError:
+        db.rollback()
+        for alert in alerts:
+            try:
+                with db.begin_nested():
+                    db.add(
+                        AlertDelivery(
+                            tenant_id=alert.tenant_id, alert_id=alert.id, channel="telegram"
+                        )
+                    )
+                    db.flush()
+            except IntegrityError:
+                # Otro worker creo la fila primero.
+                pass
+    db.execute(
+        update(AlertDelivery)
+        .where(
+            AlertDelivery.alert_id.in_(alert_ids),
+            AlertDelivery.channel == "telegram",
+        )
+        .values(status="skipped", last_error="Sin consentimiento aplicable")
+    )
+    db.commit()
