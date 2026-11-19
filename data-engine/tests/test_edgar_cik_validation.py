@@ -61,7 +61,8 @@ def _client() -> TestClient:
     return TestClient(app)
 
 
-@pytest.mark.parametrize("bad", ["123abc", "../..", "12345678901"])
+@pytest.mark.parametrize("bad", ["123abc", "../..", "12345678901", "１２３", "١٢٣"])
 def test_api_signals_cik_invalido_da_422(bad):
+    """El patron de ruta es [0-9]: digitos Unicode (fullwidth, arabes) dan 422."""
     response = _client().get("/api/insider/signals", params={"ticker": "ACME", "cik": bad})
     assert response.status_code == 422
