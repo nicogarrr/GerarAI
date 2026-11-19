@@ -136,8 +136,16 @@ def pinned_catalog(db: Session):
         # sigue poseyendo el exterior; no se retira aqui). Sonda ANTES de
         # la lectura, como en la entrada: una escritura entre ambas deja
         # la firma vieja y la siguiente sonda fuerza otra relectura.
+        # populate_existing: sin el, el identity map devolvia los objetos
+        # ya cargados con sus atributos VIEJOS (medido por el Auditor: un
+        # rename confirmado por otra sesion seguia sirviendo el nombre
+        # antiguo). Solo se llega aqui sin escrituras Company pendientes
+        # (guard de arriba), asi que refrescar no pisa cambios propios.
         sig = _probe(db)
-        rows = list(db.scalars(select(Company)).all())
+        rows = list(
+            db.scalars(select(Company).execution_options(populate_existing=True)).all()
+        )
+        db.info[_CACHE_KEY] = (db.get_transaction(), rows)
         db.info[_PIN_KEY] = (sig, rows)
         yield rows
         return

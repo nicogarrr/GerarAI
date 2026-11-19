@@ -100,6 +100,24 @@ def test_company_write_between_batches_visible_to_nested_pin(db):
             assert any(c.ticker == "MSFT" for c in inner)
 
 
+def test_nested_pin_reread_refreshes_attributes_from_other_session(db):
+    """Contraejemplo del Auditor: la sesion A pinea con el nombre viejo; la
+    sesion B renombra y confirma; el pin anidado de A debe ver el nombre
+    NUEVO (sin populate_existing el identity map servia el objeto viejo)."""
+    factory = sessionmaker(bind=db.get_bind(), autoflush=False, autocommit=False, expire_on_commit=False)
+    with pinned_catalog(db) as outer:
+        apple = next(c for c in outer if c.ticker == "AAPL")
+        assert apple.name == "AAPL"
+        with factory() as other:
+            other.get(Company, apple.id).name = "Apple Inc"
+            other.commit()
+        with pinned_catalog(db) as inner:
+            renamed = next(c for c in inner if c.ticker == "AAPL")
+            assert renamed.name == "Apple Inc"
+        # El pin sustituido sigue activo y sirve el dato nuevo.
+        assert next(c for c in all_companies(db) if c.ticker == "AAPL").name == "Apple Inc"
+
+
 def test_nested_pin_rereads_on_probe_mismatch(db):
     """Sonda que no casa (catalogo cambiado por OTRA sesion): el pin anidado
     relee, sustituye el pin y NO lo retira (lo posee el exterior)."""
