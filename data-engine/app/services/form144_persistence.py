@@ -14,6 +14,7 @@ Reglas (las mismas que ``insider_persistence`` y ``schedule13dg_persistence``):
 from __future__ import annotations
 
 import hashlib
+import logging
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -21,7 +22,29 @@ from sqlalchemy.orm import Session
 from app.models.entities import Form144Notice
 from app.services.connectors.form144 import proposed_sale_totals
 
+logger = logging.getLogger(__name__)
+
 PARSER_VERSION = "1.0"  # 1.0: esquema edgarSubmission (e-144, EDGAR 2023+)
+
+
+def _ensure_news_best_effort(db: Session, filing: dict, news_payload: dict, *, tenant_id: int | None, accession: str) -> None:
+    """Deriva la noticia sin romper la persistencia del aviso.
+
+    Un fallo se registra (accession y clase del error) en vez de tragarse en
+    silencio: asi un CIK no numerico u otra rotura de ``ensure_news`` deja rastro
+    en logs y el aviso persistido sigue en pie. SIN exc_info: el traceback
+    renderizado lleva el mensaje de la excepcion (que puede citar datos del
+    filing) y el redactor de logs solo enmascara secretos conocidos.
+    """
+    from app.services.form144_news import ensure_news
+
+    try:
+        ensure_news(db, filing, news_payload, tenant_id=tenant_id)
+    except Exception as exc:  # noqa: BLE001 - best-effort: la noticia no puede deshacer el aviso
+        logger.warning(
+            "form144: no se pudo derivar la noticia accession=%s error=%s",
+            accession, type(exc).__name__,
+        )
 
 
 def persist_filing(
@@ -55,14 +78,9 @@ def persist_filing(
         )
     )
     if record is not None:
-        from app.services.form144_news import ensure_news
-
         # Best-effort: el aviso ya existe; un fallo al derivar la noticia no
         # debe marcar el filing como no visto en el monitor.
-        try:
-            ensure_news(db, filing, news_payload, tenant_id=effective_tenant_id)
-        except Exception:  # noqa: BLE001
-            pass
+        _ensure_news_best_effort(db, filing, news_payload, tenant_id=effective_tenant_id, accession=accession)
         return {"filing_created": False, "filing_id": record.id, "status": record.status}
 
     parsed_ok = bool(parsed.get("parsed_ok"))
@@ -105,14 +123,9 @@ def persist_filing(
     with db.begin_nested():
         db.add(record)
         db.flush()
-    from app.services.form144_news import ensure_news
-
     # Best-effort: el savepoint del aviso ya cerro con exito. Si la noticia
     # derivada falla (p. ej. CIK no numerico), no se propaga: revertir aqui
     # borraria el Form144Notice ya persistido y el monitor volveria a intentar
     # el mismo filing por no haber registrado su accession.
-    try:
-        ensure_news(db, filing, news_payload, tenant_id=effective_tenant_id)
-    except Exception:  # noqa: BLE001
-        pass
+    _ensure_news_best_effort(db, filing, news_payload, tenant_id=effective_tenant_id, accession=accession)
     return {"filing_created": True, "filing_id": record.id, "status": record.status}
