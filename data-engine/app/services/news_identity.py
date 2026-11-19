@@ -10,6 +10,7 @@ normalizado. Una alerta por noticia y empresa.
 from __future__ import annotations
 
 import re
+import weakref
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -166,6 +167,7 @@ _URL_CANDIDATES = 50
 # Titulares recientes por empresa que mira la dedup por titular (mismo tope
 # que la consulta suelta original).
 _TITLE_CANDIDATES = 300
+_SNAPSHOT_WATCHERS_KEY = "news_title_snapshot_watchers"
 # Patrones por consulta en la lectura en lote (acota filas devueltas: ≤50 por patrón).
 _BATCH_PATTERNS = 100
 _BATCH_URLS = 500
@@ -216,15 +218,27 @@ def _protect_snapshots_against_rollback(db: Session, batch: NewsDedupBatch) -> N
     Una fila que entro en la foto con flush y luego se anula quedaria de
     fantasma (y su expulsion de la ventana de 300, falsa: la via suelta
     vuelve a ver la fila expulsada y la foto, no).
+
+    UN listener por sesion (no por batch): un barrido crea ~30 batches por
+    sesion y un listener por batch retendria todas sus fotos hasta el fin de
+    la sesion. El registro vive en db.info (scratch de sesion) con refs
+    debiles: el batch se libera al soltarlo el llamador.
     """
     if id(db) in batch._rollback_listeners:
         return
     batch._rollback_listeners.add(id(db))
+    watchers: list[weakref.ref] | None = db.info.get(_SNAPSHOT_WATCHERS_KEY)
+    if watchers is None:
+        watchers = db.info[_SNAPSHOT_WATCHERS_KEY] = []
 
-    def _clear(_session) -> None:
-        batch.title_snapshots.clear()
+        def _clear_all(_session) -> None:
+            for ref in list(watchers):
+                watched = ref()
+                if watched is not None:
+                    watched.title_snapshots.clear()
 
-    event.listen(db, "after_rollback", _clear)
+        event.listen(db, "after_rollback", _clear_all)
+    watchers.append(weakref.ref(batch))
 
 
 def prefetch_news_dedup(

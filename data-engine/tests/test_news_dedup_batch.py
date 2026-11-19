@@ -190,8 +190,13 @@ def test_foto_de_titulos_se_invalida_tras_rollback(db):
     """Contraejemplo del Auditor: 300 titulos, un 301 temporal con flush que
     entra en la foto (expulsando «t0» de la ventana), rollback, y la via
     batch debe volver a ver «t0» igual que la suelta."""
-    rng = random.Random(37)
-    company = _seed(db, rng, 300)
+    # Determinista y single-tenant: exactamente 300 filas del tenant 1 (la
+    # ventana de la foto), sin azar multi-tenant que pudiera dejar menos.
+    company = _company(db)
+    for i in range(300):
+        _add(db, NewsEvent(company_id=company.id, title=f"t{i}", source="rss",
+                           url=None, summary=""), tenant=1)
+    db.commit()
     batch = prefetch_news_dedup(db, [])
     db.add(NewsEvent(company_id=company.id, title="temporal", source="rss",
                      url=None, summary="", tenant_id=1))
@@ -205,3 +210,30 @@ def test_foto_de_titulos_se_invalida_tras_rollback(db):
                                     batch=batch)
     assert single is not None, "la via suelta debe seguir viendo «t0» tras el rollback"
     assert batched is not None and batched.id == single.id
+
+
+def test_un_solo_listener_por_sesion_para_todos_los_batches(db):
+    """Un barrido crea muchos batches por sesion: un listener por batch
+    retendria todas sus fotos hasta el fin de la sesion. Uno solo por sesion,
+    con refs debiles, limpia todos y no retiene batches muertos."""
+    import app.services.news_identity as ni
+
+    company = _company(db)
+    _add(db, NewsEvent(company_id=company.id, title="x", source="rss",
+                       url=None, summary=""), tenant=1)
+    db.commit()
+    batches = [prefetch_news_dedup(db, []) for _ in range(3)]
+    for batch in batches:
+        equivalent_news_event(db, company_id=company.id, url=None, title="x",
+                              batch=batch)
+    watchers = db.info[ni._SNAPSHOT_WATCHERS_KEY]
+    assert len(watchers) == 3
+    assert len(db.dispatch.after_rollback.listeners) == 1  # uno por sesion
+    assert all(batch.title_snapshots for batch in batches)
+    del batches  # refs debiles: la sesion no los retiene
+    db.rollback()  # no rompe con refs muertas
+    batch = prefetch_news_dedup(db, [])
+    equivalent_news_event(db, company_id=company.id, url=None, title="x", batch=batch)
+    assert batch.title_snapshots
+    db.rollback()
+    assert not batch.title_snapshots
