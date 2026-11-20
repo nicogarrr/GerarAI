@@ -1,5 +1,6 @@
 """Hermetic FRED ingestion: invalid inputs, source isolation and immutable vintages."""
 
+import hashlib
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
 
@@ -129,3 +130,23 @@ def test_future_cutoff_is_utc_and_includes_today(db):
     assert len(saved) == 1 and saved[0].observation_date == DAY
     assert saved[0].value == Decimal("0")
     assert saved[0].source_url == "https://fred.stlouisfed.org/series/VIXCLS"
+
+
+def test_existing_revision_vintage_is_not_reinserted_when_rejected(db):
+    original = observation()
+    value = Decimal("25")
+    vintage = (
+        FETCHED.strftime("%Y%m%dT%H%M%S.%fZ")
+        + "-"
+        + hashlib.sha256(str(value).encode()).hexdigest()[:12]
+    )
+    rejected = observation(value=value, vintage=vintage, status="rejected", fetched_at=FETCHED)
+    db.add_all([original, rejected])
+    db.flush()
+
+    result = store_series(db, "vix_us", [{"date": DAY.isoformat(), "value": "25"}], FETCHED)
+
+    assert result == {"added": 0, "revisions_applied": 1}
+    assert list(db.scalars(select(MarketObservation).order_by(MarketObservation.id))) == [original, rejected]
+    assert original.value == Decimal("20")
+    assert rejected.status == "rejected" and rejected.vintage == vintage

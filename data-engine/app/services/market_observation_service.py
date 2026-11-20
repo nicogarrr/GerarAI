@@ -96,14 +96,15 @@ def store_series(db: Session, key: str, rows: list[dict], fetched_at: datetime) 
         needed.append((day, vintage))
     existing_vintages: set[tuple[date, str]] = set()
     if needed:
-        existing_vintages = set(
-            db.execute(
+        existing_vintages = {
+            (day, vintage)
+            for day, vintage in db.execute(
                 select(MarketObservation.observation_date, MarketObservation.vintage).where(
                     MarketObservation.metric_key == key,
                     tuple_(MarketObservation.observation_date, MarketObservation.vintage).in_(needed),
                 )
             ).all()
-        )
+        }
     for day, value, vintage in pending:
         status = "observed"
         if (day, vintage) in existing_vintages:

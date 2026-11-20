@@ -98,3 +98,13 @@ repetidas e inspeccionadas: ES 390/1440 y EN 390, sin overflow; todos los estado
 sintéticos del harness siguen explícitamente marcados como QA. 32 tests frontend
 verdes, ESLint focal e i18n verdes tras retirar la etiqueta. No se repite aquí
 el gate completo de producción.
+
+## Ajuste de tipos v4
+
+La consulta de vintages convierte cada Row de SQLAlchemy en una tupla Python
+explícita antes de construir el set tipado. No cambia filtros, consultas ni
+política de append. Test adicional de colisión con vintage de revisión
+rechazado, además del caso initial existente y el presupuesto de queries.
+62 tests focales backend verdes; Ruff focal verde; Pyright 1.1.414 del servicio
+con el intérprete local: cero errores y cero warnings. Este chequeo de archivo
+no sustituye el gate completo de Pyright ni el roundtrip en PostgreSQL.
