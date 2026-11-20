@@ -50,7 +50,7 @@ probabilidad de acierto o mejora frente a mantener una cartera.
 
 ## Verificación local
 
-- 47 tests backend focales, incluidos clasificador, snapshots, futuro, ingesta
+- 64 tests backend focales, incluidos clasificador, snapshots, futuro, ingesta
   y migración del módulo de contexto: verdes. Solo fixtures sintéticos/SQLite.
 - 32 tests frontend focales de VIX y Régimen ES/EN: verdes.
 - TypeScript: los cuatro grupos originales app/tests/scripts/e2e, con sus
@@ -70,3 +70,20 @@ probabilidad de acierto o mejora frente a mantener una cartera.
 
 Pendiente auditoría independiente del HEAD, CI y gate completo del corte antes
 de desplegar. No se ha tocado producción para este cambio.
+
+## Corrección tras auditoría
+
+El Auditor reprodujo con SQLite que DateTime(timezone=True) pierde tzinfo al
+recuperar el registro: ingestión → build_snapshot serializaba fetched_at sin
+offset y el clasificador lo rechazaba. Reproducido localmente antes de corregir.
+store_series ahora normaliza a UTC antes de escribir (incluye entradas con
+offset +03 y -05). Solo el objeto datetime recuperado del ORM bajo dialecto
+SQLite recupera UTC al serializar el snapshot. El clasificador sigue rechazando
+strings externos sin offset. En PostgreSQL no se fuerza tzinfo ni se cambia el
+valor recuperado. No se ha probado esta corrección contra PostgreSQL real.
+
+Tests de extremo a extremo fuerzan commit, expire_all y nueva lectura ORM, y
+verifican el instante exacto en UTC y banda high para VIX=31 sintético. También
+siguen verdes las pruebas existentes de integridad, revisión de vintages y
+presupuesto de consultas de ingesta. El test original del Auditor pasó después
+de la corrección (una ejecución adicional, no añadido a los 64 propios).

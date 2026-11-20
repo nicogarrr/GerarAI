@@ -39,6 +39,9 @@ def parse_points(rows: list[dict]) -> list[tuple[date, Decimal]]:
 def store_series(db: Session, key: str, rows: list[dict], fetched_at: datetime) -> dict:
     if key not in FRED_SERIES or fetched_at.tzinfo is None:
         raise ValueError("Serie u hora inválida")
+    # SQLite DateTime drops offsets on round-trip. Store UTC wall time so
+    # the ORM serialization boundary can restore that known UTC semantic.
+    fetched_at = fetched_at.astimezone(UTC)
     series_id, unit, _ = FRED_SERIES[key]
     added = 0
     revisions = 0

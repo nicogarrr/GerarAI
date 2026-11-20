@@ -37,13 +37,19 @@ def build_snapshot(db: Session, as_of: date, generated_at: datetime | None = Non
         )
         if not point or point.observation_date < as_of - timedelta(days=max_age):
             continue
+        # Only ORM SQLite values: this dialect drops the timezone from the
+        # UTC-normalized timestamp written by store_series. Never normalize
+        # an external snapshot string here or in the VIX classifier.
+        fetched_at = point.fetched_at
+        if fetched_at.tzinfo is None and db.get_bind().dialect.name == "sqlite":
+            fetched_at = fetched_at.replace(tzinfo=UTC)
         metrics[key] = {
             "value": float(point.value),
             "date": point.observation_date.isoformat(),
             "unit": point.unit,
             "source": point.source,
             "source_url": point.source_url,
-            "fetched_at": point.fetched_at.isoformat(),
+            "fetched_at": fetched_at.isoformat(),
             "evidence_id": point.id,
         }
         evidence_ids.append(point.id)
