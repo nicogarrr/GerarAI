@@ -14,7 +14,7 @@ describe('Régimen: contratos de presentación ES/EN',()=>{
  it('VIX context is wired from the backend response',async()=>{
   mock.locale='es';await show({...basic(),vix_context:{status:'available',band:'high',value:31,date:'2026-11-19',source_url:'https://fred.stlouisfed.org/series/VIXCLS'}});
   expect(screen.getByText('Volatilidad elevada · 31,00')).toBeInTheDocument();
-  expect(screen.getByText('Cierre diario del 2026-11-19, no intradía.')).toBeInTheDocument();
+  expect(screen.getByText('Cierre 2026-11-19 · no intradía.')).toBeInTheDocument();
  });
 
  it.each(['en','es'])('métricas, métodos y concentración disponibles %s',async locale=>{

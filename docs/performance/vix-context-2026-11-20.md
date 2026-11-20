@@ -87,3 +87,14 @@ verifican el instante exacto en UTC y banda high para VIX=31 sintético. Tambié
 siguen verdes las pruebas existentes de integridad, revisión de vintages y
 presupuesto de consultas de ingesta. El test original del Auditor pasó después
 de la corrección (una ejecución adicional, no añadido a los 64 propios).
+
+## Presentación v3
+
+Retirada la línea visible de proveedor y su enlace, según la instrucción global
+verificada del 31 octubre. Origen, URL, fecha y método siguen en los datos y en
+esta metodología. Texto ES/EN condensado, conserva cierre/no intradía, bandas,
+limitación de riesgo y ausencia de backtest. Capturas del componente real
+repetidas e inspeccionadas: ES 390/1440 y EN 390, sin overflow; todos los estados
+sintéticos del harness siguen explícitamente marcados como QA. 32 tests frontend
+verdes, ESLint focal e i18n verdes tras retirar la etiqueta. No se repite aquí
+el gate completo de producción.

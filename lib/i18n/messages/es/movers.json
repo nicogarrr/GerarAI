@@ -80,14 +80,13 @@
       "low": "Volatilidad baja",
       "middle": "Zona intermedia",
       "unavailable": "VIX sin lectura vigente",
-      "close": "Cierre diario del {date}, no intradía.",
-      "noSignal": "Sin contexto activo: falta un cierre verificable reciente. Los datos caducados o inválidos no generan señal.",
-      "highNote": "Más incertidumbre implícita en el S&P 500. No confirma un suelo ni que una acción esté barata.",
-      "lowNote": "Menor volatilidad implícita. No confirma un techo ni justifica vender por sí sola.",
-      "middleNote": "Sin extremo según estas referencias. No significa que no haya riesgo u oportunidades.",
-      "thresholds": "Referencias orientativas: bajo 15 y sobre 30; 15 y 30 quedan en la zona intermedia.",
-      "limits": "Contexto, no orden de compra o venta. No modifica tu cartera ni el DCA. Regla sin backtest de rentabilidad.",
-      "source": "Fuente: FRED / Cboe · VIXCLS"
+      "close": "Cierre {date} · no intradía.",
+      "noSignal": "Sin contexto: falta un cierre válido reciente.",
+      "highNote": "Más volatilidad implícita del S&P 500; no confirma un suelo ni precios baratos.",
+      "lowNote": "Menor volatilidad implícita; no confirma un techo ni justifica vender.",
+      "middleNote": "Sin extremo VIX; no implica ausencia de riesgo.",
+      "thresholds": "Referencias: <15 bajo · 15–30 intermedio · >30 alto.",
+      "limits": "No ordena operaciones ni cambia cartera/DCA. Sin backtest de rentabilidad."
     }
   }
 }

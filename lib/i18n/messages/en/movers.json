@@ -80,14 +80,13 @@
       "low": "Low volatility",
       "middle": "Middle range",
       "unavailable": "No current VIX reading",
-      "close": "Daily close for {date}, not intraday.",
-      "noSignal": "No active context: a recent verifiable close is missing. Stale or invalid data does not generate a signal.",
-      "highNote": "More implied uncertainty in the S&P 500. It does not confirm a bottom or that a stock is cheap.",
-      "lowNote": "Lower implied volatility. It does not confirm a top or justify selling on its own.",
-      "middleNote": "No extreme under these references. This does not mean there are no risks or opportunities.",
-      "thresholds": "Illustrative references: below 15 and above 30; 15 and 30 remain in the middle range.",
-      "limits": "Context, not a buy or sell order. Does not change your portfolio or DCA. No return backtest for this rule.",
-      "source": "Source: FRED / Cboe · VIXCLS"
+      "close": "Close {date} · not intraday.",
+      "noSignal": "No context: a recent valid close is missing.",
+      "highNote": "Higher S&P 500 implied volatility; not confirmation of a bottom or cheap prices.",
+      "lowNote": "Lower implied volatility; not confirmation of a top or a reason to sell.",
+      "middleNote": "No VIX extreme; risk can still be present.",
+      "thresholds": "References: <15 low · 15–30 middle · >30 high.",
+      "limits": "No trades or portfolio/DCA changes. No return backtest."
     }
   }
 }

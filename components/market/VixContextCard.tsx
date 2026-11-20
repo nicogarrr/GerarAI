@@ -26,7 +26,6 @@ export function VixContextCard({ context, locale }: { context?: VixContext; loca
         <p className="text-gray-400">{!fresh ? t('movers.regime.vixContext.noSignal') : band === 'high' ? t('movers.regime.vixContext.highNote') : band === 'low' ? t('movers.regime.vixContext.lowNote') : t('movers.regime.vixContext.middleNote')}</p>
         <p className="text-xs text-gray-500">{t('movers.regime.vixContext.thresholds')}</p>
         <p className="text-xs text-gray-500">{t('movers.regime.vixContext.limits')}</p>
-        <a className="text-xs text-teal-400 underline" href="https://fred.stlouisfed.org/series/VIXCLS" target="_blank" rel="noopener noreferrer">{t('movers.regime.vixContext.source')}</a>
       </CardContent>
     </Card>
   );
