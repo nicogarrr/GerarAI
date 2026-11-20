@@ -347,10 +347,19 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
     """Keep macro context separate from tenant-retrieved author quotations."""
     from app.services.vix_reader import answer_if_relevant
 
-    volatility = answer_if_relevant(db, question)
     result = await _ask_library(db, question, scope=scope, author=author,
                                 document_id=document_id, collection_id=collection_id,
                                 mode=mode, provider=provider)
+    try:
+        volatility = answer_if_relevant(db, question)
+    except Exception:
+        from app.services.vix_reader import supplemental_note
+
+        note = supplemental_note(db, question)
+        if note:
+            result["market_context_note"] = note
+            result["message"] = result.get("message", "") + "\n\n" + note
+        return result
     if volatility is not None:
         result["market_context"] = volatility["context"]
         result["market_context_note"] = volatility["text"]

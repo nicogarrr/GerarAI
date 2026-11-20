@@ -430,25 +430,8 @@ def _dca_response(db: Session, company: Company, tenant_id: int, mode: str, revi
             "review_id": review.id if review else None, "writeback": False}
 
 
-def answer(db: Session, payload) -> dict:
+def _answer(db: Session, payload) -> dict:
     tenant_id = _tenant(db)
-    from app.services.vix_reader import answer_if_relevant
-
-    volatility = answer_if_relevant(db, payload.question)
-    if volatility is not None:
-        observation = volatility["context"]["observation"]
-        citations = ([{"id": "market_observation:vix-close", "kind": "market_observation",
-                       "source": observation["source"], "url": observation["source_url"],
-                       "as_of": observation["date"],
-                       "excerpt": f"VIX daily close: {observation['value']:g}"}]
-                     if observation.get("status") == "available" else [])
-        missing = ["Heurística de tercero sin backtest ni validación histórica."]
-        if not citations:
-            missing.append("Sin cierre VIX válido reciente.")
-        return {"mode": payload.mode, "status": "answered", "answer": volatility["text"],
-                "sections": [{"key": "hypotheses", "body": volatility["text"], "citation_ids": []}],
-                "citations": citations, "missing_data": missing,
-                "suggested_next_steps": [], "review_id": None, "writeback": False}
     if not payload.ticker:
         return _empty(payload.mode, "Indica un ticker para recuperar fuentes verificables del espacio de trabajo.")
     company = _company(db, payload.ticker)
@@ -509,3 +492,15 @@ def _empty(mode: str, reason: str) -> dict:
             "citations": [], "missing_data": [reason],
             "suggested_next_steps": ["Aporta o conecta una fuente con fecha y URL para este ticker."],
             "review_id": None, "writeback": False}
+
+
+def answer(db: Session, payload) -> dict:
+    result = _answer(db, payload)
+    from app.services.vix_reader import supplemental_note
+
+    note = supplemental_note(db, payload.question)
+    if note:
+        result["answer"] += "\n\n" + note
+        result["sections"].append({"key": "hypotheses", "body": note, "citation_ids": []})
+        result["market_context_note"] = note
+    return result

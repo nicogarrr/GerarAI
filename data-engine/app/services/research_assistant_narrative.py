@@ -84,13 +84,6 @@ async def synthesize(db, payload, baseline: dict, *, provider=None) -> dict:
         "No atribuyas al regulador un titular de prensa. Si falta soporte, devuelve sentences vacío."
         + MARKET_CONTEXT_POLICY
     )
-    prompt_data = _prompt_payload(payload, citations)
-    prompt_data["non_evidence_market_context"] = reader_context(db)
-    request = LLMRequest(
-        messages=[Message("system", system), Message("user", json.dumps(prompt_data, ensure_ascii=False))],
-        task="main_financial_analysis", temperature=0.1, max_tokens=650,
-        response_format=ResponseFormat.json_schema(_OUTPUT_SCHEMA, name="research_assistant_narrative"),
-    )
     def _record(resp) -> None:
         # CADA respuesta del proveedor consume presupuesto, tambien la que el
         # validador descarta o la que no produce frases.
@@ -102,6 +95,13 @@ async def synthesize(db, payload, baseline: dict, *, provider=None) -> dict:
             raise RuntimeError("LLM budget exhausted")
 
     try:
+        prompt_data = _prompt_payload(payload, citations)
+        prompt_data["non_evidence_market_context"] = reader_context(db) if db is not None else None
+        request = LLMRequest(
+            messages=[Message("system", system), Message("user", json.dumps(prompt_data, ensure_ascii=False))],
+            task="main_financial_analysis", temperature=0.1, max_tokens=650,
+            response_format=ResponseFormat.json_schema(_OUTPUT_SCHEMA, name="research_assistant_narrative"),
+        )
         # Las frases copian extractos literales (pueden ser en ingles): solo CJK y
         # tokens corruptos cuentan aqui.
         response = (
@@ -121,8 +121,11 @@ async def synthesize(db, payload, baseline: dict, *, provider=None) -> dict:
         return baseline
     bodies = [f"{item['body']} [{', '.join(item['citation_ids'])}]" for item in sentences]
     note = "Extractos citados, no verificación independiente ni recomendación de inversión."
-    baseline["answer"] = "\n".join([*bodies, note])
+    context_note = baseline.get("market_context_note")
+    baseline["answer"] = "\n".join([*bodies, note] + ([context_note] if context_note else []))
     baseline["sections"] = [{"key": "inferences", "body": "\n".join(bodies),
                              "citation_ids": list(dict.fromkeys(cid for item in sentences for cid in item["citation_ids"]))},
                             {"key": "insufficient_data", "body": note, "citation_ids": []}]
+    if context_note:
+        baseline["sections"].append({"key": "hypotheses", "body": context_note, "citation_ids": []})
     return baseline

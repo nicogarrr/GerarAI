@@ -44,3 +44,30 @@ proveedor en respuesta VIX, hipótesis sin citas inventadas, aislamiento de
 biblioteca, contexto automático sin ampliar evidencia. Ruff focal verde.
 Pyright 1.1.414 en 6 servicios: 0 errores, 6 warnings. No es un gate completo
 VM ni PostgreSQL; no se afirma despliegue ni validación histórica.
+
+## Revisión v2
+
+Retirado el cortocircuito de preguntas que nombran VIX. El enrutado original
+resuelve empresa, revisión y DCA; después se añade la nota macro sin sustituir
+la respuesta, citas, revisión ni secciones primarias. La síntesis conserva la
+nota cuando devuelve extractos. La lectura opcional de macro vive dentro del
+try de degradación; si falla, se conserva la respuesta principal. La biblioteca
+también termina su recuperación primaria antes de leer el suplemento.
+
+Los dos tests del Auditor se conservan. En el test mixto se completó el fixture
+con MSFT y review999: sin esos registros, el comportamiento legítimo previo es
+LookupError/404. Se conserva la aserción discriminante original. Se añadieron
+rutas mixtas con DCA real en Cerebro y asistente, preservación de revisión/citas,
+fallos macro y éxito de síntesis con nota y callbacks de presupuesto.
+
+La muestra focal de cobertura no cumple el gate global: 89 tests ejecutados
+pasaban, pero seleccionar solo 6 servicios deja el gigante chat_service en
+24,48% y synthesis en37,14%, por debajo de81%; no se ha bajado el umbral ni
+omitido el gate. vix_reader100%, biblioteca89,90%, assistant88,55%, narrative
+76,53% en esa muestra. Se añadieron después tests de callbacks/éxito narrative;
+la aprobación de cobertura completa sigue pendiente en la suite integral.
+
+Muestra ampliada final: 156 tests verdes, incluyendo fail-closed de narrative,
+validación inglesa de synthesis, DCA real, ranking bilingüe y fecha de tesis.
+No se consulta macro si el caller no proporciona sesión DB (compatibilidad con
+síntesis aislada); con sesión, un fallo macro conserva baseline sin excepción.

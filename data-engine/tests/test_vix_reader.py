@@ -78,15 +78,17 @@ def test_english_context_preserves_limits(db):
     assert 'not place orders' in text
 
 
-def test_brain_reader_short_circuits_provider(db):
+def test_brain_mixed_query_preserves_primary_analysis_and_adds_context(db, monkeypatch):
+    from app.schemas import ChatResponse
     from app.services.chat_service import ChatService
-    provider = SimpleNamespace(name='disabled', complete=AsyncMock(side_effect=AssertionError('provider')))
-    result = asyncio.run(ChatService(provider=provider).answer(db, 'VIX > 50, compro todo?', 'general', None))
-    assert result.prompt_version == 'vix-reader-v1'
-    assert result.llm_trace['provider_calls'] == 0
-    assert result.llm_trace['writeback'] is False
+    primary = ChatResponse(answer="MSFT DCA: nivel guardado 100", sources=[{"type": "company", "id": 12}])
+    original = AsyncMock(return_value=primary)
+    monkeypatch.setattr(ChatService, '_answer_impl', original)
+    result = asyncio.run(ChatService().answer(db, 'MSFT DCA y VIX', 'company', 'MSFT'))
+    original.assert_awaited_once()
+    assert result.answer.startswith('MSFT DCA: nivel guardado 100')
     assert 'no verificada' in result.answer
-    provider.complete.assert_not_called()
+    assert result.sources == [{"type": "company", "id": 12}]
 
 
 def test_assistant_reader_without_ticker_has_no_fabricated_citation(db):
@@ -95,7 +97,9 @@ def test_assistant_reader_without_ticker_has_no_fabricated_citation(db):
     payload = AssistantRequest(mode='explore', question='VIX y oportunidad extrema')
     response = AssistantResponse.model_validate(answer(db, payload))
     assert response.citations == []
-    assert response.sections[0].key == 'hypotheses'
+    assert response.sections[-1].key == 'hypotheses'
+    assert response.status == 'insufficient_data'
+    assert 'Indica un ticker' in response.answer
     assert response.writeback is False and response.review_id is None
     assert 'no verificada' in response.answer
 
@@ -165,3 +169,140 @@ def test_assistant_synthesis_keeps_opinion_outside_citable_evidence(db, monkeypa
     assert prompt['citations'] == citations
     assert prompt['non_evidence_market_context']['constraints']['allocation_rule'] is False
     assert 'no evidencia' in captured[0].messages[0].content
+
+
+def test_assistant_mixed_query_preserves_review_and_dca_evidence(db, monkeypatch):
+    from app.services import research_assistant_service as service
+    original = {"answer": "MSFT DCA 100, revisión 27", "mode": "guide", "status": "answered",
+                "review_id": 27, "sections": [{"key": "calculations", "body": "DCA 100", "citation_ids": ["dca:1"]}],
+                "citations": [{"id": "dca:1"}], "missing_data": [], "writeback": False}
+    seen = []
+    def primary(session, payload):
+        seen.append(payload)
+        return original
+    monkeypatch.setattr(service, '_answer', primary)
+    payload = SimpleNamespace(question='MSFT DCA y VIX', review_id=27, ticker='MSFT')
+    result = service.answer(db, payload)
+    assert seen == [payload]
+    assert result['answer'].startswith('MSFT DCA 100, revisión 27')
+    assert result['review_id'] == 27 and result['citations'] == [{"id": "dca:1"}]
+    assert result['sections'][0]['key'] == 'calculations'
+    assert result['sections'][-1]['key'] == 'hypotheses'
+
+
+def test_failed_macro_read_does_not_raise_from_assistant_synthesis(db, monkeypatch):
+    from app.api.routes.research_assistant import AssistantRequest
+    from app.services import research_assistant_narrative as narrative
+    from app.services.budget import BudgetController
+    monkeypatch.setattr(BudgetController, 'can_spend', lambda *a: True)
+    def failed(_):
+        raise RuntimeError('macro read failure')
+    monkeypatch.setattr(narrative, 'reader_context', failed)
+    baseline = {'status': 'answered', 'answer': 'Datos MSFT originales',
+                'citations': [{'id': 'fact:1', 'kind': 'financial_fact', 'excerpt': 'Ingresos 10'}]}
+    provider = SimpleNamespace(name='test', complete=AsyncMock())
+    result = asyncio.run(narrative.synthesize(db, AssistantRequest(
+        mode='explore', ticker='MSFT', question='Analiza MSFT con VIX'), baseline, provider=provider))
+    assert result is baseline and result['answer'] == 'Datos MSFT originales'
+    provider.complete.assert_not_called()
+
+
+def test_failed_macro_supplement_preserves_main_answer(db, monkeypatch):
+    from app.schemas import ChatResponse
+    from app.services.chat_service import ChatService
+    monkeypatch.setattr(ChatService, '_answer_impl', AsyncMock(return_value=ChatResponse(answer='MSFT DCA 100', sources=[])))
+    def failed(_):
+        raise RuntimeError('macro read failure')
+    monkeypatch.setattr(vix_reader, 'reader_context', failed)
+    result = asyncio.run(ChatService().answer(db, 'MSFT DCA y VIX', 'company', 'MSFT'))
+    assert result.answer.startswith('MSFT DCA 100')
+    assert 'falló la lectura macro' in result.answer
+
+
+def test_real_brain_and_assistant_dca_routes_survive_mixed_vix_query(db):
+    from decimal import Decimal
+
+    from app.api.routes.research_assistant import AssistantRequest
+    from app.models.entities import Company, DcaSignalState
+    from app.services.chat_service import ChatService
+    from app.services.research_assistant_service import answer
+    company = Company(ticker="MSFT", name="Microsoft", exchange="NASDAQ", currency="USD",
+                      company_type="operating", valuation_model="dcf")
+    db.add(company)
+    now = datetime.now(UTC)
+    db.add(DcaSignalState(tenant_id=2, symbol="MSFT", level=3, status="forming", period=now.strftime("%Y-%m"),
+                         signal_date=now.date(), close=Decimal("100"), currency="USD", metrics={},
+                         level_prices={}, sources=[], data_source="test", params_version="nico-v1", evaluated_at=now))
+    db.commit()
+    result = asyncio.run(ChatService().answer(db, "¿Qué nivel DCA tiene MSFT teniendo en cuenta VIX?", "portfolio", "MSFT"))
+    assert result.llm_trace['path'] == 'dca_level'
+    assert 'MSFT' in result.answer and 'no verificada' in result.answer
+    assistant = answer(db, AssistantRequest(mode='guide', ticker='MSFT', question='Nivel DCA MSFT y contexto VIX'))
+    assert assistant['citations'] and assistant['citations'][0]['kind'] == 'market_observation'
+    assert assistant['sections'][0]['key'] != 'hypotheses'
+    assert 'no verificada' in assistant['answer']
+
+
+def test_successful_assistant_synthesis_preserves_supplement_and_quotes_only_fact(db, monkeypatch):
+    import json
+
+    from app.api.routes.research_assistant import AssistantRequest
+    from app.services import research_assistant_narrative as narrative
+    from app.services.budget import BudgetController
+    monkeypatch.setattr(BudgetController, 'can_spend', lambda *a: True)
+    async def guarded(*a, **kw):
+        return SimpleNamespace(response=SimpleNamespace(text=json.dumps({
+            'sentences': [{'body': 'Ingresos 10', 'citation_ids': ['financial_fact:1']}]})))
+    monkeypatch.setattr(narrative, 'complete_guarded', guarded)
+    baseline = {'status': 'answered', 'answer': 'Base', 'market_context_note': 'Opinión VIX no verificada',
+                'citations': [{'id': 'financial_fact:1', 'kind': 'financial_fact', 'excerpt': 'Ingresos 10'}]}
+    result = asyncio.run(narrative.synthesize(db, AssistantRequest(mode='explore', ticker='MSFT',
+        question='Ingresos MSFT con VIX'), baseline, provider=SimpleNamespace(name='test')))
+    assert 'Ingresos 10 [financial_fact:1]' in result['answer']
+    assert result['answer'].endswith('Opinión VIX no verificada')
+    assert result['sections'][-1]['key'] == 'hypotheses'
+    assert result['sections'][-1]['citation_ids'] == []
+
+
+def test_library_macro_failure_preserves_retrieved_result(db, monkeypatch):
+    from app.services import knowledge_chat
+    async def primary(*a, **kw):
+        return {'status': 'fragmentos', 'answers': [{'citation': 'document:7'}], 'message': 'Fragmentos reales'}
+    def failed(*a):
+        raise RuntimeError('macro read failure')
+    monkeypatch.setattr(knowledge_chat, '_ask_library', primary)
+    monkeypatch.setattr(vix_reader, 'reader_context', failed)
+    result = asyncio.run(knowledge_chat.ask_library(db, 'VIX y documento'))
+    assert result['answers'] == [{'citation': 'document:7'}]
+    assert result['message'].startswith('Fragmentos reales')
+    assert 'falló la lectura macro' in result['message']
+
+
+@pytest.mark.parametrize('with_note', [False, True])
+def test_synthesis_quote_callbacks_and_optional_context(db, monkeypatch, with_note):
+    import json
+
+    from app.api.routes.research_assistant import AssistantRequest
+    from app.llm import LLMResponse, Message
+    from app.llm.contracts import Usage
+    from app.services import research_assistant_narrative as narrative
+    from app.services.budget import BudgetController
+    recorded = []
+    monkeypatch.setattr(BudgetController, 'can_spend', lambda *a: True)
+    monkeypatch.setattr(BudgetController, 'record', lambda *a: recorded.append(a))
+    async def guarded(*a, **kw):
+        response = LLMResponse(message=Message('assistant', json.dumps({'sentences': [
+            {'body': 'Ingresos 10', 'citation_ids': ['financial_fact:1']}]})),
+            model='test', provider='test', usage=Usage(input_tokens=1, output_tokens=1, total_tokens=2))
+        kw['before_retry']()
+        kw['on_response'](response)
+        return SimpleNamespace(response=response)
+    monkeypatch.setattr(narrative, 'complete_guarded', guarded)
+    baseline = {'status': 'answered', 'answer': 'Original',
+                'citations': [{'id': 'financial_fact:1', 'kind': 'financial_fact', 'excerpt': 'Ingresos 10'}]}
+    if with_note:
+        baseline['market_context_note'] = 'VIX no verificado'
+    result = asyncio.run(narrative.synthesize(db, AssistantRequest(mode='explore', ticker='MSFT',
+        question='Ingresos'), baseline, provider=SimpleNamespace(name='test')))
+    assert recorded
+    assert bool(result['sections'][-1]['key'] == 'hypotheses') is with_note

@@ -85,3 +85,15 @@ def answer_if_relevant(db: Session, question: str) -> dict | None:
         return None
     context = reader_context(db)
     return {"context": context, "text": context_text(context)}
+
+
+def supplemental_note(db: Session, question: str) -> str | None:
+    """Optional macro data cannot suppress an already recovered primary answer."""
+    if not relevant(question):
+        return None
+    try:
+        return context_text(reader_context(db))
+    except Exception:
+        return ("VIX context unavailable: the macro read failed; the primary answer is preserved."
+                if current_language_is_english() else
+                "Contexto VIX no disponible: falló la lectura macro; se conserva la respuesta principal.")

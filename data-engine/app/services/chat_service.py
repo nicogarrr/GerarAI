@@ -2031,10 +2031,16 @@ class ChatService:
 
         _lang_token = set_language_scope(language_from_db(db))
         try:
-            return await self._answer_impl(
+            result = await self._answer_impl(
                 db, question, scope, ticker,
                 enable_debate=enable_debate, use_jev=use_jev, page=page, history=history,
             )
+            from app.services.vix_reader import supplemental_note
+
+            note = supplemental_note(db, question)
+            if note:
+                result.answer += "\n\n" + note
+            return result
         except TimeoutError:
             # El plazo total vencio a media generacion (p. ej. todos los
             # proveedores caidos): fallback determinista rotulado en vez de
@@ -2108,24 +2114,6 @@ class ChatService:
                 prompt_version="page-identity-v1",
                 confidence=0.9,
                 llm_trace={"path": "page_identity", "generated": False, "provider_calls": 0},
-                context=context_echo,
-            )
-        # Shared read-only volatility reader. The attributed heuristic never
-        # enters an execution or model-generated recommendation path.
-        from app.services.vix_reader import answer_if_relevant
-
-        volatility = answer_if_relevant(db, question or "")
-        if volatility is not None:
-            observation = volatility["context"]["observation"]
-            sources = ([{"type": "market_observation", "id": "vix-close",
-                         "title": "VIX daily close", "url": observation["source_url"]}]
-                       if observation.get("status") == "available" else [])
-            return ChatResponse(
-                answer=volatility["text"], sources=sources, model="deterministic",
-                prompt_version="vix-reader-v1", confidence=0.35,
-                llm_trace={"path": "vix_context_reader", "provider_calls": 0,
-                           "generated": False, "writeback": False,
-                           "market_context": volatility["context"]},
                 context=context_echo,
             )
         # «¿Qué ha hecho Buffett con Apple en su último 13F?»: pide su 13F,
