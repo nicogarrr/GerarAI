@@ -213,7 +213,7 @@ def degraded_analysis(result: dict) -> dict:
     return result
 
 
-async def ask_library(db: Session, question: str, *, scope: str = "letters",
+async def _ask_library(db: Session, question: str, *, scope: str = "letters",
                       author: str | None = None, document_id: int | None = None,
                       collection_id: int | None = None, mode: str = "respuesta", provider=None) -> dict:
     rows, retrieval = retrieve(db, question, scope=scope, author=author,
@@ -338,4 +338,21 @@ async def ask_library(db: Session, question: str, *, scope: str = "letters",
             "proveedor del modelo no respondio. Los fragmentos citados son "
             "literales y siguen siendo validos."
         )
+    return result
+
+
+async def ask_library(db: Session, question: str, *, scope: str = "letters",
+                      author: str | None = None, document_id: int | None = None,
+                      collection_id: int | None = None, mode: str = "respuesta", provider=None) -> dict:
+    """Keep macro context separate from tenant-retrieved author quotations."""
+    from app.services.vix_reader import answer_if_relevant
+
+    volatility = answer_if_relevant(db, question)
+    result = await _ask_library(db, question, scope=scope, author=author,
+                                document_id=document_id, collection_id=collection_id,
+                                mode=mode, provider=provider)
+    if volatility is not None:
+        result["market_context"] = volatility["context"]
+        result["market_context_note"] = volatility["text"]
+        result["message"] = result.get("message", "") + "\n\n" + volatility["text"]
     return result

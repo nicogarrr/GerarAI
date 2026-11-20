@@ -2110,6 +2110,24 @@ class ChatService:
                 llm_trace={"path": "page_identity", "generated": False, "provider_calls": 0},
                 context=context_echo,
             )
+        # Shared read-only volatility reader. The attributed heuristic never
+        # enters an execution or model-generated recommendation path.
+        from app.services.vix_reader import answer_if_relevant
+
+        volatility = answer_if_relevant(db, question or "")
+        if volatility is not None:
+            observation = volatility["context"]["observation"]
+            sources = ([{"type": "market_observation", "id": "vix-close",
+                         "title": "VIX daily close", "url": observation["source_url"]}]
+                       if observation.get("status") == "available" else [])
+            return ChatResponse(
+                answer=volatility["text"], sources=sources, model="deterministic",
+                prompt_version="vix-reader-v1", confidence=0.35,
+                llm_trace={"path": "vix_context_reader", "provider_calls": 0,
+                           "generated": False, "writeback": False,
+                           "market_context": volatility["context"]},
+                context=context_echo,
+            )
         # «¿Qué ha hecho Buffett con Apple en su último 13F?»: pide su 13F,
         # no una cita; antes de la guardia de autor (benchmark ins08). Sin modelo.
         from app.services.brain_13f_tools import answer_13f_question
