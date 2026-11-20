@@ -71,3 +71,24 @@ Muestra ampliada final: 156 tests verdes, incluyendo fail-closed de narrative,
 validación inglesa de synthesis, DCA real, ranking bilingüe y fecha de tesis.
 No se consulta macro si el caller no proporciona sesión DB (compatibilidad con
 síntesis aislada); con sesión, un fallo macro conserva baseline sin excepción.
+
+## Revisión v3: separación estricta de evidencia
+
+Retirado el contexto macro de TODOS los prompts de síntesis financiera. En
+Cerebro y asistente se añade el suplemento determinista después de recuperar
+la respuesta principal (también en análisis financiero sin mención VIX). No
+se envían la heurística, su nivel ni el suplemento como evidencia al modelo.
+La validación de salida de síntesis estricta rechaza además menciones VIX o
+spacanpanman: una cita financiera reutilizada no puede colar esa opinión como
+hecho. Se conserva el test discriminante del Auditor que simula exactamente
+esa respuesta. Su monkeypatch usa raising=False porque se retiró la dependencia
+reader_context de la síntesis. Igualmente el test previo de fallo macro ya
+no puede forzar una lectura que no existe en narrative.
+
+Cobertura medida con muestra ampliada de157 tests, todos pasaban, gate de
+cobertura ROJO42,06% (no se rebajó81%). Por fichero, con ramas:
+chat24,44%; synthesis51,64%; biblioteca89,90%; assistant88,83%; narrative97,92%;
+reader95,12%. Estos porcentajes son de una muestra, no de la suite integral.
+Se añaden después dos tests de suplemento omitido/automático. El gate completo
+VM y la cobertura global siguen pendientes. No se presenta la muestra como
+aprobación de release.

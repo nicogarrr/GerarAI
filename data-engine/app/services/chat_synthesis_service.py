@@ -25,7 +25,6 @@ from app.services.budget import BudgetController, BudgetExceededError
 from app.services.langfuse_client import LangfuseTracer
 from app.services.llm_output_guard import _english_hits, _spanish_hits, inspect_response_text
 from app.services.prompt_registry import get_prompt
-from app.services.vix_reader import MARKET_CONTEXT_POLICY, reader_context
 
 logger = logging.getLogger(__name__)
 PROMPT_VERSION = get_prompt("chat_source_synthesis", allow_remote=False).version
@@ -655,6 +654,10 @@ def _reject_untrusted_output(payload: dict, baseline: Any, question: str) -> Non
     plantado en noticias/documentos NO debe llegar al usuario. Rechaza (y asi se
     cae al baseline determinista) secretos, enlaces/HTML en secciones y cifras
     de la prosa que no estan en la pregunta ni en el contexto recuperado."""
+    # VIX belongs only to the deterministic supplemental reader, never a
+    # model-generated company fact or a reused company evidence citation.
+    if re.search(r"(?i)\bvix\b|spacanpanman", json.dumps(payload, ensure_ascii=False)):
+        raise ValueError("Macro volatility claims require the separate deterministic reader")
     answer = str(payload.get("answer") or "")
     bodies = [str(s.get("body") or "") for s in payload.get("sections", []) if isinstance(s, dict)]
     for text in [answer, *bodies]:
@@ -1162,7 +1165,7 @@ class ChatSynthesisService:
                     messages=[
                         Message(
                             "system",
-                            get_prompt("chat_source_synthesis", allow_remote=False).text + MARKET_CONTEXT_POLICY,
+                            get_prompt("chat_source_synthesis", allow_remote=False).text,
                         ),
                         Message(
                             "user",
@@ -1176,7 +1179,6 @@ class ChatSynthesisService:
                                         section.model_dump() for section in baseline.sections
                                     ],
                                     "retrieved_sources": baseline.sources[:40],
-                                    "non_evidence_market_context": reader_context(db) if db is not None else None,
                                 },
                                 default=str,
                                 ensure_ascii=False,

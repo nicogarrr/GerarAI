@@ -8,7 +8,6 @@ from app.llm.chat_provider import create_chat_llm_provider
 from app.services.budget import BudgetController
 from app.services.chat_synthesis_service import _history_for_prompt
 from app.services.llm_output_guard import complete_guarded
-from app.services.vix_reader import MARKET_CONTEXT_POLICY, reader_context
 
 _OUTPUT_SCHEMA = {
     "type": "object", "additionalProperties": False,
@@ -82,7 +81,6 @@ async def synthesize(db, payload, baseline: dict, *, provider=None) -> dict:
         "El historial solo sirve para entender a qué se refiere la pregunta; no es evidencia: no copies ni cites nada de él. "
         "Sin fuente primaria fechada no des conclusiones; devuelve sentences vacío. "
         "No atribuyas al regulador un titular de prensa. Si falta soporte, devuelve sentences vacío."
-        + MARKET_CONTEXT_POLICY
     )
     def _record(resp) -> None:
         # CADA respuesta del proveedor consume presupuesto, tambien la que el
@@ -96,7 +94,6 @@ async def synthesize(db, payload, baseline: dict, *, provider=None) -> dict:
 
     try:
         prompt_data = _prompt_payload(payload, citations)
-        prompt_data["non_evidence_market_context"] = reader_context(db) if db is not None else None
         request = LLMRequest(
             messages=[Message("system", system), Message("user", json.dumps(prompt_data, ensure_ascii=False))],
             task="main_financial_analysis", temperature=0.1, max_tokens=650,

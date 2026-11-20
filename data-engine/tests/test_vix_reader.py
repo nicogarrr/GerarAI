@@ -137,9 +137,9 @@ def test_sourced_company_analysis_receives_context_not_additional_evidence(db, m
         question='Analiza Microsoft', ticker='MSFT', baseline=baseline, db=db))
     assert captured
     payload = json.loads(captured[0].messages[1].content)
-    assert payload['non_evidence_market_context']['third_party_heuristic']['backtest'] is None
+    assert 'non_evidence_market_context' not in payload
     assert payload['allowed_source_ids'] == ['financial_fact:1']
-    assert 'no evidencia' in captured[0].messages[0].content
+    assert 'spacanpanman' not in captured[0].messages[0].content
 
 
 def test_assistant_synthesis_keeps_opinion_outside_citable_evidence(db, monkeypatch):
@@ -167,8 +167,8 @@ def test_assistant_synthesis_keeps_opinion_outside_citable_evidence(db, monkeypa
     assert captured
     prompt = json.loads(captured[0].messages[1].content)
     assert prompt['citations'] == citations
-    assert prompt['non_evidence_market_context']['constraints']['allocation_rule'] is False
-    assert 'no evidencia' in captured[0].messages[0].content
+    assert 'non_evidence_market_context' not in prompt
+    assert 'spacanpanman' not in captured[0].messages[0].content
 
 
 def test_assistant_mixed_query_preserves_review_and_dca_evidence(db, monkeypatch):
@@ -197,14 +197,15 @@ def test_failed_macro_read_does_not_raise_from_assistant_synthesis(db, monkeypat
     monkeypatch.setattr(BudgetController, 'can_spend', lambda *a: True)
     def failed(_):
         raise RuntimeError('macro read failure')
-    monkeypatch.setattr(narrative, 'reader_context', failed)
+    macro = AsyncMock(side_effect=AssertionError('macro must remain outside synthesis'))
+    monkeypatch.setattr(narrative, 'reader_context', macro, raising=False)
     baseline = {'status': 'answered', 'answer': 'Datos MSFT originales',
                 'citations': [{'id': 'fact:1', 'kind': 'financial_fact', 'excerpt': 'Ingresos 10'}]}
-    provider = SimpleNamespace(name='test', complete=AsyncMock())
+    provider = SimpleNamespace(name='test', complete=AsyncMock(side_effect=RuntimeError('offline fixture')))
     result = asyncio.run(narrative.synthesize(db, AssistantRequest(
         mode='explore', ticker='MSFT', question='Analiza MSFT con VIX'), baseline, provider=provider))
     assert result is baseline and result['answer'] == 'Datos MSFT originales'
-    provider.complete.assert_not_called()
+    macro.assert_not_called()
 
 
 def test_failed_macro_supplement_preserves_main_answer(db, monkeypatch):
@@ -306,3 +307,19 @@ def test_synthesis_quote_callbacks_and_optional_context(db, monkeypatch, with_no
         question='Ingresos'), baseline, provider=SimpleNamespace(name='test')))
     assert recorded
     assert bool(result['sections'][-1]['key'] == 'hypotheses') is with_note
+
+
+def test_non_financial_supplement_does_not_read_macro(monkeypatch):
+    monkeypatch.setattr(vix_reader, 'reader_context', lambda _: pytest.fail('unexpected macro read'))
+    assert vix_reader.supplemental_note(None, 'Gracias') is None
+
+
+def test_financial_answer_adds_macro_after_primary_without_vix_in_prompt(db, monkeypatch):
+    from app.schemas import ChatResponse
+    from app.services.chat_service import ChatService
+    primary = AsyncMock(return_value=ChatResponse(answer='Microsoft: ingresos observados', sources=[]))
+    monkeypatch.setattr(ChatService, '_answer_impl', primary)
+    result = asyncio.run(ChatService().answer(db, 'Analiza Microsoft', 'company', 'MSFT'))
+    assert result.answer.startswith('Microsoft: ingresos observados')
+    assert 'no verificada' in result.answer
+    assert primary.await_args.args[1] == 'Analiza Microsoft'

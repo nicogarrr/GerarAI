@@ -42,7 +42,7 @@ def test_macro_read_failure_preserves_company_synthesis_baseline(db,monkeypatch)
     from app.services import research_assistant_narrative as target
     from app.services.budget import BudgetController
     def broken(_): raise RuntimeError('macro unavailable fixture')
-    monkeypatch.setattr(target,'reader_context',broken)
+    monkeypatch.setattr(target,'reader_context',broken,raising=False)
     monkeypatch.setattr(BudgetController,'can_spend',lambda *a:True)
     baseline={'status':'answered','citations':[{'id':'financial_fact:1','kind':'financial_fact','excerpt':'Ingresos 10'}],'answer':'Ingresos 10'}
     provider=SimpleNamespace(name='test',complete=AsyncMock(side_effect=RuntimeError('offline')))

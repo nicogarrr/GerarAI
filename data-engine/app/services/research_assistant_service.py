@@ -498,7 +498,7 @@ def answer(db: Session, payload) -> dict:
     result = _answer(db, payload)
     from app.services.vix_reader import supplemental_note
 
-    note = supplemental_note(db, payload.question)
+    note = supplemental_note(db, payload.question, financial=bool(payload.ticker))
     if note:
         result["answer"] += "\n\n" + note
         result["sections"].append({"key": "hypotheses", "body": note, "citation_ids": []})
