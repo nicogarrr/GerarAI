@@ -92,3 +92,20 @@ reader95,12%. Estos porcentajes son de una muestra, no de la suite integral.
 Se añaden después dos tests de suplemento omitido/automático. El gate completo
 VM y la cobertura global siguen pendientes. No se presenta la muestra como
 aprobación de release.
+
+## Revisión v4: regresiones detectadas por selección ampliada VM
+
+La selección257ficheros sobre37ca62f4 encontró30regresiones de prosa: el
+suplemento automático se pegaba incluso en posición/fiscal/conceptos/memoria.
+2687tests pasaban, pero la corrida es ROJA y no se excluyen los fallidos.
+Se restringe la adición automática a petición explícita de análisis; las
+preguntas VIX siguen añadiendo contexto. No se cambia ningún test existente
+para aceptar prosa añadida. Nuevos tests fijan saldo/posición/fiscal/conceptos
+sin sufijo y analisis financiero con suplemento.
+
+Cobertura37ca62f4 de esos257ficheros, líneas/ramas: chat91,69/83,57;
+synthesis96,11/94,77; biblioteca93,03/86,05; narrative98,53/96,43;
+assistant95,42/85,42; reader100/100. Se añaden tests de ramas de formato/riesgo
+y recuperación RAG con filtros de tenant/empresa, duplicados, IDs inválidos,
+texto vacío, point-ID incoherente y proveedor ausente. La medición v4 exacta
+sigue pendiente. No se afirma FAV ni cobertura final.

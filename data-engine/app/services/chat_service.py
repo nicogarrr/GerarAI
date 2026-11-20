@@ -2035,9 +2035,9 @@ class ChatService:
                 db, question, scope, ticker,
                 enable_debate=enable_debate, use_jev=use_jev, page=page, history=history,
             )
-            from app.services.vix_reader import supplemental_note
+            from app.services.vix_reader import financial_analysis, supplemental_note
 
-            note = supplemental_note(db, question, financial=bool(ticker) or scope in {"company", "portfolio"})
+            note = supplemental_note(db, question, financial=financial_analysis(question))
             if note:
                 result.answer += "\n\n" + note
             return result

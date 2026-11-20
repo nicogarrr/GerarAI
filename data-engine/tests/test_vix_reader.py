@@ -323,3 +323,83 @@ def test_financial_answer_adds_macro_after_primary_without_vix_in_prompt(db, mon
     assert result.answer.startswith('Microsoft: ingresos observados')
     assert 'no verificada' in result.answer
     assert primary.await_args.args[1] == 'Analiza Microsoft'
+
+
+@pytest.mark.parametrize('question', ['Qué es un dividendo', 'Mi posición en MSFT', 'Mis impuestos 2025',
+                                      'Recuerda mi idea', 'How many shares do I have?'])
+def test_operational_question_does_not_get_macro_suffix(db, monkeypatch, question):
+    from app.schemas import ChatResponse
+    from app.services.chat_service import ChatService
+    monkeypatch.setattr(ChatService, '_answer_impl', AsyncMock(return_value=ChatResponse(answer='Exact answer', sources=[])))
+    assert asyncio.run(ChatService().answer(db, question, 'portfolio', 'MSFT')).answer == 'Exact answer'
+
+
+def test_chat_formatting_edges_keep_missing_units_dates_and_prices_explicit():
+    from app.services import chat_service as c
+    assert c._fmt_value_es(None, None) == 'sin dato'
+    assert c._fmt_value_es(300, 'shares') == '300 acciones'
+    assert c._fmt_value_es(1000, None) == '1 mil'
+    assert c._fmt_value_es(2, 'decimal') == '2'
+    assert c._fmt_period_es('', 2025, 'Q2') == 'Q2 2025'
+    assert c._fmt_period_es('', 2025, 'FY') == 'ejercicio 2025'
+    assert c._fmt_period_es('  custom ') == 'custom'
+    assert c._fmt_period_es(None) == 'periodo sin fecha'
+    assert c._price_display_en(1, None) == '1.00 (currency not stated)'
+    assert c._price_display_en(1, '  ') == '1.00 (currency not stated)'
+    assert c._price_display_en(1, 'GBP') == '1.00 GBP'
+    assert c._is_stale('bad', datetime.now(UTC)) is False
+    assert c._is_stale(None, None) is False
+    assert c._fmt_date_en('2026-99-01') == '2026-99-01'
+    assert c._fmt_date_en('invalid') == 'invalid'
+
+
+def test_risk_lead_keeps_documented_risk_separate_from_vix():
+    from app.services.chat_service import _answer_lead
+    arguments = dict(company=SimpleNamespace(ticker='MSFT'), facts=[], thesis=None, thesis_line=None,
+                     news=[], claims=[], contradiction_claims=[], price_line=None, focus_metrics=set())
+    assert _answer_lead('', **arguments) is None
+    assert 'No tengo riesgos documentados' in _answer_lead('riesgo', **arguments)
+    arguments.update(thesis=SimpleNamespace(valuation_risk_score=70, version=3),
+                     claims=[SimpleNamespace(status='unverified')], contradiction_claims=[SimpleNamespace()])
+    lead = _answer_lead('riesgo', **arguments)
+    assert '1 afirmaciones contradichas' in lead and '1 afirmaciones pendientes' in lead
+    assert '70/100' in lead
+
+
+def test_rag_company_evidence_rejects_cross_tenant_invalid_duplicate_and_mismatched_hits(db, monkeypatch):
+    from app.models.entities import Company, Document, DocumentChunk
+    from app.services import rag
+    from app.services.chat_service import ChatService
+    monkeypatch.setenv('CAVAAI_ENABLE_VECTOR_CHAT', '1')
+    company = Company(ticker='MSFT', name='Microsoft', exchange='NASDAQ', currency='USD',
+                      company_type='operating', valuation_model='dcf')
+    db.add(company)
+    db.flush()
+    document = Document(tenant_id=2, company_id=company.id, title='Filing', source_type='company_ir')
+    db.add(document)
+    db.flush()
+    chunks = []
+    for text, point in [('Revenue 10', 'point1'), ('', 'point2'), ('Debt 2', None), ('Cash 3', 'point4')]:
+        chunk = DocumentChunk(tenant_id=2, document_id=document.id, text=text, chunk_index=len(chunks),
+                              qdrant_point_id=point)
+        db.add(chunk)
+        chunks.append(chunk)
+    db.flush()
+    hits = [{'entity_type': 'document_chunk', 'entity_id': c.id, 'point_id': c.qdrant_point_id} for c in chunks]
+    hits[-1]['point_id'] = 'wrong'
+    hits += [hits[0], {'entity_type': 'other', 'entity_id': chunks[0].id},
+             {'entity_type': 'document_chunk', 'entity_id': 'bad'},
+             {'entity_type': 'document_chunk', 'entity_id': 999999, 'point_id': 'ghost'}]
+    monkeypatch.setattr(rag, 'RAGIndex', lambda: SimpleNamespace(search=lambda *a, **kw: hits))
+    service = ChatService()
+    assert [r['entity_id'] for r in service._rag_chunks(db, 'Revenue', company)] == [chunks[0].id]
+    assert [r['entity_id'] for r in service._rag_chunks(db, 'Revenue', None)] == [chunks[0].id]
+    db.info['tenant_id'] = None
+    assert service._rag_chunks(db, 'Revenue', company) == []
+    db.info['tenant_id'] = 2
+    monkeypatch.setattr(rag, 'RAGIndex', lambda: SimpleNamespace(search=lambda *a, **kw: []))
+    assert service._rag_chunks(db, 'Revenue', company) == []
+    def failed():
+        raise RuntimeError('vector unavailable')
+    monkeypatch.setattr(rag, 'RAGIndex', failed)
+    assert service._rag_chunks(db, 'Revenue', company) == []

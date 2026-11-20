@@ -11,6 +11,11 @@ from app.services.market_snapshot_service import latest_snapshot
 _TOPIC = re.compile(r"(?i)\bvix\b|\bvolatilidad\s+extrema\b|\bextreme\s+volatility\b")
 
 
+def financial_analysis(question: str) -> bool:
+    """Only an explicit analysis request, never account facts or local definitions."""
+    return bool(re.search(r"(?i)\b(?:analiza|an[aá]lisis|analyse|analyze|analysis)\b", question))
+
+
 def relevant(question: str) -> bool:
     return bool(_TOPIC.search(question))
 
