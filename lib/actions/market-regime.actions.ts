@@ -83,7 +83,17 @@ export type RegimeMetrics = {
   portfolio_beta?: RegimeStatusBlock;
 };
 
+export type VixContext = {
+  status: 'available' | 'unavailable';
+  band?: 'low' | 'middle' | 'high';
+  reason?: string;
+  value?: number;
+  date?: string;
+  source_url?: string;
+};
+
 export type MarketRegime = {
+  vix_context?: VixContext;
   /** 'disponible' | 'obsoleto' | 'sin datos' (lo decide el backend por fecha). */
   status: string;
   coverage: string;

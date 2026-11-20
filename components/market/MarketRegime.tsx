@@ -1,3 +1,4 @@
+import { VixContextCard } from '@/components/market/VixContextCard';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import BackendOffline from '@/components/system/BackendOffline';
@@ -244,6 +245,8 @@ export async function MarketRegimeVista() {
           </p>
         ) : null}
       </div>
+
+      <VixContextCard context={regimen.vix_context} locale={fmt.locale} />
 
       {sinSnapshot ? (
         <p className="text-sm text-gray-500">{t('movers.regime.empty')}</p>

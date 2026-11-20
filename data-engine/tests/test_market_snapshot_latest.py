@@ -93,3 +93,32 @@ def test_portfolio_beta_marker_never_leaks(db):
     db.commit()
     beta = latest_snapshot(db)["portfolio_beta"]
     assert beta["status"] == "no_disponible"
+
+
+def test_vix_context_uses_observation_date_even_in_fresh_snapshot(db):
+    snapshot = _snapshot(0, 'ok', 'vix-stale')
+    snapshot.metrics = {'vix_us': {
+        'value': 35, 'date': (datetime.now(UTC).date() - timedelta(days=6)).isoformat(),
+        'fetched_at': datetime.now(UTC).isoformat(), 'source': 'FRED',
+        'source_url': 'https://fred.stlouisfed.org/series/VIXCLS', 'unit': 'índice',
+    }}
+    db.add(snapshot)
+    db.commit()
+    result = latest_snapshot(db)
+    assert result['status'] == 'disponible'
+    assert result['vix_context']['reason'] == 'stale'
+    assert 'band' not in result['vix_context']
+
+
+def test_vix_context_derived_without_writing_snapshot(db):
+    snapshot = _snapshot(0, 'ok', 'vix-fresh')
+    snapshot.metrics = {'vix_us': {
+        'value': 30.01, 'date': datetime.now(UTC).date().isoformat(),
+        'fetched_at': datetime.now(UTC).isoformat(), 'source': 'FRED',
+        'source_url': 'https://fred.stlouisfed.org/series/VIXCLS', 'unit': 'índice',
+    }}
+    db.add(snapshot)
+    db.commit()
+    assert latest_snapshot(db)['vix_context']['band'] == 'high'
+    assert 'vix_context' not in snapshot.metrics
+    assert not db.dirty and not db.new

@@ -11,6 +11,12 @@ const date='2026-11-13';
 const basic=():MarketRegime=>({coverage:'fixture',status:'disponible',date,generated_at:date+'T14:00:00Z',metrics:{},probabilities:{},note:'Probabilidades filtradas sin etiqueta económica; métricas faltantes indican sin datos.'});
 const show=async(data:MarketRegime)=>{mock.result={data,error:null};return render(await MarketRegimeVista());};
 describe('Régimen: contratos de presentación ES/EN',()=>{
+ it('VIX context is wired from the backend response',async()=>{
+  mock.locale='es';await show({...basic(),vix_context:{status:'available',band:'high',value:31,date:'2026-11-19',source_url:'https://fred.stlouisfed.org/series/VIXCLS'}});
+  expect(screen.getByText('Volatilidad elevada · 31,00')).toBeInTheDocument();
+  expect(screen.getByText('Cierre diario del 2026-11-19, no intradía.')).toBeInTheDocument();
+ });
+
  it.each(['en','es'])('métricas, métodos y concentración disponibles %s',async locale=>{
   mock.locale=locale;
   await show({...basic(),metrics:{

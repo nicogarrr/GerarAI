@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from app.models import MarketObservation, MarketRegimeSnapshot
 from app.services.market_observation_service import FRED_SERIES
 from app.services.market_regime_quant import observed_hmm, sp500_top_ten_concentration
+from app.services.vix_context import vix_context
 
 MODEL_VERSION = "macro-context-hmm-v2"
 
@@ -115,7 +116,7 @@ def latest_snapshot(db: Session) -> dict:
         .limit(1)
     )
     if not snapshot:
-        return {"status": "sin datos", "coverage": "unavailable", "metrics": {}, "probabilities": {}}
+        return {"status": "sin datos", "coverage": "unavailable", "metrics": {}, "probabilities": {}, "vix_context": vix_context(None, now)}
     age = (datetime.now(UTC).date() - snapshot.snapshot_date).days
     return {
         "status": "sin datos"
@@ -130,6 +131,7 @@ def latest_snapshot(db: Session) -> dict:
         "date": snapshot.snapshot_date.isoformat(),
         "generated_at": snapshot.generated_at.isoformat(),
         "model_version": snapshot.model_version,
+        "vix_context": vix_context(snapshot.metrics.get("vix_us"), now),
         "metrics": snapshot.metrics,
         "probabilities": snapshot.probabilities,
         # Bloqueo multi-tenant (#561): la beta no se expone hasta el aislamiento
