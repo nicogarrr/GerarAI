@@ -96,7 +96,11 @@ class ThesisGraphApprovalService:
             idempotency_key=idempotency_key,
         )
         if envelope.replayed:
-            return {**dict(envelope.run.result_payload or {}), "idempotent_replay": True}
+            return {
+                **dict(envelope.run.result_payload or {}),
+                "idempotent_replay": True,
+                "run_id": envelope.run.id,
+            }
 
         thread_id = thesis_thread_id(
             tenant_external_id, str(company.id), f"approval-{company.ticker}"
@@ -143,6 +147,7 @@ class ThesisGraphApprovalService:
                 "status": snapshot.values.get("status"),
                 "awaiting_approval": False,
             }
+        result["run_id"] = envelope.run.id
         envelope.finish(result)
         return result
 
